@@ -1926,12 +1926,13 @@ Les tables de stock, retours et finance restent les mêmes pour un livreur inter
 
 ### Sources fournies et examinées localement
 
-- `codflow-main.zip` : README, schéma `cod-shared/db/schema.ts`, documentation des livreurs/règlements/stock, limitations connues, adaptateur/statuts/types Ecotrack.
+- `codflow-main.zip` https://github.com/bighadj22/codflow.git : README, schéma `cod-shared/db/schema.ts`, documentation des livreurs/règlements/stock, limitations connues, adaptateur/statuts/types Ecotrack.
 - Collection `codflow-main/.agents/skills/Ecotrack/postman_collection.json`, intitulée **ECOTRACK API**, et référence `API-REFERENCE.md`. Son identité est `e70df4ed-4d0c-4b8e-aa89-cf36be6fb823`. La collection accompagne le code reçu ; son actualité sur le compte DHD n’a pas été certifiée.
-- `Texte collé(20260922-083627).txt` : fiche produit / Baymard.
-- `Texte collé (2)(3).txt` : optimisation du checkout / Baymard.
-- `Texte collé (3)(1).txt` : SEO de fiches Shopify.
-- `Texte collé (4).txt` : GA4.
+- `[Texte collé(20260922-083627).txt](https://youtu.be/vv74GmBXxHE) ` : fiche produit / Baymard.
+- `[Texte collé (2)(3).txt](https://youtu.be/DlQ1wcHFxBo)` : optimisation du checkout / Baymard.
+- `[Texte collé (3)(1).txt](https://youtu.be/8ZsOd5VVz4g)` : SEO de fiches Shopify.
+- `[Texte collé (4).txt](https://youtu.be/M37C9-ksZDo)` : GA4.
+- https://youtu.be/sVE6AcTdYoE
 - Tes notes, ton premier ERD, le cahier des charges recopié et tes réponses de cadrage.
 
 Les tableaux, noms de tables et règles proposées sont une **synthèse de conception adaptée à ton projet**, pas un schéma officiel prescrit par ces sources. Le modèle a fait l’objet de contrôles structurels de ses références et scénarios ; aucun appel authentifié DHD, migration de ta BDD ou essai de production n’a été réalisé.
