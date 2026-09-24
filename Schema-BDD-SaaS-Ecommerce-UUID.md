@@ -1,8 +1,8 @@
 # Schéma BDD — SaaS e-commerce algérien
 
-Version V3 consolidée du 24 septembre 2026 — intégration des corrections du document « les derniere modiff.docx ». Les diagrammes, champs, contraintes, parcours et critères de validation sont mis à jour ensemble. Les choix fiscaux, juridiques et les capacités API restant à valider sont explicitement distingués des décisions métier retenues.
+Version V3.1 consolidée du 24 septembre 2026 — intégration des corrections du document « les derniere modiff.docx » et des correctifs AUD-01 à AUD-09. Les diagrammes, champs, contraintes, parcours et critères de validation sont mis à jour ensemble. Les choix fiscaux, juridiques et les capacités API restant à valider sont explicitement distingués des décisions métier retenues.
 
-Ce document contient **49 tables centrales et 66 tables par boutique**, dont `personnalisations_theme` réservée à une évolution. Les 95 tables de la V2 sont conservées et complétées. Les tables techniques Laravel (sessions, cache, jobs, migrations, réinitialisation de mot de passe) sont exclues du décompte.
+Ce document contient **50 tables centrales et 70 tables par boutique**, dont `personnalisations_theme` réservée à une évolution. Les 95 tables de la V2 sont conservées et complétées. Les tables techniques Laravel (sessions, cache, jobs, migrations, réinitialisation de mot de passe) sont exclues du décompte.
 
 Les diagrammes sont répartis en modules pour rester exploitables. **Les champs, les références et les contraintes écrites font ensemble le schéma** : Mermaid ne peut pas imposer toutes les règles transactionnelles. Ce document n’est pas une migration SQL déjà exécutée.
 
@@ -15,7 +15,7 @@ Les diagrammes sont répartis en modules pour rester exploitables. **Les champs,
 | Comptes | Identités et autorisations d’équipe au central, données commerciales au tenant. Pas de compte obligatoire pour les acheteurs. |
 | Identifiants | UUID, pas ULID. UUID v4 est la convention proposée ; même représentation pour PK et références. |
 | Marché | Algérie et DZD au lancement ; codes pays/devise internationaux, résultats fiscaux historisés, sans moteur fiscal universel. |
-| Produits | Produits physiques standards ou personnalisés, dont les bouquets. Aucun agenda de rendez-vous. |
+| Produits | Produits physiques standards ou personnalisés, dont les bouquets. Aucun agenda de rendez-vous. L’identité physique d’une variante devient immuable dès sa première utilisation métier. |
 | Catalogue | Produits, variantes, catégories hiérarchiques, images/vidéos, caractéristiques, étiquettes, promotions sans code. |
 | Panier | Panier invité côté serveur ; plusieurs produits d’une seule boutique. |
 | Commandes | Checkout en attente ; accord téléphonique saisi par le commerçant sur une révision précise et réservation atomique à cette confirmation ; contrôle opérationnel distinct ; aucun paiement carte. |
@@ -26,14 +26,14 @@ Les diagrammes sont répartis en modules pour rester exploitables. **Les champs,
 | Argent | Montant COD global par colis, mais prix/coût détaillés par ligne dans ta BDD. Encaissement et reversement distincts. |
 | Abonnement | Rattaché au propriétaire ; expiration payante → gratuit automatique, une boutique active, autres hors_quota, données conservées. Fonctionnalités, quotas et exceptions datées. |
 | Administrateurs | Root complet ; administrateurs délégués limitables par action, boutique et compte ciblé. |
-| Statistiques | Mesure interne des visiteurs et événements ; ventes/retours fondés sur les événements métier. Aucun GA4 requis. |
+| Statistiques | Mesure interne des visiteurs et événements ; ventes/retours fondés sur les événements métier. Les corrections commerciales utilisent un événement économique finalisé avec date d’effet explicite. Aucun GA4 requis. |
 | Site | Un template, profil public, plusieurs adresses et liens sociaux. Personnalisation CSS encadrée plus tard. |
-| Documents | Contrats par révision acceptée, preuves de transmission, factures et avoirs à snapshots fiscaux, preuve de réception indépendante de l’étiquette. |
+| Documents | Contrats par révision acceptée, preuves de transmission, factures et avoirs à snapshots fiscaux, preuve de réception indépendante de l’étiquette. Toute identité documentaire émise est aussi inscrite dans un registre central durable avant transmission. |
 | Propriété | Propriétaire fixé à la création et immuable ; gestion délégable. |
 | Comptes transporteur | Comptes centraux partageables entre boutiques du même propriétaire ; secrets uniquement au central. |
-| Conservation | Politiques versionnées par catégorie, durées à faire valider ; purge/anonymisation contrôlée des données éligibles, protection des preuves encore requises. |
+| Conservation | Politiques versionnées par catégorie, durées à faire valider ; purge/anonymisation contrôlée des données éligibles, protection des preuves encore requises. Sauvegarde/PITR du central distincts des tenants et reprise contrôlée après restauration. |
 
-**Modules complétés en V3 :** confirmation téléphonique et accords distincts (T19/T21), manquants (T9), incidents multi-causes (T18), lignage produit (T7/T8), sauvegardes/restauration (C12), données personnelles (C14/T21), facturation SaaS (C13), obligations de facturation et échanges (T22).
+**Modules complétés en V3.1 :** confirmation téléphonique et accords distincts (T19/T21), manquants (T9), incidents multi-causes (T18), lignage produit (T7/T8), identité physique des variantes (T2/T3), sauvegardes/restauration tenant et reprise centrale (C12), registre durable des documents émis (C12/T17/T20), données personnelles (C14/T21), facturation SaaS (C13), créances transporteur (T16), obligations de facturation et échanges (T22), corrections économiques structurées (T23).
 
 **Parcours retenu :** ni le panier ni la soumission au checkout ne réservent le stock. La soumission crée une commande `a_confirmer`, avec révision et lignes immuables. Le commerçant appelle, annonce le contenu et le total, puis saisit l’accord téléphonique : contrat et réservations sont créés dans une seule transaction. Le contrôle opérationnel ne réserve pas une deuxième fois ; seule la remise physique sort les produits. Cette règle remplace explicitement la réservation au checkout de la V2. Les prix affichés ne garantissent pas une disponibilité jusqu’à l’appel : recontrôle obligatoire avant confirmation. Tarif de livraison par colis. Ventes en caisse, multi-entrepôts, comptes acheteurs, codes promo, cartes et marketplace restent hors MVP.
 
@@ -339,7 +339,7 @@ erDiagram
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
-- **`exceptions_permissions` :** effet=autoriser|interdire ; statut=active|expiree|revoquee. `contexte_normalise=COALESCE(tenant_id,'plateforme')` ; `actif_unique=CASE WHEN statut='active' AND deleted_at IS NULL THEN 1 ELSE NULL END`. UNIQUE(user_id,permission_id,contexte_normalise,actif_unique) conserve toutes les périodes anciennes. CHECK(expire_at IS NULL OR expire_at>commence_at). Autorisation effective uniquement si statut actif, non supprimée et date dans [commence_at,expire_at) ; le cron n’est pas une garantie d’expiration. Avant renouvellement, verrouiller le user bénéficiaire, expirer une ancienne ligne échue puis insérer la nouvelle dans la même transaction. `terminee_at` trace révocation/expiration ; ne pas réécrire motif/auteur/période d’une ancienne attribution. Interdiction prioritaire sur les rôles ; aucun contournement du plan ou de l’appartenance. Invalidation du cache à chaque mutation et expiration limitée par la borne temporelle. Pas de NOW() dans les colonnes générées.
+- **`exceptions_permissions` :** effet=autoriser|interdire ; statut=active|expiree|revoquee. `contexte_normalise=COALESCE(tenant_id,'plateforme')` ; `actif_unique=CASE WHEN statut='active' AND deleted_at IS NULL THEN 1 ELSE NULL END`. UNIQUE(user_id,permission_id,contexte_normalise,actif_unique) conserve toutes les périodes anciennes. CHECK(expire_at IS NULL OR expire_at>commence_at). **Contrat de portée obligatoire :** si `permissions.portee='tenant'`, `tenant_id` est NOT NULL et le bénéficiaire doit disposer d’une appartenance valide à ce tenant ; si `permissions.portee='plateforme'`, `tenant_id` doit être NULL. Le service Laravel ET des triggers BEFORE INSERT/UPDATE lisant `permissions.portee` refusent les deux combinaisons incohérentes. Autorisation effective uniquement si statut actif, non supprimée et date dans [commence_at,expire_at) ; le cron n’est pas une garantie d’expiration. Avant renouvellement, verrouiller le user bénéficiaire, expirer une ancienne ligne échue puis insérer la nouvelle dans la même transaction. `terminee_at` trace révocation/expiration ; ne pas réécrire motif/auteur/période d’une ancienne attribution. Interdiction prioritaire sur les rôles ; aucun contournement du plan ou de l’appartenance. `attribue_par_id` doit posséder le **droit de déléguer** la permission dans ce contexte ; posséder la permission ne suffit pas. Le même contrôle s’applique à l’auto-attribution. Les permissions d’assistance restent des permissions plateforme distinctes. Invalidation du cache à chaque mutation/révocation/expiration et revalidation des droits par les jobs sensibles au moment de l’exécution. Pas de NOW() dans les colonnes générées.
 
 - **`restrictions_admins` :** Exactement une cible renseignée parmi tenant, user et rôle. La cible rôle limite la consultation/administration de ce rôle ; les comptes représentés se contrôlent séparément. Une interdiction visant un propriétaire peut bloquer l’accès à toutes ses boutiques selon la permission tenants.acceder. Une autorisation ciblée ne crée pas de permission globale absente. UNIQUE(admin_id,permission_id,type_cible,cible_normalisee,actif_unique). Même historisation active/expiree/revoquee et contrôle temporel que exceptions_permissions, sous verrou du compte administrateur ; actif_unique vaut 1 pour une ligne active non supprimée, NULL sinon. Les anciennes lignes ne sont pas réutilisées.
 
@@ -585,6 +585,7 @@ erDiagram
         varchar identifiant_compte_externe
         varchar url_api "nullable"
         text identifiants_api_chiffres "nullable"
+        varchar version_cle_chiffrement "nullable"
         boolean actif
         datetime derniere_sync_at "nullable"
         datetime created_at
@@ -614,7 +615,7 @@ erDiagram
     comptes_livraison ||--o{ tarifs_transporteur : compte_livraison_id
 ```
 
-- **`comptes_livraison` :** UNIQUE(id,proprietaire_id), UNIQUE(transporteur,identifiant_compte_externe). Le compte externe canonique est vérifié avant activation pour éviter deux enregistrements du même compte ; à défaut d’identification fiable par API, activation manuelle contrôlée. Propriétaire et identité externe immuables dès utilisation. Secrets chiffrés au repos, déchiffrables uniquement par le connecteur serveur ; URL autorisée pour éviter les appels arbitraires. Un compte manuel peut ne pas avoir de secret. Un rôle d’une boutique ne donne jamais accès aux autres boutiques utilisant ce compte.
+- **`comptes_livraison` :** UNIQUE(id,proprietaire_id), UNIQUE(transporteur,identifiant_compte_externe). Le compte externe canonique est vérifié avant activation pour éviter deux enregistrements du même compte ; à défaut d’identification fiable par API, activation manuelle contrôlée. Propriétaire et identité externe immuables dès utilisation. Secrets chiffrés au repos, déchiffrables uniquement par le connecteur serveur ; `version_cle_chiffrement` identifie la version de clé utilisée. **La clé maître elle-même reste hors de cette BDD**, dans le gestionnaire de secrets/clé de l’infrastructure, avec sauvegarde/versionnement indépendants afin qu’une restauration centrale ne réactive pas aveuglément une ancienne clé. URL autorisée pour éviter les appels arbitraires. Un compte manuel peut ne pas avoir de secret. Un rôle d’une boutique ne donne jamais accès aux autres boutiques utilisant ce compte.
 - **`boutiques_comptes_livraison` :** UNIQUE(tenant_id,compte_livraison_id), UNIQUE(id,tenant_id,compte_livraison_id). FK(tenant_id,proprietaire_id) → tenants(id,proprietaire_id) et FK(compte_livraison_id,proprietaire_id) → comptes_livraison(id,proprietaire_id). L’association et le compte doivent être actifs pour de nouveaux envois. Leur désactivation conserve les liens historiques et autorise un rapprochement de clôture contrôlé.
 - **`tarifs_transporteur` :** UNIQUE(compte_livraison_id,date_debut), tarif_retour>=0, date_fin NULL ou >date_debut. Intervalles semi-ouverts [date_debut,date_fin), sans chevauchement pour un compte ; insertion sous verrou du compte. Les montants déjà appliqués ne changent jamais. Pour un changement futur, fermer l’ancien intervalle sans invalider les frais historiques, puis créer la nouvelle version. `actif` autorise l’utilisation de la version ; une version échue reste consultable. Source manuel|api. Un tarif nul signifie gratuit explicitement, jamais « inconnu ».
 
@@ -779,9 +780,9 @@ erDiagram
 - `politiques_retention` : UNIQUE(type_donnee,portee,version), portee=central|tenant. action_expiration=purge|anonymise|conserve ; statut=brouillon|validee|retiree. Durée positive lorsqu’elle existe ; `conserve` exige un fondement et une date/condition de revue, jamais « pour toujours » par défaut. La définition appliquée est immuable ; nouvelle version pour toute évolution. La version applicable à une exécution est choisie explicitement selon effective_at et enregistrée dans politique_id ; une seule version courante résolue par catégorie/portée. L’implémentation est une allowlist de traitements serveur, pas du SQL administrable. Les durées ne sont pas inventées ici : elles sont validées avant collecte réelle.
 - `executions_retention` : scope central → tenant NULL ; scope tenant → tenant obligatoire, vérifié côté service. statut=en_attente|en_cours|reussie|echec ; UNIQUE(cle_operation), clé déterministe politique/tenant/fenêtre. Le lot local est idempotent, son ACK central peut être repris ; compteurs reconstruits depuis les lots techniques persistés, pas incrémentés aveuglément après un crash. Pas de copie des données effacées dans le journal. Les exécutions centrales n’ont accès qu’au tenant annoncé ; reprise avec curseur stable. Voir section 12 pour les dépendances, gels de conservation et sauvegardes.
 
-### C12 — Sauvegardes et restaurations par boutique
+### C12 — Sauvegardes/restaurations tenant, registre documentaire et reprise centrale
 
-Les sauvegardes sont pilotées au central, afin que leurs références et l’historique de restauration ne disparaissent pas avec la BDD restaurée. Les fichiers sont privés, chiffrés et accompagnés d’une empreinte ; les clés de chiffrement ne sont pas conservées dans ces tables.
+Les sauvegardes tenant sont pilotées au central, afin que leurs références et l’historique de restauration ne disparaissent pas avec la BDD tenant restaurée. Les fichiers sont privés, chiffrés et accompagnés d’une empreinte ; les clés de chiffrement ne sont pas conservées dans ces tables. **La BDD centrale possède en plus son propre backup/PITR et son propre runbook de reprise, stockés/pilotés hors de la BDD centrale elle-même.** C12 conserve aussi un registre durable des identités documentaires émises afin qu’une restauration tenant ne puisse pas réutiliser un numéro déjà sorti du système.
 
 ```mermaid
 erDiagram
@@ -869,6 +870,30 @@ erDiagram
         datetime applique_at "nullable"
         datetime created_at
     }
+    registre_documents_emis {
+        uuid id PK
+        varchar portee_document
+        uuid tenant_id FK "nullable ; tenants.id"
+        uuid proprietaire_id FK "nullable ; users.id"
+        varchar contexte_document "generated stored"
+        uuid document_id
+        varchar type_document
+        varchar serie
+        int exercice
+        bigint numero_sequence
+        varchar numero_document
+        uuid commande_id "nullable ; REF tenant.commandes.id"
+        uuid revision_id "nullable ; REF tenant.revisions_commandes.id"
+        uuid facture_origine_id "nullable ; REF tenant.factures.id"
+        varchar cle_emission_document
+        char(64) empreinte_document
+        varchar cle_stockage_document
+        datetime date_emission
+        datetime date_transmission "nullable"
+        varchar statut
+        datetime created_at
+        datetime updated_at
+    }
     configurations_sauvegardes ||--o{ sauvegardes_tenants : configuration_id
     sauvegardes_tenants ||--o{ restaurations_tenants : restaure_depuis_backup_id
 ```
@@ -877,8 +902,11 @@ erDiagram
 - **Limites du plan :** une ligne immuable avec chaque version de plan ; valeurs entières positives (quota/délai manuels peuvent valoir zéro pour interdiction/absence de délai). Les options payantes sont représentées par une version de plan incluant l’option ou des exceptions fonctionnelles validées, sans modifier un plan historique. Valider l’espacement minimal réel des jours choisis, pas seulement leur nombre ; fréquence, rétention, choix horaire/jours et sauvegarde manuelle doivent respecter les droits effectifs. Quota manuel : fenêtre locale définie, verrou propriétaire/configuration et comptage des demandes acceptées, y compris en attente. Après downgrade, adapter les futures exécutions au plan gratuit ; aucune réduction rétroactive de expire_at des backups existants. Le maximum conservé bloque une nouvelle demande manuelle ou déclenche une alerte capacité si tous les backups sont encore protégés ; ne pas supprimer une pièce avant son expiration pour faire de la place. Le service doit conserver la protection automatique minimale.
 - **Backups :** type_backup=automatique|manuel|avant_migration ; statut=programme|en_cours|termine|echec|expire|supprime. UNIQUE(id,tenant_id), FK(configuration_id,tenant_id) → configurations_sauvegardes(id,tenant_id), parent UNIQUE. Clé automatique déterministe tenant/créneau ; un retry reprend la même intention. Les champs fichier, empreinte, taille>=0, point et date de snapshot sont obligatoires pour termine ; expire_at calculé à la capture selon configuration_snapshot. Une expiration logique ne prouve pas une suppression physique ; celle-ci doit être vérifiée et auditée. Aucun backup incomplet proposé pour restauration. Vérifier réellement intégrité et restauration périodique. Conserver le journal de métadonnées après suppression du fichier.
 - **Journal central durable :** UNIQUE(tenant_id,sequence_tenant), UNIQUE(tenant_id,cle_operation). Sous verrou du tenant, allouer la séquence et écrire l’intention dans la même transaction que la mutation centrale concernée. Un simple AUTO_INCREMENT global ou un timestamp n’est pas présenté comme un ordre de commit sûr. Aucune opération centrale affectant le tenant ne contourne ce protocole : projection de profil, part de reversement, routage, état d’abonnement à appliquer, etc. Le contenu de rejeu contient des identifiants et des faits minimisés, jamais les coordonnées acheteur. L’application locale utilise sa clé métier/outbox de déduplication ; l’ACK central est une projection, pas une preuve que la BDD restaurée possède encore l’écriture. Conserver les intentions nécessaires au moins jusqu’à expiration des backups qui peuvent les précéder, avec politique de rétention validée.
+- **Registre documentaire durable — AUD-04 :** `portee_document=tenant|saas`. Pour `tenant`, `tenant_id` est obligatoire et `proprietaire_id` peut être NULL ; pour `saas`, `tenant_id` est NULL et `proprietaire_id` est obligatoire. `contexte_document` est une valeur technique normalisée utilisée dans les contraintes. Imposer UNIQUE(contexte_document,type_document,serie,exercice,numero_sequence), UNIQUE(contexte_document,numero_document), UNIQUE(contexte_document,document_id) et UNIQUE(contexte_document,cle_emission_document). Une identité enregistrée comme émise n’est jamais réutilisable. `cle_stockage_document` pointe vers un PDF/snapshot privé hors du périmètre de restauration de la BDD tenant, avec empreinte SHA-256. L’enregistrement central et le stockage objet ne sont pas une transaction distribuée : clé stable, états intermédiaires, reprise et rapprochement obligatoires. Une pièce tenant ne peut être transmise avant que son identité d’émission et son snapshot durable soient retrouvables.
 - **Point de réconciliation :** pour capturer un backup cohérent, mettre temporairement les écritures métier et workers du tenant en pause, attendre les transactions actives, acquérir les verrous de coordination centraux, relever le dernier préfixe contigu appliqué, puis établir le snapshot cohérent local avant de reprendre les écritures. Toute intention non acquittée, même antérieure au point, reste dans la liste de réconciliation. Une opération externe déjà envoyée ne doit pas être oubliée : conserver son intention technique minimale et son résultat/incertitude au central avant appel, puis rapprocher ; aucun rejeu HTTP mutateur automatique. Si un snapshot cohérent ne peut être obtenu, la sauvegarde échoue explicitement.
 - **Restauration :** FK(restaure_depuis_backup_id,tenant_id) → sauvegardes_tenants(id,tenant_id). Une seule restauration active par tenant via clé générée UNIQUE. Statut=demande|en_cours|reconciliation|terminee|echec. Sous contrôle d’exploitation, passer le tenant à suspendu_restauration, bloquer checkout/écritures et fencing des workers, vérifier backup/empreinte/version, restaurer puis rattraper les migrations compatibles. Rechercher les intentions postérieures au point ET toutes les antérieures non convergées ; vérifier leurs clés dans la BDD locale et recréer uniquement les faits absents. Rejouer n’exécute pas une seconde collecte de fonds ni une seconde création de colis. Rapprocher transporteur/finance, jobs, fichiers et politiques de rétention, puis contrôler stock, FK, quotas et autorisations. Après convergence seulement, recalculer le statut autorisé (actif, hors_quota ou suspension administrative), jamais forcer actif. Un échec reste suspendu_restauration ; la reprise garde la même cle_operation.
+- **Protection de la numérotation après restauration — AUD-04 :** avant toute réouverture documentaire, comparer `sequences_documents`, `factures`, transmissions locales, `registre_documents_emis` et les objets S3/MinIO. Si la base restaurée propose 101 mais que le registre connaît 101–103, la prochaine position sûre doit être >=104 selon la série applicable. Une pièce déjà transmise doit être retransmise avec le même numéro/snapshot, jamais recréée sous une nouvelle identité. Si l’historique ne peut pas être reconstruit avec certitude, bloquer toute nouvelle émission.
+- **Reprise de la BDD centrale — AUD-09 :** les backups complets, binlogs/PITR, manifestes de sauvegarde et clés nécessaires à leur déchiffrement sont conservés hors du serveur/volume de la BDD centrale et testés régulièrement. Lors d’une perte/restauration du central, un **mode `reprise_centrale` porté par l’orchestrateur ou l’exploitation, donc extérieur à la BDD restaurée**, bloque au minimum les mutations de permissions, tenants, abonnements, secrets, règlements/reversements et opérations externes irréversibles. Restaurer le central, identifier le point temporel, récupérer les clés/secret manager, puis rapprocher avec les BDD tenant, banque/transporteurs, stockage documentaire et journaux externes avant réactivation. Une permission révoquée après le backup ne doit pas être réintroduite ; un règlement déjà exécuté ne doit jamais être rejoué. Invalider caches et jobs sensibles après restauration. Si un état critique reste ambigu, conserver l’accès/action concerné bloqué (`bloquee_reconciliation`) plutôt que deviner. Le central restauré est un état ancien connu, pas automatiquement la vérité actuelle.
 
 Une sauvegarde ancienne ne permet pas de reconstituer toute commande locale créée après sa capture à partir des seuls journaux centraux. Prévoir les sauvegardes des journaux binaires/PITR et la sauvegarde/version des fichiers pour le RPO validé ; à défaut, documenter la perte potentielle et traiter manuellement les objets transporteur orphelins. Le point central assure une réconciliation inter-systèmes, pas une garantie de perte de données nulle.
 
@@ -921,6 +949,7 @@ erDiagram
         json snapshot_identite_client
         varchar document_immuable "nullable avant generation ; cle privee"
         char(64) empreinte_document "nullable avant generation"
+        uuid registre_emission_id "nullable avant emission ; registre_documents_emis.id"
         varchar cle_operation UK
         datetime created_at
         datetime updated_at
@@ -957,6 +986,7 @@ erDiagram
         datetime date_emission "nullable avant emission"
         varchar document_immuable "nullable avant generation ; cle privee"
         char(64) empreinte_document "nullable avant generation"
+        uuid registre_emission_id "nullable avant emission ; registre_documents_emis.id"
         varchar cle_operation UK
         datetime created_at
         datetime updated_at
@@ -999,7 +1029,7 @@ erDiagram
 - **Factures :** UNIQUE(numero) hors NULL, UNIQUE(sequence_id,numero_sequence), UNIQUE(cle_operation). Statut=brouillon|emise|annulee_brouillon. La période est [debut,fin), fin>debut ; montants>=0, HT+taxes=TTC et égalité aux sommes de lignes. DZD au MVP. Contrôler structure et somme du JSON taxes. FK(abonnement_id,proprietaire_id) → abonnements(id,user_id), clé parent UNIQUE ; FK(echeance_id,abonnement_id) → echeances_abonnement(id,abonnement_id), clé parent UNIQUE. Le fait générateur durable déclenche obligatoirement une facture par échéance/occurrence validée avec une clé stable ; aucun doublon au retry. L’échéance et les règlements conservent leur sens de dette/paiements, les rectifications fiscales passent par avoir. Une correction du dû après facture/avoir doit être rapprochée, jamais changée silencieusement pour correspondre au paiement. Aucun remboursement SaaS automatique n’est inféré d’un avoir : son exécution réelle nécessite une preuve et un flux de remboursement distinct de l’annulation technique d’un paiement. Le périmètre présent conserve les factures/avoirs et paiements SaaS ; un remboursement SaaS effectif reste une procédure comptable externe documentée tant qu’un journal dédié de décaissements SaaS n’est pas implémenté. Ne pas utiliser une contrepassation de paiement pour prétendre que le paiement initial n’a jamais eu lieu.
 - **Lignes :** UNIQUE(facture_id,numero_ligne), UNIQUE(id,facture_id), quantité>0, prix/remise/base/taxes/TTC>=0. Version du plan, période et nature de l’option incluses dans la désignation/snapshot document ; aucun recalcul historique depuis le plan courant. Émission seulement avec au moins une ligne et identité légale du SaaS et du client complètes.
 - **Avoirs :** origine obligatoire, facture émise de même devise ; montants positifs exprimant la réduction, pas un règlement. UNIQUE(numero), UNIQUE(sequence_id,numero_sequence), UNIQUE(id,facture_origine_id). FK(avoir_id,facture_origine_id) → avoirs_saas(id,facture_origine_id) et FK(ligne_facture_origine_id,facture_origine_id) → lignes_factures_saas(id,facture_id). UNIQUE(avoir_id,ligne_facture_origine_id). Sous verrou facture puis lignes, les avoirs émis et brouillons réservés ne dépassent ni quantités ni HT/taxes/TTC facturés ; annuler un brouillon libère sa réserve. Période, propriétaire et abonnement sont obtenus depuis la facture d’origine ; ne pas maintenir des copies modifiables concurrentes.
-- **Numérotation et immutabilité :** UNIQUE(type_document,exercice), type=facture|avoir, prochain_numero>0 ; allocation sous verrou, pas MAX+1. Contrôler le type de séquence avant émission. Facture/avoir émis et leurs lignes sont immuables via triggers/privilèges ; correction par nouveau document lié. Fichier privé central/... produit depuis snapshots figés, renseigné une seule fois avec empreinte. La numérotation SaaS concerne son émetteur légal, pas les séries commerciales des tenants.
+- **Numérotation et immutabilité :** UNIQUE(type_document,exercice), type=facture|avoir, prochain_numero>0 ; allocation sous verrou, pas MAX+1. Contrôler le type de séquence avant émission. Facture/avoir émis et leurs lignes sont immuables via triggers/privilèges ; correction par nouveau document lié. Fichier privé `central/...` produit depuis snapshots figés, renseigné une seule fois avec empreinte. **Avant transmission, facture/avoir SaaS inscrit son identité dans `registre_documents_emis` avec `portee_document=saas`, puis renseigne `registre_emission_id`.** Comme ce registre appartient lui aussi au central, une restauration centrale doit le rapprocher avec le stockage documentaire versionné/immuable et les manifestes/PITR externes avant toute nouvelle émission ; aucune séquence restaurée n’est reprise aveuglément. La numérotation SaaS concerne son émetteur légal, pas les séries commerciales des tenants.
 - **Transmission :** exactement une FK facture/avoir non NULL ; même protocole durable que T19, créé à l’émission, reprise avec clé stable, statut=en_attente|en_cours|envoye|delivre|echec_reessayable|echec_definitif|incertain. PDF ou lien accessible après autorisation ; un portail consultable seul ne prouve pas l’envoi. Les flux SaaS ne sont jamais additionnés aux recettes des boutiques.
 
 ### C14 — Règles de facturation et gouvernance des données
@@ -1246,6 +1276,7 @@ erDiagram
         varchar reference_sku
         varchar code_barres "nullable"
         varchar signature_combinaison
+        datetime utilisee_at "nullable ; identité physique figée après première utilisation"
         decimal prix_vente
         decimal cout_unitaire
         decimal ancien_prix "nullable"
@@ -1278,7 +1309,7 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 - **`produits` :** UNIQUE(slug). type=physique_standard|physique_personnalise. Un bouquet personnalisé reste livrable : aucun agenda de services. Prix, coût, SKU, code-barres et stock sont portés par la variante, même pour un produit simple. Prix par unité de contenu calculable si pertinent.
 
-- **`variantes_produits` :** UNIQUE(reference_sku), UNIQUE(produit_id,signature_combinaison), UNIQUE(id,produit_id). Index(code_barres), chaîne conservant ses zéros. produit_id est immuable dès INSERT : trigger BEFORE UPDATE avec SIGNAL et refus applicatif ; corriger par archivage puis création sous le bon produit. CHECK(stock_physique>=0 AND stock_reserve>=0 AND stock_quarantaine>=0 AND stock_reserve<=stock_physique). Disponible calculé P-R. Aucun champ survente_autorisee au MVP. Réservation uniquement si disponible>=q, expédition si réservations actives et physique>=q, sous verrous. Les trois compteurs sont matérialisés depuis mouvements_stock, initialisés à zéro puis alimentés par ouverture. prix_vente TTC, cout_unitaire et seuil_stock_faible>=0 ; ancien_prix NULL ou>=0. Les règles fiscales configurées sont figées dans la révision avant facturation, voir T17. Signature recalculée et validée depuis les options.
+- **`variantes_produits` :** UNIQUE(reference_sku), UNIQUE(produit_id,signature_combinaison), UNIQUE(id,produit_id). Index(code_barres), chaîne conservant ses zéros. `produit_id` est immuable dès INSERT : trigger BEFORE UPDATE avec SIGNAL et refus applicatif ; corriger par archivage puis création sous le bon produit. **AUD-01 : `utilisee_at` devient non NULL lors du premier mouvement de stock, de la première réservation ou de la première présence dans `articles_commande`. Dès cet instant, toute modification de combinaison définissant l’identité physique est interdite.** Une taille/couleur/dimension physique différente reçoit une nouvelle variante et un nouvel UUID ; une variante archivée n’est jamais recyclée. La mutation de composition et le premier usage verrouillent la même ligne `variantes_produits` avec `FOR UPDATE`, afin qu’une seule décision sérialisée gagne. Signature recalculée depuis les identifiants stables de composition ; après `utilisee_at`, toute signature physique différente est refusée. CHECK(stock_physique>=0 AND stock_reserve>=0 AND stock_quarantaine>=0 AND stock_reserve<=stock_physique). Disponible calculé P-R. Aucun champ survente_autorisee au MVP. Réservation uniquement si disponible>=q, expédition si réservations actives et physique>=q, sous verrous. Les trois compteurs sont matérialisés depuis mouvements_stock, initialisés à zéro puis alimentés par ouverture. prix_vente TTC, cout_unitaire et seuil_stock_faible>=0 ; ancien_prix NULL ou>=0. Les règles fiscales configurées sont figées dans la révision avant facturation, voir T17.
 
 ### T3 — Options et images
 
@@ -1306,6 +1337,7 @@ erDiagram
     valeurs_options {
         uuid id PK "UUID v4"
         uuid option_id FK "options_produit.id"
+        varchar code_identite "identité stable dans cet axe"
         varchar valeur
         char(7) couleur_hex "nullable"
         int position
@@ -1341,9 +1373,9 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 - **`options_produit` :** UNIQUE(produit_id,nom normalisé). Une caractéristique descriptive non achetable n’est pas un axe de variante.
 
-- **`valeurs_options` :** UNIQUE(option_id,valeur normalisée). Une couleur hexadécimale est facultative.
+- **`valeurs_options` :** UNIQUE(option_id,valeur normalisée), UNIQUE(option_id,code_identite). `code_identite` représente la signification stable de la valeur dans l’axe et ne peut pas être réaffecté à une autre identité physique. Dès qu’une valeur est référencée par une variante dont `utilisee_at IS NOT NULL`, sa signification physique est immuable : `40` ne devient jamais `41`. Une correction purement éditoriale du libellé `valeur` reste possible uniquement si `code_identite` et la signification métier restent strictement identiques. Une couleur hexadécimale est facultative.
 
-- **`variantes_valeurs` :** UNIQUE(variante_id,option_id). valeur_id doit appartenir à option_id ; l’option et la variante au même produit. Renforcer par clés composites là où possible. Chaque variante possède exactement une valeur pour chaque axe actif du produit ; aucune valeur pour la variante standard.
+- **`variantes_valeurs` :** UNIQUE(variante_id,option_id). valeur_id doit appartenir à option_id ; l’option et la variante au même produit. Renforcer par clés composites là où possible. Chaque variante possède exactement une valeur pour chaque axe actif du produit ; aucune valeur pour la variante standard. **INSERT/UPDATE/DELETE de composition est refusé lorsque la variante parente possède `utilisee_at IS NOT NULL`**, par service et protection BDD. Les imports passent par la même règle ; modifier une taille/couleur historique crée une nouvelle variante au lieu de muter l’ancienne.
 
 - **`medias_produits` :** La variante éventuelle appartient au produit. role=principal|galerie|guide_taille|mise_en_situation. Au maximum un principal par portée produit/variante. Les galeries peuvent contenir images ou vidéos.
 
@@ -1732,7 +1764,7 @@ erDiagram
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
-- **`commandes` :** UNIQUE(numero), UNIQUE(cle_soumission), UNIQUE(panier_id) hors NULL. type_commande=standard|remplacement|echange ; canal=panier|page_vente|manuel. Standard : commande_origine_id, incident_origine_id, quantite_incident_origine, retour_origine_id et motif_remplacement NULL. Remplacement/échange : origine standard expédiée, incident de cette commande, quantité source >0 et motif obligatoires ; origine différente de soi. Un remplacement traite UN incident d’UNE ligne ; plusieurs lignes incidentées produisent plusieurs commandes de remplacement au MVP. Somme des quantités des lignes destination = quantite_incident_origine. Remplacement gratuit : variante/personnalisation préservées sauf substitution documentée. Échange : nouvelle variante et prix explicitement annoncés et confirmés ; produits/quantités substitués identifiés dans la nouvelle révision, avec compensation affectée selon T22. Les cas automatisés restent un échange d’une quantité donnée pour la même quantité de nouvelles unités ; lots de quantités différentes exigent une évolution explicite. FK(incident_origine_id,commande_origine_id) → incidents_commande(id,commande_id). Si retour_origine_id présent, il correspond à celui de l’incident ; contrôle transactionnel. Les quantités d’un remplacement ou échange non annulé consomment le budget incident dès création, même avant expédition. Annulation avant remise libère ce budget une seule fois ; après remise, il reste consommé. `confirmation_client_at/mode` sont des projections de la première confirmation téléphonique dans contrats_commandes ; le détail des versions acceptées est dans contrats_commandes. Le contrôle opérationnel manuel n’est pas une acceptation du consommateur. revision_courante_id NULL seulement dans la transaction initiale, jamais exposé. Empreinte de soumission immuable ; clé seule non suffisante pour accéder à la commande.
+- **`commandes` :** UNIQUE(numero), UNIQUE(cle_soumission), UNIQUE(panier_id) hors NULL. type_commande=standard|remplacement|echange ; canal=panier|page_vente|manuel. Standard : commande_origine_id, incident_origine_id, quantite_incident_origine, retour_origine_id et motif_remplacement NULL. Remplacement/échange : origine standard expédiée, incident de cette commande, quantité source >0 et motif obligatoires ; origine différente de soi. Un remplacement traite UN incident d’UNE ligne ; plusieurs lignes incidentées produisent plusieurs commandes de remplacement au MVP. Somme des quantités des lignes destination = quantite_incident_origine. Remplacement gratuit : variante/personnalisation préservées sauf substitution documentée. Échange : c’est le **mécanisme valorisé** ; variante identique ou différente selon le cas documenté, prix/valeur commerciale explicitement annoncés et confirmés, produits/quantités substitués identifiés dans la nouvelle révision, avec compensation affectée selon T22. Si un remplacement identique doit, après validation fiscale/comptable, produire une nouvelle vente valorisée, utiliser ce mécanisme d’échange valorisé plutôt qu’une révision de remplacement à zéro. Les cas automatisés restent un échange d’une quantité donnée pour la même quantité de nouvelles unités ; lots de quantités différentes exigent une évolution explicite. FK(incident_origine_id,commande_origine_id) → incidents_commande(id,commande_id). Si retour_origine_id présent, il correspond à celui de l’incident ; contrôle transactionnel. Les quantités d’un remplacement ou échange non annulé consomment le budget incident dès création, même avant expédition. Annulation avant remise libère ce budget une seule fois ; après remise, il reste consommé. `confirmation_client_at/mode` sont des projections de la première confirmation téléphonique dans contrats_commandes ; le détail des versions acceptées est dans contrats_commandes. Le contrôle opérationnel manuel n’est pas une acceptation du consommateur. revision_courante_id NULL seulement dans la transaction initiale, jamais exposé. Empreinte de soumission immuable ; clé seule non suffisante pour accéder à la commande.
 
 - **`revisions_commandes` :** UNIQUE(commande_id,numero_revision), UNIQUE(id,commande_id), UNIQUE(id,commande_id,mode_livraison), UNIQUE(id,commande_id,point_relais_id). Immuable dès validation de la transaction de création ; chaque changement produit une nouvelle révision. sous_total_catalogue=Σ(quantite×prix_unitaire_catalogue), sous_total_applique=Σ(total_ligne). total_commande=sous_total_applique+frais_livraison_client-remise_livraison ; montant_a_encaisser=total_commande-montant_compensation_echange, avec 0<=montant_compensation_echange<=sous_total_applique ; compensation nulle hors échange (T22). CHECK des montants non négatifs et remise_livraison<=frais_livraison_client. devise, pays_code, vendeur_legal_snapshot et fiscalite_livraison_snapshot sont figés ; un profil brouillon incomplet ne peut être confirmé. Un snapshot fiscal vide ne signifie jamais taxe nulle. frais_livraison_client est le montant demandé avant remise ; montant_livraison_client désigne dans les notes sa valeur nette, calculée ici sans deuxième colonne. prise_en_charge_livraison=client|commercant|livreur|societe_livraison|mixte ; montant_livraison_commercant est une estimation figée, les frais réels sont uniquement dans frais_transporteur. Mode fermé domicile|stop_desk. CHECK((mode_livraison='domicile' AND point_relais_id IS NULL) OR (mode_livraison='stop_desk' AND point_relais_id IS NOT NULL)). Adresse complète à domicile, snapshot bureau obligatoire en stop desk. Pas de portefeuille client ; seule la compensation d’échange affectée de T22 est autorisée ; prix commerciaux TTC, ventilation fiscale de lignes et livraison figée selon T17. conditions_vente_snapshot conserve le texte/blocs et la version réellement présentés ; modification de pages_contenu ne réécrit pas ce snapshot. L’acceptation éventuelle des conditions au checkout est exclusivement dans acceptations_conditions_vente (T21), avec révision/version/date/mode propres. Aucun champ d’acceptation n’est ajouté après création dans cette révision. Une soumission reste a_confirmer jusqu’à l’accord téléphonique documenté dans contrats_commandes. Toute nouvelle révision proposée est une photographie immuable ; les acceptations sont dans contrats_commandes, sans modifier rétroactivement la révision. Les changements de produit, quantité, prix, adresse ou conditions nécessitent un nouvel accord avant envoi ; conserver la réservation du contenu effectivement engagé pendant cette procédure, voir section 8.
 
@@ -1838,7 +1870,7 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 - **`mouvements_stock` :** UNIQUE(variante_id,sequence_variante), séquence allouée sous verrou de la variante et strictement croissante ; UNIQUE(cle_operation), UNIQUE(contrepassation_de_id). Journal append-only, même transaction que compteurs, réservations et inspection. physique_apres=physique_avant+delta_physique ; mêmes égalités pour réservé et quarantaine. Tous les soldes après>=0. Types : ouverture, entree_manuelle, reservation, liberation, expedition, entree_quarantaine, quarantaine_vers_vendable, quarantaine_vers_perte, perte_stock, manquant_retour_constate, contrepassation. Une réception de retour entre d’abord en quarantaine : delta_recu_retour=+q, delta_quarantaine=+q ; disposition vendable : delta_remis_retour=+q, delta_quarantaine=-q, delta_physique=+q ; perte : delta_perdu_retour=+q, delta_quarantaine=-q, montant_perte=coût×q. Manquant constaté q : delta_manquant_retour=+q, delta_physique=delta_reserve=delta_quarantaine=0, montant_perte=q×cout_unitaire_snapshot ; article_retour_id obligatoire et autres deltas retour=0. La perte de gestion est constatée ici une seule fois ; responsabilité, indemnisation, avoir et remboursement restent des décisions séparées. Correction par inverse exact (-q et montant inverse), jamais UPDATE du mouvement. Les autres deltas de retour valent zéro. Toute réception/disposition est liée à article_retour_id et à sa variante. La quarantaine initiale hors retour est représentée par ouverture ; sa libération hors retour utilise les mêmes deltas physiques/quarantaine sans deltas de retour. Une contrepassation inverse tous les deltas et montant_perte, conserve les mêmes références et verrouille l’original ; interdiction de contrepasser une contrepassation. Refuser l’inverse si les soldes ou le cycle métier ne le permettent plus. Une correction crée ensuite un nouveau mouvement lié par correlation_id.
 
-- **`retours_commandes` :** UNIQUE(livraison_id), UNIQUE(id,revision_expediee_id), UNIQUE(id,commande_id), UNIQUE(id,livraison_id). Statuts demande|en_transit|recu|en_inspection|clos. FK(livraison_id,commande_id,revision_expediee_id) → livraisons(id,commande_id,revision_expediee_id). Le retour complet conserve toutes les lignes et quantités expédiées ; création atomique sous verrou de livraison. recu_at exige une réception locale et ne vient pas d’un simple statut distant. La clôture de réception peut laisser une quarantaine suivie ultérieurement ; la libération reste journalisée.
+- **`retours_commandes` :** UNIQUE(livraison_id), UNIQUE(id,revision_expediee_id), UNIQUE(id,commande_id), UNIQUE(id,livraison_id). Statuts demande|en_transit|recu|en_inspection|clos. FK(livraison_id,commande_id,revision_expediee_id) → livraisons(id,commande_id,revision_expediee_id). **AUD-08 / décision MVP : tout retour physique porte obligatoirement sur le colis complet.** À la création, générer sous verrou une `articles_retour` pour chaque ligne de la révision expédiée avec sa quantité totale ; refuser toute création volontaire omettant une ligne ou réduisant sa quantité attendue. Un article non présent à la réception est `manquant_documente`, pas un retour partiel autorisé. `recu_at` exige une réception locale et ne vient pas d’un simple statut distant. La clôture de réception peut laisser une quarantaine suivie ultérieurement ; la libération reste journalisée.
 
 - **`articles_retour` :** UNIQUE(retour_id,article_commande_id), UNIQUE(id,variante_id). FK(retour_id,revision_expediee_id) → retours_commandes(id,revision_expediee_id), FK(article_commande_id,revision_expediee_id) → articles_commande(id,revision_id), FK(article_commande_id,variante_id) → articles_commande(id,variante_id). quantite_attendue égale à la quantité de la ligne expédiée ; validation sous verrou. Tous les compteurs>=0 ; CHECK(recue<=attendue), CHECK(remise_stock+perdue+en_quarantaine=recue), CHECK(recue+manquante_documentee<=attendue). À clôture : recue+manquante_documentee=attendue et motif_ecart obligatoire si manquant. Les quantités reçues, vendables, perdues, en quarantaine et manquantes sont matérialisées depuis les mouvements ; quantite_manquante_documentee=Σdelta_manquant_retour ; toute réception est d’abord mise en quarantaine, donc aucun écart indéterminé ne masque des unités reçues. Les manquants ne sont pas des unités reçues et ne sont jamais ajoutés au stock.
 
@@ -2293,7 +2325,7 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 - **`personnalisations_theme` :** Pas nécessaire au MVP : un seul template et les champs de boutique suffisent. CSS limité à des propriétés/sélecteurs autorisés, sans JavaScript, réseau arbitraire ni masquage des informations de checkout. Aucun code serveur stocké. L’expiration de l’essai revient au template standard sans supprimer les commandes.
 
 
-### T16 — Frais transporteur et preuve d’encaissement
+### T16 — Frais transporteur, créances et preuve d’encaissement
 
 ```mermaid
 erDiagram
@@ -2333,6 +2365,35 @@ erDiagram
         varchar cle_operation
         datetime created_at
     }
+    creances_transporteur {
+        uuid id PK
+        uuid prestataire_id FK "prestataires_livraison.id"
+        uuid frais_transporteur_id FK "frais_transporteur.id"
+        uuid reglement_frais_origine_id FK "nullable ; reglements_frais_transporteur.id"
+        decimal montant_initial
+        decimal montant_restant "projection materialisee"
+        varchar motif
+        varchar statut
+        varchar cle_operation
+        uuid contrepassation_de_id FK "nullable ; creances_transporteur.id"
+        datetime reconnue_at
+        datetime soldee_at "nullable"
+        datetime created_at
+        datetime updated_at
+    }
+    allocations_creances_transporteur {
+        uuid id PK
+        uuid creance_id FK "creances_transporteur.id"
+        varchar type_apurement
+        uuid bordereau_id FK "nullable ; bordereaux_reversement.id"
+        uuid frais_transporteur_id FK "nullable ; frais_transporteur.id"
+        decimal montant "signe"
+        varchar reference_externe "nullable"
+        varchar cle_operation
+        uuid contrepassation_de_id FK "nullable ; allocations_creances_transporteur.id"
+        datetime effectue_at
+        datetime created_at
+    }
     ecritures_encaissement {
         uuid id PK
         uuid recouvrement_id FK "recouvrements.id"
@@ -2349,10 +2410,14 @@ erDiagram
         datetime created_at
     }
     frais_transporteur ||--o{ reglements_frais_transporteur : frais_transporteur_id
+    frais_transporteur ||--o{ creances_transporteur : frais_transporteur_id
+    creances_transporteur ||--o{ allocations_creances_transporteur : creance_id
 ```
 
 - **`frais_transporteur` :** UNIQUE(cle_operation), UNIQUE(contrepassation_de_id) hors NULL. type_frais=livraison|retour|seconde_tentative|remplacement|autre. payeur=client|commercant|livreur|societe_livraison ; mode_reglement=retenu_encaissement|compensation|paiement_separe|pris_en_charge. statut=brouillon|constate|annule. Les frais payés par le client et retenus sur le COD sont enregistrés pour expliquer le net, sans être une charge du commerçant. Seuls payeur=commercant et statut=constate alimentent les charges ; ils sont réglables par reglements_frais_transporteur. Un même service partagé entre payeurs produit plusieurs lignes correspondant à leurs quotes-parts, jamais le total répété pour chacun. FK(livraison_id,prestataire_id) → livraisons(id,prestataire_id), FK(retour_id,livraison_id) → retours_commandes(id,livraison_id). compte_livraison_id doit correspondre au compte du prestataire, validé par le serveur ; NULL pour interne. Snapshot du tarif appliqué immuable même si la grille centrale évolue. Frais retour automatiques dédupliqués avec une clé dérivée du retour et du type de frais ; ne pas utiliser un UUID aléatoire à chaque polling. Toute écriture constatée est immuable ; correction par inverse exact puis nouvelle écriture. Une constatation client retenue ne peut excéder l’encaissement vérifié ni le montant de livraison client éligible sans traiter un écart explicite.
-- **`reglements_frais_transporteur` :** UNIQUE(cle_operation), UNIQUE(contrepassation_de_id) hors NULL. mode=compensation|paiement_separe. Frais du même prestataire que le bordereau, payeur=commercant, déjà constatés. Sous verrou du frais, 0<=somme nette des allocations sur bordereaux rapprochés<=montant effectif du frais (original + contrepassation). Pour corriger un frais déjà payé, contrepasser d’abord son allocation dans le même processus de correction puis affecter la nouvelle écriture ; ne pas perdre le trop-payé, qui devient un montant à recouvrer auprès du prestataire. Une écriture d’allocation n’est jamais une seconde charge.
+- **`reglements_frais_transporteur` :** UNIQUE(cle_operation), UNIQUE(contrepassation_de_id) hors NULL. mode=compensation|paiement_separe. Frais du même prestataire que le bordereau, payeur=commercant, déjà constatés. Sous verrou du frais, 0<=somme nette des allocations sur bordereaux rapprochés<=montant effectif du frais (original + contrepassation). Pour corriger un frais déjà payé, contrepasser/réaffecter son allocation sans créer de mouvement bancaire fictif ; le trop-payé reconnu devient une `creances_transporteur`. Une écriture d’allocation n’est jamais une seconde charge.
+- **`creances_transporteur` — AUD-02 :** représente un montant reconnu dû par le transporteur après correction d’un frais déjà payé, sans présumer qu’il a été encaissé. UNIQUE(cle_operation), UNIQUE(contrepassation_de_id) hors NULL. `montant_initial>0`, `0<=montant_restant<=montant_initial`; `montant_restant` est une projection vérifiable depuis les allocations nettes. statut=ouverte|partiellement_apuree|remboursee|compensee|annulee_par_contrepassation. Exemple : paiement réel 650, frais corrigé 600 → charge nette 600, trésorerie -650, créance 50. La création de la créance ne produit aucun `+50` bancaire. Une erreur sur une créance finalisée se corrige par contrepassation puis nouvelle écriture, pas par réécriture silencieuse.
+- **`allocations_creances_transporteur` :** UNIQUE(cle_operation), UNIQUE(contrepassation_de_id) hors NULL. `type_apurement=remboursement_bancaire|compensation_frais|compensation_bordereau|autre_reglement_valide`. Sous `FOR UPDATE` sur la créance, exiger que la somme nette des allocations ne dépasse jamais `montant_initial`. Un remboursement bancaire exige un bordereau/preuve réellement rapproché ; une compensation de frais référence le frais futur effectivement réduit. Une réaffectation interne sans cash n’entre jamais dans le net bancaire. Quand le net des allocations atteint `montant_initial`, `montant_restant=0` et la créance est soldée.
 - **`ecritures_encaissement` :** UNIQUE(cle_operation), UNIQUE(contrepassation_de_id) hors NULL. Append-only dès insertion ; seuls des montants vérifiés y entrent. Un encaissement ordinaire est positif ; un refus impayé donne somme=0 sans fausse écriture positive. Un inverse négatif conserve le même recouvrement. Somme nette>=0 et <=COD attendu ; un trop-perçu exige une investigation et une régularisation contrôlée plutôt qu’une augmentation silencieuse de la vente. La référence/preuve atteste l’encaissement chez le transporteur, pas sa réception par le commerçant. Une diminution ne peut rendre les reversements déjà rapprochés supérieurs au nouveau plafond : correction coordonnée sous verrous.
 
 Les tables ajoutées matérialisent des faits manquants dans les notes : allocation de paiement à un frais précis et journal des encaissements vérifiés. Elles évitent des compteurs financiers modifiables sans historique.
@@ -2397,6 +2462,7 @@ erDiagram
         varchar reference_externe "nullable"
         varchar document_externe_url "nullable"
         char(64) empreinte_document "nullable ; SHA-256"
+        uuid registre_emission_central_id "nullable avant emission ; REF central.registre_documents_emis.id"
         datetime emise_at "nullable"
         datetime annulee_at "nullable"
         text motif_annulation "nullable"
@@ -2409,8 +2475,8 @@ erDiagram
     }
 ```
 
-- **`indemnisations_transporteur` :** UNIQUE(cle_operation), UNIQUE(contrepassation_de_id) hors NULL. Un remboursement de frais ou dédommagement payé par le prestataire au commerçant est séparé du COD et du remboursement client. La livraison et le bordereau ont le même prestataire ; un remplacement éventuel se rattache à la commande de cette livraison, contrôlé sous verrou. Montant>0 sauf inverse exact. L’indemnisation devient effective uniquement avec un bordereau rapproché ; les promesses peuvent rester sur un brouillon. Les pièces et références sont contrôlées pour ne pas importer deux fois la même indemnisation. Ne pas enregistrer simultanément une baisse de frais et une indemnisation pour une seule réduction de dette. Un frais réellement payé puis remboursé peut rester en charge, avec indemnisation distincte : les deux flux existent réellement.
-- **`factures` :** UNIQUE(numero) hors NULL, UNIQUE(sequence_id,numero_sequence) hors NULL, UNIQUE(cle_operation), UNIQUE(fournisseur_externe,reference_externe) si renseignés ensemble. FK(revision_id,commande_id) → revisions_commandes(id,commande_id). type_document=facture|avoir ; UNIQUE(id,commande_id). CHECK couplant type_document et facture_origine_id : facture → NULL, avoir → NOT NULL et différent de soi ; l’origine doit être une facture émise, pas un autre avoir, vérifié sous verrou. Un avoir exige motif_document non vide et facture_origine_id de cette commande via FK(facture_origine_id,commande_id) → factures(id,commande_id), clé parent UNIQUE. statut=brouillon|emise|annulee_brouillon ; un avoir émis est un document fiscal de correction, PAS un crédit dépensable et PAS une preuve de remboursement. Numéro alloué sous verrou sequences_documents à l’émission, préfixe boutique stable central ; fournisseur externe : numéro/reçu final importés sous idempotence sans inventer un numéro local concurrent. Snapshots versionnés : identité légale vendeur, acheteur, lignes fiscales détaillées et totaux, voir 10.4. FK(incident_id,commande_id) → incidents_commande(id,commande_id) lorsque renseigné. Révision confirmée requise ; valeurs définitives figées à l’émission. L’émission obligatoire suit obligations_facturation et sa règle validée (T22), indépendamment du reversement transporteur. Numéro, snapshots, média et empreinte d’un document émis ne sont jamais réécrits par le métier. Seul un brouillon non émis peut être annulé directement. L’annulation d’une vente après émission conserve facture et statut historique emise ; correction via avoir puis nouveau document selon la procédure fiscale validée. annulee_at/motif_annulation décrivent uniquement l’annulation d’un brouillon ; toute rectification fiscale ultérieure est un nouveau document lié. Ne jamais réutiliser un numéro. PDF différé : media_id/empreinte remplis une seule fois sur les snapshots figés ; état de génération suivi par le job et transmission reprise durablement. Un lien externe seul ne suffit pas à conserver la pièce. Plafonner les avoirs par ligne et cumul contre la facture d’origine, sous verrou ; un avoir ne déclenche pas automatiquement de remboursement.
+- **`indemnisations_transporteur` :** UNIQUE(cle_operation), UNIQUE(contrepassation_de_id) hors NULL. Un dédommagement pour perte/casse ou autre sinistre payé par le prestataire au commerçant est séparé du COD et du remboursement client. La livraison et le bordereau ont le même prestataire ; un remplacement éventuel se rattache à la commande de cette livraison, contrôlé sous verrou. Montant>0 sauf inverse exact. L’indemnisation devient effective uniquement avec un bordereau rapproché ; les promesses peuvent rester sur un brouillon. Les pièces et références sont contrôlées pour ne pas importer deux fois la même indemnisation. **Le remboursement d’un trop-payé issu d’une correction de frais n’est pas une indemnisation : il apure `creances_transporteur` via T16.** Ne pas enregistrer simultanément une baisse de frais et une indemnisation pour une seule réduction de dette.
+- **`factures` :** UNIQUE(numero) hors NULL, UNIQUE(sequence_id,numero_sequence) hors NULL, UNIQUE(cle_operation), UNIQUE(fournisseur_externe,reference_externe) si renseignés ensemble. Ajouter les clés parents composites `UNIQUE(id,commande_id)`, `UNIQUE(id,commande_id,revision_id,type_document)` et `UNIQUE(id,commande_id,revision_id,type_document,facture_origine_id)` pour permettre les liens exacts de T22. FK(revision_id,commande_id) → revisions_commandes(id,commande_id). type_document=facture|avoir. CHECK couplant type_document et facture_origine_id : facture → NULL, avoir → NOT NULL et différent de soi ; l’origine doit être une facture émise, pas un autre avoir, vérifié sous verrou. Un avoir exige motif_document non vide et facture_origine_id de cette commande via FK(facture_origine_id,commande_id) → factures(id,commande_id). statut=brouillon|en_enregistrement|emise|annulee_brouillon ; un avoir émis est un document fiscal de correction, PAS un crédit dépensable et PAS une preuve de remboursement. Numéro alloué sous verrou `sequences_documents` lors du passage en `en_enregistrement`, avec préfixe boutique stable central ; fournisseur externe : numéro/reçu final importés sous idempotence sans inventer un numéro local concurrent. Snapshots versionnés : identité légale vendeur, acheteur, lignes fiscales détaillées et totaux, voir 10.4. FK(incident_id,commande_id) → incidents_commande(id,commande_id) lorsque renseigné. Révision confirmée requise ; valeurs définitives figées à l’émission. L’émission obligatoire suit `obligations_facturation` et sa règle validée (T22), indépendamment du reversement transporteur. **Avant `statut=emise` et avant toute transmission, le worker produit le snapshot/PDF durable, calcule `empreinte_document`, inscrit ou retrouve la même `cle_operation` dans `central.registre_documents_emis`, puis renseigne une seule fois `registre_emission_central_id`.** Central, tenant et stockage objet n’étant pas atomiques, toute reprise utilise la même clé et rapproche l’état au lieu de consommer un nouveau numéro. Numéro, snapshots, média, empreinte et registre d’émission d’un document émis ne sont jamais réécrits par le métier. Seul un brouillon non émis peut être annulé directement. L’annulation d’une vente après émission conserve facture et statut historique `emise` ; correction via avoir puis nouveau document selon la procédure fiscale validée. `annulee_at/motif_annulation` décrivent uniquement l’annulation d’un brouillon ; toute rectification fiscale ultérieure est un nouveau document lié. Ne jamais réutiliser un numéro. PDF différé : le document peut rester `en_enregistrement` pendant la génération/inscription durable ; aucune transmission n’est permise avant convergence. Un lien externe seul ne suffit pas à conserver la pièce. Plafonner les avoirs par ligne et cumul contre la facture d’origine, sous verrou ; un avoir ne déclenche pas automatiquement de remboursement.
 
 ### T18 — Incidents par ligne et plafonds des remèdes
 
@@ -2452,7 +2518,7 @@ erDiagram
 
 Dossier lié à la **ligne expédiée précise**, donc deux bouquets de même variante avec deux personnalisations restent distincts. UNIQUE(article_commande_id) au MVP : un seul dossier par ligne, réouvrable et enrichi par historique_commandes. Cette décision évite de dupliquer des incidents pour contourner le plafond ; plusieurs causes sont ventilées dans incidents_commande_details. Chaque détail : type=casse|perte|manquant|non_conforme|retour|autre, quantite>0 et motif requis. Sous verrou commande puis incident, SUM(details.quantite)<=article_commande.quantite et quantite_affectee=SUM(details.quantite). Une unité n’est comptée qu’une fois dans cette ventilation : choisir sa cause principale et décrire les causes secondaires dans le motif. Exemple 3 unités : 1 cassée + 1 manquante, la troisième correcte ne consomme aucun budget. Création/modification des détails et projection sont atomiques, auditées ; aucune diminution sous les remèdes déjà engagés. Le dossier porte le statut=ouvert|valide|rejete|clos. Quantité affectée >0 et <= quantité expédiée ; ne jamais la diminuer sous la quantité déjà engagée. Montants éligibles>=0, alloués par décision documentée, pas automatiquement égaux au total commande. La clôture ne libère aucun budget consommé.
 
-Clés parents : UNIQUE(id,commande_id) ; FK(livraison_id,commande_id,revision_expediee_id) → livraisons(id,commande_id,revision_expediee_id), FK(article_commande_id,revision_expediee_id) → articles_commande(id,revision_id), FK(retour_id,livraison_id) → retours_commandes(id,livraison_id). Définir les parents avant d’ajouter les FK cycliques. L’incident peut exister sans retour : une photo et une décision de SAV peuvent justifier un remplacement sans collecte physique.
+Clés parents : UNIQUE(id,commande_id) ; FK(livraison_id,commande_id,revision_expediee_id) → livraisons(id,commande_id,revision_expediee_id), FK(article_commande_id,revision_expediee_id) → articles_commande(id,revision_id), FK(retour_id,livraison_id) → retours_commandes(id,livraison_id). Définir les parents avant d’ajouter les FK cycliques. L’incident peut exister sans retour : une photo et une décision de SAV peuvent justifier un remplacement sans collecte physique. **En revanche, si une prise en charge nécessite un retour physique dans le MVP, il n’existe pas de réception SAV isolée par article : le retour T9 porte sur tout le colis.**
 
 **Protocole commun remplacement/remboursement :** verrous des commandes concernées par UUID, puis incident, puis recouvrement et autres parents financiers nécessaires ; relecture courante des remèdes. Soit Qr la somme des quantite_incident_origine des commandes de remplacement ET d’échange non annulées, Qf les quantités de remboursements produits réservées/effectuées nettes des seules contrepassations effectuées. Exiger Qr+Qf<=quantite_affectee avant insertion/validation. Le budget SAV est réservé dès création du remplacement ; son stock est réservé à son acceptation selon le même protocole que les autres commandes. Un brouillon sans acceptation ne réserve donc pas encore de stock. Réessayer une action avec la même clé ne consomme pas une seconde quantité. Un remboursement brouillon annulé libère sa réserve ; une correction effectuée passe par inverse exact. Aucun inverse en attente ne crée de disponibilité. Une commande déjà expédiée n’est pas annulable pour libérer artificiellement son budget SAV.
 
@@ -2526,7 +2592,7 @@ erDiagram
     }
 ```
 
-UNIQUE(type_document,exercice) dans la BDD tenant ; prefixe_boutique fixé centralement et jamais réutilisé pour une autre boutique. type_document=facture|avoir. À l’émission locale : verrou sur cette ligne stable, lire/incrémenter prochain_numero, attribuer numéro et snapshots, commit atomique. Initialiser les séquences avant usage ; en création concurrente, gérer l’unicité puis relire sous verrou. Pas de MAX(numero)+1. Format proposé : préfixe-type-exercice-numéro ; politique de séries par boutique pour une même entité légale à valider avant production. Si une séquence unique par société est requise, déplacer son allocation dans le central avec registre d’attribution idempotent avant activation, sans simulation de transaction distribuée. Le bon de commande peut utiliser numero_commande + version_document.
+UNIQUE(type_document,exercice) dans la BDD tenant ; prefixe_boutique fixé centralement et jamais réutilisé pour une autre boutique. type_document=facture|avoir. À l’émission locale : verrou sur cette ligne stable, lire/incrémenter `prochain_numero`, attribuer numéro et snapshots puis entrer en état `en_enregistrement`. **Avant que le document devienne `emis` ou soit transmis, son identité est enregistrée/retrouvée idempotemment dans `central.registre_documents_emis` et son snapshot/PDF durable est vérifié.** Initialiser les séquences avant usage ; en création concurrente, gérer l’unicité puis relire sous verrou. Pas de MAX(numero)+1. Après restauration tenant, `prochain_numero` n’est jamais accepté seul : rapprocher le registre central et reconstruire une borne sûre ; tout numéro déjà émis reste consommé. Format proposé : préfixe-type-exercice-numéro ; politique de séries par boutique pour une même entité légale à valider avant production. Si une séquence unique par société est requise, déplacer son allocation dans le central avec registre d’attribution idempotent avant activation, sans simulation de transaction distribuée. Le bon de commande peut utiliser numero_commande + version_document.
 
 ### T21 — Accords distincts et opérations sur les données personnelles
 
@@ -2624,7 +2690,7 @@ erDiagram
     }
 ```
 
-- **Obligation :** FK(revision_id,commande_id) → revisions_commandes(id,commande_id), FK(facture_id,commande_id) → factures(id,commande_id), FK(facture_origine_id,commande_id) → factures(id,commande_id). Type=facture|avoir ; origine NULL pour facture, obligatoire pour avoir. UNIQUE(facture_id) hors NULL. Clé métier stable issue de l’occurrence du fait générateur et du type de pièce ; la règle ne se change pas au retry pour créer une deuxième facture. Statut=a_emettre|en_cours|emise|erreur ; conserver une erreur visible et réessayer, jamais annuler silencieusement une obligation. L’événement métier et cette intention sont commités ensemble ; si fait constaté externe, son import crée l’intention dans la même transaction. Un rapprochement périodique cherche les faits générateurs sans obligation et les obligations sans document. Émission idempotente de factures avec cle_operation dérivée, puis transmission T19. Révision confirmée exigée ; un avoir reste lié à la facture originale même après fermeture de commande. Les règles de déclenchement exactes restent à valider, puis doivent être implémentées comme contraintes de service obligatoires.
+- **Obligation — AUD-03 :** FK(revision_id,commande_id) → revisions_commandes(id,commande_id). `type_document=facture|avoir`; origine NULL pour facture, obligatoire pour avoir. Le document satisfaisant l’obligation doit correspondre **simultanément** à la bonne commande, la bonne révision et le bon type : FK composite `(facture_id,commande_id,revision_id,type_document)` → `factures(id,commande_id,revision_id,type_document)`. Pour un avoir, renforcer aussi l’égalité de l’origine par FK composite `(facture_id,commande_id,revision_id,type_document,facture_origine_id)` → `factures(id,commande_id,revision_id,type_document,facture_origine_id)` ; la FK simple sur `facture_origine_id` garde la validation de l’origine elle-même. UNIQUE(facture_id) hors NULL. Statut=a_emettre|en_cours|emise|erreur. **`statut=emise` est interdit si `facture_id` est NULL ou si le document lié n’a pas lui-même `factures.statut='emise'`.** Le service et un trigger de transition vérifient ce statut, l’origine et l’impossibilité de remplacer le document après satisfaction. Clé métier stable issue de l’occurrence du fait générateur et du type de pièce ; la règle ne se change pas au retry pour créer une deuxième facture. L’événement métier et cette intention sont commités ensemble ; si fait constaté externe, son import crée l’intention dans la même transaction. Un rapprochement périodique cherche les faits générateurs sans obligation et les obligations sans document. Émission idempotente de factures avec `cle_operation` dérivée, puis transmission T19. Révision confirmée exigée ; un avoir reste lié à la facture originale même après fermeture de commande. Une clé d’idempotence évite les doublons mais ne remplace jamais ces contraintes de correspondance documentaire.
 - **Compensation dédiée :** sert uniquement à affecter un avoir émis d’une ancienne vente à UNE commande d’échange identifiée ; aucun solde client librement dépensable. FK(incident_id,commande_origine_id) → incidents_commande(id,commande_id) ; FK(avoir_origine_id,commande_origine_id) → factures(id,commande_id) ; FK(revision_destination_id,commande_destination_id) → revisions_commandes(id,commande_id). Le service vérifie type_document=avoir, statut=emise, origine de l’incident et type_commande=echange. Origine et destination distinctes. Montant>0, sauf inverse exact ; UNIQUE(contrepassation_de_id). Statut=reservee|effectuee|annulee_avant_effet. Une affectation réservée consomme déjà le disponible de l’avoir ; une inverse ne libère ce disponible qu’une fois effectuée. Après effet, pas de modification/suppression, uniquement contrepassation traçable. Annulation avant effet uniquement avant figement distant de la destination.
 - **Plafonds coordonnés :** verrouiller les commandes par UUID, incident puis facture/avoir et parents financiers dans l’ordre commun. Pour chaque avoir, somme des compensations réservées/effectuées nettes + remboursements liés engagés/effectifs <= TTC de l’avoir. Un avoir sur une vente impayée ne crée aucun crédit de compensation : au niveau de la commande d’origine, somme de toutes les compensations engagées/effectives et remboursements engagés/effectifs <= encaissement initial vérifié, net des seules contrepassations effectives. Plafonner la compensation produits à la valeur de produits effectivement payée et créditée, en excluant les frais non éligibles. Réserver ce budget avant tout envoi externe de la destination et interdire une correction d’encaissement qui rendrait les affectations excessives sans correction coordonnée. Les régularisations lient avoir_id lorsque le remboursement corrige une facture émise ; elles gardent aussi leurs plafonds d’encaissement réel. Les compensations ne créent ni cash ni revenu : l’avoir corrige la vente initiale, la nouvelle facture représente la nouvelle vente, la compensation en acquitte une part. Si plusieurs avoirs couvrent les mêmes unités, plafonner aussi contre la facture originale et les remèdes de l’incident.
 - **Révision destination :** montant_compensation_echange est un snapshot non négatif, égal à la somme affectée à cette révision lors de sa confirmation ; CHECK <= sous_total_applique : la compensation couvre les produits, les nouveaux frais de livraison restent payables séparément dans le COD. montant_a_encaisser=total_commande-montant_compensation_echange. Valeur nulle pour standard/remplacement gratuit. Une évolution avant envoi crée une nouvelle révision et réaffecte atomiquement les réserves ; une livraison déjà figée ne change pas son COD. Le solde effectif de compensation est validé avec le fait de nouvelle vente défini par la règle comptable, et ne dépend pas du reversement transporteur. Une compensation annulée après un effet externe ne doit pas rendre le COD distant contradictoire : geler puis rapprocher et corriger via nouvelles pièces.
@@ -2637,7 +2703,7 @@ erDiagram
 | Retour total remboursé | Retour complet, inspection, décision de remboursement ; avoir lié à facture originale si émise ; paiement réel séparé, plafonné à l’encaissement |
 | Correction d’une seule unité | Avoir/remboursement partiel permis sur la ligne concernée ; ce cas financier n’active pas un retour physique partiel dans T9 |
 | Article cassé/défectueux | Incident multi-causes ; décision réparation/remplacement/échange/remboursement tracée. La casse ne crée pas automatiquement un avoir. Réparation gérée manuellement dans le dossier, sans faux flux de stock |
-| Remplacement identique sans supplément | Nouvelle commande de remplacement gratuite liée à incident, nouvelle livraison ; facture originale conservée, document justificatif et éventuels avoir/nouvelle facture selon règle fiscale validée |
+| Remplacement identique sans supplément | **Si traitement SAV gratuit :** nouvelle commande `remplacement`, lignes produits à 0, aucune nouvelle facture valorisée incompatible avec cette révision. **Si la règle validée exige avoir + nouvelle facture valorisée :** utiliser le mécanisme `echange` valorisé, nouvelle révision/facture à la valeur commerciale, compensation affectée, reste client éventuellement 0. |
 | Échange 8 000 → 8 000 | Nouvelle commande d’échange de valeur 8 000 ; si règle avoir + nouvelle facture, affectation 8 000, COD produits 0 ; original et retour conservés |
 | Échange 8 000 → 10 000 | Avoir émis 8 000 affecté à nouvelle vente 10 000 ; complément produits COD 2 000, plus frais de livraison annoncés et acceptés |
 | Échange 10 000 → 8 000 | Affectation 8 000 et restitution réelle de différence 2 000 depuis l’avoir disponible, après validation ; pas de portefeuille client |
@@ -2646,7 +2712,50 @@ erDiagram
 | Colis perdu/cassé chez transporteur | Incident/perte et indemnisation transporteur séparés de remboursement client, remplacement et documents de vente |
 | COD encaissé, reversement en attente | Facture émise selon sa règle ; paiement client chez transporteur et créance commerçant séparés ; aucune attente du reversement pour effacer l’obligation de facturation |
 
-**Arbitrage explicite avec les notes :** leur exemple d’échange mentionne une nouvelle révision et une nouvelle livraison. Après expédition, la révision originale reste immuable et UNIQUE(livraisons.commande_id) est conservé : la nouvelle révision appartient à la nouvelle commande d’échange liée à l’originale. Une modification de taille AVANT expédition peut rester une nouvelle révision de la même commande, avec nouvel accord téléphonique. Le retour physique partiel demeure hors MVP. Si la règle fiscale validée impose un autre mécanisme documentaire pour un échange sans différence, adapter le document justificatif et les obligations avant d’activer ce cas ; ne pas appliquer automatiquement un avoir par défaut.
+**Arbitrage explicite avec les notes — AUD-07/AUD-08 :** leur exemple d’échange mentionne une nouvelle révision et une nouvelle livraison. Après expédition, la révision originale reste immuable et UNIQUE(livraisons.commande_id) est conservé : la nouvelle révision appartient à la nouvelle commande liée à l’originale. Une modification de taille AVANT expédition peut rester une nouvelle révision de la même commande, avec nouvel accord téléphonique. **Le retour physique partiel demeure interdit : si un retour physique est ouvert, toutes les lignes de la révision expédiée sont attendues.** Pour un remplacement gratuit, la valeur produits de la nouvelle révision reste 0 et aucune facture complète valorisée ne peut lui être rattachée. Si la règle fiscale validée exige une nouvelle facture valorisée, utiliser le mécanisme d’échange valorisé avec compensation ; ne jamais créer une facture de 8 000 sur une révision à 0.
+
+
+### T23 — Reconnaissance économique et corrections commerciales
+
+La réception physique d’un retour, la décision économique, l’avoir et le remboursement sont quatre faits distincts. Les indicateurs commerciaux utilisent l’événement finalisé ci-dessous, pas la date de réception du colis ni la date du cash.
+
+```mermaid
+erDiagram
+    direction TB
+    corrections_commerciales {
+        uuid id PK
+        uuid commande_id FK "commandes.id"
+        uuid revision_source_id FK "revisions_commandes.id"
+        uuid incident_id FK "nullable ; incidents_commande.id"
+        varchar type_correction
+        varchar statut
+        datetime date_effet
+        datetime date_enregistrement
+        text motif
+        varchar cle_operation UK
+        uuid correction_de_id FK "nullable ; corrections_commerciales.id"
+        uuid acteur_id "nullable ; REF central.users.id"
+        datetime created_at
+    }
+    lignes_corrections_commerciales {
+        uuid id PK
+        uuid correction_id FK "corrections_commerciales.id"
+        uuid revision_source_id FK "revisions_commandes.id"
+        uuid article_commande_id FK "articles_commande.id"
+        int quantite_concernee
+        decimal montant_vente_reference
+        decimal delta_revenu "signe"
+        decimal delta_cout_vendu "signe"
+        text motif_detaille "nullable"
+        datetime created_at
+    }
+    corrections_commerciales ||--o{ lignes_corrections_commerciales : correction_id
+```
+
+- **`corrections_commerciales` — AUD-06 :** UNIQUE(cle_operation), UNIQUE(correction_de_id) hors NULL, UNIQUE(id,revision_source_id). FK(revision_source_id,commande_id) → revisions_commandes(id,commande_id) ; si incident renseigné, FK(incident_id,commande_id) → incidents_commande(id,commande_id). `type_correction=retour|annulation|geste_commercial|echange|autre`. `statut=brouillon|finalisee|contrepassation`. `date_effet` est la période économique utilisée par les indicateurs ; `date_enregistrement` est l’instant où la décision est réellement enregistrée. Au MVP, une décision finalisée prend effet à sa date commerciale explicite ; elle ne réécrit pas silencieusement une période déjà publiée. Une ligne finalisée est immuable ; une erreur se corrige par un nouvel événement lié via `correction_de_id`, jamais par UPDATE destructif. L’ouverture d’un incident ou la réception d’un retour ne crée pas automatiquement cette correction.
+- **`lignes_corrections_commerciales` :** UNIQUE(correction_id,article_commande_id). FK(correction_id,revision_source_id) → corrections_commerciales(id,revision_source_id) et FK(article_commande_id,revision_source_id) → articles_commande(id,revision_id), avec clés parents UNIQUE ; la ligne concernée appartient donc obligatoirement à la révision source. `quantite_concernee>0` et ne dépasse pas la quantité admissible de la ligne. `montant_vente_reference>=0`. `delta_revenu` et `delta_cout_vendu` sont signés et expliquent exactement l’impact de gestion ; exemple d’annulation de 8 000 : `delta_revenu=-8000`. Les sommes des lignes reconstruisent l’impact de l’événement. Les montants fiscaux restent dans factures/avoirs et le mouvement de trésorerie dans `regularisations_clients`/journaux financiers : cette table ne simule ni document fiscal ni paiement.
+
+**Convention temporelle :** vente en janvier, colis reçu en février, décision commerciale finalisée en mars, remboursement en avril → vente initiale en janvier, correction commerciale en mars (`date_effet`), cash en avril. Les exports exposent séparément `date_retour_physique`, `date_effet_correction`, `date_emission_document` et `date_remboursement` lorsqu’elles existent.
 
 ## 6. Contraintes relationnelles obligatoires
 
@@ -2734,6 +2843,8 @@ L’exhaustivité des axes actifs d’une variante, l’absence de cycles de cat
 
 CHECK roles : (portee='plateforme' AND tenant_id IS NULL) OR (portee='tenant' AND tenant_id IS NOT NULL). Le code propriétaire n’est pas un rôle assignable. Le propriétaire est une relation immuable, les administrateurs n’en reçoivent que les actions déléguées. Les triggers protègent la propriété, l’appartenance du propriétaire et la suppression de son compte ; leur accès DDL est réservé à l’exploitation. La suspension d’un tenant ne supprime aucune appartenance historique.
 
+**Exceptions de permission — AUD-05 :** le même contrat de portée est obligatoire sur `exceptions_permissions` : permission tenant ⇒ `tenant_id` obligatoire ; permission plateforme ⇒ `tenant_id IS NULL`. Comme la portée appartient au parent `permissions`, cette règle est vérifiée par service et trigger, pas par un CHECK local fictif. L’auteur doit également être autorisé à déléguer la permission dans le contexte ciblé ; l’auto-attribution n’échappe pas à cette règle.
+
 Unicités conditionnelles à matérialiser par colonne générée nullable et UNIQUE : domaine principal actif d’un tenant, compte racine actif, abonnement actif d’un propriétaire, panier actif d’un visiteur, adresse principale active, média principal de portée produit/variante, déploiement en cours d’un tenant, exception de permission/restriction active. Ne pas utiliser NOW() dans ces expressions : l’état explicite est mis à jour transactionnellement et les bornes de dates sont aussi contrôlées à la lecture. Les contextes NULL des permissions/quotas sont normalisés par une valeur sentinelle interdite comme UUID métier. [S4]
 
 ### 6.4 Exemples de protections supplémentaires
@@ -2762,11 +2873,32 @@ ALTER TABLE exceptions_permissions
     UNIQUE (user_id, permission_id, contexte_normalise, actif_unique);
 ```
 
-Le trigger de variante compare OLD.produit_id et NEW.produit_id avec `<=>` et émet SIGNAL SQLSTATE '45000' en cas de différence. Même mécanisme pour les propriétés centrales immuables. Les droits DDL restent hors du rôle applicatif. Les colonnes générées ne contiennent aucun appel à l’heure courante ; les services vérifient les dates à chaque décision [S3, S4, S7].
+Le trigger de variante compare OLD.produit_id et NEW.produit_id avec `<=>` et émet SIGNAL SQLSTATE '45000' en cas de différence. **AUD-01 :** la modification de `variantes_valeurs` et toute mutation de composition doit aussi verrouiller `variantes_produits`; si `utilisee_at IS NOT NULL`, toute modification d’identité physique est refusée. La première réservation, le premier mouvement et la première ligne de commande renseignent `utilisee_at` sous ce même verrou. Les imports utilisent le même service. Même mécanisme pour les propriétés centrales immuables. Les droits DDL restent hors du rôle applicatif. Les colonnes générées ne contiennent aucun appel à l’heure courante ; les services vérifient les dates à chaque décision [S3, S4, S7].
 
 ### 6.5 Compléments obligatoires de la V3
 
 Les liens simples présents dans les nouveaux diagrammes sont des FK SQL locales, sauf les champs marqués REF central/tenant. Les FK composites supplémentaires de C12, C13, T21 et T22 sont obligatoires comme celles des tableaux précédents. Créer les UNIQUE parents déclarés avant les FK, et ajouter les références cycliques ensuite. Les seuls liens polymorphes (ressource_type/ressource_id, événement métier) sont validés par le service, pas par une FK générique fictive.
+
+**AUD-03 — exemple de correspondance obligation/document :**
+
+```sql
+ALTER TABLE factures
+  ADD CONSTRAINT uq_facture_contexte
+    UNIQUE (id, commande_id, revision_id, type_document),
+  ADD CONSTRAINT uq_facture_contexte_origine
+    UNIQUE (id, commande_id, revision_id, type_document, facture_origine_id);
+
+ALTER TABLE obligations_facturation
+  ADD CONSTRAINT fk_obligation_document_exact
+    FOREIGN KEY (facture_id, commande_id, revision_id, type_document)
+    REFERENCES factures (id, commande_id, revision_id, type_document),
+  ADD CONSTRAINT fk_obligation_avoir_origine_exacte
+    FOREIGN KEY (facture_id, commande_id, revision_id, type_document, facture_origine_id)
+    REFERENCES factures (id, commande_id, revision_id, type_document, facture_origine_id);
+```
+
+La seconde FK renforce le cas avoir lorsque `facture_origine_id` est non NULL ; les triggers/services restent obligatoires pour les transitions et pour vérifier `factures.statut='emise'` avant `obligations_facturation.statut='emise'`.
+
 
 Exemple du verrouillage structurel du lieu de livraison, à intégrer une seule fois après nettoyage des données existantes ; mode_livraison est NOT NULL des deux côtés :
 
@@ -2924,13 +3056,13 @@ Fcommercant = somme nette des frais constatés payeur=commercant. Ces frais sont
 
 Dans la dernière ligne, deux colis différents peuvent être ventilés dans le même bordereau du même prestataire. Les allocations de frais restent liées à leur colis de retour.
 
-**Correction monétaire :** original +650, inverse -650, remplacement +600 ; original et inverse restent inclus dans la somme. Une ligne annulée avant constatation/rapprochement ne compte pas. Une ligne déjà effective n’est pas simplement marquée annulée en plus de son inverse. Une contrepassation est unique, référence une écriture ordinaire du même objet, en inverse exactement le montant et ne peut elle-même être contrepassée ; une correction suivante cible la nouvelle écriture ordinaire. Les services verrouillent recouvrement, frais et bordereau dans un ordre stable, vérifient les plafonds puis valident atomiquement les lignes locales. Les tables à journal validé sont protégées contre UPDATE/DELETE par triggers ou privilèges dédiés ; pour les tables à brouillon, les triggers bloquent les changements de montants après validation.
+**Correction monétaire — AUD-02 :** original +650, inverse -650, remplacement +600 corrige la **charge** à 600 ; si 650 avaient déjà été réellement payés, la trésorerie reste néanmoins -650 tant qu’aucun remboursement/compensation n’est reçu. Le trop-payé 50 crée immédiatement une `creances_transporteur` de 50. La réaffectation de l’ancien paiement vers le nouveau frais est comptable et ne génère aucun encaissement. Lors d’un remboursement bancaire réel de 50 : cash +50 et créance 0 ; lors d’une compensation future de 50 : la créance est apurée contre le montant futur et seul le cash réellement payé est enregistré. Une ligne annulée avant constatation/rapprochement ne compte pas. Une ligne déjà effective n’est pas simplement marquée annulée en plus de son inverse. Une contrepassation est unique, référence une écriture ordinaire du même objet, en inverse exactement le montant et ne peut elle-même être contrepassée ; une correction suivante cible la nouvelle écriture ordinaire. Les services verrouillent recouvrement, frais, créance et bordereau dans un ordre stable, vérifient les plafonds puis valident atomiquement les lignes locales. Les tables à journal validé sont protégées contre UPDATE/DELETE par triggers ou privilèges dédiés ; pour les tables à brouillon, les triggers bloquent les changements de montants après validation.
 
 ### 10.3 Résultat et trésorerie
 
 Résultat de gestion estimé = ventes produits livrées hors taxes collectées, nettes des retours reconnus + part de livraison effectivement conservée par la boutique + indemnisations effectives − coût des marchandises sorties pour ventes/remplacements − pertes reconnues non déjà comptées en coût vendu − frais_transporteur à charge commerçant − autres depenses constatées.
 
-Un refus ne crée pas une vente. Si un retour annule une vente, contrepasser le revenu et le coût vendu à la date du retour reconnu, puis valoriser les pertes éventuelles une fois. Un remplacement gratuit conserve le coût des produits expédiés ; ne pas ajouter encore comme perte le même coût déjà reconnu sur la vente originale pour un article cassé chez le client. Un remboursement est une sortie de trésorerie : si la vente a déjà été contrepassée, ne pas diminuer le résultat une seconde fois. Une indemnisation est distincte d’un reversement COD. Si des taxes collectées existent, calculer les ventes nettes hors taxes collectées ; utiliser des coûts cohérents avec leur traitement déductible/non déductible. Les exemples TTC sans ventilation ne constituent pas un calcul de résultat fiscal.
+Un refus ne crée pas une vente. **AUD-06 : une réception physique de retour ne corrige pas automatiquement le revenu.** La correction commerciale est portée par `corrections_commerciales`/`lignes_corrections_commerciales` finalisées : `date_effet` fixe la période économique, `date_enregistrement` conserve l’instant de saisie, et les `delta_revenu`/`delta_cout_vendu` signés rendent le calcul reproductible. Exemple : vente janvier, retour physique février, décision économique mars, remboursement avril → revenu corrigé en mars et trésorerie en avril. Un remplacement gratuit conserve le coût des produits expédiés ; ne pas ajouter encore comme perte le même coût déjà reconnu sur la vente originale pour un article cassé chez le client. Un remboursement est une sortie de trésorerie : si la vente a déjà été corrigée économiquement, ne pas diminuer le résultat une seconde fois. Une indemnisation est distincte d’un reversement COD. Si des taxes collectées existent, calculer les ventes nettes hors taxes collectées ; utiliser des coûts cohérents avec leur traitement déductible/non déductible. Les exemples TTC sans ventilation ne constituent pas un calcul de résultat fiscal.
 
 Exemple normal : produits 5 000, coût 3 000, livraison 650 intégralement payée par le client et retenue par le transporteur → marge avant autres frais = 2 000, pas 1 350. Les coûts d’achat sont déclaratifs, sans méthode FIFO/coût moyen ni registre fiscal : la marge reste une estimation de gestion. Créance produits non reversée = Reversable − reversements rapprochés ; les dettes transporteur et remboursements clients sont affichés séparément. La trésorerie suit uniquement les mouvements effectivement reçus/payés.
 
@@ -3042,12 +3174,12 @@ Les acheteurs restent invités. visiteurs identifie un navigateur dans une bouti
 | Commandes reçues | commandes, pas nombre de révisions |
 | Produits livrés | Lignes de la révision expédiée et livraison effective |
 | Retours | Retours reçus/inspectés ; distinguer demandes et pertes |
-| Meilleure vente | Quantités livrées nettes des retours sur période explicite |
+| Meilleure vente | Quantités livrées, corrigées par les lignes de `corrections_commerciales` finalisées selon leur `date_effet` ; le simple retour physique ne suffit pas |
 | Pages performantes | Attribution déclarée à la page d’origine ; ne pas créditer toutes les pages vues |
 | Argent à recevoir | Encaissement vérifié moins frais client retenus et reversements rapprochés |
-| Coûts et résultat | Snapshots, frais, dépenses, pertes et indemnisations sans double comptage |
+| Coûts et résultat | Snapshots + deltas signés des corrections commerciales finalisées + frais, dépenses, pertes et indemnisations sans double comptage |
 
-Filtres heure/jour/mois/année en Africa/Algiers avec dates stockées UTC. Séparer cohorte de commandes créées et événements survenus dans la période. Les retours tardifs ne réécrivent pas silencieusement les événements antérieurs.
+Filtres heure/jour/mois/année en Africa/Algiers avec dates stockées UTC. Séparer cohorte de commandes créées et événements survenus dans la période. Les retours physiques tardifs ne réécrivent pas silencieusement les événements antérieurs ; la correction économique apparaît selon `corrections_commerciales.date_effet`, distincte de la date de réception, de l’avoir et du remboursement. Les exports conservent aussi `date_enregistrement` afin de reconstruire ce qui était connu à chaque clôture.
 
 **Conservation :** remplacer l’ancienne règle de conservation indéfinie par C11. Les durées sont validées avant production, avec finalité, point de départ, action, base justificative et version ; l’absence de durée validée est un point à résoudre avant collecte, pas une autorisation de tout garder. La loi 18-07, art. 9, prévoit une limitation à la durée nécessaire ; tenir compte de sa modification par 25-11 [S11–S12].
 
@@ -3087,13 +3219,13 @@ Créer les index des FK et des contraintes UNIQUE, puis les index de lecture sui
 
 Index complémentaires : tenants(proprietaire_id,deleted_at,statut), exceptions_permissions(user_id,statut,expire_at), exceptions_fonctionnalites(proprietaire_id,fonctionnalite_id,tenant_id,commence_at), incidents_commande(commande_id,statut), commandes(incident_origine_id,statut_commercial), regularisations_clients(incident_id,statut), contrats_commandes(commande_id,created_at), transmissions_documents(statut,prochaine_tentative_at), executions_retention(statut,created_at), evenements_livraison(livraison_id,survenu_at), et payload_expire_at sur les diagnostics purgés. Valider la longueur des clés composées de plusieurs VARCHAR avant migration ; les empreintes et UUID ont des types fixes.
 
-Index V3 : configurations_sauvegardes(sauvegarde_active,prochaine_execution_at), sauvegardes_tenants(tenant_id,statut,backup_realise_at), sauvegardes_tenants(expire_at), operations_centrales_tenants(tenant_id,sequence_tenant), restaurations_tenants(tenant_id,statut), incidents_commande_details(incident_id), obligations_facturation(statut,prochaine_tentative_at), compensations_echanges(avoir_origine_id,statut), operations_transporteur(requete_expire_at), journaux personnels(effectue_at,type_operation) adaptés à leurs noms réels, factures_saas(proprietaire_id,date_emission).
+Index V3.1 : configurations_sauvegardes(sauvegarde_active,prochaine_execution_at), sauvegardes_tenants(tenant_id,statut,backup_realise_at), sauvegardes_tenants(expire_at), operations_centrales_tenants(tenant_id,sequence_tenant), restaurations_tenants(tenant_id,statut), registre_documents_emis(contexte_document,date_emission), registre_documents_emis(cle_emission_document), incidents_commande_details(incident_id), obligations_facturation(statut,prochaine_tentative_at), compensations_echanges(avoir_origine_id,statut), creances_transporteur(prestataire_id,statut,montant_restant), allocations_creances_transporteur(creance_id,effectue_at), corrections_commerciales(statut,date_effet), lignes_corrections_commerciales(article_commande_id), operations_transporteur(requete_expire_at), journaux personnels(effectue_at,type_operation) adaptés à leurs noms réels, factures_saas(proprietaire_id,date_emission).
 
 Confirmer les index avec EXPLAIN sur données représentatives. Pour reconstituer un historique strict à timestamp égal, utiliser sequence_variante allouée sous verrou, et contrôler la chaîne avant/après ; un UUID v4 ne fournit pas un ordre de commit.
 
 **Versions :** ce document cible les capacités de MySQL 8.4/InnoDB pour ses contraintes ; il ne prétend pas connaître les versions installées du projet. Avant migrations, enregistrer les versions exactes PHP/Laravel/stancl/tenancy/MySQL et conserver composer.lock. La documentation Tenancy v4 existe et annonce des exigences plus élevées ; ne pas mélanger ses instructions avec les migrations/configurations v3. Vérifier les contraintes Composer du tag retenu et ses migrations réelles. [S5–S6]
 
-**Déploiement :** créer central puis tenant, ajouter les FK cycliques après création des tables, seed des référentiels/permissions et provisioning idempotent. Tester sauvegarde/restauration sur une seule boutique. Le statut central et deploiements_schema_tenants montrent les succès et échecs individuellement ; une panne au tenant 37 ne doit pas faire perdre l’état des 36 premiers. Les DDL peuvent produire des commits implicites : reprise par migration/étape, pas promesse de rollback global d’un déploiement.
+**Déploiement et reprise :** créer central puis tenant, ajouter les FK cycliques après création des tables, seed des référentiels/permissions et provisioning idempotent. Tester sauvegarde/restauration sur une seule boutique **et tester séparément la perte/restauration de la BDD centrale**. Les backups/PITR du central, les clés de déchiffrement et les manifestes permettant sa restauration ne dépendent pas uniquement de cette BDD. Pendant une reprise centrale, activer le mode externe `reprise_centrale`, bloquer les effets sensibles, rapprocher tenants/systèmes externes puis seulement réouvrir. Le statut central et `deploiements_schema_tenants` montrent les succès et échecs individuellement ; une panne au tenant 37 ne doit pas faire perdre l’état des 36 premiers. Les DDL peuvent produire des commits implicites : reprise par migration/étape, pas promesse de rollback global d’un déploiement.
 
 ### Scénarios d’acceptation à implémenter
 
@@ -3118,7 +3250,8 @@ Confirmer les index avec EXPLAIN sur données représentatives. Pour reconstitue
 | Tarif retour 300 puis changement à 350 | Ancien retour reste à 300 |
 | Livraison 5 000+650 payée, frais retenus 650 | Reversable 5 000, aucune charge 650 commerçant |
 | Même frais réglé simultanément par deux bordereaux | Plafond respecté sous verrou |
-| Correction financière 650 vers 600 | +650,-650,+600, historique intact |
+| Frais payé 650 puis corrigé à 600, avant remboursement | Charge nette 600, trésorerie -650, créance transporteur 50 ; aucun +50 fictif |
+| Remboursement réel ultérieur des 50 | Trésorerie nette -600, créance 0 ; allocation unique du remboursement |
 | Même compte API utilisé par deux boutiques | Tracking routé une fois ; aucun accès croisé |
 | Crash après commit bordereau tenant avant ACK central | Reprise sur part_centrale_id, aucun doublon |
 | Émission facture puis changement catalogue/boutique | Facture originale identique |
@@ -3132,6 +3265,7 @@ Confirmer les index avec EXPLAIN sur données représentatives. Pour reconstitue
 | Cron d’expiration arrêté | Permission échue refusée malgré statut matériel ancien |
 | Intervalles fonctionnels concurrents qui chevauchent | Une seule insertion ; périodes adjacentes admises |
 | Changement produit_id d’une variante | Refus SQL et applicatif, statistiques historiques intactes |
+| Variante taille 40 déjà utilisée puis tentative 40→41 | Refus sous verrou ; créer un nouvel UUID pour taille 41 |
 | Remplacement et remboursement simultanés d’une unité | Un seul budget disponible, brouillons inclus |
 | Deux dossiers incident pour la même ligne | Un seul dossier, enrichissement audité du premier |
 | Deux lignes identiques sauf personnalisation | Chaque incident vise sa vraie ligne |
@@ -3169,17 +3303,22 @@ Confirmer les index avec EXPLAIN sur données représentatives. Pour reconstitue
 | Stop desk X accepté puis Y demandé dans livraison | Refus SQL |
 | Stop desk accepté puis mode domicile/point NULL dans livraison | Refus SQL sur mode, même si FK nullable serait ignorée |
 | Domicile avec point non NULL | Refus CHECK |
+| Tentative de retour physique d’une seule ligne sur colis multi-articles | Refus ; toutes les lignes expédiées sont créées comme attendues |
 | Retour attendu 5, reçu 3, manquant 2 | Journal reconstruit les cinq compteurs ; P/R/Q inchangés pour les deux manquants |
 | Manquant retrouvé | Contrepassation -q puis réception réelle, aucune double perte |
 | Variante A et page B dans panier/commande | Refus SQL |
 | Avis lié à une ligne d’un autre produit | Refus SQL ; preuve d’identité toujours contrôlée en plus |
 | Rôle tenant + permission plateforme et cas inverse | Refus triggers ; changement de portée parent refusé |
+| Exception permission tenant sans tenant / plateforme avec tenant | Refus service + trigger ; aucune élévation par exception |
+| Admin tente une exception qu’il ne peut déléguer, y compris pour lui-même | Refus |
 | Même cle_creation pour deux propriétaires | Deux demandes permises ; même propriétaire/autre empreinte=409 |
 | Payload transporteur expiré | Coordonnées chiffrées effacées, références/empreinte/résultat conservés ; pas de retry aveugle |
 | Backup quotidien, tous les 3 jours, lundi/vendredi | Échéances UTC correctes à partir du fuseau et respect des limites de plan |
 | Changement de fréquence | Backups existants et leur expire_at inchangés |
 | Deux demandes manuelles concurrentes au dernier quota | Une seule acceptée sous verrou |
 | Restauration avec ACK ancien déjà central | Recherche locale par clé puis recréation du seul fait manquant ; pas de second paiement/colis |
+| Central restauré avant révocation permission | Permission sensible reste bloquée jusqu’au rapprochement ; ancienne autorisation non réintroduite |
+| Central restauré avant règlement réellement exécuté | Rapprochement externe détecte le paiement ; aucun second règlement |
 | Journal central antérieur non convergé au watermark | Toujours inclus au rapprochement |
 | Même nom média dans A et B | Clés physiques distinctes ; accès privé croisé refusé |
 | Ligne de 3 : 1 cassé et 1 manquant | Un dossier, deux détails, quantité affectée=2 ; ajout dépassant 3 refusé |
@@ -3188,7 +3327,10 @@ Confirmer les index avec EXPLAIN sur données représentatives. Pour reconstitue
 | Accord collecte absent | Aucune collecte des coordonnées ni autosauvegarde permise |
 | Consultation/export/transmission/purge | Journal métier minimisé, acteur/date/motif/ressource et destinataire traçables |
 | Fait générateur puis crash worker facture | Obligation persistée, une seule facture à la reprise et transmission durable |
+| Obligation R2 reliée à facture R1 / mauvais type / mauvaise origine | Refus des FK composites ou de la transition ; jamais `emise` |
+| Facture 101 émise après backup puis restauration tenant | Registre central empêche toute réutilisation de 101 ; séquence reconstruite |
 | Retour/refus après facture | Original inchangé, avoir lié si décision financière validée |
+| Vente janvier, retour février, décision mars, remboursement avril | Correction économique en mars, cash en avril ; reconstruction reproductible |
 | Casse ou manquant sans décision financière | Aucun avoir/remboursement automatique |
 | Échange 8 000 vers 10 000 | Nouvelle commande/facture, affectation 8 000, complément 2 000 hors frais |
 | Échange 10 000 vers 8 000 | Affectation 8 000, différence remboursable 2 000 sous plafond, aucune double unité compensée |
@@ -3223,7 +3365,7 @@ La référence est « les derniere modiff.docx ». Ses premiers paragraphes util
 
 ### Décisions métier fixées
 
-Incidents multi-causes autorisés ; retour physique partiel hors MVP ; expiration payante vers gratuit/hors_quota ; backups automatiques configurables ; restauration avec réconciliation ; isolation physique des fichiers ; timeout ambigu=incertain ; factures émises immuables ; propriétaire immuable ; un colis par commande. Le stock est réservé lors de la confirmation téléphonique atomique, après une soumission en attente. Un échange après expédition utilise une nouvelle commande liée pour préserver ces invariants.
+Incidents multi-causes autorisés ; retour physique partiel hors MVP ; identité physique des variantes figée après première utilisation ; créances transporteur explicites ; expiration payante vers gratuit/hors_quota ; backups automatiques configurables ; restauration tenant et reprise centrale avec réconciliation ; registre durable des documents émis ; corrections économiques structurées ; isolation physique des fichiers ; timeout ambigu=incertain ; factures émises immuables ; propriétaire immuable ; un colis par commande. Le stock est réservé lors de la confirmation téléphonique atomique, après une soumission en attente. Un échange après expédition utilise une nouvelle commande liée pour préserver ces invariants.
 
 ### Décisions et validations encore requises
 
@@ -3278,7 +3420,7 @@ Les sources juridiques motivent les besoins de données ; les choix de tables et
 
 ## Annexe Inventaire complet
 
-### BDD centrale — 49 tables
+### BDD centrale — 50 tables
 
 1. `users`
 2. `tenants`
@@ -3320,17 +3462,18 @@ Les sources juridiques motivent les besoins de données ; les choix de tables et
 38. `sauvegardes_tenants`
 39. `restaurations_tenants`
 40. `operations_centrales_tenants`
-41. `sequences_facturation_saas`
-42. `factures_saas`
-43. `lignes_factures_saas`
-44. `avoirs_saas`
-45. `lignes_avoirs_saas`
-46. `transmissions_documents_saas`
-47. `regles_facturation`
-48. `registre_activites_traitement`
-49. `journal_operations_donnees_personnelles_central`
+41. `registre_documents_emis`
+42. `sequences_facturation_saas`
+43. `factures_saas`
+44. `lignes_factures_saas`
+45. `avoirs_saas`
+46. `lignes_avoirs_saas`
+47. `transmissions_documents_saas`
+48. `regles_facturation`
+49. `registre_activites_traitement`
+50. `journal_operations_donnees_personnelles_central`
 
-### BDD boutique — 66 tables
+### BDD boutique — 70 tables
 
 1. `boutique`
 2. `adresses_boutique`
@@ -3385,17 +3528,21 @@ Les sources juridiques motivent les besoins de données ; les choix de tables et
 51. `personnalisations_theme` — évolution
 52. `frais_transporteur`
 53. `reglements_frais_transporteur`
-54. `ecritures_encaissement`
-55. `indemnisations_transporteur`
-56. `factures`
-57. `incidents_commande`
-58. `incidents_commande_details`
-59. `contrats_commandes`
-60. `transmissions_documents`
-61. `sequences_documents`
-62. `acceptations_conditions_vente`
-63. `accords_collecte_donnees`
-64. `journal_operations_donnees_personnelles`
-65. `obligations_facturation`
-66. `compensations_echanges`
+54. `creances_transporteur`
+55. `allocations_creances_transporteur`
+56. `ecritures_encaissement`
+57. `indemnisations_transporteur`
+58. `factures`
+59. `incidents_commande`
+60. `incidents_commande_details`
+61. `contrats_commandes`
+62. `transmissions_documents`
+63. `sequences_documents`
+64. `acceptations_conditions_vente`
+65. `accords_collecte_donnees`
+66. `journal_operations_donnees_personnelles`
+67. `obligations_facturation`
+68. `compensations_echanges`
+69. `corrections_commerciales`
+70. `lignes_corrections_commerciales`
 
