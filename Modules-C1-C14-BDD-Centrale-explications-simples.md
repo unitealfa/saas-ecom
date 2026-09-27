@@ -32,17 +32,17 @@ C1 répond surtout à 4 questions :
 
 ## 4. Fonctionnement simple
 
-Exemple : **un propriétaire veut créer une boutique.**
+Exemple : **un propriétaire clique sur « Créer une boutique ».**
 
-1. `users` vérifie quel utilisateur est connecté.
-2. C4 vérifie combien de boutiques son abonnement lui permet d’avoir.
-3. S’il a encore une place, `tenants` crée la nouvelle boutique.
-4. `membres_tenants` relie le propriétaire à cette boutique.
-5. C9 crée réellement la BDD séparée de la boutique et ses tables.
-6. `domains` ajoute l’adresse web de la boutique.
+1. `users` regarde **qui est connecté**.
+2. C4 regarde son abonnement pour savoir **combien de boutiques il a le droit d’avoir**.
+3. S’il a encore le droit d’en créer une, `tenants` crée la nouvelle boutique.
+4. `membres_tenants` indique : **ce propriétaire appartient à cette boutique**.
+5. C9 crée **la vraie BDD séparée** de cette boutique avec ses tables.
+6. `domains` ajoute **l’adresse du site**, par exemple `maboutique.monsaas.dz`.
 7. Quand tout est prêt, la boutique peut être utilisée.
 
-En résumé : **C1 crée la boutique et la relie à son propriétaire.**
+**En très simple :** on vérifie le propriétaire → on vérifie qu’il peut créer une boutique → on crée la boutique → on crée sa BDD → on lui donne son adresse web.
 
 ## 5. Diagramme
 
@@ -103,15 +103,15 @@ Par exemple :
 
 Exemple : **un collaborateur veut modifier un produit.**
 
-1. `users` vérifie qui est le collaborateur.
-2. `membres_tenants` vérifie qu’il fait bien partie de cette boutique.
+1. `users` regarde **qui essaie de faire l’action**.
+2. `membres_tenants` vérifie : **est-ce que cette personne travaille bien dans cette boutique ?**
 3. `membres_roles` regarde son rôle, par exemple **vendeur**.
-4. `roles_permissions` regarde ce que ce rôle a le droit de faire.
-5. C3 vérifie s’il existe une règle spéciale pour cette personne, par exemple lui retirer un droit.
-6. C4 vérifie aussi si l’abonnement de la boutique permet d’utiliser cette fonction.
-7. Si tout est autorisé, l’action continue. Sinon, elle est refusée.
+4. `roles_permissions` regarde ce que ce rôle peut faire.
+5. C3 vérifie s’il existe une **règle spéciale** pour cette personne, par exemple : « normalement il peut modifier les prix, mais pas aujourd’hui ».
+6. C4 vérifie si l’abonnement de la boutique permet d’utiliser cette fonction.
+7. Si tout est bon → action autorisée. Sinon → action refusée.
 
-En résumé : **C2 répond à la question : “Est-ce que cette personne a le droit de faire cette action ?”**
+**En très simple :** on vérifie la personne → son rôle → ses droits → les règles spéciales → son abonnement → puis on dit oui ou non.
 
 ## 5. Diagramme
 
@@ -174,15 +174,27 @@ Par exemple :
 
 C3 gère les **cas spéciaux d’accès**.
 
-1. `exceptions_permissions` peut donner ou retirer un droit précis à une personne, parfois seulement pendant une période.
-2. `invitations_equipes` sert quand le propriétaire veut inviter un collaborateur dans sa boutique.
-3. Quand l’invitation est acceptée, C1 ajoute la personne dans `membres_tenants` et C2 lui donne son rôle dans `membres_roles`.
-4. `restrictions_admins` sert à limiter un administrateur SaaS : par exemple lui interdire certaines actions sur une boutique ou un utilisateur précis.
-5. `sessions_assistance` permet à un administrateur SaaS d’entrer temporairement dans le contexte d’une boutique pour l’aider.
-6. Pendant cette assistance, ses droits sont toujours vérifiés : il ne récupère pas automatiquement tous les droits du commerçant.
-7. C6 garde une trace des actions importantes réalisées.
+### Cas 1 — Inviter quelqu’un dans une boutique
 
-En résumé : **C3 gère les invitations, les droits spéciaux et l’assistance des administrateurs SaaS.**
+1. Le propriétaire veut ajouter un collaborateur.
+2. `invitations_equipes` crée une invitation.
+3. Le collaborateur accepte.
+4. C1 l’ajoute dans `membres_tenants`.
+5. C2 lui donne son rôle dans `membres_roles`.
+
+### Cas 2 — Donner ou retirer un droit spécial
+
+1. `exceptions_permissions` peut dire : **cette personne a ce droit spécial** ou **ce droit lui est interdit**.
+2. Cette règle peut avoir une date de début et une date de fin.
+
+### Cas 3 — Un administrateur SaaS aide une boutique
+
+1. `restrictions_admins` vérifie ce que cet administrateur SaaS a le droit de faire.
+2. S’il peut aider cette boutique, `sessions_assistance` ouvre un accès temporaire.
+3. Pendant l’aide, ses droits sont toujours vérifiés.
+4. C6 garde une trace de ses actions importantes.
+
+**En très simple :** C3 sert à inviter des membres, ajouter ou retirer un droit spécial, et permettre à un administrateur SaaS d’aider une boutique sans lui donner tous les pouvoirs.
 
 ## 5. Diagramme
 
@@ -243,17 +255,18 @@ Exemple :
 
 ## 4. Fonctionnement simple
 
-Exemple : **un propriétaire veut utiliser une fonction ou créer une nouvelle boutique.**
+Exemple : **un propriétaire veut utiliser une fonction payante ou créer une autre boutique.**
 
-1. `abonnements` indique quel abonnement il possède.
-2. `plans` indique le plan concerné, par exemple **Gratuit** ou **Pro**.
-3. `plans_fonctionnalites` dit ce que ce plan autorise.
-4. Exemple : le plan Gratuit peut autoriser 1 boutique et le plan Pro 3 boutiques.
-5. `exceptions_fonctionnalites` peut exceptionnellement changer une limite ou activer/désactiver une fonction pour ce propriétaire.
-6. Le système compare ensuite ce qui est demandé avec ce que le plan autorise.
-7. Si l’abonnement payant est terminé, le plan gratuit prend le relais.
+1. `abonnements` regarde **quel abonnement il possède**.
+2. `plans` regarde le nom de son offre, par exemple **Gratuit** ou **Pro**.
+3. `plans_fonctionnalites` regarde **ce que cette offre permet**.
+4. Exemple : Gratuit = 1 boutique ; Pro = 3 boutiques.
+5. `exceptions_fonctionnalites` regarde s’il existe une règle spéciale pour ce propriétaire, par exemple lui donner temporairement une fonction en plus.
+6. Si son abonnement permet ce qu’il demande → autorisé.
+7. Sinon → refusé.
+8. Si son abonnement payant est terminé, le plan gratuit prend le relais.
 
-En résumé : **C4 répond à la question : “Est-ce que son abonnement lui permet d’utiliser cette fonction ou ce quota ?”**
+**En très simple :** C4 regarde l’abonnement et répond : « est-ce que cette offre permet cette fonction ou ce nombre de boutiques ? »
 
 ## 5. Diagramme
 
@@ -314,16 +327,26 @@ Ces trois parties ne représentent pas une seule chaîne.
 
 ## 4. Fonctionnement simple
 
-C5 contient **trois petits services différents**.
+C5 fait **trois choses séparées**.
 
-1. Pour un quota, `consommations_fonctionnalites` garde la quantité utilisée et C4 la compare à la limite autorisée.
-2. Pour l’abonnement, `echeances_abonnement` indique combien le commerçant doit payer.
-3. `reglements_abonnement` indique combien il a réellement payé.
-4. Le système peut alors savoir combien il reste à payer.
-5. Pour une adresse, `wilayas` contient les wilayas et `communes` contient leurs communes.
-6. Le système vérifie par exemple qu’une commune appartient bien à la wilaya choisie.
+### 1 — Suivre un quota
 
-En résumé : **C5 suit certains quotas, les paiements d’abonnement et les wilayas/communes.**
+1. `consommations_fonctionnalites` regarde **combien une fonction a déjà été utilisée**.
+2. C4 compare ce nombre avec la limite du plan.
+
+### 2 — Suivre le paiement de l’abonnement
+
+1. `echeances_abonnement` dit **combien le commerçant doit payer**.
+2. `reglements_abonnement` dit **combien il a réellement payé**.
+3. Le système calcule ce qu’il reste à payer.
+
+### 3 — Vérifier une adresse
+
+1. `wilayas` contient les wilayas.
+2. `communes` contient les communes.
+3. Le système vérifie que la commune choisie appartient bien à la bonne wilaya.
+
+**En très simple :** C5 suit certaines limites, les paiements de l’abonnement et les wilayas/communes.
 
 ## 5. Diagramme
 
@@ -379,16 +402,22 @@ C6 permet surtout de :
 
 ## 4. Fonctionnement simple
 
-C6 fait surtout **deux choses**.
+C6 fait **deux choses**.
 
-1. Quand une action importante est faite, `journal_audit_central` garde une trace.
-2. Cette trace indique par exemple qui a fait l’action, quand et sur quoi.
-3. Pour vérifier un téléphone ou WhatsApp, `verifications_contacts` crée un code temporaire.
-4. L’utilisateur reçoit puis saisit ce code.
-5. Le système vérifie que le code est correct et pas expiré.
-6. S’il est valide, le contact est marqué comme vérifié.
+### 1 — Garder une trace
 
-En résumé : **C6 garde les traces importantes et vérifie les contacts.**
+1. Une action importante est faite, par exemple modifier un abonnement.
+2. `journal_audit_central` enregistre **qui l’a faite, quand et sur quoi**.
+
+### 2 — Vérifier un téléphone ou WhatsApp
+
+1. `verifications_contacts` crée un code temporaire.
+2. Le code est envoyé à l’utilisateur.
+3. L’utilisateur tape le code.
+4. Le système vérifie s’il est correct et encore valable.
+5. S’il est bon, le contact est marqué comme vérifié.
+
+**En très simple :** C6 garde l’historique des actions importantes et vérifie les contacts avec un code.
 
 ## 5. Diagramme
 
@@ -442,17 +471,17 @@ Un même propriétaire peut utiliser le même compte transporteur pour plusieurs
 
 ## 4. Fonctionnement simple
 
-Exemple : **un propriétaire veut utiliser le même compte transporteur pour plusieurs boutiques.**
+Exemple : **un propriétaire a deux boutiques et veut utiliser le même compte transporteur pour les deux.**
 
-1. `comptes_livraison` enregistre son compte transporteur.
+1. `comptes_livraison` garde le compte du transporteur.
 2. `boutiques_comptes_livraison` indique quelles boutiques peuvent utiliser ce compte.
-3. Le système vérifie que ces boutiques appartiennent bien au même propriétaire.
-4. Quand une boutique veut créer une livraison, elle utilise ce compte si l’association est autorisée.
-5. `tarifs_transporteur` garde les tarifs avec leurs dates de validité.
-6. Si le tarif change plus tard, un ancien retour garde le tarif qui était valable à sa date.
-7. Le montant réellement appliqué est ensuite gardé dans T16.
+3. Le système vérifie que ces boutiques ont bien le même propriétaire.
+4. Quand une boutique envoie un colis, elle peut utiliser ce compte.
+5. `tarifs_transporteur` garde les prix du transporteur avec leurs dates.
+6. Si le prix change plus tard, un ancien retour garde l’ancien prix qui était valable ce jour-là.
+7. T16 garde ensuite le vrai montant facturé.
 
-En résumé : **C7 partage correctement un compte transporteur entre les boutiques du même propriétaire et garde l’historique des tarifs.**
+**En très simple :** C7 dit quelles boutiques peuvent utiliser un compte transporteur et quel tarif était valable à chaque date.
 
 ## 5. Diagramme
 
@@ -508,14 +537,20 @@ Il faut alors savoir :
 
 Exemple : **deux boutiques utilisent le même compte transporteur.**
 
-1. Quand le transporteur parle d’un colis, `registre_colis_transporteur` indique à quelle boutique ce colis appartient.
-2. L’information est alors envoyée vers la bonne BDD boutique.
-3. Si le transporteur verse une grosse somme pour plusieurs boutiques, `lots_reversement_transporteur` garde le montant total.
-4. `parts_reversement_tenants` découpe ce total entre les boutiques.
-5. Le système vérifie que toutes les parts réunies donnent bien le montant total reçu.
-6. Chaque part est ensuite envoyée une seule fois vers la bonne boutique.
+### Si le transporteur parle d’un colis
 
-En résumé : **C8 évite de mélanger les colis et l’argent de plusieurs boutiques qui utilisent le même compte transporteur.**
+1. `registre_colis_transporteur` regarde **à quelle boutique appartient le colis**.
+2. L’information est envoyée vers la bonne boutique.
+
+### Si le transporteur envoie de l’argent pour plusieurs boutiques
+
+1. `lots_reversement_transporteur` garde le montant total reçu.
+2. `parts_reversement_tenants` sépare ce total entre les boutiques.
+3. Exemple : 100 000 DA = 60 000 DA pour Boutique A + 40 000 DA pour Boutique B.
+4. Le système vérifie que les parts donnent bien le total.
+5. Chaque part est ensuite envoyée à la bonne boutique.
+
+**En très simple :** C8 évite de mélanger les colis et l’argent de plusieurs boutiques qui utilisent le même compte transporteur.
 
 ## 5. Diagramme
 
@@ -565,17 +600,17 @@ C9 suit techniquement la création et les mises à jour des BDD boutiques.
 
 ## 4. Fonctionnement simple
 
-Exemple : **une BDD boutique doit être créée ou mise à jour.**
+Exemple : **la BDD d’une boutique doit être créée ou mise à jour.**
 
-1. C9 identifie la boutique concernée avec `tenants`.
-2. `deploiements_schema_tenants` crée une ligne pour suivre l’opération.
-3. Le système lance la création de la BDD ou la mise à jour de ses tables.
-4. Si tout réussit, l’opération est marquée comme réussie.
-5. `tenants.version_schema` est alors mise à jour.
-6. Si ça échoue, l’erreur reste enregistrée.
-7. Une nouvelle tentative peut ensuite être lancée.
+1. C9 regarde quelle boutique est concernée.
+2. `deploiements_schema_tenants` crée une ligne pour dire : **je commence cette opération**.
+3. Le système crée la BDD ou modifie ses tables.
+4. Si ça marche, l’opération est marquée comme réussie.
+5. `tenants.version_schema` indique alors la nouvelle version de la BDD.
+6. Si ça échoue, l’erreur est enregistrée.
+7. Une nouvelle tentative peut être faite plus tard.
 
-En résumé : **C9 garde l’historique de la création et des mises à jour techniques de chaque BDD boutique.**
+**En très simple :** C9 garde l’historique de chaque création ou mise à jour de BDD boutique.
 
 ## 5. Diagramme
 
@@ -622,17 +657,17 @@ C10 conserve les informations légales du propriétaire utilisées dans les docu
 
 ## 4. Fonctionnement simple
 
-Exemple : **le propriétaire renseigne ses informations légales.**
+Exemple : **le propriétaire remplit ses informations légales.**
 
 1. `users` indique quel propriétaire est concerné.
-2. `entites_legales` enregistre ses informations légales.
-3. Le système vérifie si ces informations sont complètes et valides.
-4. Si elles ne le sont pas, le propriétaire doit les corriger.
-5. Si elles sont validées, elles peuvent être utilisées dans les factures et autres documents.
-6. Quand un document est créé, on garde une copie des informations utilisées à ce moment-là.
-7. Si le propriétaire change ses informations plus tard, les anciens documents ne changent pas.
+2. `entites_legales` garde ses informations légales.
+3. Le système vérifie si elles sont correctes.
+4. Si elles ne sont pas correctes → il doit les corriger.
+5. Si elles sont correctes → elles peuvent être utilisées dans les documents.
+6. Quand une facture est créée, on garde une copie des informations utilisées ce jour-là.
+7. Si le propriétaire change ses informations plus tard, l’ancienne facture ne change pas.
 
-En résumé : **C10 garde l’identité légale du vendeur et protège l’historique des anciens documents.**
+**En très simple :** C10 garde l’identité légale du vendeur et empêche les anciens documents de changer après coup.
 
 ## 5. Diagramme
 
@@ -681,17 +716,17 @@ C11 décide combien de temps certaines données doivent rester conservées et su
 
 ## 4. Fonctionnement simple
 
-Exemple : **certaines données sont arrivées à la fin de leur durée de conservation.**
+Exemple : **certaines données sont devenues anciennes.**
 
-1. `politiques_retention` indique combien de temps garder ces données et quoi faire ensuite.
+1. `politiques_retention` dit **combien de temps on doit garder ces données** et quoi faire ensuite.
 2. Le système cherche les données concernées.
-3. Il vérifie d’abord si elles doivent encore être conservées pour une autre raison.
-4. Si oui, il ne les supprime pas.
-5. Sinon, il applique l’action prévue : garder, anonymiser ou supprimer.
-6. `executions_retention` enregistre ce qui a réellement été fait.
-7. C14 ou T21 garde aussi une trace de l’opération.
+3. Il vérifie : **est-ce qu’on doit encore les garder ?**
+4. Si oui → il ne touche à rien.
+5. Si non → il peut les anonymiser ou les supprimer selon la règle.
+6. `executions_retention` garde une trace de ce qui a été fait.
+7. C14 ou T21 garde aussi une trace de l’opération sur les données personnelles.
 
-En résumé : **C11 décide quand les données peuvent être gardées, anonymisées ou supprimées.**
+**En très simple :** C11 décide quand une donnée peut rester, être cachée/anonymisée ou être supprimée.
 
 ## 5. Diagramme
 
@@ -750,18 +785,25 @@ C12 gère :
 
 ## 4. Fonctionnement simple
 
-Exemple : **une boutique doit être restaurée avec une ancienne sauvegarde.**
+Exemple : **on veut remettre une ancienne sauvegarde d’une boutique.**
 
-1. `configurations_sauvegardes` indique quand faire les sauvegardes.
+### Sauvegarde
+
+1. `configurations_sauvegardes` dit quand faire la sauvegarde.
 2. `limites_sauvegardes_plans` vérifie ce que le plan autorise.
-3. Chaque sauvegarde réussie est enregistrée dans `sauvegardes_tenants`.
-4. Pour restaurer, `restaurations_tenants` enregistre la demande et la boutique est temporairement bloquée en écriture.
-5. La sauvegarde est remise en place.
-6. C9 vérifie que la structure de la BDD est correcte.
-7. `operations_centrales_tenants` et `registre_documents_emis` servent à retrouver ce qui s’est passé après cette ancienne sauvegarde.
-8. Si tout redevient cohérent, la boutique est réactivée. Sinon, elle reste bloquée.
+3. La sauvegarde est créée et enregistrée dans `sauvegardes_tenants`.
 
-En résumé : **C12 sauvegarde les boutiques et vérifie qu’une restauration ne fait pas perdre des opérations récentes.**
+### Restauration
+
+1. `restaurations_tenants` enregistre la demande.
+2. La boutique est temporairement bloquée pour éviter de nouvelles modifications.
+3. L’ancienne sauvegarde est remise en place.
+4. C9 vérifie que la BDD fonctionne avec la bonne structure.
+5. `operations_centrales_tenants` et `registre_documents_emis` vérifient ce qui s’est passé après cette ancienne sauvegarde.
+6. Si tout correspond → la boutique est réactivée.
+7. Si quelque chose ne correspond pas → elle reste bloquée jusqu’à correction.
+
+**En très simple :** C12 remet une sauvegarde sans oublier ce qui s’est passé après cette sauvegarde.
 
 ## 5. Diagramme
 
@@ -822,18 +864,19 @@ C13 sert à **facturer le commerçant pour l'utilisation du SaaS**.
 
 ## 4. Fonctionnement simple
 
-Exemple : **le SaaS doit facturer l’abonnement d’un commerçant.**
+Exemple : **le SaaS doit envoyer une facture d’abonnement au commerçant.**
 
-1. C5 indique le montant d’abonnement à facturer avec `echeances_abonnement`.
-2. C14 indique quelle règle de facturation utiliser.
+1. C5 dit combien le commerçant doit payer.
+2. C14 dit quelle règle de facturation utiliser.
 3. `factures_saas` crée la facture.
 4. `lignes_factures_saas` détaille ce qui est facturé.
-5. C10 fournit l’identité du commerçant et `sequences_facturation_saas` donne le prochain numéro.
-6. La facture est ensuite figée et enregistrée dans `registre_documents_emis`.
-7. `transmissions_documents_saas` suit son envoi.
-8. Si une facture déjà émise doit être corrigée, on crée un `avoirs_saas` au lieu de modifier l’ancienne facture.
+5. C10 donne les informations légales du commerçant.
+6. `sequences_facturation_saas` donne le prochain numéro de facture.
+7. La facture est enregistrée et ne doit plus être modifiée.
+8. `transmissions_documents_saas` suit son envoi.
+9. S’il faut corriger une facture déjà envoyée, on crée un `avoirs_saas` au lieu de modifier l’ancienne facture.
 
-En résumé : **C13 facture l’utilisation du SaaS au commerçant.**
+**En très simple :** C13 crée et envoie la facture que le commerçant paie pour utiliser le SaaS.
 
 ## 5. Diagramme
 
@@ -893,17 +936,23 @@ Documenter et tracer certains traitements de données personnelles.
 
 ## 4. Fonctionnement simple
 
-C14 contient **deux parties différentes**.
+C14 fait **deux choses différentes**.
 
-1. Pour la facturation, `regles_facturation` contient les règles à utiliser.
-2. Avant de créer une facture, C13 ou T22 vérifie que la règle est bien validée.
-3. Si elle ne l’est pas, la facture est bloquée.
-4. Pour les données personnelles, `registre_activites_traitement` explique quelles données sont utilisées et pourquoi.
-5. C11 peut appliquer les règles de conservation correspondantes.
-6. Si une action est faite sur les données centrales, `journal_operations_donnees_personnelles_central` garde la trace.
-7. Si l’action concerne seulement une boutique, la trace est gardée dans T21.
+### 1 — Règles de facturation
 
-En résumé : **C14 garde les règles de facturation et les traces importantes liées aux données personnelles.**
+1. `regles_facturation` garde les règles à utiliser pour créer les factures.
+2. Avant de créer une facture, C13 ou T22 vérifie si la bonne règle est validée.
+3. Si elle est validée → la facture peut continuer.
+4. Sinon → la facture est bloquée.
+
+### 2 — Données personnelles
+
+1. `registre_activites_traitement` explique **quelles données sont utilisées et pourquoi**.
+2. C11 applique les règles de conservation si nécessaire.
+3. Si une action est faite sur les données centrales, `journal_operations_donnees_personnelles_central` garde la trace.
+4. Si l’action concerne seulement une boutique, la trace est gardée dans T21.
+
+**En très simple :** C14 garde les règles de facturation et explique ce qui est fait avec les données personnelles.
 
 ## 5. Diagramme
 
