@@ -168,6 +168,93 @@ erDiagram
     users ||--o{ membres_tenants : user_id
 ```
 
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`users` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`nom`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
+- **`prenom`** : le prénom de la personne. Il peut rester vide si le SaaS n’en a pas besoin ou ne le connaît pas encore.
+- **`email`** : l’adresse email du compte.
+- **`password`** : le mot de passe protégé par hachage. Le mot de passe réel ne doit jamais être stocké tel quel.
+- **`telephone`** : le numéro de téléphone. Il est gardé comme texte pour ne pas perdre le `0`, le `+213` ou d’autres signes utiles. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`email_verified_at`** : la date et l’heure liées à **email verified**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`telephone_verified_at`** : la date et l’heure liées à **telephone verified**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`whatsapp_verified_at`** : la date et l’heure liées à **whatsapp verified**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`pays_code`** : le code court du pays. Exemple : `DZ` pour l’Algérie.
+- **`langue`** : la langue préférée pour l’affichage. Exemple : `fr` ou `ar`.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`est_superadmin_racine`** : indique si le compte est le super administrateur racine du SaaS. `true` = compte root ; `false` = utilisateur normal, propriétaire, employé ou administrateur délégué selon ses rôles.
+- **`derniere_connexion_at`** : la date et l’heure liées à **derniere connexion**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`remember_token`** : un jeton technique utilisé par Laravel pour la fonction « se souvenir de moi ». Il peut rester vide.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`tenants` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`proprietaire_id`** : l’identifiant du propriétaire. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`libelle_interne`** : un nom utilisé seulement dans l’administration, pas forcément montré aux visiteurs.
+- **`nom_boutique`** : le nom officiel de la boutique dans le SaaS. Exemple : « Karim Shoes ».
+- **`nom_boutique_normalise`** : une version nettoyée du nom utilisée pour comparer les boutiques. Exemple : «  Karim  Shoes » devient quelque chose comme « karim shoes », afin d’éviter deux noms considérés identiques.
+- **`version_profil`** : un numéro qui augmente quand le profil central change. Exemple : version 4 puis 5 après une modification.
+- **`prefixe_documents`** : un petit code propre à la boutique utilisé dans la numérotation de ses documents. Exemple : `KRM` dans `KRM-FAC-2026-0001`.
+- **`cle_creation`** : une clé donnée à une demande de création. Exemple : si Karim clique deux fois sur « Créer la boutique » à cause d’un réseau lent, la même clé permet de retrouver la première création au lieu d’en créer deux.
+- **`empreinte_creation`** : une empreinte calculée à partir du contenu de la demande de création. Elle permet de vérifier que la même clé n’est pas réutilisée avec des informations différentes.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`est_principale`** : indique si cet élément est le principal. Exemple : l’adresse principale de la boutique.
+- **`priorite_activation`** : le choix de priorité entre plusieurs boutiques. Exemple : si le plan n’en autorise plus qu’une, cette valeur aide à savoir laquelle le propriétaire veut garder active. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`hors_quota_depuis_at`** : la date depuis laquelle la boutique dépasse ce que le plan permet. Exemple : après passage de Pro à Gratuit, une deuxième boutique peut devenir `hors_quota` à cette date. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`data`** : des informations techniques supplémentaires regroupées au même endroit. Exemple : le nom technique de la base créée pour cette boutique.
+- **`version_schema`** : la version du schéma de base de données installée pour cette boutique. Elle aide à savoir si une migration technique manque. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`provisionnee_at`** : la date où la base et les ressources techniques de la boutique ont fini d’être créées. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`domains` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`domain`** : l’adresse web de la boutique. Exemple : `boutique-karim.monsaas.dz`.
+- **`type`** : indique la catégorie de l’élément. Exemple : un domaine peut être `sous_domaine` ou `personnalise`.
+- **`est_principal`** : indique si cet élément est le principal parmi plusieurs. Exemple : le domaine principal de la boutique.
+- **`statut_verification`** : indique où en est la vérification. Exemple : `a_verifier`, `verifiee` ou `a_corriger`.
+- **`verifie_at`** : la date où l’information a été vérifiée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`certificat_statut`** : indique où en est le certificat de sécurité HTTPS du domaine. Exemple : en attente, actif ou en erreur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`membres_tenants` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`user_id`** : l’identifiant du compte utilisateur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`rejoint_at`** : la date et l’heure liées à **rejoint**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`verifications_contacts` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`user_id`** : l’identifiant du compte utilisateur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`canal`** : indique par quel moyen on communique. Exemple : téléphone ou WhatsApp.
+- **`destination_normalisee`** : le téléphone ou contact remis dans un format standard pour comparer correctement deux valeurs écrites différemment.
+- **`code_hash`** : la version protégée du code temporaire. Le vrai code n’est pas conservé directement dans la base.
+- **`expire_at`** : la date où l’élément n’est plus valable.
+- **`nombre_essais`** : le nombre de tentatives déjà faites. Exemple : 2 codes faux saisis.
+- **`consomme_at`** : la date où le code, jeton ou droit à usage unique a été utilisé. S’il est vide, il n’a pas encore été consommé.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
+
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **`users` :** UNIQUE(email normalisé). Pays DZ par défaut. Password contient un hachage. Au maximum un compte racine actif, contrainte conditionnelle à prévoir. Le compte racine possède les droits complets d’administration centrale ; un administrateur délégué conserve toutes les restrictions explicites. Le statut d’administrateur plateforme, racine compris, ne dispense pas des contrôles d’appartenance et d’autorisation pour utiliser le back-office marchand d’une boutique. La langue est une préférence, pas une table de traductions du catalogue.
@@ -263,6 +350,77 @@ erDiagram
     roles ||--o{ users_roles : role_id
 ```
 
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`fonctionnalites` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette fonctionnalité dans la base.
+- **`code`** : le petit nom utilisé par le programme pour reconnaître l’élément. Exemple : `boutiques.nombre` ou `produits.creer`.
+- **`nom`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
+- **`type_valeur`** : indique si la fonctionnalité se règle par **oui/non** ou par **un nombre maximum**. Exemple : « Peut-il utiliser EcoTrack ? Oui. » ou « Combien de boutiques ? 3. »
+- **`unite`** : explique ce que le nombre représente. Exemple : dans **« 3 boutiques »**, le nombre est 3 et l’unité est « boutiques ». Pour une fonction seulement oui/non, ce champ peut rester vide.
+- **`portee_quota`** : indique à qui s’applique la limite. Exemple : **3 boutiques pour Karim au total**, ou une limite calculée séparément pour chacune de ses boutiques.
+- **`periodicite`** : indique quand le compteur recommence. Exemple avec une limite de **5 utilisations** : `jour` = 5 aujourd’hui puis de nouveau 5 demain ; `mois` = 5 ce mois-ci puis de nouveau 5 le mois suivant ; `aucune` = la limite ne recommence pas avec le temps. Par exemple, posséder déjà 3 boutiques ne permet pas d’en créer 3 nouvelles au début du mois suivant.
+- **`actif`** : indique si cette fonctionnalité est proposée par le SaaS. Exemple : elle peut exister dans la liste mais être désactivée parce qu’elle n’est pas encore prête. Cela ne veut pas dire que tous les abonnements y ont accès.
+- **`created_at`** : la date où cette fonctionnalité a été ajoutée dans la base.
+- **`updated_at`** : la date de sa dernière modification. Exemple : tu changes son nom aujourd’hui ; cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où cette fonctionnalité a été retirée tout en gardant son ancienne ligne dans la base. Si ce champ est vide, elle n’a pas été retirée.
+
+**`permissions` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`fonctionnalite_id`** : l’identifiant de la fonctionnalité. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`code`** : le petit nom utilisé par le programme pour reconnaître l’élément. Exemple : `boutiques.nombre` ou `produits.creer`.
+- **`nom`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
+- **`portee`** : indique dans quel endroit la règle s’applique. Exemple : `plateforme` pour l’administration du SaaS ou `tenant` pour une boutique.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`roles` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`nom`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
+- **`code`** : le petit nom utilisé par le programme pour reconnaître l’élément. Exemple : `boutiques.nombre` ou `produits.creer`.
+- **`portee`** : indique dans quel endroit la règle s’applique. Exemple : `plateforme` pour l’administration du SaaS ou `tenant` pour une boutique.
+- **`protege`** : indique si l’élément est protégé contre certaines modifications ou suppressions. Exemple : un rôle système important peut être protégé.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`roles_permissions` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`role_id`** : l’identifiant du rôle. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`permission_id`** : l’identifiant de la permission. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`users_roles` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`user_id`** : l’identifiant du compte utilisateur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`role_id`** : l’identifiant du rôle. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`portee_role`** : confirme que le rôle est utilisé dans la bonne zone. Ici, par exemple, `plateforme` signifie que le rôle sert à administrer le SaaS.
+- **`attribue_par_id`** : l’identifiant de la personne qui a donné ce droit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`membres_roles` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`membre_tenant_id`** : l’identifiant du membre de l’équipe. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`role_id`** : l’identifiant du rôle. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`attribue_par_id`** : l’identifiant de la personne qui a donné ce droit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
+
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **`fonctionnalites` :** UNIQUE(code). type_valeur=booleen|quota ; portee_quota=compte|tenant ; periodicite=aucune|jour|mois. Les quotas journaliers utilisent une fenêtre calendaire explicite. Exemples boutiques.nombre, domaines.personnalises, design.personnalise, livraison.ecotrack, statistiques.lire. Les fonctionnalités doivent correspondre à des contrôles réellement implémentés.
@@ -340,6 +498,64 @@ erDiagram
         datetime updated_at
     }
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`exceptions_permissions` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`user_id`** : l’identifiant du compte utilisateur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`permission_id`** : l’identifiant de la permission. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`effet`** : indique ce que la règle fait. Exemple : `autoriser` donne le droit ; `interdire` le bloque.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`commence_at`** : la date et l’heure où la période ou l’action commence.
+- **`terminee_at`** : la date et l’heure où cette attribution ou règle a pris fin. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`contexte_normalise`** : une valeur technique calculée pour représenter toujours le contexte de la même manière. Exemple : `plateforme` ou l’identifiant d’une boutique. Cela permet d’appliquer correctement les règles d’unicité.
+- **`actif_unique`** : un petit champ technique calculé pour empêcher qu’il y ait deux règles actives identiques en même temps. Les anciennes règles terminées peuvent quand même rester dans l’historique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`expire_at`** : la date où l’élément n’est plus valable. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`attribue_par_id`** : l’identifiant de la personne qui a donné ce droit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`motif`** : explique pourquoi l’action ou la décision a été faite. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`restrictions_admins` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`admin_id`** : l’identifiant de l’administrateur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`permission_id`** : l’identifiant de la permission. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`tenant_cible_id`** : l’identifiant de la boutique visée. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`user_cible_id`** : l’identifiant de l’utilisateur visé. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`role_cible_id`** : l’identifiant du rôle visé. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`effet`** : indique ce que la règle fait. Exemple : `autoriser` donne le droit ; `interdire` le bloque.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`commence_at`** : la date et l’heure où la période ou l’action commence.
+- **`terminee_at`** : la date et l’heure où cette attribution ou règle a pris fin. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`actif_unique`** : un petit champ technique calculé pour empêcher qu’il y ait deux règles actives identiques en même temps. Les anciennes règles terminées peuvent quand même rester dans l’historique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`expire_at`** : la date où l’élément n’est plus valable. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cree_par_id`** : l’identifiant de la personne qui a créé l’élément. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`invitations_equipes` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`role_initial_id`** : l’identifiant du rôle proposé dans l’invitation. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`invite_par_id`** : l’identifiant de la personne qui a envoyé l’invitation. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`email`** : l’adresse email du compte.
+- **`jeton_hash`** : la version protégée du jeton d’invitation. Si la base est lue, le vrai lien secret n’est pas directement récupérable.
+- **`expire_at`** : la date où l’élément n’est plus valable.
+- **`accepte_at`** : la date et l’heure liées à **accepte**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`revoque_at`** : la date et l’heure liées à **revoque**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
@@ -421,6 +637,70 @@ erDiagram
     plans ||--o{ plans_fonctionnalites : plan_id
     plans ||--o{ abonnements : plan_id
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`plans` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`code`** : le petit nom utilisé par le programme pour reconnaître l’élément. Exemple : `boutiques.nombre` ou `produits.creer`.
+- **`version`** : le numéro de version de cet élément. Exemple : version 1, puis version 2 après une évolution ; l’ancienne version peut rester conservée pour comprendre l’historique.
+- **`nom`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
+- **`description`** : un texte qui explique l’élément plus en détail. Il peut rester vide si aucune explication supplémentaire n’est nécessaire.
+- **`prix_mensuel`** : le prix à payer pour un mois d’abonnement.
+- **`prix_annuel`** : le prix à payer pour une année d’abonnement.
+- **`actif`** : indique si l’élément peut encore être utilisé. `true` = oui, `false` = non.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`plans_fonctionnalites` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`plan_id`** : l’identifiant du plan d’abonnement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`fonctionnalite_id`** : l’identifiant de la fonctionnalité. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`active`** : indique si cette possibilité est autorisée. `true` = oui, `false` = non.
+- **`limite`** : le nombre maximum autorisé. Exemple : `3` peut vouloir dire maximum 3 boutiques. Si le champ est vide dans un cas prévu comme illimité, il n’y a pas de nombre maximum. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`abonnements` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`user_id`** : l’identifiant du compte utilisateur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`plan_id`** : l’identifiant du plan d’abonnement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`periodicite`** : indique la durée choisie pour l’abonnement payant. Exemple : `mensuel` pour payer par mois ou `annuel` pour payer par année, selon les valeurs prévues par le SaaS.
+- **`montant_convenu`** : le montant qui a été décidé pour cet abonnement, afin de garder le prix réellement accepté même si le tarif du plan change plus tard.
+- **`commence_at`** : la date et l’heure où la période ou l’action commence.
+- **`periode_debut`** : le début de la période concernée. Exemple : début du mois payé.
+- **`periode_fin`** : la fin de la période concernée. Exemple : fin du mois payé. Peut rester vide lorsque la période n’a pas de fin prévue.
+- **`essai_fin`** : la date où la période d’essai se termine. Elle peut rester vide s’il n’y a pas d’essai.
+- **`termine_at`** : la date et l’heure où elle s’est terminée. Peut rester vide tant que ce n’est pas terminé.
+- **`renouvellement_automatique`** : indique si l’abonnement payant doit être renouvelé automatiquement selon la règle prévue. `false` signifie qu’on ne prépare pas un nouveau renouvellement payant.
+- **`attribue_par_id`** : l’identifiant de la personne qui a donné ce droit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`exceptions_fonctionnalites` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`proprietaire_id`** : l’identifiant du propriétaire. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`fonctionnalite_id`** : l’identifiant de la fonctionnalité. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`active`** : indique si cette possibilité est autorisée. `true` = oui, `false` = non.
+- **`limite`** : le nombre maximum autorisé. Exemple : `3` peut vouloir dire maximum 3 boutiques. Si le champ est vide dans un cas prévu comme illimité, il n’y a pas de nombre maximum. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`commence_at`** : la date et l’heure où la période ou l’action commence.
+- **`expire_at`** : la date où l’élément n’est plus valable. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`attribue_par_id`** : l’identifiant de la personne qui a donné ce droit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`motif`** : explique pourquoi l’action ou la décision a été faite. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
@@ -518,6 +798,84 @@ erDiagram
     wilayas ||--o{ communes : wilaya_id
 ```
 
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`consommations_fonctionnalites` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`proprietaire_id`** : l’identifiant du propriétaire. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`fonctionnalite_id`** : l’identifiant de la fonctionnalité. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`periode_debut`** : le début de la période concernée. Exemple : début du mois payé.
+- **`periode_fin`** : la fin de la période concernée. Exemple : fin du mois payé. Peut rester vide lorsque la période n’a pas de fin prévue.
+- **`quantite`** : le nombre d’éléments concernés. Exemple : `2` signifie deux unités du produit.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`echeances_abonnement` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`abonnement_id`** : l’identifiant de l’abonnement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`numero`** : le numéro lisible de l’élément. Exemple : numéro d’échéance ou de facture selon la table.
+- **`periode_debut`** : le début de la période concernée. Exemple : début du mois payé.
+- **`periode_fin`** : la fin de la période concernée. Exemple : fin du mois payé. Peut rester vide lorsque la période n’a pas de fin prévue.
+- **`montant`** : la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA.
+- **`exigible_at`** : la date et l’heure liées à **exigible**. Elle permet de savoir exactement quand cette étape a eu lieu.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`reglements_abonnement` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`echeance_id`** : l’identifiant de l’échéance à payer. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`montant`** : la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA.
+- **`moyen`** : la manière utilisée pour payer. Exemple : virement, espèces ou autre moyen autorisé par le SaaS.
+- **`reference`** : un numéro ou texte de référence qui aide à reconnaître l’opération. Exemple : numéro d’un reçu ou référence externe. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`preuve_chemin`** : l’endroit où est rangé le fichier servant de preuve, par exemple un reçu ou un bordereau. Le fichier lui-même n’est pas stocké dans ce champ. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`recu_at`** : la date et l’heure liées à **recu**. Elle permet de savoir exactement quand cette étape a eu lieu.
+- **`valide_par_id`** : l’identifiant de la personne qui a validé. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`valide_at`** : la date et l’heure liées à **valide**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`annule_at`** : la date et l’heure liées à **annule**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`contrepassation_de_id`** : l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`correction_de_id`** : l’identifiant de l’ancienne écriture que cette ligne corrige. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`wilayas` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`code`** : le petit nom utilisé par le programme pour reconnaître l’élément. Exemple : `boutiques.nombre` ou `produits.creer`.
+- **`nom_fr`** : le nom en français.
+- **`nom_ar`** : le nom en arabe. Il peut rester vide si cette traduction n’est pas encore renseignée.
+- **`active`** : indique si cette possibilité est autorisée. `true` = oui, `false` = non.
+- **`source_referentiel`** : indique d’où vient la liste officielle utilisée. Exemple : le texte officiel ayant servi à importer les wilayas.
+- **`date_effet`** : la date à partir de laquelle l’information ou la correction doit compter. Exemple : une correction enregistrée aujourd’hui peut devoir compter pour la vente d’hier.
+- **`version_referentiel`** : indique quelle version de cette liste officielle a été utilisée.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`communes` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`wilaya_id`** : l’identifiant de la wilaya. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`code`** : le petit nom utilisé par le programme pour reconnaître l’élément. Exemple : `boutiques.nombre` ou `produits.creer`.
+- **`nom_fr`** : le nom en français.
+- **`nom_ar`** : le nom en arabe. Il peut rester vide si cette traduction n’est pas encore renseignée.
+- **`active`** : indique si cette possibilité est autorisée. `true` = oui, `false` = non.
+- **`source_referentiel`** : indique d’où vient la liste officielle utilisée. Exemple : le texte officiel ayant servi à importer les wilayas.
+- **`date_effet`** : la date à partir de laquelle l’information ou la correction doit compter. Exemple : une correction enregistrée aujourd’hui peut devoir compter pour la vente d’hier.
+- **`version_referentiel`** : indique quelle version de cette liste officielle a été utilisée.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+
+
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **`consommations_fonctionnalites` :** UNIQUE(proprietaire_id,contexte_normalise,fonctionnalite_id,periode_debut). Mise à jour atomique, contrôlée par le serveur, compteur recalculable. Pour une NOUVELLE création, boutiques.nombre compte TOUS les tenants non supprimés du propriétaire, y compris hors_quota, en_provisionnement, suspendu et echec_provisionnement, sous verrou ; voir 7.1. Pour l’exploitation après rétrogradation, sélectionner au plus le quota de boutiques actives existantes (7.2), sans supprimer les excédentaires. Un échec récupérable conserve sa place, une libération définitive est explicite. Pas de second compteur concurrent. Quotas d’un membre = ceux du propriétaire de la boutique.
@@ -551,6 +909,26 @@ erDiagram
         datetime created_at
     }
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`journal_audit_central` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`acteur_id`** : l’identifiant de la personne qui a fait l’action. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`action`** : le nom de l’action réalisée. Exemple : `abonnement.modifier`.
+- **`cible_type`** : le type de chose concernée par l’action. Exemple : `tenant`, `user` ou `role`.
+- **`cible_id`** : l’identifiant de l’élément précis concerné par l’action. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`avant`** : une petite copie des informations importantes avant la modification. Exemple : ancien statut = `actif`. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`apres`** : une petite copie des informations importantes après la modification. Exemple : nouveau statut = `suspendu`. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`correlation_id`** : un numéro commun utilisé pour relier plusieurs traces qui appartiennent à la même grande opération. Exemple : une création de boutique qui produit plusieurs actions techniques.
+- **`origine`** : indique d’où vient l’action. Exemple : utilisateur, serveur, tâche automatique ou transporteur.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
@@ -607,6 +985,50 @@ erDiagram
     comptes_livraison ||--o{ boutiques_comptes_livraison : compte_livraison_id
     comptes_livraison ||--o{ tarifs_transporteur : compte_livraison_id
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`comptes_livraison` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`proprietaire_id`** : l’identifiant du propriétaire. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`transporteur`** : le nom du transporteur concerné. Exemple : EcoTrack ou un autre prestataire configuré.
+- **`libelle`** : un nom court utilisé pour reconnaître facilement l’élément à l’écran.
+- **`adaptateur`** : le nom du morceau de programme qui sait parler avec ce transporteur. Cela permet d’utiliser des APIs différentes sans mélanger leur logique.
+- **`identifiant_compte_externe`** : le numéro ou nom qui identifie ce compte chez le transporteur.
+- **`url_api`** : l’adresse utilisée par le serveur pour parler avec l’API du transporteur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`identifiants_api_chiffres`** : les informations secrètes de connexion au transporteur, enregistrées sous forme chiffrée et non lisible directement. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`version_cle_chiffrement`** : indique quelle version de la clé a servi à chiffrer les secrets. La clé elle-même n’est pas stockée ici. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`actif`** : indique si l’élément peut encore être utilisé. `true` = oui, `false` = non.
+- **`derniere_sync_at`** : la dernière fois où le SaaS a synchronisé ce compte avec le service externe. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`boutiques_comptes_livraison` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`compte_livraison_id`** : l’identifiant du compte transporteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`proprietaire_id`** : l’identifiant du propriétaire. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`actif`** : indique si l’élément peut encore être utilisé. `true` = oui, `false` = non.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`tarifs_transporteur` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`compte_livraison_id`** : l’identifiant du compte transporteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`tarif_retour`** : le prix facturé pour un retour selon ce compte transporteur. Exemple : 300 DA.
+- **`date_debut`** : la date où cette règle ou ce tarif commence à s’appliquer.
+- **`date_fin`** : la date où cette règle ou ce tarif arrête de s’appliquer. Si elle est vide, il n’y a pas encore de fin prévue.
+- **`actif`** : indique si l’élément peut encore être utilisé. `true` = oui, `false` = non.
+- **`source`** : indique d’où vient l’information. Exemple : saisie manuelle ou réponse de l’API.
+- **`cree_par_id`** : l’identifiant de la personne qui a créé l’élément. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+
 
 - **`comptes_livraison` :** UNIQUE(id,proprietaire_id), UNIQUE(transporteur,identifiant_compte_externe). Le compte externe canonique est vérifié avant activation pour éviter deux enregistrements du même compte ; à défaut d’identification fiable par API, activation manuelle contrôlée. Propriétaire et identité externe immuables dès utilisation. Secrets chiffrés au repos, déchiffrables uniquement par le connecteur serveur ; `version_cle_chiffrement` identifie la version de clé utilisée. **La clé maître elle-même reste hors de cette BDD**, dans le gestionnaire de secrets/clé de l’infrastructure, avec sauvegarde/versionnement indépendants afin qu’une restauration centrale ne réactive pas aveuglément une ancienne clé. URL autorisée pour éviter les appels arbitraires. Un compte manuel peut ne pas avoir de secret. Un rôle d’une boutique ne donne jamais accès aux autres boutiques utilisant ce compte.
 - **`boutiques_comptes_livraison` :** UNIQUE(tenant_id,compte_livraison_id), UNIQUE(id,tenant_id,compte_livraison_id). FK(tenant_id,proprietaire_id) → tenants(id,proprietaire_id) et FK(compte_livraison_id,proprietaire_id) → comptes_livraison(id,proprietaire_id). L’association et le compte doivent être actifs pour de nouveaux envois. Leur désactivation conserve les liens historiques et autorise un rapprochement de clôture contrôlé.
@@ -665,6 +1087,50 @@ erDiagram
     lots_reversement_transporteur ||--o{ parts_reversement_tenants : lot_id
 ```
 
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`registre_colis_transporteur` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`compte_livraison_id`** : l’identifiant du compte transporteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`livraison_id`** : l’identifiant de la livraison. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`reference_marchand`** : un numéro stable créé côté marchand/SaaS pour reconnaître le colis chez le transporteur.
+- **`tracking`** : le numéro de suivi du colis donné par le transporteur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`lots_reversement_transporteur` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`compte_livraison_id`** : l’identifiant du compte transporteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`reference_externe`** : le numéro donné par un système extérieur. Exemple : référence d’un reversement chez le transporteur.
+- **`montant_net_verifie`** : le montant net réellement vérifié pour ce lot, après contrôle des informations disponibles.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`preuve_chemin`** : l’endroit où est rangé le fichier servant de preuve, par exemple un reçu ou un bordereau. Le fichier lui-même n’est pas stocké dans ce champ. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`contrepassation_de_id`** : l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`valide_par_id`** : l’identifiant de la personne qui a validé. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`recu_at`** : la date et l’heure liées à **recu**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`parts_reversement_tenants` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`lot_id`** : l’identifiant du lot de reversement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`compte_livraison_id`** : l’identifiant du compte transporteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`montant_net_affecte`** : la partie du montant global attribuée à cette boutique.
+- **`statut_application`** : indique si la part ou l’opération a déjà été appliquée dans la base de la boutique. Exemple : `en_attente`, `appliquee` ou `erreur`.
+- **`bordereau_tenant_id`** : l’identifiant du bordereau créé dans la base de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`applique_at`** : la date et l’heure liées à **applique**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
+
 - **`registre_colis_transporteur` :** UNIQUE(compte_livraison_id,reference_marchand), UNIQUE(compte_livraison_id,tracking) hors NULL, UNIQUE(tenant_id,livraison_id). FK(tenant_id,compte_livraison_id) → boutiques_comptes_livraison(tenant_id,compte_livraison_id). Référence marchand stable calculée depuis tenant et livraison, sans données personnelles. Routage immuable dès envoi. Les événements inconnus ne sont pas appliqués à une boutique par simple ressemblance de numéro ; rapprochement manuel. Le job consomme le compte une fois et route seulement les identifiants connus.
 - **`lots_reversement_transporteur` :** UNIQUE(compte_livraison_id,reference_externe), UNIQUE(id,compte_livraison_id), UNIQUE(contrepassation_de_id) hors NULL. Statut=brouillon|valide|annule. Un lot validé est figé ; annulation financière via lot inverse, jamais en retirant les montants historiques. Contrôle de preuve et validation humaine si l’API ne fournit pas un bordereau détaillé. Montant signé pour les paiements de frais. Une référence de saisie manuelle doit être stable et contrôlée pour éviter les doublons.
 - **`parts_reversement_tenants` :** UNIQUE(lot_id,tenant_id), FK(lot_id,compte_livraison_id) → lots_reversement_transporteur(id,compte_livraison_id), FK(tenant_id,compte_livraison_id) → boutiques_comptes_livraison(tenant_id,compte_livraison_id). Avant validation du lot, somme des parts = net vérifié sous verrou du lot. Parts figées après validation ; statut_application=en_attente|appliquee|erreur. Chaque BDD tenant crée son bordereau de façon idempotente sur UNIQUE(part_centrale_id). Un crash entre commit tenant et accusé central est repris en recherchant cette même clé. Le central prouve la réception globale ; les lignes locales en expliquent la ventilation. Ne jamais additionner les montants centraux aux locaux dans le résultat financier.
@@ -697,6 +1163,31 @@ erDiagram
         datetime updated_at
     }
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`deploiements_schema_tenants` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`version_depart`** : la version technique présente avant la migration. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`version_cible`** : la version technique que l’on veut installer.
+- **`operation`** : le type de travail technique réalisé. Exemple : création de base, migration ou restauration.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`numero_tentative`** : le numéro de l’essai. Exemple : 1 pour le premier essai, 2 après un nouvel essai.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`commence_at`** : la date et l’heure où la période ou l’action commence. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`termine_at`** : la date et l’heure où elle s’est terminée. Peut rester vide tant que ce n’est pas terminé.
+- **`erreur_code`** : un petit code qui permet de reconnaître le type d’erreur sans stocker un long message sensible. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`erreur_filtree`** : un message d’erreur nettoyé pour ne pas enregistrer de mot de passe, jeton ou autre secret. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`correlation_id`** : un numéro commun utilisé pour relier plusieurs traces qui appartiennent à la même grande opération. Exemple : une création de boutique qui produit plusieurs actions techniques.
+- **`versions_runtime`** : la liste des versions réellement utilisées pendant l’opération. Exemple : version de PHP, Laravel, MySQL et de l’application.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
 
 **Contraintes :** UNIQUE(cle_operation), index(tenant_id,created_at). operation=provisionnement|migration|restauration_controle ; statut=en_attente|en_cours|reussi|echec. Une seule opération en cours par tenant via clé générée conditionnelle UNIQUE et verrou de déploiement. Chaque reprise conserve l’échec précédent et crée une nouvelle tentative. versions_runtime fige PHP, Laravel, stancl/tenancy, MySQL et version applicative réellement utilisés. tenants.version_schema est mis à jour seulement après succès ; la table technique migrations de chaque BDD reste le détail des migrations exécutées. Une migration échouée ne rend pas le tenant actif. Après restauration, contrôler références centrales, autorisations, registre transporteur, parts de règlements et jobs avant réactivation. Une intention externe incertaine reste à rapprocher ; ne pas la renvoyer aveuglément après restauration.
 
@@ -734,6 +1225,37 @@ erDiagram
         datetime updated_at
     }
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`entites_legales` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`proprietaire_id`** : l’identifiant du propriétaire. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`raison_sociale`** : le nom légal de l’entreprise ou de l’activité du vendeur.
+- **`nom_commercial`** : le nom utilisé commercialement s’il est différent du nom légal. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`forme_juridique`** : la forme juridique déclarée de l’activité.
+- **`nature_activite`** : le type d’activité exercée par le vendeur.
+- **`nif`** : le numéro d’identification fiscale, conservé comme texte.
+- **`nis`** : le numéro d’identification statistique lorsqu’il est nécessaire. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`numero_rc`** : le numéro du registre de commerce lorsqu’il s’applique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`numero_carte_artisan`** : le numéro de carte d’artisan lorsqu’il s’applique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`adresse_legale`** : l’adresse officielle de l’entité légale.
+- **`pays_code`** : le code court du pays. Exemple : `DZ` pour l’Algérie.
+- **`telephone_legal`** : le téléphone officiel de l’entité légale.
+- **`email_legal`** : l’email officiel de l’entité légale.
+- **`capital_social`** : le capital social déclaré lorsqu’il existe.
+- **`regime_fiscal`** : le régime fiscal déclaré pour cette entité.
+- **`version`** : le numéro de version de cet élément. Exemple : version 1, puis version 2 après une évolution ; l’ancienne version peut rester conservée pour comprendre l’historique.
+- **`statut_verification`** : indique où en est la vérification. Exemple : `a_verifier`, `verifiee` ou `a_corriger`.
+- **`verifie_at`** : la date où l’information a été vérifiée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`verifie_par_id`** : l’identifiant de la personne qui a vérifié. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
 
 UNIQUE(proprietaire_id) ; FK RESTRICT. Numéros conservés en chaînes, normalisation et validation selon le régime déclaré, pas de longueur numérique algérienne imposée à un identifiant international futur. Au moins RC ou carte artisan renseigné dans un profil vérifié ; conditions de validité contrôlées selon activité. Capital NULL si inapplicable ; sinon >=0. `statut_verification=a_completer|a_verifier|verifiee|a_corriger` ; absence d’identité vérifiée bloque l’activation commerciale, pas la création du brouillon de boutique. Propriétaire immuable. Un changement incrémente version, révoque la validation si nécessaire et laisse une trace filtrée au central.
 
@@ -783,6 +1305,47 @@ erDiagram
     }
     politiques_retention ||--o{ executions_retention : politique_id
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`politiques_retention` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`type_donnee`** : le type de données concerné par la règle. Exemple : données de commande ou données de contact.
+- **`portee`** : indique dans quel endroit la règle s’applique. Exemple : `plateforme` pour l’administration du SaaS ou `tenant` pour une boutique.
+- **`version`** : le numéro de version de cet élément. Exemple : version 1, puis version 2 après une évolution ; l’ancienne version peut rester conservée pour comprendre l’historique.
+- **`duree_jours`** : le nombre de jours pendant lesquels les données doivent être gardées lorsque la règle utilise une durée fixe. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`evenement_depart`** : l’événement à partir duquel on commence à compter la durée. Exemple : fermeture d’une commande.
+- **`action_expiration`** : ce qu’il faut faire à la fin de la durée. Exemple : supprimer, anonymiser ou conserver si une raison validée l’exige.
+- **`base_justificative`** : le texte qui explique pourquoi cette règle de conservation existe.
+- **`version_implementation`** : la version du traitement informatique qui applique cette règle.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`effective_at`** : la date à partir de laquelle cette version devient réellement applicable. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`revue_at`** : la date prévue ou réalisée pour revoir cette règle. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`valide_par_id`** : l’identifiant de la personne qui a validé. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`executions_retention` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`politique_id`** : l’identifiant de la règle de conservation. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`commence_at`** : la date et l’heure où la période ou l’action commence. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`termine_at`** : la date et l’heure où elle s’est terminée. Peut rester vide tant que ce n’est pas terminé.
+- **`nombre_lignes`** : le nombre de lignes de base traitées par l’opération.
+- **`nombre_fichiers`** : le nombre de fichiers traités par l’opération.
+- **`nombre_ignores`** : le nombre d’éléments laissés de côté parce qu’ils ne pouvaient pas encore être supprimés ou traités.
+- **`curseur_reprise`** : une petite information technique qui indique où reprendre après une coupure, sans recommencer tout le travail depuis le début. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`erreur_code`** : un petit code qui permet de reconnaître le type d’erreur sans stocker un long message sensible. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`erreur_filtree`** : un message d’erreur nettoyé pour ne pas enregistrer de mot de passe, jeton ou autre secret. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
 
 - `politiques_retention` : UNIQUE(type_donnee,portee,version), portee=central|tenant. action_expiration=purge|anonymise|conserve ; statut=brouillon|validee|retiree. Durée positive lorsqu’elle existe ; `conserve` exige un fondement et une date/condition de revue, jamais « pour toujours » par défaut. La définition appliquée est immuable ; nouvelle version pour toute évolution. La version applicable à une exécution est choisie explicitement selon effective_at et enregistrée dans politique_id ; une seule version courante résolue par catégorie/portée. L’implémentation est une allowlist de traitements serveur, pas du SQL administrable. Les durées ne sont pas inventées ici : elles sont validées avant collecte réelle.
 - `executions_retention` : scope central → tenant NULL ; scope tenant → tenant obligatoire, vérifié côté service. statut=en_attente|en_cours|reussie|echec ; UNIQUE(cle_operation), clé déterministe politique/tenant/fenêtre. Le lot local est idempotent, son ACK central peut être repris ; compteurs reconstruits depuis les lots techniques persistés, pas incrémentés aveuglément après un crash. Pas de copie des données effacées dans le journal. Les exécutions centrales n’ont accès qu’au tenant annoncé ; reprise avec curseur stable. Voir section 12 pour les dépendances, gels de conservation et sauvegardes.
@@ -916,6 +1479,125 @@ erDiagram
     configurations_sauvegardes ||--o{ sauvegardes_tenants : configuration_id
     sauvegardes_tenants ||--o{ restaurations_tenants : restaure_depuis_backup_id
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`configurations_sauvegardes` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`sauvegarde_active`** : indique si les sauvegardes automatiques de cette boutique sont activées.
+- **`mode_frequence`** : indique comment le planning est défini. Exemple : tous les X jours ou certains jours de la semaine.
+- **`intervalle_jours`** : le nombre de jours entre deux sauvegardes. Exemple : `2` = une sauvegarde tous les deux jours. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`heure_execution`** : l’heure à laquelle la sauvegarde automatique doit démarrer.
+- **`jours_semaine`** : les jours choisis quand le planning utilise des jours précis. Exemple : lundi, mercredi et vendredi. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`date_ancrage`** : la date de départ utilisée pour calculer les répétitions. Exemple : si on sauvegarde tous les 3 jours, on compte à partir de cette date.
+- **`retention_jours`** : le nombre de jours pendant lesquels une sauvegarde est gardée avant de pouvoir être supprimée.
+- **`timezone`** : la zone horaire utilisée pour calculer correctement les heures de cette configuration.
+- **`derniere_execution_at`** : la dernière fois où cette tâche a été exécutée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`prochaine_execution_at`** : la prochaine date prévue pour exécuter automatiquement cette tâche. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`version`** : le numéro de version de cet élément. Exemple : version 1, puis version 2 après une évolution ; l’ancienne version peut rester conservée pour comprendre l’historique.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`limites_sauvegardes_plans` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`plan_id`** : l’identifiant du plan d’abonnement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`frequence_minimale_jours`** : le plus petit intervalle autorisé par le plan. Exemple : `1` permet au maximum une sauvegarde planifiée chaque jour.
+- **`retention_max_jours`** : la durée maximale pendant laquelle le plan permet de garder les sauvegardes.
+- **`nombre_max_backups_conserves`** : le nombre maximum de sauvegardes qui peuvent rester conservées en même temps.
+- **`configuration_horaire_autorisee`** : indique si ce plan permet au commerçant de choisir lui-même l’heure de sauvegarde.
+- **`configuration_jours_autorisee`** : indique si ce plan permet de choisir des jours précis de sauvegarde.
+- **`sauvegarde_manuelle_autorisee`** : indique si le commerçant peut lancer une sauvegarde manuellement.
+- **`quota_manuel_jour`** : le nombre maximum de sauvegardes manuelles autorisées dans une journée. Exemple : `2` = deux sauvegardes manuelles aujourd’hui, puis le compteur repart demain.
+- **`delai_manuel_min_minutes`** : le nombre minimum de minutes à attendre entre deux sauvegardes manuelles.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`sauvegardes_tenants` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`configuration_id`** : l’identifiant de la configuration. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`type_backup`** : le type de sauvegarde réalisé. Exemple : sauvegarde automatique ou manuelle selon les valeurs prévues.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`demande_par_id`** : l’identifiant de la personne qui a fait la demande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`backup_realise_at`** : la date où la sauvegarde a réellement été produite. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`point_reconciliation_central`** : la position ou référence utilisée pour savoir jusqu’où les opérations centrales ont été rapprochées après une restauration. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`position_snapshot`** : une **copie figée** de position au moment important de l’opération. Si l’information d’origine change plus tard, cette ancienne ligne garde la valeur utilisée à ce moment-là. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`configuration_snapshot`** : une **copie figée** de configuration au moment important de l’opération. Si l’information d’origine change plus tard, cette ancienne ligne garde la valeur utilisée à ce moment-là.
+- **`version_schema`** : la version du schéma de base de données installée pour cette boutique. Elle aide à savoir si une migration technique manque.
+- **`cle_stockage`** : le chemin ou la clé interne utilisée pour retrouver le fichier dans le stockage privé/public. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`empreinte_fichier`** : une signature calculée à partir du fichier pour vérifier qu’il n’a pas été modifié ou abîmé. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`taille_octets`** : la taille du fichier. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`expire_at`** : la date où l’élément n’est plus valable. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`commence_at`** : la date et l’heure où la période ou l’action commence. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`termine_at`** : la date et l’heure où elle s’est terminée. Peut rester vide tant que ce n’est pas terminé.
+- **`erreur_code`** : un petit code qui permet de reconnaître le type d’erreur sans stocker un long message sensible. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`restaurations_tenants` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`restaure_depuis_backup_id`** : l’identifiant de la sauvegarde utilisée pour restaurer. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`statut_tenant_avant`** : indique où en est **tenant avant**. Exemple : en attente, actif, terminé ou en erreur selon les valeurs prévues pour cette table.
+- **`point_reconciliation_central`** : la position ou référence utilisée pour savoir jusqu’où les opérations centrales ont été rapprochées après une restauration.
+- **`curseur_reconciliation`** : un numéro qui indique jusqu’où le rapprochement a déjà été fait après une restauration. Cela permet de reprendre sans tout recommencer.
+- **`restauration_debutee_at`** : la date où la restauration a commencé. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`restauration_terminee_at`** : la date où la restauration s’est terminée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`demande_par_id`** : l’identifiant de la personne qui a fait la demande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`controles_resultat`** : le résultat des vérifications faites après restauration avant de rouvrir la boutique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`erreur_code`** : un petit code qui permet de reconnaître le type d’erreur sans stocker un long message sensible. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`operations_centrales_tenants` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`sequence_tenant`** : le numéro d’ordre de l’opération pour cette boutique. Exemple : 15 signifie qu’elle vient après l’opération 14.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`type_operation`** : indique quelle action a été faite sur les données ou le système. Exemple : export, suppression ou anonymisation.
+- **`ressource_type`** : le type d’élément concerné. Exemple : client, commande ou fichier.
+- **`ressource_id`** : l’identifiant de l’élément précis concerné. Il peut rester vide si l’opération porte sur un lot entier.
+- **`donnees_rejeu_minimisees`** : plusieurs petits réglages liés à **donnees rejeu minimisees**, regroupés ensemble de manière structurée.
+- **`statut_application`** : indique si la part ou l’opération a déjà été appliquée dans la base de la boutique. Exemple : `en_attente`, `appliquee` ou `erreur`.
+- **`applique_at`** : la date et l’heure liées à **applique**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`registre_documents_emis` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`portee_document`** : indique à quel ensemble appartient la numérotation du document. Exemple : série propre à une boutique ou au SaaS.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`proprietaire_id`** : l’identifiant du propriétaire. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`contexte_document`** : une valeur technique calculée qui permet de reconnaître clairement la série de documents concernée.
+- **`document_id`** : l’identifiant du document. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`type_document`** : indique quel document c’est. Exemple : facture, avoir ou autre type prévu.
+- **`serie`** : le code de série utilisé dans la numérotation. Exemple : `FAC` pour les factures.
+- **`exercice`** : l’année ou période de numérotation concernée. Exemple : `2026`.
+- **`numero_sequence`** : le nombre utilisé à l’intérieur de la série du document. Exemple : `123` dans `FAC-2026-000123`.
+- **`numero_document`** : le numéro lisible du document. Exemple : `FAC-2026-000123`.
+- **`commande_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`revision_id`** : l’identifiant de la version de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`facture_origine_id`** : l’identifiant de la facture d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_emission_document`** : une clé unique qui empêche d’émettre deux fois deux documents différents pour la même demande.
+- **`empreinte_document`** : une signature du contenu du document qui permet de vérifier qu’il est resté identique.
+- **`cle_stockage_document`** : une clé technique stable pour reconnaître stockage document. Elle aide surtout à éviter les doublons quand la même demande est reçue deux fois.
+- **`date_emission`** : la date officielle d’émission du document.
+- **`date_transmission`** : la date où le document a été transmis. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
 
 - **Configuration :** une ligne par tenant, créée au provisionnement. Politique minimale automatique sur tous les plans ; l’utilisateur ne désactive pas la protection obligatoire, `sauvegarde_active=false` est réservé à une suspension technique auditée. Exemple initial configurable : tous les 7 jours à 02:00, rétention 14 jours, Africa/Algiers. Ce sont des valeurs de produit, pas des durées légales. `mode_frequence=quotidien|intervalle|jours_semaine`. Quotidien : intervalle/jours NULL ; intervalle : intervalle_jours>=1 et jours NULL ; jours_semaine : intervalle NULL et tableau non vide de jours ISO 1–7 distincts. CHECK des champs dépendants, validation serveur du JSON. Date d’ancrage locale fixe le cycle d’intervalle ; calculer les échéances en timezone puis stocker les instants en UTC. Une échéance ratée produit au plus un rattrapage, pas une avalanche de sauvegardes. Changements sous verrou configuration, version incrémentée ; les backups précédents gardent leur expire_at.
 - **Limites du plan :** une ligne immuable avec chaque version de plan ; valeurs entières positives (quota/délai manuels peuvent valoir zéro pour interdiction/absence de délai). Les options payantes sont représentées par une version de plan incluant l’option ou des exceptions fonctionnelles validées, sans modifier un plan historique. Valider l’espacement minimal réel des jours choisis, pas seulement leur nombre ; fréquence, rétention, choix horaire/jours et sauvegarde manuelle doivent respecter les droits effectifs. Quota manuel : fenêtre locale définie, verrou propriétaire/configuration et comptage des demandes acceptées, y compris en attente. Après downgrade, adapter les futures exécutions au plan gratuit ; aucune réduction rétroactive de expire_at des backups existants. Le maximum conservé bloque une nouvelle demande manuelle ou déclenche une alerte capacité si tous les backups sont encore protégés ; ne pas supprimer une pièce avant son expiration pour faire de la place. Le service doit conserver la protection automatique minimale.
@@ -1057,6 +1739,121 @@ erDiagram
     lignes_factures_saas ||--o{ lignes_avoirs_saas : ligne_facture_origine_id
 ```
 
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`sequences_facturation_saas` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`type_document`** : indique quel document c’est. Exemple : facture, avoir ou autre type prévu.
+- **`exercice`** : l’année ou période de numérotation concernée. Exemple : `2026`.
+- **`prefixe`** : le début fixe ajouté devant les numéros. Exemple : `FAC` pour les factures.
+- **`prochain_numero`** : le prochain nombre disponible dans cette série. Exemple : si le dernier document était 102, le prochain peut être 103.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`factures_saas` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`proprietaire_id`** : l’identifiant du propriétaire. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`abonnement_id`** : l’identifiant de l’abonnement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`echeance_id`** : l’identifiant de l’échéance à payer. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`regle_facturation_id`** : la règle de facturation précise utilisée pour décider comment ce document devait être créé.
+- **`sequence_id`** : l’identifiant du compteur de numérotation. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`numero_sequence`** : le nombre utilisé à l’intérieur de la série du document. Exemple : `123` dans `FAC-2026-000123`. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`numero`** : le numéro lisible de l’élément. Exemple : numéro d’échéance ou de facture selon la table. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`periode_debut`** : le début de la période concernée. Exemple : début du mois payé.
+- **`periode_fin`** : la fin de la période concernée. Exemple : fin du mois payé. Peut rester vide lorsque la période n’a pas de fin prévue.
+- **`devise`** : la monnaie utilisée. Exemple : `DZD` pour le dinar algérien.
+- **`montant_ht`** : le montant avant taxes.
+- **`taxes`** : plusieurs petits réglages liés à **taxes**, regroupés ensemble de manière structurée.
+- **`montant_taxes`** : le montant total des taxes.
+- **`montant_ttc`** : le montant final avec les taxes.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`date_emission`** : la date officielle d’émission du document. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`date_echeance`** : la date utilisée pour **echeance**.
+- **`snapshot_identite_saas`** : une copie figée des informations légales du SaaS au moment de la facture. Si le profil change plus tard, l’ancienne facture garde les anciennes informations.
+- **`snapshot_identite_client`** : une copie figée du nom, téléphone et adresse nécessaires à cette commande. Si le client donne plus tard une autre adresse, l’ancienne commande garde ce qu’elle utilisait.
+- **`document_immuable`** : indique que le document, une fois officiellement émis, ne doit plus être modifié comme un simple brouillon. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`empreinte_document`** : une signature du contenu du document qui permet de vérifier qu’il est resté identique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`registre_emission_id`** : l’identifiant de l’enregistrement du document émis. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`lignes_factures_saas` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`facture_id`** : l’identifiant de la facture. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`numero_ligne`** : la position de cette ligne dans le document. Exemple : 1 pour la première ligne, 2 pour la deuxième.
+- **`designation`** : le nom ou texte qui explique ce qui est facturé sur cette ligne. Exemple : « Abonnement Pro — septembre 2026 ».
+- **`quantite`** : le nombre d’éléments concernés. Exemple : `2` signifie deux unités du produit.
+- **`prix_unitaire_ht`** : le prix correspondant à **unitaire HT**.
+- **`remise_ht`** : la réduction appliquée avant taxes sur cette ligne.
+- **`montant_ht`** : le montant avant taxes.
+- **`taxes`** : plusieurs petits réglages liés à **taxes**, regroupés ensemble de manière structurée.
+- **`montant_taxes`** : le montant total des taxes.
+- **`montant_ttc`** : le montant final avec les taxes.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`avoirs_saas` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`facture_origine_id`** : l’identifiant de la facture d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`sequence_id`** : l’identifiant du compteur de numérotation. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`numero_sequence`** : le nombre utilisé à l’intérieur de la série du document. Exemple : `123` dans `FAC-2026-000123`. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`numero`** : le numéro lisible de l’élément. Exemple : numéro d’échéance ou de facture selon la table. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`motif`** : explique pourquoi l’action ou la décision a été faite.
+- **`montant_ht`** : le montant avant taxes.
+- **`taxes`** : plusieurs petits réglages liés à **taxes**, regroupés ensemble de manière structurée.
+- **`montant_taxes`** : le montant total des taxes.
+- **`montant_ttc`** : le montant final avec les taxes.
+- **`devise`** : la monnaie utilisée. Exemple : `DZD` pour le dinar algérien.
+- **`snapshot_identite_saas`** : une copie figée des informations légales du SaaS au moment de la facture. Si le profil change plus tard, l’ancienne facture garde les anciennes informations.
+- **`snapshot_identite_client`** : une copie figée du nom, téléphone et adresse nécessaires à cette commande. Si le client donne plus tard une autre adresse, l’ancienne commande garde ce qu’elle utilisait.
+- **`date_emission`** : la date officielle d’émission du document. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`document_immuable`** : indique que le document, une fois officiellement émis, ne doit plus être modifié comme un simple brouillon. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`empreinte_document`** : une signature du contenu du document qui permet de vérifier qu’il est resté identique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`registre_emission_id`** : l’identifiant de l’enregistrement du document émis. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`lignes_avoirs_saas` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`avoir_id`** : l’identifiant de l’avoir. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`facture_origine_id`** : l’identifiant de la facture d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`ligne_facture_origine_id`** : l’identifiant de la ligne de facture d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`quantite`** : le nombre d’éléments concernés. Exemple : `2` signifie deux unités du produit.
+- **`montant_ht`** : le montant avant taxes.
+- **`taxes`** : plusieurs petits réglages liés à **taxes**, regroupés ensemble de manière structurée.
+- **`montant_taxes`** : le montant total des taxes.
+- **`montant_ttc`** : le montant final avec les taxes.
+- **`motif`** : explique pourquoi l’action ou la décision a été faite.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`transmissions_documents_saas` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`facture_id`** : l’identifiant de la facture. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`avoir_id`** : l’identifiant de l’avoir. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`canal`** : indique par quel moyen on communique. Exemple : téléphone ou WhatsApp.
+- **`destinataire_chiffre`** : les coordonnées du destinataire enregistrées de manière protégée lorsqu’elles doivent être conservées.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`nombre_tentatives`** : le nombre de **tentatives**. Exemple : `3` signifie qu’il y en a trois.
+- **`prochaine_tentative_at`** : la date prévue pour retenter l’opération après un échec récupérable. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`envoye_at`** : la date où l’envoi a été effectué. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`delivre_at`** : la date où la réception ou livraison du message a été confirmée quand cette information existe. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`reference_fournisseur`** : le numéro de facture, reçu ou référence donné par le fournisseur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
+
 - **Factures :** UNIQUE(numero) hors NULL, UNIQUE(sequence_id,numero_sequence), UNIQUE(cle_operation). Statut=brouillon|emise|annulee_brouillon. La période est [debut,fin), fin>debut ; montants>=0, HT+taxes=TTC et égalité aux sommes de lignes. DZD au MVP. Contrôler structure et somme du JSON taxes. FK(abonnement_id,proprietaire_id) → abonnements(id,user_id), clé parent UNIQUE ; FK(echeance_id,abonnement_id) → echeances_abonnement(id,abonnement_id), clé parent UNIQUE. Le fait générateur durable déclenche obligatoirement une facture par échéance/occurrence validée avec une clé stable ; aucun doublon au retry. L’échéance et les règlements conservent leur sens de dette/paiements, les rectifications fiscales passent par avoir. Une correction du dû après facture/avoir doit être rapprochée, jamais changée silencieusement pour correspondre au paiement. Aucun remboursement SaaS automatique n’est inféré d’un avoir. **Décision AUD-16 : le SaaS n’exécute ni ne suit comme trésorerie interne les remboursements réels d’abonnement.** Les paiements sont validés manuellement sur reçu/preuve ; une résiliation normale laisse la période déjà payée active jusqu’à son terme, puis empêche le renouvellement payant. Un remboursement exceptionnel, s’il est décidé, reste une procédure manuelle externe à l’application et ne crée donc pas de table `decaissements_saas` dans le périmètre actuel. Un avoir reste un document de correction et non une preuve que de l’argent a été remis. Ne pas utiliser une contrepassation de paiement pour prétendre que le paiement initial n’a jamais eu lieu. Si le produit commence un jour à exécuter ou suivre ces remboursements réels, un journal de décaissements dédié deviendra obligatoire.
 - **Lignes :** UNIQUE(facture_id,numero_ligne), UNIQUE(id,facture_id), quantité>0, prix/remise/base/taxes/TTC>=0. Version du plan, période et nature de l’option incluses dans la désignation/snapshot document ; aucun recalcul historique depuis le plan courant. Émission seulement avec au moins une ligne et identité légale du SaaS et du client complètes.
 - **Avoirs :** origine obligatoire, facture émise de même devise ; montants positifs exprimant la réduction, pas un règlement. UNIQUE(numero), UNIQUE(sequence_id,numero_sequence), UNIQUE(id,facture_origine_id). FK(avoir_id,facture_origine_id) → avoirs_saas(id,facture_origine_id) et FK(ligne_facture_origine_id,facture_origine_id) → lignes_factures_saas(id,facture_id). UNIQUE(avoir_id,ligne_facture_origine_id). Sous verrou facture puis lignes, les avoirs émis et brouillons réservés ne dépassent ni quantités ni HT/taxes/TTC facturés ; annuler un brouillon libère sa réserve. Période, propriétaire et abonnement sont obtenus depuis la facture d’origine ; ne pas maintenir des copies modifiables concurrentes.
@@ -1127,6 +1924,67 @@ erDiagram
         datetime created_at
     }
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`regles_facturation` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`code`** : le petit nom utilisé par le programme pour reconnaître l’élément. Exemple : `boutiques.nombre` ou `produits.creer`.
+- **`version`** : le numéro de version de cet élément. Exemple : version 1, puis version 2 après une évolution ; l’ancienne version peut rester conservée pour comprendre l’historique.
+- **`perimetre`** : indique à quelle partie du système la règle s’applique. Exemple : `saas` ou `boutique`.
+- **`entite_legale_id`** : l’identifiant de l’identité légale du vendeur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`evenement_declencheur`** : l’événement qui dit « maintenant, il faut appliquer cette règle ». Exemple : une vente finalisée qui déclenche l’émission d’une facture.
+- **`regle_echanges`** : explique comment les échanges/remplacements doivent être traités pour la facturation.
+- **`portee_numerotation`** : indique à quel niveau les numéros sont uniques. Exemple : une série propre à une boutique ou une série du SaaS.
+- **`parametres`** : les réglages supplémentaires de cette règle, regroupés dans un format structuré.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`reference_validation`** : la référence qui prouve ou explique qui a validé cette règle et sur quelle base. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`valide_par_id`** : l’identifiant de la personne qui a validé. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`valide_at`** : la date et l’heure liées à **valide**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`effective_at`** : la date à partir de laquelle cette version devient réellement applicable. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`registre_activites_traitement` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`code`** : le petit nom utilisé par le programme pour reconnaître l’élément. Exemple : `boutiques.nombre` ou `produits.creer`.
+- **`version`** : le numéro de version de cet élément. Exemple : version 1, puis version 2 après une évolution ; l’ancienne version peut rester conservée pour comprendre l’historique.
+- **`finalite`** : explique pourquoi les données personnelles sont utilisées. Exemple : utiliser une adresse pour livrer une commande.
+- **`categories_personnes`** : les groupes de personnes concernés. Exemple : acheteurs, commerçants ou membres d’équipe.
+- **`categories_donnees`** : les types d’informations concernés. Exemple : nom, téléphone ou adresse, sans recopier toutes les valeurs ici.
+- **`destinataires`** : les personnes ou services qui peuvent recevoir ces données. Exemple : le transporteur pour livrer le colis.
+- **`base_traitement`** : explique la raison qui autorise ou justifie ce traitement de données selon la règle validée.
+- **`responsable_traitement`** : indique qui décide pourquoi et comment ces données sont utilisées.
+- **`sous_traitants`** : indique les prestataires qui traitent des données pour le service.
+- **`regles_conservation`** : résume les règles qui disent combien de temps ces données sont gardées.
+- **`mesures_securite`** : résume les protections mises en place. Exemple : chiffrement, limitation des accès et journalisation.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`valide_at`** : la date et l’heure liées à **valide**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`effective_at`** : la date à partir de laquelle cette version devient réellement applicable. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`journal_operations_donnees_personnelles_central` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`acteur_id`** : l’identifiant de la personne qui a fait l’action. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`type_operation`** : indique quelle action a été faite sur les données ou le système. Exemple : export, suppression ou anonymisation.
+- **`ressource_type`** : le type d’élément concerné. Exemple : client, commande ou fichier.
+- **`ressource_id`** : l’identifiant de l’élément précis concerné. Il peut rester vide si l’opération porte sur un lot entier.
+- **`categories_donnees`** : les types d’informations concernés. Exemple : nom, téléphone ou adresse, sans recopier toutes les valeurs ici.
+- **`motif`** : explique pourquoi l’action ou la décision a été faite.
+- **`destinataire`** : indique à qui l’information ou le document a été envoyé lorsque cela doit être tracé. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`effectue_at`** : la date où l’opération a réellement été faite.
+- **`contexte`** : quelques informations utiles pour comprendre l’opération, sans recopier inutilement des données sensibles. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`correlation_id`** : un numéro commun utilisé pour relier plusieurs traces qui appartiennent à la même grande opération. Exemple : une création de boutique qui produit plusieurs actions techniques.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+
 
 - **Règles fiscales :** UNIQUE(code,version), perimetre=saas|boutique ; entite_legale_id requis pour boutique et NULL pour SaaS. Statut=brouillon|validee|retiree. Une version validée/utilisée est immuable ; la sélection de la version effective est déterministe et sans chevauchement par périmètre/émetteur, sous verrou de coordination. Le déclencheur exact, les échanges et la portée de numérotation ne sont pas inventés : valeurs `a_valider` admises seulement en brouillon. Aucune émission/activation commerciale sans règle validée. `portee_numerotation=boutique|entite_legale` pour les commerçants ; pour SaaS, émetteur SaaS. La validation d’un texte de règle n’exécute pas du code : allowlist d’événements et d’implémentations serveur versionnées. Pour les tenants, conserver copie exacte versionnée dans chaque obligation de facturation (T22) ; aucune FK inter-BDD.
 - **Registre :** documentation des traitements, distincte du journal d’événements. UNIQUE(contexte_normalise,code,version), contexte=tenant UUID ou central ; pas de simple UNIQUE sur tenant_id nullable. Version utilisée immuable ; finalités, personnes, données, destinataires, responsabilités, conservation et mesures de sécurité sont documentés, sans liste nominative des acheteurs. Le responsable juridique/DPO valide périmètre, rôles SaaS/commerçant/transporteur, transferts et durées avant production.
@@ -1225,6 +2083,88 @@ erDiagram
     boutique ||--o{ liens_sociaux : boutique_id
     adresses_boutique |o--o{ liens_sociaux : adresse_boutique_id
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`boutique` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`singleton`** : un petit verrou technique qui garantit qu’il n’existe qu’une seule ligne de ce type dans la base. Exemple : une seule fiche `boutique`.
+- **`version_profil_central`** : la dernière version du profil central que cette boutique a reçue. Cela permet de voir si elle est à jour.
+- **`nom`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
+- **`description`** : un texte qui explique l’élément plus en détail. Il peut rester vide si aucune explication supplémentaire n’est nécessaire.
+- **`a_propos`** : le texte de présentation de la boutique. Exemple : son histoire ou ce qu’elle vend. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`type_activite`** : le type d’activité de la boutique. Exemple : vêtements, restaurant ou salon.
+- **`email_contact`** : l’email public que les visiteurs peuvent utiliser pour contacter la boutique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`telephone_contact`** : le téléphone public de la boutique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`whatsapp_contact`** : le numéro WhatsApp public de la boutique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`logo_media_id`** : le fichier utilisé comme logo de la boutique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`favicon_media_id`** : la petite image affichée dans l’onglet du navigateur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`langue`** : la langue préférée pour l’affichage. Exemple : `fr` ou `ar`.
+- **`devise`** : la monnaie utilisée. Exemple : `DZD` pour le dinar algérien.
+- **`fuseau_horaire`** : la zone utilisée pour afficher les dates et heures. Exemple : `Africa/Algiers`.
+- **`theme_code`** : le modèle visuel choisi pour le site. Exemple : `standard`.
+- **`couleurs`** : les couleurs choisies pour le site, enregistrées ensemble. Exemple : couleur principale et couleur des boutons.
+- **`fiscalite_livraison_configuration`** : les réglages qui expliquent comment les frais de livraison doivent être traités dans les calculs fiscaux. Ils doivent être validés avant la vente réelle. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`duree_panier_jours`** : le nombre de jours pendant lesquels un panier invité peut rester conservé avant d’expirer.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`adresses_boutique` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`boutique_id`** : l’identifiant de la fiche de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`libelle`** : un nom court utilisé pour reconnaître facilement l’élément à l’écran.
+- **`adresse`** : l’adresse écrite. Exemple : rue, cité ou quartier.
+- **`wilaya_id`** : l’identifiant de la wilaya. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`commune_id`** : l’identifiant de la commune. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`code_postal`** : le code postal lorsqu’il est connu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`latitude`** : la position nord/sud utilisée pour placer l’adresse sur une carte. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`longitude`** : la position est/ouest utilisée pour placer l’adresse sur une carte. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`url_carte`** : un lien vers la position sur une carte. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`telephone`** : le numéro de téléphone. Il est gardé comme texte pour ne pas perdre le `0`, le `+213` ou d’autres signes utiles. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`horaires`** : les heures d’ouverture regroupées par jour. Exemple : samedi 09:00–18:00. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`principale`** : indique si cette ligne est la principale parmi plusieurs choix.
+- **`visible`** : indique si les visiteurs peuvent voir l’élément sur le site.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`liens_sociaux` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`boutique_id`** : l’identifiant de la fiche de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`adresse_boutique_id`** : l’identifiant de l’adresse de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`reseau`** : le réseau social concerné. Exemple : Instagram, Facebook ou TikTok.
+- **`libelle`** : un nom court utilisé pour reconnaître facilement l’élément à l’écran. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`url`** : le lien web à ouvrir.
+- **`position`** : l’ordre d’affichage. Exemple : 1 apparaît avant 2.
+- **`actif`** : indique si l’élément peut encore être utilisé. `true` = oui, `false` = non.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`pages_contenu` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`slug`** : la partie simple de l’adresse web. Exemple : `a-propos` dans `/a-propos`.
+- **`type`** : indique la catégorie de l’élément. Exemple : un domaine peut être `sous_domaine` ou `personnalise`.
+- **`titre`** : le titre affiché à l’utilisateur.
+- **`contenu`** : le texte ou contenu principal de la page.
+- **`meta_titre`** : le titre prévu pour les moteurs de recherche et le partage web. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`meta_description`** : la petite description prévue pour les moteurs de recherche. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`indexable`** : indique si les moteurs de recherche sont autorisés à indexer cette page.
+- **`publiee`** : indique si l’élément est publié et donc prêt à être montré.
+- **`publiee_at`** : la date et l’heure liées à **publiee**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`version`** : le numéro de version de cet élément. Exemple : version 1, puis version 2 après une évolution ; l’ancienne version peut rester conservée pour comprendre l’historique.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
@@ -1337,6 +2277,98 @@ erDiagram
     produits ||--o{ variantes_produits : produit_id
 ```
 
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`medias` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`cle_stockage`** : le chemin ou la clé interne utilisée pour retrouver le fichier dans le stockage privé/public.
+- **`mime_type`** : le type technique du fichier. Exemple : `image/jpeg` ou `video/mp4`.
+- **`nom_original`** : le nom original du fichier envoyé par l’utilisateur.
+- **`taille_octets`** : la taille du fichier.
+- **`largeur`** : la largeur de l’image ou vidéo en pixels lorsque cette information existe. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`hauteur`** : la hauteur en pixels lorsque cette information existe. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`duree_secondes`** : une durée exprimée en secondes pour **duree**. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`texte_alternatif`** : un texte qui décrit l’image pour l’accessibilité et lorsque l’image ne s’affiche pas. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cree_par_id`** : l’identifiant de la personne qui a créé l’élément. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`categories` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`parent_id`** : l’élément parent. Exemple : une sous-catégorie « Chaussures » peut avoir « Mode » comme catégorie parent. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`nom`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
+- **`slug`** : la partie simple de l’adresse web. Exemple : `a-propos` dans `/a-propos`.
+- **`description`** : un texte qui explique l’élément plus en détail. Il peut rester vide si aucune explication supplémentaire n’est nécessaire.
+- **`media_id`** : l’identifiant du fichier/image/vidéo. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`position`** : l’ordre d’affichage. Exemple : 1 apparaît avant 2.
+- **`active`** : indique si cette possibilité est autorisée. `true` = oui, `false` = non.
+- **`meta_titre`** : le titre prévu pour les moteurs de recherche et le partage web. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`meta_description`** : la petite description prévue pour les moteurs de recherche. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`produits` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`categorie_id`** : l’identifiant de la catégorie. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`nom`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
+- **`slug`** : la partie simple de l’adresse web. Exemple : `a-propos` dans `/a-propos`.
+- **`description_courte`** : une petite description affichée rapidement, plus courte que la description complète. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`description`** : un texte qui explique l’élément plus en détail. Il peut rester vide si aucune explication supplémentaire n’est nécessaire.
+- **`avantages`** : plusieurs petits réglages liés à **avantages**, regroupés ensemble de manière structurée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`faq`** : plusieurs petits réglages liés à **faq**, regroupés ensemble de manière structurée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`marque`** : la marque du produit lorsqu’il en a une. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`type`** : indique la catégorie de l’élément. Exemple : un domaine peut être `sous_domaine` ou `personnalise`.
+- **`personnalisation_autorisee`** : un **oui/non** pour indiquer si **personnalisation autorisee** est vrai ou autorisé. `true` = oui ; `false` = non.
+- **`consignes_personnalisation`** : les instructions données au client pour personnaliser le produit. Exemple : « Écrivez le prénom à imprimer ». Ce champ peut rester vide pour un produit normal.
+- **`unite_vente`** : ce que représente une unité vendue. Exemple : `pièce`, `boîte` ou `bouquet`.
+- **`quantite_contenu`** : le nombre d’unités correspondant à **contenu**. Exemple : `2` signifie deux unités. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`unite_contenu`** : l’unité utilisée pour décrire le contenu. Exemple : une bouteille de `500 ml`. Ce champ peut rester vide si ce n’est pas utile.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`publie_at`** : la date où l’élément a été publié. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`mis_en_avant`** : indique si l’élément doit être davantage mis en évidence sur le site.
+- **`meta_titre`** : le titre prévu pour les moteurs de recherche et le partage web. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`meta_description`** : la petite description prévue pour les moteurs de recherche. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`indexable`** : indique si les moteurs de recherche sont autorisés à indexer cette page.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`variantes_produits` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`produit_id`** : l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`libelle`** : un nom court utilisé pour reconnaître facilement l’élément à l’écran.
+- **`reference_sku`** : la référence utilisée pour reconnaître **SKU** sans se baser seulement sur son nom.
+- **`code_barres`** : le code-barres de la variante lorsqu’il existe.
+- **`signature_combinaison`** : une signature calculée à partir des options choisies pour empêcher deux variantes représentant exactement la même combinaison.
+- **`utilisee_at`** : la date et l’heure liées à **utilisee**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`prix_vente`** : le prix de vente actuel de cette variante.
+- **`cout_unitaire`** : le coût d’achat ou de revient d’une unité pour le commerçant.
+- **`ancien_prix`** : le prix affiché comme ancien prix avant la promotion. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`fiscalite_configuration`** : les informations nécessaires pour appliquer la règle fiscale prévue à ce moment-là, sans changer l’historique plus tard. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`stock_physique`** : le nombre d’unités réellement présentes physiquement.
+- **`stock_reserve`** : le nombre d’unités gardées de côté pour des commandes déjà confirmées.
+- **`stock_quarantaine`** : le nombre d’unités mises de côté parce qu’elles doivent être vérifiées et ne peuvent pas être vendues tout de suite.
+- **`seuil_stock_faible`** : le niveau à partir duquel le système doit prévenir que le stock devient faible.
+- **`poids_kg`** : le poids en kilogrammes. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`longueur_cm`** : la longueur en centimètres. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`largeur_cm`** : la largeur en centimètres. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`hauteur_cm`** : la hauteur en centimètres. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`active`** : indique si cette possibilité est autorisée. `true` = oui, `false` = non.
+- **`position`** : l’ordre d’affichage. Exemple : 1 apparaît avant 2.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+
+
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **`medias` :** UNIQUE(cle_stockage). Clé physique construite exclusivement par le serveur : tenants/{tenant_uuid}/public/{identifiant_opaque} ou tenants/{tenant_uuid}/private/{identifiant_opaque}. Les pièces centrales utilisent central/... . Refuser traversée de chemin, préfixe d’un autre tenant et toute clé complète fournie par le client. Vérifier tenant, média, visibilité et autorisation avant signature ; URL privée courte et non transférable entre contextes autorisés, jamais présentée comme une garantie contre le partage du lien lui-même. Fichier dans le stockage de fichiers, pas un BLOB dans chaque produit. Documents privés servis après autorisation ; médias publics séparés. Les textes alternatifs ne sont pas arbitrairement limités à 30 caractères.
@@ -1405,6 +2437,56 @@ erDiagram
     valeurs_options ||--o{ variantes_valeurs : valeur_id
 ```
 
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`options_produit` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`produit_id`** : l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`nom`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
+- **`type_affichage`** : la façon d’afficher l’option. Exemple : boutons, liste ou pastilles de couleur.
+- **`position`** : l’ordre d’affichage. Exemple : 1 apparaît avant 2.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`valeurs_options` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`option_id`** : l’option concernée. Exemple : « Taille ».
+- **`code_identite`** : le code utilisé pour reconnaître **identite** de manière stable dans le programme ou chez un service externe.
+- **`valeur`** : la valeur enregistrée. Exemple : `Rouge`, `XL` ou une autre valeur selon la table.
+- **`couleur_hex`** : la couleur écrite sous forme de code web. Exemple : `#FF0000` pour rouge. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`position`** : l’ordre d’affichage. Exemple : 1 apparaît avant 2.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`variantes_valeurs` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`produit_id`** : l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`variante_id`** : l’identifiant de la variante du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`option_id`** : l’option concernée. Exemple : « Taille ».
+- **`valeur_id`** : la valeur choisie pour l’option. Exemple : « 42 » pour l’option Taille.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`medias_produits` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`produit_id`** : l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`variante_id`** : l’identifiant de la variante du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`media_id`** : l’identifiant du fichier/image/vidéo. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`role`** : indique le rôle du média pour le produit. Exemple : image principale, image secondaire ou vidéo.
+- **`position`** : l’ordre d’affichage. Exemple : 1 apparaît avant 2.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
+
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **`options_produit` :** UNIQUE(produit_id,nom normalisé). Une caractéristique descriptive non achetable n’est pas un axe de variante.
@@ -1467,6 +2549,52 @@ erDiagram
     etiquettes ||--o{ produits_etiquettes : etiquette_id
     caracteristiques ||--o{ produits_caracteristiques : caracteristique_id
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`etiquettes` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`nom`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
+- **`slug`** : la partie simple de l’adresse web. Exemple : `a-propos` dans `/a-propos`.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`produits_etiquettes` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`produit_id`** : l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`etiquette_id`** : l’identifiant de l’étiquette. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`caracteristiques` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`nom`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
+- **`groupe`** : un nom qui permet de ranger plusieurs caractéristiques ensemble. Exemple : « Dimensions » pour longueur, largeur et hauteur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`type_valeur`** : indique si la fonctionnalité se règle par **oui/non** ou par **un nombre maximum**. Exemple : « Peut-il utiliser EcoTrack ? Oui. » ou « Combien de boutiques ? 3. »
+- **`unite`** : explique ce que le nombre représente. Exemple : dans **« 3 boutiques »**, le nombre est 3 et l’unité est « boutiques ». Pour une fonction seulement oui/non, ce champ peut rester vide.
+- **`explication`** : un texte simple qui aide à comprendre la caractéristique. Exemple : expliquer ce que veut dire « matière ». Ce champ peut rester vide.
+- **`position`** : l’ordre d’affichage. Exemple : 1 apparaît avant 2.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`produits_caracteristiques` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`produit_id`** : l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`caracteristique_id`** : l’identifiant de la caractéristique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`valeur_texte`** : la valeur écrite en texte pour cette caractéristique. Exemple : `Coton`. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`valeur_nombre`** : la valeur numérique de la caractéristique quand elle se mesure avec un nombre. Exemple : `500`. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
@@ -1541,6 +2669,64 @@ erDiagram
     pages_vente |o--o{ promotions_produits : page_vente_id
 ```
 
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`pages_vente` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`produit_id`** : l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`slug`** : la partie simple de l’adresse web. Exemple : `a-propos` dans `/a-propos`.
+- **`titre`** : le titre affiché à l’utilisateur.
+- **`contenu`** : le texte ou contenu principal de la page.
+- **`meta_titre`** : le titre prévu pour les moteurs de recherche et le partage web. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`meta_description`** : la petite description prévue pour les moteurs de recherche. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`url_canonique`** : l’adresse web principale que les moteurs de recherche doivent considérer comme la vraie version de cette page. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`indexable`** : indique si les moteurs de recherche sont autorisés à indexer cette page.
+- **`publiee`** : indique si l’élément est publié et donc prêt à être montré.
+- **`publiee_at`** : la date et l’heure liées à **publiee**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`promotions_produits` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`produit_id`** : l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`variante_id`** : l’identifiant de la variante du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`page_vente_id`** : l’identifiant de la page de vente. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`nom`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
+- **`type_reduction`** : la manière de calculer la promotion. Exemple : pourcentage ou montant fixe.
+- **`valeur`** : la valeur enregistrée. Exemple : `Rouge`, `XL` ou une autre valeur selon la table.
+- **`quantite_minimum`** : le nombre d’unités correspondant à **minimum**. Exemple : `2` signifie deux unités.
+- **`commence_at`** : la date et l’heure où la période ou l’action commence. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`termine_at`** : la date et l’heure où elle s’est terminée. Peut rester vide tant que ce n’est pas terminé.
+- **`priorite`** : un nombre utilisé pour décider quel élément passe avant un autre. Exemple : priorité 1 avant priorité 2.
+- **`active`** : indique si cette possibilité est autorisée. `true` = oui, `false` = non.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`avis_produits` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`produit_id`** : l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`visiteur_id`** : l’identifiant du visiteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`article_commande_id`** : l’identifiant de la ligne de produit de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`nom_affiche`** : le nom réellement montré aux visiteurs.
+- **`note`** : une information libre ajoutée pour aider à comprendre la ligne. Selon la table, cela peut être une note interne ou une note chiffrée.
+- **`commentaire`** : le texte écrit par le client ou l’utilisateur.
+- **`statut_moderation`** : indique si l’avis est en attente, accepté ou refusé.
+- **`modere_par_id`** : l’identifiant de la personne qui a modéré. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`modere_at`** : la date où l’avis a été vérifié. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`publie_at`** : la date où l’élément a été publié. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+
+
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **`pages_vente` :** UNIQUE(slug), UNIQUE(id,produit_id). produit_id immuable dès INSERT ; archiver et créer une page distincte en cas de changement de produit. Plusieurs pages peuvent présenter le même produit. Prix/stock calculés depuis variantes et promotions ; pas de prix indépendant dans le contenu. La page n’est pas une condition obligatoire pour commander. Pas de canonical automatique vers la catégorie.
@@ -1614,6 +2800,63 @@ erDiagram
     visiteurs ||--o{ preferences_visiteur : visiteur_id
 ```
 
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`visiteurs` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`jeton_hash`** : la version protégée du jeton d’invitation. Si la base est lue, le vrai lien secret n’est pas directement récupérable.
+- **`premiere_visite_at`** : la date de la première visite connue de ce visiteur.
+- **`derniere_visite_at`** : la date de sa dernière visite connue.
+- **`expire_at`** : la date où l’élément n’est plus valable.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`sessions_visite` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`visiteur_id`** : l’identifiant du visiteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`commence_at`** : la date et l’heure où la période ou l’action commence.
+- **`derniere_activite_at`** : la date et l’heure liées à **derniere activite**. Elle permet de savoir exactement quand cette étape a eu lieu.
+- **`termine_at`** : la date et l’heure où elle s’est terminée. Peut rester vide tant que ce n’est pas terminé.
+- **`chemin_entree`** : la première page visitée dans cette session. Exemple : `/produit/chaussure-noire`.
+- **`source`** : indique d’où vient l’information. Exemple : saisie manuelle ou réponse de l’API. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`support`** : une information sur le support utilisé pour arriver sur le site, par exemple une source marketing ou un canal suivi. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`campagne`** : le nom ou code d’une campagne marketing utilisé pour savoir d’où vient la visite. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`referent_hote`** : le site ou domaine qui a envoyé le visiteur vers la boutique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`type_appareil`** : le type d’appareil utilisé. Exemple : téléphone, ordinateur ou tablette. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`evenements_navigation` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`session_id`** : la session de navigation concernée.
+- **`produit_id`** : l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`variante_id`** : l’identifiant de la variante du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`page_vente_id`** : l’identifiant de la page de vente. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`page_contenu_id`** : l’identifiant de la page de contenu. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`panier_id`** : l’identifiant du panier. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`type`** : indique la catégorie de l’élément. Exemple : un domaine peut être `sous_domaine` ou `personnalise`.
+- **`chemin`** : l’endroit où le fichier est rangé dans le stockage privé.
+- **`quantite`** : le nombre d’éléments concernés. Exemple : `2` signifie deux unités du produit. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`survenu_at`** : la date et l’heure où l’événement s’est produit.
+- **`recu_at`** : la date et l’heure liées à **recu**. Elle permet de savoir exactement quand cette étape a eu lieu.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`preferences_visiteur` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`visiteur_id`** : l’identifiant du visiteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`mesure_audience_autorisee`** : indique si la mesure d’audience prévue par le site peut être utilisée pour ce visiteur selon la règle retenue.
+- **`version_information`** : la version du texte d’information montrée au client.
+- **`choisi_at`** : la date et l’heure liées à **choisi**. Elle permet de savoir exactement quand cette étape a eu lieu.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+
+
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **`visiteurs` :** UNIQUE(jeton_hash). Le cookie porte un secret aléatoire opaque distinct du UUID. Aucun identifiant commun entre commerçants. Ni IP ni fingerprint utilisés comme identité fiable.
@@ -1657,6 +2900,36 @@ erDiagram
     }
     paniers ||--o{ articles_panier : panier_id
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`paniers` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`visiteur_id`** : l’identifiant du visiteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`derniere_activite_at`** : la date et l’heure liées à **derniere activite**. Elle permet de savoir exactement quand cette étape a eu lieu.
+- **`expire_at`** : la date où l’élément n’est plus valable.
+- **`converti_at`** : la date où le panier a été transformé en commande. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`articles_panier` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`panier_id`** : l’identifiant du panier. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`variante_id`** : l’identifiant de la variante du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`produit_id`** : l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`page_vente_id`** : l’identifiant de la page de vente. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`quantite`** : le nombre d’éléments concernés. Exemple : `2` signifie deux unités du produit.
+- **`personnalisation`** : les choix personnalisés du client pour cet article. Exemple : texte à imprimer ou couleur spéciale. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`signature_personnalisation`** : une signature calculée à partir des choix personnalisés de l’article. Elle permet de savoir si deux articles ont exactement la même personnalisation.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
@@ -1799,6 +3072,130 @@ erDiagram
     revisions_commandes |o--o{ historique_commandes : revision_apres_id
 ```
 
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`commandes` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`numero`** : le numéro lisible de l’élément. Exemple : numéro d’échéance ou de facture selon la table.
+- **`visiteur_id`** : l’identifiant du visiteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`panier_id`** : l’identifiant du panier. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`politique_donnees_version`** : la version de la politique d’information sur les données personnelles montrée au client pendant ce checkout.
+- **`information_donnees_acceptee_at`** : la date où le client a continué le checkout après que l’information sur l’utilisation de ses données lui a été présentée.
+- **`texte_information_hash`** : une empreinte du texte montré au client, pour pouvoir prouver quelle version a été présentée sans dupliquer inutilement le texte. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`session_origine_id`** : l’identifiant de la session d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`page_vente_origine_id`** : l’identifiant de la page de vente d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`retour_origine_id`** : l’identifiant du retour d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`commande_origine_id`** : l’identifiant de la commande d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`incident_origine_id`** : l’identifiant de l’incident d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`quantite_incident_origine`** : le nombre d’unités correspondant à **incident origine**. Exemple : `2` signifie deux unités. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`motif_remplacement`** : explique la raison de **remplacement**. Cela permet de comprendre plus tard pourquoi la décision a été prise. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`revision_courante_id`** : l’identifiant de la version actuelle de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`type_commande`** : indique la catégorie de **commande** utilisée pour cette ligne.
+- **`canal`** : indique par quel moyen on communique. Exemple : téléphone ou WhatsApp.
+- **`statut_commercial`** : indique où en est la commande du point de vue de la vente.
+- **`responsable_confirmation_id`** : l’identifiant de la personne responsable de la confirmation. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`confirmation_client_at`** : la date et l’heure liées à **confirmation client**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`confirmation_client_mode`** : la manière dont l’accord du client a été confirmé. Dans le MVP, cela peut être la confirmation téléphonique saisie par le commerçant. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`confirme_operationnellement_at`** : la date et l’heure liées à **confirme operationnellement**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`confirme_operationnellement_par_id`** : l’identifiant de la personne qui a validé le contrôle opérationnel. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`annulee_at`** : la date et l’heure liées à **annulee**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_soumission`** : une clé qui reconnaît une soumission précise. Elle évite qu’un double clic ou un nouvel envoi réseau crée deux fois la même chose.
+- **`empreinte_soumission`** : une empreinte du contenu envoyé. Exemple : si la même clé revient avec un autre panier, le système voit que le contenu n’est pas identique.
+- **`version_verrou`** : le numéro de version de verrou. Exemple : version 1, puis version 2 après une évolution ; l’ancienne version peut rester conservée pour comprendre l’historique.
+- **`gel_conservation`** : un **oui/non** pour indiquer si **gel conservation** est vrai ou autorisé. `true` = oui ; `false` = non.
+- **`motif_gel_conservation`** : explique la raison de **gel conservation**. Cela permet de comprendre plus tard pourquoi la décision a été prise. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`revue_gel_at`** : la date et l’heure liées à **revue gel**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`revisions_commandes` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`commande_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`numero_revision`** : le numéro de version de la commande. Exemple : 1 pour la première version, 2 après une modification avant expédition.
+- **`devise`** : la monnaie utilisée. Exemple : `DZD` pour le dinar algérien.
+- **`pays_code`** : le code court du pays. Exemple : `DZ` pour l’Algérie.
+- **`vendeur_legal_snapshot`** : une copie figée des informations légales du vendeur au moment de la facture.
+- **`fiscalite_livraison_snapshot`** : une copie figée de la manière dont les frais de livraison ont été traités fiscalement pour ce document.
+- **`auteur_id`** : l’identifiant de la personne qui a créé l’élément. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`motif`** : explique pourquoi l’action ou la décision a été faite. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`nom_destinataire`** : le nom de **destinataire** affiché ou conservé pour cette ligne.
+- **`prenom_destinataire`** : le prénom de la personne qui recevra le colis. Il peut rester vide si seul le nom nécessaire est renseigné.
+- **`telephone`** : le numéro de téléphone. Il est gardé comme texte pour ne pas perdre le `0`, le `+213` ou d’autres signes utiles.
+- **`telephone_secondaire`** : le numéro de téléphone utilisé pour **secondaire**. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`email`** : l’adresse email du compte. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`adresse`** : l’adresse écrite. Exemple : rue, cité ou quartier.
+- **`wilaya_id`** : l’identifiant de la wilaya. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`commune_id`** : l’identifiant de la commune. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`wilaya_nom`** : le nom de la wilaya copié dans la version de commande pour garder l’historique tel qu’il était au moment de la vente.
+- **`commune_nom`** : le nom de la commune copié dans la version de commande pour garder l’historique.
+- **`code_postal`** : le code postal lorsqu’il est connu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`mode_livraison`** : la façon de livrer choisie. Exemple : domicile ou point relais.
+- **`point_relais_id`** : l’identifiant du point relais. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`point_relais_snapshot`** : une copie figée des informations du point relais choisi au moment de l’expédition. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`sous_total_catalogue`** : le total calculé avec les prix normaux du catalogue avant les changements manuels appliqués à la commande.
+- **`sous_total_applique`** : le total réellement utilisé après les changements de prix ou remises prévus.
+- **`frais_livraison_client`** : le montant de livraison payé par le client.
+- **`remise_livraison`** : la réduction appliquée aux frais de livraison.
+- **`prise_en_charge_livraison`** : indique qui prend en charge les frais de livraison selon la règle choisie.
+- **`montant_livraison_commercant`** : la somme d’argent correspondant à **livraison commercant**. Exemple : `1500` représente 1 500 DA au lancement.
+- **`total_commande`** : le montant total de la commande à cette révision.
+- **`montant_compensation_echange`** : la somme d’argent correspondant à **compensation echange**. Exemple : `1500` représente 1 500 DA au lancement.
+- **`montant_a_encaisser`** : le montant que le livreur doit demander au client lors de la livraison.
+- **`regle_gratuite_id`** : l’identifiant de la règle de livraison gratuite. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`note_client`** : la note donnée par le client. Exemple : 4 sur 5. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`conditions_vente_version`** : la version des conditions de vente applicables à cette commande.
+- **`conditions_vente_snapshot`** : une copie figée du texte ou des informations importantes des conditions acceptées.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`articles_commande` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`revision_id`** : l’identifiant de la version de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`variante_id`** : l’identifiant de la variante du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`produit_id`** : l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`promotion_id`** : l’identifiant de la promotion. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`page_vente_id`** : l’identifiant de la page de vente. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`nom_produit`** : le nom de **produit** affiché ou conservé pour cette ligne.
+- **`nom_variante`** : le nom de **variante** affiché ou conservé pour cette ligne.
+- **`reference_sku`** : la référence utilisée pour reconnaître **SKU** sans se baser seulement sur son nom.
+- **`options_snapshot`** : une **copie figée** de options au moment important de l’opération. Si l’information d’origine change plus tard, cette ancienne ligne garde la valeur utilisée à ce moment-là. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`personnalisation_snapshot`** : une **copie figée** de personnalisation au moment important de l’opération. Si l’information d’origine change plus tard, cette ancienne ligne garde la valeur utilisée à ce moment-là. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`quantite`** : le nombre d’éléments concernés. Exemple : `2` signifie deux unités du produit.
+- **`prix_unitaire_catalogue`** : le prix du produit tel qu’il était dans le catalogue au moment de l’ajout.
+- **`prix_unitaire_applique`** : le prix réellement utilisé pour cette ligne de commande. Il peut être différent du prix actuel du catalogue.
+- **`prix_modifie_manuellement`** : indique si le commerçant a changé manuellement le prix de cette ligne.
+- **`motif_modification_prix`** : explique pourquoi le prix a été changé manuellement. Exemple : remise faite à un ami. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`origine_prix`** : indique d’où vient le prix utilisé. Exemple : catalogue, promotion ou modification manuelle.
+- **`promotion_snapshot`** : une **copie figée** de promotion au moment important de l’opération. Si l’information d’origine change plus tard, cette ancienne ligne garde la valeur utilisée à ce moment-là. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cout_unitaire_snapshot`** : une copie du coût unitaire au moment de la vente, afin que la marge historique ne change pas si le coût catalogue change plus tard.
+- **`total_ligne`** : le total de cette ligne après quantité et règles de prix prévues.
+- **`fiscalite_snapshot`** : une copie figée des règles ou informations fiscales utilisées pour calculer ce document.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`historique_commandes` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`commande_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`revision_avant_id`** : l’identifiant de l’ancienne version de commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`revision_apres_id`** : l’identifiant de la nouvelle version de commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`acteur_id`** : l’identifiant de la personne qui a fait l’action. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`action`** : le nom de l’action réalisée. Exemple : `abonnement.modifier`.
+- **`resultat_contact`** : le résultat de l’appel ou du contact avec le client. Exemple : confirmé, injoignable ou refusé selon les valeurs prévues. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`prochain_rappel_at`** : la date et l’heure liées à **prochain rappel**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`ancien_statut`** : le statut avant l’action. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`nouveau_statut`** : le statut après l’action. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`changements`** : un résumé structuré de ce qui a changé, sans recopier des secrets ou toutes les données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`note`** : une information libre ajoutée pour aider à comprendre la ligne. Selon la table, cela peut être une note interne ou une note chiffrée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`correlation_id`** : un numéro commun utilisé pour relier plusieurs traces qui appartiennent à la même grande opération. Exemple : une création de boutique qui produit plusieurs actions techniques.
+- **`origine`** : indique d’où vient l’action. Exemple : utilisateur, serveur, tâche automatique ou transporteur.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+
+
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **`commandes` :** UNIQUE(numero), UNIQUE(cle_soumission), UNIQUE(panier_id) hors NULL. type_commande=standard|remplacement|echange ; canal=panier|page_vente|manuel. Standard : commande_origine_id, incident_origine_id, quantite_incident_origine, retour_origine_id et motif_remplacement NULL. Remplacement/échange : origine standard expédiée, incident de cette commande, quantité source >0 et motif obligatoires ; origine différente de soi. Un remplacement traite UN incident d’UNE ligne ; plusieurs lignes incidentées produisent plusieurs commandes de remplacement au MVP. Somme des quantités des lignes destination = quantite_incident_origine. Remplacement gratuit : variante/personnalisation préservées sauf substitution documentée. Échange : c’est le **mécanisme valorisé** ; variante identique ou différente selon le cas documenté, prix/valeur commerciale explicitement annoncés et confirmés, produits/quantités substitués identifiés dans la nouvelle révision, avec compensation affectée selon T22. Si un remplacement identique doit, après validation fiscale/comptable, produire une nouvelle vente valorisée, utiliser ce mécanisme d’échange valorisé plutôt qu’une révision de remplacement à zéro. Les cas automatisés restent un échange d’une quantité donnée pour la même quantité de nouvelles unités ; lots de quantités différentes exigent une évolution explicite. `politique_donnees_version` et `information_donnees_acceptee_at` sont obligatoires pour toute nouvelle commande issue d’une saisie de coordonnées ; `texte_information_hash` fige facultativement l’empreinte du texte/bloc présenté. Il n’existe plus de `accord_collecte_id` : l’action de soumission du checkout documente directement la version d’information affichée pour cette commande, sans case facultative « accepter/refuser » qui permettrait malgré tout de commander. Les consentements réellement optionnels (prospection/newsletter, s’ils sont ajoutés plus tard) restent séparés du checkout et ne sont jamais déduits de ces champs. FK(incident_origine_id,commande_origine_id) → incidents_commande(id,commande_id). Si retour_origine_id présent, il correspond à celui de l’incident ; contrôle transactionnel. Les quantités d’un remplacement ou échange non annulé consomment le budget incident dès création, même avant expédition. Annulation avant remise libère ce budget une seule fois ; après remise, il reste consommé. `confirmation_client_at/mode` sont des projections de la première confirmation téléphonique dans contrats_commandes ; le détail des versions acceptées est dans contrats_commandes. Le contrôle opérationnel manuel n’est pas une acceptation du consommateur. revision_courante_id NULL seulement dans la transaction initiale, jamais exposé. Empreinte de soumission immuable ; clé seule non suffisante pour accéder à la commande.
@@ -1901,6 +3298,90 @@ erDiagram
     retours_commandes ||--o{ articles_retour : retour_id
 ```
 
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`reservations_stock` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`article_commande_id`** : l’identifiant de la ligne de produit de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`quantite`** : le nombre d’éléments concernés. Exemple : `2` signifie deux unités du produit.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`reserve_at`** : la date et l’heure liées à **reserve**. Elle permet de savoir exactement quand cette étape a eu lieu.
+- **`libere_at`** : la date et l’heure liées à **libere**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`mouvements_stock` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`variante_id`** : l’identifiant de la variante du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`sequence_variante`** : le numéro d’ordre des mouvements de stock pour cette variante. Il aide à remettre les mouvements dans le bon ordre.
+- **`article_commande_id`** : l’identifiant de la ligne de produit de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`article_retour_id`** : l’identifiant de la ligne du retour. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`acteur_id`** : l’identifiant de la personne qui a fait l’action. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`type`** : indique la catégorie de l’élément. Exemple : un domaine peut être `sous_domaine` ou `personnalise`.
+- **`delta_physique`** : le changement du stock physique. Exemple : `-2` signifie que deux unités ont quitté le stock physique.
+- **`delta_reserve`** : le changement du stock réservé. Exemple : `+1` réserve une unité ; `-1` la libère.
+- **`delta_quarantaine`** : le changement du stock en quarantaine.
+- **`delta_recu_retour`** : le nombre d’unités ajoutées au journal parce qu’elles ont été reçues lors d’un retour.
+- **`delta_remis_retour`** : le nombre d’unités revenues dans le stock vendable après contrôle du retour.
+- **`delta_perdu_retour`** : le nombre d’unités reconnues perdues pendant le traitement d’un retour.
+- **`delta_manquant_retour`** : le nombre d’unités attendues dans le retour mais non reçues.
+- **`physique_avant`** : le stock physique juste avant le mouvement.
+- **`physique_apres`** : le stock physique juste après le mouvement.
+- **`reserve_avant`** : le stock réservé juste avant le mouvement.
+- **`reserve_apres`** : le stock réservé juste après le mouvement.
+- **`quarantaine_avant`** : le stock en quarantaine juste avant le mouvement.
+- **`quarantaine_apres`** : le stock en quarantaine juste après le mouvement.
+- **`cout_unitaire_snapshot`** : une copie du coût unitaire au moment de la vente, afin que la marge historique ne change pas si le coût catalogue change plus tard.
+- **`montant_perte`** : le montant estimé de la perte liée à l’incident.
+- **`contrepassation_de_id`** : l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`correlation_id`** : un numéro commun utilisé pour relier plusieurs traces qui appartiennent à la même grande opération. Exemple : une création de boutique qui produit plusieurs actions techniques.
+- **`note`** : une information libre ajoutée pour aider à comprendre la ligne. Selon la table, cela peut être une note interne ou une note chiffrée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`retours_commandes` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`livraison_id`** : l’identifiant de la livraison. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`commande_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`revision_expediee_id`** : l’identifiant de la version réellement expédiée. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`raison`** : la raison principale de l’action. Exemple : retour parce que le client a refusé le colis.
+- **`detail`** : quelques détails utiles sur l’événement, sans y mettre de secrets. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`demande_at`** : la date et l’heure liées à **demande**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`recu_at`** : la date et l’heure liées à **recu**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`recu_par_id`** : l’identifiant de la personne qui a reçu. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`clos_at`** : la date et l’heure liées à **clos**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`articles_retour` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`retour_id`** : l’identifiant du retour. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`article_commande_id`** : l’identifiant de la ligne de produit de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`revision_expediee_id`** : l’identifiant de la version réellement expédiée. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`variante_id`** : l’identifiant de la variante du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`quantite_attendue`** : le nombre d’unités que l’on s’attend à recevoir ou traiter.
+- **`quantite_recue`** : le nombre d’unités réellement reçues.
+- **`quantite_remise_stock`** : le nombre d’unités contrôlées puis remises dans le stock vendable.
+- **`quantite_perdue`** : le nombre d’unités considérées comme perdues.
+- **`quantite_en_quarantaine`** : le nombre d’unités gardées à part pour vérification.
+- **`quantite_manquante_documentee`** : le nombre d’unités qui devaient revenir mais qui manquent, avec une explication enregistrée.
+- **`motif_ecart`** : explique pourquoi le montant reçu est différent du montant attendu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cout_unitaire_snapshot`** : une copie du coût unitaire au moment de la vente, afin que la marge historique ne change pas si le coût catalogue change plus tard.
+- **`inspecte_par_id`** : l’identifiant de la personne qui a inspecté. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`inspecte_at`** : la date et l’heure liées à **inspecte**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`note`** : une information libre ajoutée pour aider à comprendre la ligne. Selon la table, cela peut être une note interne ou une note chiffrée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
+
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **`reservations_stock` :** UNIQUE(article_commande_id). Statut=active|liberee|consommee ; quantité>0 égale à celle de la ligne lorsqu’active. Réserver à confirmation TÉLÉPHONIQUE atomique ; le contrôle opérationnel ne réserve rien de plus. Pour un remplacement gratuit accepté, réserver également sans survente ; une révision remplacée libère ses réservations et la nouvelle réserve dans la même transaction. Chaque variante est verrouillée dans un ordre stable. Somme des réservations actives par variante = stock_reserve. La remise physique consomme les réservations ; une commande annulée avant remise les libère.
@@ -1982,6 +3463,72 @@ erDiagram
     }
     prestataires_livraison ||--o{ tarifs_prestataires : prestataire_id
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`prestataires_livraison` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`type`** : indique la catégorie de l’élément. Exemple : un domaine peut être `sous_domaine` ou `personnalise`.
+- **`nom`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
+- **`user_id`** : l’identifiant du compte utilisateur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`telephone`** : le numéro de téléphone. Il est gardé comme texte pour ne pas perdre le `0`, le `+213` ou d’autres signes utiles. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`email`** : l’adresse email du compte. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`code_transporteur`** : le code utilisé par le transporteur pour reconnaître une zone ou un service. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`compte_livraison_id`** : l’identifiant du compte transporteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`derniere_sync_at`** : la dernière fois où le SaaS a synchronisé ce compte avec le service externe. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`actif`** : indique si l’élément peut encore être utilisé. `true` = oui, `false` = non.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`tarifs_livraison_client` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`wilaya_id`** : l’identifiant de la wilaya. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`commune_id`** : l’identifiant de la commune. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`mode_livraison`** : la façon de livrer choisie. Exemple : domicile ou point relais.
+- **`montant`** : la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA.
+- **`active`** : indique si cette possibilité est autorisée. `true` = oui, `false` = non.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`tarifs_prestataires` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`prestataire_id`** : l’identifiant du transporteur ou livreur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`wilaya_id`** : l’identifiant de la wilaya. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`commune_id`** : l’identifiant de la commune. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`mode_livraison`** : la façon de livrer choisie. Exemple : domicile ou point relais.
+- **`type_prestation`** : indique la catégorie de **prestation** utilisée pour cette ligne.
+- **`montant`** : la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA.
+- **`source`** : indique d’où vient l’information. Exemple : saisie manuelle ou réponse de l’API.
+- **`releve_at`** : la date et l’heure liées à **releve**. Elle permet de savoir exactement quand cette étape a eu lieu.
+- **`active`** : indique si cette possibilité est autorisée. `true` = oui, `false` = non.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`regles_livraison_gratuite` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`nom`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
+- **`produit_id`** : l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`wilaya_id`** : l’identifiant de la wilaya. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`mode_livraison`** : la façon de livrer choisie. Exemple : domicile ou point relais. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`montant_panier_minimum`** : la somme d’argent correspondant à **panier minimum**. Exemple : `1500` représente 1 500 DA au lancement. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`commence_at`** : la date et l’heure où la période ou l’action commence. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`termine_at`** : la date et l’heure où elle s’est terminée. Peut rester vide tant que ce n’est pas terminé.
+- **`priorite`** : un nombre utilisé pour décider quel élément passe avant un autre. Exemple : priorité 1 avant priorité 2.
+- **`active`** : indique si cette possibilité est autorisée. `true` = oui, `false` = non.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
@@ -2100,6 +3647,106 @@ erDiagram
     livraisons ||--o{ evenements_livraison : livraison_id
 ```
 
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`correspondances_geo_transporteur` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`prestataire_id`** : l’identifiant du transporteur ou livreur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`type_zone`** : indique la catégorie de **zone** utilisée pour cette ligne.
+- **`wilaya_id`** : l’identifiant de la wilaya. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`commune_id`** : l’identifiant de la commune. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`code_externe`** : le code utilisé pour reconnaître **externe** de manière stable dans le programme ou chez un service externe.
+- **`nom_externe`** : le nom utilisé par le transporteur pour cet élément.
+- **`code_wilaya_externe`** : le code de wilaya attendu par ce transporteur, qui peut être différent du code interne du SaaS.
+- **`source_verification`** : indique d’où vient **verification** afin de savoir si l’information vient du SaaS, d’un utilisateur ou d’un service externe.
+- **`verifie_at`** : la date où l’information a été vérifiée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`version_mapping`** : la version des règles utilisées pour traduire les statuts du transporteur en statuts internes.
+- **`active`** : indique si cette possibilité est autorisée. `true` = oui, `false` = non.
+- **`synchronise_at`** : la date et l’heure liées à **synchronise**. Elle permet de savoir exactement quand cette étape a eu lieu.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`points_relais` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`prestataire_id`** : l’identifiant du transporteur ou livreur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`code_externe`** : le code utilisé pour reconnaître **externe** de manière stable dans le programme ou chez un service externe.
+- **`nom`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
+- **`wilaya_id`** : l’identifiant de la wilaya. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`commune_id`** : l’identifiant de la commune. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`adresse`** : l’adresse écrite. Exemple : rue, cité ou quartier.
+- **`telephone`** : le numéro de téléphone. Il est gardé comme texte pour ne pas perdre le `0`, le `+213` ou d’autres signes utiles. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`url_carte`** : un lien vers la position sur une carte. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`actif_transporteur`** : un **oui/non** pour indiquer si **actif transporteur** est vrai ou autorisé. `true` = oui ; `false` = non.
+- **`active_boutique`** : un **oui/non** pour indiquer si **active boutique** est vrai ou autorisé. `true` = oui ; `false` = non.
+- **`synchronise_at`** : la date et l’heure liées à **synchronise**. Elle permet de savoir exactement quand cette étape a eu lieu.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+**`livraisons` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`commande_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`revision_expediee_id`** : l’identifiant de la version réellement expédiée. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`prestataire_id`** : l’identifiant du transporteur ou livreur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`registre_colis_id`** : l’identifiant de l’enregistrement central du colis. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`point_relais_id`** : l’identifiant du point relais. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`mode_livraison`** : la façon de livrer choisie. Exemple : domicile ou point relais.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`statut_externe_brut`** : le statut exact reçu du transporteur avant de le traduire dans les statuts internes du SaaS. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`tracking`** : le numéro de suivi du colis donné par le transporteur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`reference_externe`** : le numéro donné par un système extérieur. Exemple : référence d’un reversement chez le transporteur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`montant_cod`** : la somme d’argent correspondant à **COD**. Exemple : `1500` représente 1 500 DA au lancement.
+- **`cout_estime`** : le coût correspondant à **estime**, utilisé pour connaître ce que cela coûte réellement au commerçant.
+- **`poids_kg`** : le poids en kilogrammes. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`fragile`** : indique si le produit ou la variante doit être traité comme fragile.
+- **`etiquete_media_id`** : l’identifiant lié à **etiquete media**. Il sert à retrouver l’élément correspondant. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`affectee_par_id`** : l’identifiant de la personne qui a affecté. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`expediee_at`** : la date et l’heure liées à **expediee**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`validee_transporteur_at`** : la date et l’heure liées à **validee transporteur**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`accuse_reception_at`** : la date et l’heure liées à **accuse reception**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`accuse_reception_source`** : indique d’où vient la preuve que le colis ou document a été reçu. Exemple : transporteur, saisie manuelle ou autre source prévue. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`preuve_reception_media_id`** : l’identifiant lié à **preuve reception media**. Il sert à retrouver l’élément correspondant. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`preuve_reception_reference_externe`** : la référence donnée par le système extérieur pour la preuve de réception. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`empreinte_preuve`** : une petite signature calculée à partir de preuve. Elle permet de vérifier que le contenu n’a pas changé sans stocker une deuxième copie complète. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`livree_at`** : la date et l’heure liées à **livree**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`derniere_sync_at`** : la dernière fois où le SaaS a synchronisé ce compte avec le service externe. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`evenements_livraison` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`livraison_id`** : l’identifiant de la livraison. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`statut_logistique`** : indique où en est le colis. Exemple : préparé, expédié, livré, refusé ou retourné. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`statut_financier`** : indique où en est l’argent lié à la commande. Exemple : à encaisser, encaissé, à reverser ou rapproché. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`code_externe`** : le code utilisé pour reconnaître **externe** de manière stable dans le programme ou chez un service externe. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`type_evenement`** : le type d’événement enregistré. Exemple : vue produit, ajout au panier ou début de checkout.
+- **`activity_externe_brute`** : le texte ou code d’activité exact reçu du transporteur, conservé seulement si nécessaire pour comprendre son événement. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`statut_externe_brut`** : le statut exact reçu du transporteur avant de le traduire dans les statuts internes du SaaS. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`version_adaptateur`** : le numéro de version de adaptateur. Exemple : version 1, puis version 2 après une évolution ; l’ancienne version peut rester conservée pour comprendre l’historique.
+- **`payload_externe_filtre`** : une copie nettoyée de la réponse externe, sans secrets inutiles. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`empreinte_payload`** : une petite signature calculée à partir de payload. Elle permet de vérifier que le contenu n’a pas changé sans stocker une deuxième copie complète.
+- **`payload_expire_at`** : la date et l’heure liées à **payload expire**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`payload_purge_at`** : la date et l’heure liées à **payload purge**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`motif`** : explique pourquoi l’action ou la décision a été faite. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`commentaire`** : le texte écrit par le client ou l’utilisateur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`station`** : la station ou agence du transporteur concernée lorsqu’elle existe.
+- **`livreur_libelle`** : le nom ou libellé du livreur fourni par le transporteur lorsqu’il existe.
+- **`prochain_passage_at`** : la date et l’heure liées à **prochain passage**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`survenu_at`** : la date et l’heure où l’événement s’est produit. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`observe_at`** : la date où le SaaS a vu cet événement.
+- **`source`** : indique d’où vient l’information. Exemple : saisie manuelle ou réponse de l’API.
+- **`acteur_id`** : l’identifiant de la personne qui a fait l’action. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_deduplication`** : une clé utilisée pour repérer deux messages ou événements qui représentent en réalité la même action.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+
+
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **`correspondances_geo_transporteur` :** type_zone=wilaya|commune ; commune_id obligatoire pour commune, NULL pour wilaya. UNIQUE(prestataire_id,type_zone,wilaya_id,commune_normalisee). code_externe désigne le code de la zone ; code_wilaya_externe donne son contexte externe, obligatoire même pour une commune. Plusieurs zones internes peuvent correspondre à une ancienne zone externe : pas de UNIQUE global sur code_externe. Mapping actif et vérifié requis à l’envoi ; sinon livraison indisponible pour cette route. Vérifier wilaya/commune/desk via le compte réel, ne pas inventer de conversion automatique. Ne pas envoyer un UUID local comme code_wilaya Ecotrack.
@@ -2163,6 +3810,56 @@ erDiagram
     }
     operations_transporteur ||--o{ tentatives_operations_transporteur : operation_id
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`operations_transporteur` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`prestataire_id`** : l’identifiant du transporteur ou livreur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`livraison_id`** : l’identifiant de la livraison. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`commande_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`retour_id`** : l’identifiant du retour. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`type`** : indique la catégorie de l’élément. Exemple : un domaine peut être `sous_domaine` ou `personnalise`.
+- **`revision_id`** : l’identifiant de la version de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`requete_sans_secrets`** : une copie de la demande envoyée à l’API après retrait des mots de passe, clés et données inutiles.
+- **`requete_personnelle_chiffree`** : les données personnelles nécessaires à l’appel transporteur, enregistrées sous forme chiffrée seulement tant qu’elles sont encore utiles. Elles peuvent ensuite être supprimées. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`empreinte_requete`** : une petite signature calculée à partir de requete. Elle permet de vérifier que le contenu n’a pas changé sans stocker une deuxième copie complète.
+- **`requete_expire_at`** : la date et l’heure liées à **requete expire**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`requete_purge_at`** : la date et l’heure liées à **requete purge**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`reference_marchand`** : un numéro stable créé côté marchand/SaaS pour reconnaître le colis chez le transporteur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`version_adaptateur`** : le numéro de version de adaptateur. Exemple : version 1, puis version 2 après une évolution ; l’ancienne version peut rester conservée pour comprendre l’historique.
+- **`resultat_technique`** : indique si l’appel technique a réussi, échoué ou reste incertain. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`nombre_tentatives`** : le nombre de **tentatives**. Exemple : `3` signifie qu’il y en a trois.
+- **`prochaine_tentative_at`** : la date prévue pour retenter l’opération après un échec récupérable. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`terminee_at`** : la date et l’heure où cette attribution ou règle a pris fin. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`envoi_commence_at`** : la date et l’heure liées à **envoi commence**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`supersedee_at`** : la date et l’heure liées à **supersedee**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`supersedee_par_operation_id`** : l’identifiant de l’opération plus récente qui remplace celle-ci. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`declenche_par_id`** : l’identifiant de la personne ou action qui a déclenché. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`tentatives_operations_transporteur` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`operation_id`** : l’identifiant de l’opération. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`numero_tentative`** : le numéro de l’essai. Exemple : 1 pour le premier essai, 2 après un nouvel essai.
+- **`code_http`** : le code renvoyé par l’API. Exemple : 200, 400 ou 500. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`reponse_filtre`** : une copie nettoyée de la réponse reçue de l’API. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`payload_expire_at`** : la date et l’heure liées à **payload expire**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`payload_purge_at`** : la date et l’heure liées à **payload purge**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`erreur_code`** : un petit code qui permet de reconnaître le type d’erreur sans stocker un long message sensible. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`duree_ms`** : le temps pris par l’appel, en millisecondes.
+- **`commence_at`** : la date et l’heure où la période ou l’action commence.
+- **`termine_at`** : la date et l’heure où elle s’est terminée. Peut rester vide tant que ce n’est pas terminé.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
@@ -2231,6 +3928,62 @@ erDiagram
     bordereaux_reversement ||--o{ lignes_reversement : bordereau_id
     recouvrements ||--o{ lignes_reversement : recouvrement_id
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`recouvrements` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`livraison_id`** : l’identifiant de la livraison. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`statut_declare`** : indique où en est **declare**. Exemple : en attente, actif, terminé ou en erreur selon les valeurs prévues pour cette table.
+- **`montant_attendu`** : le montant que l’on pense devoir recevoir selon les ventes et frais connus.
+- **`montant_encaisse_declare`** : le montant déclaré comme encaissé avant ou pendant la vérification. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`encaisse_at`** : la date où l’argent a réellement été encaissé auprès du client. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`paiement_pret_at`** : la date et l’heure liées à **paiement pret**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`paye_declare_at`** : la date et l’heure liées à **paye declare**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`source`** : indique d’où vient l’information. Exemple : saisie manuelle ou réponse de l’API.
+- **`rapproche_at`** : la date où le montant reçu a été comparé et rapproché avec ce qui était attendu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`bordereaux_reversement` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`prestataire_id`** : l’identifiant du transporteur ou livreur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`numero`** : le numéro lisible de l’élément. Exemple : numéro d’échéance ou de facture selon la table.
+- **`reference_externe`** : le numéro donné par un système extérieur. Exemple : référence d’un reversement chez le transporteur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`type`** : indique la catégorie de l’élément. Exemple : un domaine peut être `sous_domaine` ou `personnalise`.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`montant_brut`** : la somme d’argent correspondant à **brut**. Exemple : `1500` représente 1 500 DA au lancement.
+- **`montant_frais`** : la somme d’argent correspondant à **frais**. Exemple : `1500` représente 1 500 DA au lancement.
+- **`montant_net_attendu`** : la somme d’argent correspondant à **net attendu**. Exemple : `1500` représente 1 500 DA au lancement.
+- **`montant_net_recu`** : le montant net réellement reçu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`declare_at`** : la date et l’heure liées à **declare**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`recu_at`** : la date et l’heure liées à **recu**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`valide_par_id`** : l’identifiant de la personne qui a validé. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`preuve_media_id`** : l’identifiant lié à **preuve media**. Il sert à retrouver l’élément correspondant. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`note`** : une information libre ajoutée pour aider à comprendre la ligne. Selon la table, cela peut être une note interne ou une note chiffrée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`part_centrale_id`** : l’identifiant de la part centrale du reversement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`contrepassation_de_id`** : l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`rapproche_at`** : la date où le montant reçu a été comparé et rapproché avec ce qui était attendu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`lignes_reversement` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`bordereau_id`** : l’identifiant du bordereau de reversement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`recouvrement_id`** : l’identifiant du recouvrement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`montant_restitue`** : le montant rendu au client ou compensé selon le flux prévu.
+- **`contrepassation_de_id`** : l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`correction_de_id`** : l’identifiant de l’ancienne écriture que cette ligne corrige. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
@@ -2310,6 +4063,72 @@ erDiagram
     }
 ```
 
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`depenses` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`produit_id`** : l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`commande_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`livraison_id`** : l’identifiant de la livraison. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`retour_id`** : l’identifiant du retour. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`categorie`** : la catégorie de l’élément. Exemple : transport, publicité ou autre type de dépense.
+- **`libelle`** : un nom court utilisé pour reconnaître facilement l’élément à l’écran.
+- **`montant`** : la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA.
+- **`date_depense`** : la date à laquelle la dépense doit être comptée.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`preuve_media_id`** : l’identifiant lié à **preuve media**. Il sert à retrouver l’élément correspondant. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`auteur_id`** : l’identifiant de la personne qui a créé l’élément. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`source`** : indique d’où vient l’information. Exemple : saisie manuelle ou réponse de l’API.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`contrepassation_de_id`** : l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`correction_de_id`** : l’identifiant de l’ancienne écriture que cette ligne corrige. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`annulee_at`** : la date et l’heure liées à **annulee**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`note`** : une information libre ajoutée pour aider à comprendre la ligne. Selon la table, cela peut être une note interne ou une note chiffrée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`regularisations_clients` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`commande_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`retour_id`** : l’identifiant du retour. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`incident_id`** : l’identifiant de l’incident de commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`avoir_id`** : l’identifiant de l’avoir. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`commande_echange_id`** : l’identifiant de la commande d’échange. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`quantite_compensee`** : le nombre d’unités correspondant à **compensee**. Exemple : `2` signifie deux unités.
+- **`nature_montant`** : explique ce que représente le montant. Exemple : frais, remboursement ou correction.
+- **`type`** : indique la catégorie de l’élément. Exemple : un domaine peut être `sous_domaine` ou `personnalise`.
+- **`montant`** : la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`effectue_at`** : la date où l’opération a réellement été faite. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`valide_par_id`** : l’identifiant de la personne qui a validé. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`reference`** : un numéro ou texte de référence qui aide à reconnaître l’opération. Exemple : numéro d’un reçu ou référence externe. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`preuve_media_id`** : l’identifiant lié à **preuve media**. Il sert à retrouver l’élément correspondant. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`motif`** : explique pourquoi l’action ou la décision a été faite.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`contrepassation_de_id`** : l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`correction_de_id`** : l’identifiant de l’ancienne écriture que cette ligne corrige. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`bons_commande` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`commande_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`revision_id`** : l’identifiant de la version de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`numero`** : le numéro lisible de l’élément. Exemple : numéro d’échéance ou de facture selon la table.
+- **`version_document`** : le numéro de version de document. Exemple : version 1, puis version 2 après une évolution ; l’ancienne version peut rester conservée pour comprendre l’historique.
+- **`emetteur_snapshot`** : une **copie figée** de emetteur au moment important de l’opération. Si l’information d’origine change plus tard, cette ancienne ligne garde la valeur utilisée à ce moment-là.
+- **`media_id`** : l’identifiant du fichier/image/vidéo. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`genere_par_id`** : l’identifiant de la personne qui a généré. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`genere_at`** : la date et l’heure liées à **genere**. Elle permet de savoir exactement quand cette étape a eu lieu.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+
+
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **`depenses` :** UNIQUE(cle_operation), UNIQUE(contrepassation_de_id) hors NULL. statut=brouillon|constatee|annulee. Montant positif ordinaire, négatif uniquement pour une contrepassation exacte ; les dépenses constatées restent immuables. Corriger 650 en 600 par +650, -650, +600 avec liens de contrepassation/correction ; ne pas exclure l’original de la somme en plus de son inverse. Annulation simple uniquement en brouillon. Frais transporteur interdits ici (source unique frais_transporteur) ; pertes uniquement dans mouvements_stock. Les dimensions simultanées doivent être cohérentes ; FK composites livraison/commande et retour/commande, avec commande_id obligatoire si l’une est renseignée. Une dépense produit/période n’est imputée qu’une fois.
@@ -2353,6 +4172,39 @@ erDiagram
         datetime deleted_at "nullable"
     }
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`journal_audit` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`acteur_id`** : l’identifiant de la personne qui a fait l’action. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`action`** : le nom de l’action réalisée. Exemple : `abonnement.modifier`.
+- **`cible_type`** : le type de chose concernée par l’action. Exemple : `tenant`, `user` ou `role`.
+- **`cible_id`** : l’identifiant de l’élément précis concerné par l’action. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`avant`** : une petite copie des informations importantes avant la modification. Exemple : ancien statut = `actif`. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`apres`** : une petite copie des informations importantes après la modification. Exemple : nouveau statut = `suspendu`. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`correlation_id`** : un numéro commun utilisé pour relier plusieurs traces qui appartiennent à la même grande opération. Exemple : une création de boutique qui produit plusieurs actions techniques.
+- **`origine`** : indique d’où vient l’action. Exemple : utilisateur, serveur, tâche automatique ou transporteur.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`personnalisations_theme` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`code_theme`** : le code utilisé pour reconnaître **theme** de manière stable dans le programme ou chez un service externe.
+- **`version`** : le numéro de version de cet élément. Exemple : version 1, puis version 2 après une évolution ; l’ancienne version peut rester conservée pour comprendre l’historique.
+- **`configuration`** : plusieurs petits réglages liés à **configuration**, regroupés ensemble de manière structurée.
+- **`css_filtre`** : le CSS personnalisé après filtrage des règles interdites. Il ne doit pas contenir de JavaScript ni permettre de masquer des informations importantes. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`publie_at`** : la date où l’élément a été publié. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`auteur_id`** : l’identifiant de la personne qui a créé l’élément. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
+
+
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
@@ -2460,6 +4312,96 @@ erDiagram
     creances_transporteur ||--o{ allocations_creances_transporteur : creance_id
 ```
 
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`frais_transporteur` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`livraison_id`** : l’identifiant de la livraison. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`prestataire_id`** : l’identifiant du transporteur ou livreur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`retour_id`** : l’identifiant du retour. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`compte_livraison_id`** : l’identifiant du compte transporteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`tarif_source_id`** : l’identifiant lié à **tarif source**. Il sert à retrouver l’élément correspondant. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`tarif_snapshot`** : une copie figée du tarif utilisé pour calculer ce frais. Si le tarif change demain, l’ancien frais garde son ancien prix. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`type_frais`** : le type de frais du transporteur. Exemple : frais de retour ou autre frais prévu.
+- **`payeur`** : indique qui doit supporter le frais. Exemple : commerçant ou autre partie prévue.
+- **`mode_reglement`** : la façon dont le règlement a été fait. Exemple : déduction, versement ou autre mode autorisé.
+- **`montant`** : la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`fait_generateur_at`** : la date de l’événement qui fait réellement naître le frais. Exemple : la date où le transporteur accepte le retour.
+- **`source_date`** : indique d’où vient la date utilisée. Exemple : date fournie par le transporteur ou première date observée par le SaaS.
+- **`constate_at`** : la date et l’heure liées à **constate**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`reference_externe`** : le numéro donné par un système extérieur. Exemple : référence d’un reversement chez le transporteur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`preuve_media_id`** : l’identifiant lié à **preuve media**. Il sert à retrouver l’élément correspondant. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`contrepassation_de_id`** : l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`correction_de_id`** : l’identifiant de l’ancienne écriture que cette ligne corrige. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`reglements_frais_transporteur` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`bordereau_id`** : l’identifiant du bordereau de reversement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`frais_transporteur_id`** : l’identifiant des frais du transporteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`montant`** : la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA.
+- **`mode`** : indique la manière utilisée pour cette opération. Exemple : paiement séparé, déduction ou autre mode prévu.
+- **`contrepassation_de_id`** : l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`correction_de_id`** : l’identifiant de l’ancienne écriture que cette ligne corrige. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`creances_transporteur` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`prestataire_id`** : l’identifiant du transporteur ou livreur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`frais_transporteur_id`** : l’identifiant des frais du transporteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`reglement_frais_origine_id`** : l’identifiant du règlement de frais d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`montant_initial`** : le montant du frais au moment où il a été constaté.
+- **`montant_restant`** : la partie du montant qui n’a pas encore été réglée ou affectée.
+- **`motif`** : explique pourquoi l’action ou la décision a été faite.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`contrepassation_de_id`** : l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`reconnue_at`** : la date et l’heure liées à **reconnue**. Elle permet de savoir exactement quand cette étape a eu lieu.
+- **`soldee_at`** : la date et l’heure liées à **soldee**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`allocations_creances_transporteur` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`creance_id`** : la somme due par le transporteur que ce règlement vient réduire.
+- **`type_apurement`** : indique la catégorie de **apurement** utilisée pour cette ligne.
+- **`bordereau_id`** : l’identifiant du bordereau de reversement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`frais_transporteur_id`** : l’identifiant des frais du transporteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`montant`** : la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA.
+- **`reference_externe`** : le numéro donné par un système extérieur. Exemple : référence d’un reversement chez le transporteur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`contrepassation_de_id`** : l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`effectue_at`** : la date où l’opération a réellement été faite.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`ecritures_encaissement` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`recouvrement_id`** : l’identifiant du recouvrement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`montant`** : la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA.
+- **`encaisse_at`** : la date où l’argent a réellement été encaissé auprès du client.
+- **`verifie_at`** : la date où l’information a été vérifiée.
+- **`verifie_par_id`** : l’identifiant de la personne qui a vérifié. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`preuve_media_id`** : l’identifiant lié à **preuve media**. Il sert à retrouver l’élément correspondant. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`reference`** : un numéro ou texte de référence qui aide à reconnaître l’opération. Exemple : numéro d’un reçu ou référence externe.
+- **`motif`** : explique pourquoi l’action ou la décision a été faite.
+- **`contrepassation_de_id`** : l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`correction_de_id`** : l’identifiant de l’ancienne écriture que cette ligne corrige. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+
+
 - **`frais_transporteur` :** UNIQUE(cle_operation), UNIQUE(contrepassation_de_id) hors NULL. type_frais=livraison|retour|seconde_tentative|remplacement|autre. payeur=client|commercant|livreur|societe_livraison ; mode_reglement=retenu_encaissement|compensation|paiement_separe|pris_en_charge. statut=brouillon|constate|annule. Les frais payés par le client et retenus sur le COD sont enregistrés pour expliquer le net, sans être une charge du commerçant. Seuls payeur=commercant et statut=constate alimentent les charges ; ils sont réglables par reglements_frais_transporteur. Un même service partagé entre payeurs produit plusieurs lignes correspondant à leurs quotes-parts, jamais le total répété pour chacun. FK(livraison_id,prestataire_id) → livraisons(id,prestataire_id), FK(retour_id,livraison_id) → retours_commandes(id,livraison_id). compte_livraison_id doit correspondre au compte du prestataire, validé par le serveur ; NULL pour interne. Snapshot du tarif appliqué immuable même si la grille centrale évolue. Frais retour automatiques dédupliqués avec une clé dérivée du retour et du type de frais ; ne pas utiliser un UUID aléatoire à chaque polling. Toute écriture constatée est immuable ; correction par inverse exact puis nouvelle écriture. Une constatation client retenue ne peut excéder l’encaissement vérifié ni le montant de livraison client éligible sans traiter un écart explicite.
 - **`reglements_frais_transporteur` :** UNIQUE(cle_operation), UNIQUE(contrepassation_de_id) hors NULL. mode=compensation|paiement_separe. Frais du même prestataire que le bordereau, payeur=commercant, déjà constatés. Sous verrou du frais, 0<=somme nette des allocations sur bordereaux rapprochés<=montant effectif du frais (original + contrepassation). Pour corriger un frais déjà payé, contrepasser/réaffecter son allocation sans créer de mouvement bancaire fictif ; le trop-payé reconnu devient une `creances_transporteur`. Une écriture d’allocation n’est jamais une seconde charge.
 - **`creances_transporteur` — AUD-02 :** représente un montant reconnu dû par le transporteur après correction d’un frais déjà payé, sans présumer qu’il a été encaissé. UNIQUE(cle_operation), UNIQUE(contrepassation_de_id) hors NULL. `montant_initial>0`, `0<=montant_restant<=montant_initial`; `montant_restant` est une projection vérifiable depuis les allocations nettes. statut=ouverte|partiellement_apuree|remboursee|compensee|annulee_par_contrepassation. Exemple : paiement réel 650, frais corrigé 600 → charge nette 600, trésorerie -650, créance 50. La création de la créance ne produit aucun `+50` bancaire. Une erreur sur une créance finalisée se corrige par contrepassation puis nouvelle écriture, pas par réécriture silencieuse.
@@ -2525,6 +4467,60 @@ erDiagram
     }
 ```
 
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`indemnisations_transporteur` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`bordereau_id`** : l’identifiant du bordereau de reversement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`livraison_id`** : l’identifiant de la livraison. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`commande_remplacement_id`** : l’identifiant de la commande de remplacement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`montant`** : la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA.
+- **`motif`** : explique pourquoi l’action ou la décision a été faite.
+- **`reference_externe`** : le numéro donné par un système extérieur. Exemple : référence d’un reversement chez le transporteur.
+- **`preuve_media_id`** : l’identifiant lié à **preuve media**. Il sert à retrouver l’élément correspondant. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`contrepassation_de_id`** : l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`correction_de_id`** : l’identifiant de l’ancienne écriture que cette ligne corrige. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`factures` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`commande_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`revision_id`** : l’identifiant de la version de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`type_document`** : indique quel document c’est. Exemple : facture, avoir ou autre type prévu.
+- **`facture_origine_id`** : l’identifiant de la facture d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`sequence_id`** : l’identifiant du compteur de numérotation. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`numero_sequence`** : le nombre utilisé à l’intérieur de la série du document. Exemple : `123` dans `FAC-2026-000123`. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`version_format_snapshot`** : une **copie figée** de version format au moment important de l’opération. Si l’information d’origine change plus tard, cette ancienne ligne garde la valeur utilisée à ce moment-là.
+- **`devise`** : la monnaie utilisée. Exemple : `DZD` pour le dinar algérien.
+- **`numero`** : le numéro lisible de l’élément. Exemple : numéro d’échéance ou de facture selon la table. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`vendeur_snapshot`** : une copie figée des informations du vendeur utilisées pour cette commande.
+- **`client_snapshot`** : une copie figée des informations client utilisées par cette version de commande.
+- **`articles_snapshot`** : une **copie figée** de articles au moment important de l’opération. Si l’information d’origine change plus tard, cette ancienne ligne garde la valeur utilisée à ce moment-là.
+- **`totaux_snapshot`** : une copie figée des totaux de la commande à ce moment précis.
+- **`media_id`** : l’identifiant du fichier/image/vidéo. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`fournisseur_externe`** : le nom du fournisseur ou service extérieur auquel la dépense est liée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`reference_externe`** : le numéro donné par un système extérieur. Exemple : référence d’un reversement chez le transporteur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`document_externe_url`** : un lien vers un document fourni par le service extérieur lorsqu’il existe.
+- **`empreinte_document`** : une signature du contenu du document qui permet de vérifier qu’il est resté identique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`registre_emission_central_id`** : l’identifiant de l’enregistrement central durable du document. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`emise_at`** : la date et l’heure liées à **emise**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`annulee_at`** : la date et l’heure liées à **annulee**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`motif_annulation`** : explique la raison de **annulation**. Cela permet de comprendre plus tard pourquoi la décision a été prise. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`emise_par_id`** : l’identifiant de la personne qui a émis. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`motif_document`** : explique la raison de **document**. Cela permet de comprendre plus tard pourquoi la décision a été prise. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`incident_id`** : l’identifiant de l’incident de commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
+
 - **`indemnisations_transporteur` :** UNIQUE(cle_operation), UNIQUE(contrepassation_de_id) hors NULL. Un dédommagement pour perte/casse ou autre sinistre payé par le prestataire au commerçant est séparé du COD et du remboursement client. La livraison et le bordereau ont le même prestataire ; un remplacement éventuel se rattache à la commande de cette livraison, contrôlé sous verrou. Montant>0 sauf inverse exact. L’indemnisation devient effective uniquement avec un bordereau rapproché ; les promesses peuvent rester sur un brouillon. Les pièces et références sont contrôlées pour ne pas importer deux fois la même indemnisation. **Le remboursement d’un trop-payé issu d’une correction de frais n’est pas une indemnisation : il apure `creances_transporteur` via T16.** Ne pas enregistrer simultanément une baisse de frais et une indemnisation pour une seule réduction de dette.
 - **`factures` :** UNIQUE(numero) hors NULL, UNIQUE(sequence_id,numero_sequence) hors NULL, UNIQUE(cle_operation), UNIQUE(fournisseur_externe,reference_externe) si renseignés ensemble. Ajouter les clés parents composites `UNIQUE(id,commande_id)`, `UNIQUE(id,commande_id,revision_id,type_document)` et `UNIQUE(id,commande_id,revision_id,type_document,facture_origine_id)` pour permettre les liens exacts de T22. FK(revision_id,commande_id) → revisions_commandes(id,commande_id). type_document=facture|avoir. CHECK couplant type_document et facture_origine_id : facture → NULL, avoir → NOT NULL et différent de soi ; l’origine doit être une facture émise, pas un autre avoir, vérifié sous verrou. Un avoir exige motif_document non vide et facture_origine_id de cette commande via FK(facture_origine_id,commande_id) → factures(id,commande_id). statut=brouillon|en_enregistrement|emise|annulee_brouillon ; un avoir émis est un document fiscal de correction, PAS un crédit dépensable et PAS une preuve de remboursement. Numéro alloué sous verrou `sequences_documents` lors du passage en `en_enregistrement`, avec préfixe boutique stable central ; fournisseur externe : numéro/reçu final importés sous idempotence sans inventer un numéro local concurrent. Snapshots versionnés : identité légale vendeur, acheteur, lignes fiscales détaillées et totaux, voir 10.4. FK(incident_id,commande_id) → incidents_commande(id,commande_id) lorsque renseigné. Révision confirmée requise ; valeurs définitives figées à l’émission. L’émission obligatoire suit `obligations_facturation` et sa règle validée (T22), indépendamment du reversement transporteur. **Avant `statut=emise` et avant toute transmission, le worker produit le snapshot/PDF durable, calcule `empreinte_document`, inscrit ou retrouve la même `cle_operation` dans `central.registre_documents_emis`, puis renseigne une seule fois `registre_emission_central_id`.** Central, tenant et stockage objet n’étant pas atomiques, toute reprise utilise la même clé et rapproche l’état au lieu de consommer un nouveau numéro. Numéro, snapshots, média, empreinte et registre d’émission d’un document émis ne sont jamais réécrits par le métier. Seul un brouillon non émis peut être annulé directement. L’annulation d’une vente après émission conserve facture et statut historique `emise` ; correction via avoir puis nouveau document selon la procédure fiscale validée. `annulee_at/motif_annulation` décrivent uniquement l’annulation d’un brouillon ; toute rectification fiscale ultérieure est un nouveau document lié. Ne jamais réutiliser un numéro. PDF différé : le document peut rester `en_enregistrement` pendant la génération/inscription durable ; aucune transmission n’est permise avant convergence. Un lien externe seul ne suffit pas à conserver la pièce. Plafonner les avoirs par ligne et cumul contre la facture d’origine, sous verrou ; un avoir ne déclenche pas automatiquement de remboursement.
 
@@ -2569,6 +4565,44 @@ erDiagram
     }
     incidents_commande ||--o{ incidents_commande_details : incident_id
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`incidents_commande` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`commande_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`livraison_id`** : l’identifiant de la livraison. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`revision_expediee_id`** : l’identifiant de la version réellement expédiée. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`article_commande_id`** : l’identifiant de la ligne de produit de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`retour_id`** : l’identifiant du retour. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`quantite_affectee`** : la quantité de la créance ou du montant affectée par cette ligne.
+- **`montant_eligible_produits`** : la somme d’argent correspondant à **eligible produits**. Exemple : `1500` représente 1 500 DA au lancement.
+- **`montant_eligible_livraison`** : la somme d’argent correspondant à **eligible livraison**. Exemple : `1500` représente 1 500 DA au lancement.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`motif`** : explique pourquoi l’action ou la décision a été faite.
+- **`ouvert_par_id`** : l’identifiant de la personne qui a ouvert. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`valide_par_id`** : l’identifiant de la personne qui a validé. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`valide_at`** : la date et l’heure liées à **valide**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`clos_at`** : la date et l’heure liées à **clos**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`incidents_commande_details` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`incident_id`** : l’identifiant de l’incident de commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`type`** : indique la catégorie de l’élément. Exemple : un domaine peut être `sous_domaine` ou `personnalise`.
+- **`quantite`** : le nombre d’éléments concernés. Exemple : `2` signifie deux unités du produit.
+- **`motif`** : explique pourquoi l’action ou la décision a été faite.
+- **`auteur_id`** : l’identifiant de la personne qui a créé l’élément. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
 
 Dossier lié à la **ligne expédiée précise**, donc deux bouquets de même variante avec deux personnalisations restent distincts. UNIQUE(article_commande_id) au MVP : un seul dossier par ligne, réouvrable et enrichi par historique_commandes. Cette décision évite de dupliquer des incidents pour contourner le plafond ; plusieurs causes sont ventilées dans incidents_commande_details. Chaque détail : type=casse|perte|manquant|non_conforme|retour|autre, quantite>0 et motif requis. Sous verrou commande puis incident, SUM(details.quantite)<=article_commande.quantite et quantite_affectee=SUM(details.quantite). Une unité n’est comptée qu’une fois dans cette ventilation : choisir sa cause principale et décrire les causes secondaires dans le motif. Exemple 3 unités : 1 cassée + 1 manquante, la troisième correcte ne consomme aucun budget. Création/modification des détails et projection sont atomiques, auditées ; aucune diminution sous les remèdes déjà engagés. Le dossier porte le statut=ouvert|valide|rejete|clos. Quantité affectée >0 et <= quantité expédiée ; ne jamais la diminuer sous la quantité déjà engagée. Montants éligibles>=0, alloués par décision documentée, pas automatiquement égaux au total commande. La clôture ne libère aucun budget consommé.
 
@@ -2630,6 +4664,52 @@ erDiagram
     contrats_commandes ||--o{ transmissions_documents : contrat_id
 ```
 
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`contrats_commandes` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`commande_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`revision_id`** : l’identifiant de la version de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`version_format`** : le numéro de version de format. Exemple : version 1, puis version 2 après une évolution ; l’ancienne version peut rester conservée pour comprendre l’historique.
+- **`confirme_client_at`** : la date et l’heure liées à **confirme client**. Elle permet de savoir exactement quand cette étape a eu lieu.
+- **`confirmation_mode`** : la manière dont le client a donné son accord au contrat. Dans le MVP, l’exemple principal est l’accord téléphonique.
+- **`confirme_par_user_id`** : l’identifiant de la personne qui a saisi la confirmation. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`preuve_confirmation_filtree`** : plusieurs petits réglages liés à **preuve confirmation filtree**, regroupés ensemble de manière structurée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`document_snapshot`** : une copie figée du document ou de ses informations importantes au moment de l’envoi.
+- **`empreinte`** : une petite signature calculée à partir des données. Elle sert à vérifier que le contenu n’a pas changé sans recopier tout le contenu.
+- **`media_id`** : l’identifiant du fichier/image/vidéo. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`empreinte_media`** : une signature du fichier qui permet de vérifier son contenu et parfois de repérer un doublon. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`transmis_at`** : la date et l’heure liées à **transmis**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`canal_transmission`** : le moyen utilisé pour envoyer le document. Exemple : email, lien sécurisé ou autre canal prévu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`reference_transmission`** : la référence utilisée pour reconnaître **transmission** sans se baser seulement sur son nom. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`transmissions_documents` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`contrat_id`** : l’identifiant du contrat de commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`facture_id`** : l’identifiant de la facture. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`livraison_id`** : l’identifiant de la livraison. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`canal`** : indique par quel moyen on communique. Exemple : téléphone ou WhatsApp.
+- **`destinataire_chiffre`** : les coordonnées du destinataire enregistrées de manière protégée lorsqu’elles doivent être conservées. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`nombre_tentatives`** : le nombre de **tentatives**. Exemple : `3` signifie qu’il y en a trois.
+- **`prochaine_tentative_at`** : la date prévue pour retenter l’opération après un échec récupérable. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`reference_fournisseur`** : le numéro de facture, reçu ou référence donné par le fournisseur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`envoye_at`** : la date où l’envoi a été effectué. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`delivre_at`** : la date où la réception ou livraison du message a été confirmée quand cette information existe. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`erreur_code`** : un petit code qui permet de reconnaître le type d’erreur sans stocker un long message sensible. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`preuve_media_id`** : l’identifiant lié à **preuve media**. Il sert à retrouver l’élément correspondant. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
+
 - `contrats_commandes` : UNIQUE(commande_id,revision_id), FK(revision_id,commande_id) → revisions_commandes(id,commande_id). La confirmation est attachée à une révision exacte ; le snapshot complet contient vendeur identifié/version, client, lignes, TTC, livraison, conditions, version de format et confirmation. `empreinte`=SHA-256 du JSON canonique, `empreinte_media`=SHA-256 des octets du document : ne pas confondre les deux. Création immuable dans la transaction d’acceptation/réservation, y compris avenant avant expédition. Le média peut être produit après commit à partir du snapshot exact. confirmation_mode=telephone (CHECK pour le MVP), confirme_par_user_id obligatoire, confirme_client_at=date de l’accord déclaré et created_at=date de saisie. Le commerçant appelle puis clique « Confirmer la commande » ; aucun retour du client sur le site n’est exigé. Note/référence facultative minimisée : la déclaration du commerçant ne constitue pas à elle seule une preuve indépendante de l’appel. UNIQUE(cle_operation) et UNIQUE(commande_id,revision_id) dédupliquent le double clic. L’acceptation des conditions reste un événement distinct (T21). La preuve minimale de l’information relative aux données de commande est portée directement par `commandes` (T8), sans table `accords_collecte_donnees`. Les trois projections de première transmission sont remplies depuis une transmission réussie et jamais depuis la seule création du contrat.
 - `transmissions_documents` : exactement UNE des trois FK est non NULL (CHECK explicite avec IS NOT NULL). Pour livraison, l’objet est la copie de l’accusé, jamais son étiquette. canal=email|sms_lien|whatsapp_lien|remise_documentee ; statut=en_attente|en_cours|envoye|delivre|echec_reessayable|echec_definitif|incertain. Référence fournisseur et preuve adaptées au canal. Une acceptation par le fournisseur établit au mieux « envoyé », pas « lu par le client ». Aucun numéro/e-mail inventé pour remplir la preuve. Si un canal nécessite une adresse absente, obtenir un canal utilisable ou maintenir l’anomalie à résoudre, sans prétendre la transmission faite.
 - C’est une outbox locale durable : ligne créée dans la transaction qui produit le document, envoi après commit, retries et déduplication par cle_operation. Un timeout ambigu est incertain et rapproché selon les capacités du fournisseur. Les tentatives techniques détaillées utilisent le mécanisme de jobs retenu sans effacer la trace d’échec de cette action. Accès aux documents via liens signés limités, jamais téléphone/UUID seuls. Le destinataire est chiffré et soumis à la politique de rétention.
@@ -2651,6 +4731,22 @@ erDiagram
         datetime updated_at
     }
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`sequences_documents` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`prefixe_boutique`** : la copie du préfixe documentaire de la boutique utilisée pour construire ses numéros. Exemple : `KRM`.
+- **`type_document`** : indique quel document c’est. Exemple : facture, avoir ou autre type prévu.
+- **`exercice`** : l’année ou période de numérotation concernée. Exemple : `2026`.
+- **`prochain_numero`** : le prochain nombre disponible dans cette série. Exemple : si le dernier document était 102, le prochain peut être 103.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+
 
 UNIQUE(type_document,exercice) dans la BDD tenant ; prefixe_boutique fixé centralement et jamais réutilisé pour une autre boutique. type_document=facture|avoir. À l’émission locale : verrou sur cette ligne stable, lire/incrémenter `prochain_numero`, attribuer numéro et snapshots puis entrer en état `en_enregistrement`. **Avant que le document devienne `emis` ou soit transmis, son identité est enregistrée/retrouvée idempotemment dans `central.registre_documents_emis` et son snapshot/PDF durable est vérifié.** Initialiser les séquences avant usage ; en création concurrente, gérer l’unicité puis relire sous verrou. Pas de MAX(numero)+1. Après restauration tenant, `prochain_numero` n’est jamais accepté seul : rapprocher le registre central et reconstruire une borne sûre ; tout numéro déjà émis reste consommé. Format proposé : préfixe-type-exercice-numéro ; politique de séries par boutique pour une même entité légale à valider avant production. Si une séquence unique par société est requise, déplacer son allocation dans le central avec registre d’attribution idempotent avant activation, sans simulation de transaction distribuée. Le bon de commande peut utiliser numero_commande + version_document.
 
@@ -2691,6 +4787,41 @@ erDiagram
         datetime created_at
     }
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`acceptations_conditions_vente` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`commande_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`revision_id`** : l’identifiant de la version de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`conditions_vente_version`** : la version des conditions de vente applicables à cette commande.
+- **`empreinte_conditions`** : une petite signature calculée à partir de conditions. Elle permet de vérifier que le contenu n’a pas changé sans stocker une deuxième copie complète.
+- **`accepte_at`** : la date et l’heure liées à **accepte**. Elle permet de savoir exactement quand cette étape a eu lieu.
+- **`mode_acceptation`** : indique la manière choisie pour **acceptation**.
+- **`preuve_filtree`** : plusieurs petits réglages liés à **preuve filtree**, regroupés ensemble de manière structurée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`journal_operations_donnees_personnelles` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`acteur_id`** : l’identifiant de la personne qui a fait l’action. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`type_operation`** : indique quelle action a été faite sur les données ou le système. Exemple : export, suppression ou anonymisation.
+- **`ressource_type`** : le type d’élément concerné. Exemple : client, commande ou fichier.
+- **`ressource_id`** : l’identifiant de l’élément précis concerné. Il peut rester vide si l’opération porte sur un lot entier.
+- **`categories_donnees`** : les types d’informations concernés. Exemple : nom, téléphone ou adresse, sans recopier toutes les valeurs ici.
+- **`motif`** : explique pourquoi l’action ou la décision a été faite.
+- **`destinataire`** : indique à qui l’information ou le document a été envoyé lorsque cela doit être tracé. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`effectue_at`** : la date où l’opération a réellement été faite.
+- **`contexte`** : quelques informations utiles pour comprendre l’opération, sans recopier inutilement des données sensibles. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`correlation_id`** : un numéro commun utilisé pour relier plusieurs traces qui appartiennent à la même grande opération. Exemple : une création de boutique qui produit plusieurs actions techniques.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+
 
 - **Conditions de vente :** événement immuable distinct du contrat téléphonique et de l’information relative aux données de commande. FK(revision_id,commande_id) → revisions_commandes(id,commande_id). Mode MVP=checkout ; version et empreinte doivent correspondre aux conditions de la révision ; serveur vérifie le hash du snapshot canonique. Une nouvelle révision n’hérite pas automatiquement d’une nouvelle acceptation de conditions. Si une nouvelle acceptation est requise, la recueillir explicitement et la tracer ; ne pas transformer l’appel en acceptation implicite. Dédupliquer avec cle_operation. Cette table peut être vide si aucun événement n’a été réellement recueilli ; ne pas fabriquer des dates pour satisfaire un champ.
 
@@ -2746,6 +4877,48 @@ erDiagram
         datetime created_at
     }
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`obligations_facturation` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`commande_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`revision_id`** : l’identifiant de la version de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`regle_facturation_id`** : la règle de facturation précise utilisée pour décider comment ce document devait être créé.
+- **`regle_snapshot`** : une **copie figée** de regle au moment important de l’opération. Si l’information d’origine change plus tard, cette ancienne ligne garde la valeur utilisée à ce moment-là.
+- **`evenement_type`** : le type d’événement qui a créé l’obligation de facturer. Exemple : vente finalisée, avoir à produire ou autre événement prévu.
+- **`evenement_id`** : l’identifiant de l’événement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`fait_generateur_at`** : la date de l’événement qui fait réellement naître le frais. Exemple : la date où le transporteur accepte le retour.
+- **`type_document`** : indique quel document c’est. Exemple : facture, avoir ou autre type prévu.
+- **`facture_origine_id`** : l’identifiant de la facture d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`facture_id`** : l’identifiant de la facture. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`nombre_tentatives`** : le nombre de **tentatives**. Exemple : `3` signifie qu’il y en a trois.
+- **`prochaine_tentative_at`** : la date prévue pour retenter l’opération après un échec récupérable. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`erreur_code`** : un petit code qui permet de reconnaître le type d’erreur sans stocker un long message sensible. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+
+**`compensations_echanges` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`incident_id`** : l’identifiant de l’incident de commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`commande_origine_id`** : l’identifiant de la commande d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`avoir_origine_id`** : l’identifiant de l’avoir d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`commande_destination_id`** : l’identifiant de la nouvelle commande liée. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`revision_destination_id`** : l’identifiant de la version de commande de destination. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`montant`** : la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`contrepassation_de_id`** : l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`effectue_at`** : la date où l’opération a réellement été faite. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+
 
 - **Obligation — AUD-03 :** FK(revision_id,commande_id) → revisions_commandes(id,commande_id). `type_document=facture|avoir`; origine NULL pour facture, obligatoire pour avoir. Le document satisfaisant l’obligation doit correspondre **simultanément** à la bonne commande, la bonne révision et le bon type : FK composite `(facture_id,commande_id,revision_id,type_document)` → `factures(id,commande_id,revision_id,type_document)`. Pour un avoir, renforcer aussi l’égalité de l’origine par FK composite `(facture_id,commande_id,revision_id,type_document,facture_origine_id)` → `factures(id,commande_id,revision_id,type_document,facture_origine_id)` ; la FK simple sur `facture_origine_id` garde la validation de l’origine elle-même. UNIQUE(facture_id) hors NULL. Statut=a_emettre|en_cours|emise|erreur. **`statut=emise` est interdit si `facture_id` est NULL ou si le document lié n’a pas lui-même `factures.statut='emise'`.** Le service et un trigger de transition vérifient ce statut, l’origine et l’impossibilité de remplacer le document après satisfaction. Clé métier stable issue de l’occurrence du fait générateur et du type de pièce ; la règle ne se change pas au retry pour créer une deuxième facture. L’événement métier et cette intention sont commités ensemble ; si fait constaté externe, son import crée l’intention dans la même transaction. Un rapprochement périodique cherche les faits générateurs sans obligation et les obligations sans document. Émission idempotente de factures avec `cle_operation` dérivée, puis transmission T19. Révision confirmée exigée ; un avoir reste lié à la facture originale même après fermeture de commande. Une clé d’idempotence évite les doublons mais ne remplace jamais ces contraintes de correspondance documentaire.
 - **Compensation dédiée :** sert uniquement à affecter un avoir émis d’une ancienne vente à UNE commande d’échange identifiée ; aucun solde client librement dépensable. FK(incident_id,commande_origine_id) → incidents_commande(id,commande_id) ; FK(avoir_origine_id,commande_origine_id) → factures(id,commande_id) ; FK(revision_destination_id,commande_destination_id) → revisions_commandes(id,commande_id). Le service vérifie type_document=avoir, statut=emise, origine de l’incident et type_commande=echange. Origine et destination distinctes. Montant>0, sauf inverse exact ; UNIQUE(contrepassation_de_id). Statut=reservee|effectuee|annulee_avant_effet. Une affectation réservée consomme déjà le disponible de l’avoir ; une inverse ne libère ce disponible qu’une fois effectuée. Après effet, pas de modification/suppression, uniquement contrepassation traçable. Annulation avant effet uniquement avant figement distant de la destination.
@@ -2814,6 +4987,43 @@ erDiagram
     }
     corrections_commerciales ||--o{ lignes_corrections_commerciales : correction_id
 ```
+
+#### Explication très simple des champs
+
+> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
+
+**`corrections_commerciales` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`commande_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`revision_source_id`** : l’identifiant de la version de commande servant de source. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`incident_id`** : l’identifiant de l’incident de commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`type_correction`** : le type de correction économique. Exemple : réduction après retour, geste commercial ou autre correction prévue.
+- **`statut`** : indique où en est l’élément. Exemple : `en_attente`, `actif`, `termine` ou `annule` selon la table.
+- **`delta_revenu_hors_produits`** : la correction de revenu qui ne correspond pas directement à une ligne produit. Exemple : corriger 500 DA de livraison.
+- **`nature_hors_produits`** : indique ce que représente la correction hors produit. Exemple : livraison, geste global ou autre.
+- **`date_effet`** : la date à partir de laquelle l’information ou la correction doit compter. Exemple : une correction enregistrée aujourd’hui peut devoir compter pour la vente d’hier.
+- **`date_enregistrement`** : la date où la correction a été saisie dans le système ; elle peut être différente de la date où elle doit compter.
+- **`motif`** : explique pourquoi l’action ou la décision a été faite.
+- **`cle_operation`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
+- **`correction_de_id`** : l’identifiant de l’ancienne écriture que cette ligne corrige. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`acteur_id`** : l’identifiant de la personne qui a fait l’action. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+**`lignes_corrections_commerciales` :**
+
+- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
+- **`correction_id`** : l’identifiant de la correction commerciale. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`revision_source_id`** : l’identifiant de la version de commande servant de source. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`article_commande_id`** : l’identifiant de la ligne de produit de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
+- **`quantite_concernee`** : le nombre d’unités correspondant à **concernee**. Exemple : `2` signifie deux unités.
+- **`montant_vente_reference`** : la somme d’argent correspondant à **vente reference**. Exemple : `1500` représente 1 500 DA au lancement.
+- **`delta_revenu`** : le changement à appliquer au chiffre d’affaires pour cette ligne. Exemple : `-2000` retire 2 000 DA des ventes reconnues.
+- **`delta_cout_vendu`** : le changement à appliquer au coût des produits vendus pour calculer correctement la marge.
+- **`motif_detaille`** : explique la raison de **detaille**. Cela permet de comprendre plus tard pourquoi la décision a été prise. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`created_at`** : la date où cette ligne a été créée dans la base.
+
+
 
 - **`corrections_commerciales` — AUD-06/AUD-12 :** UNIQUE(cle_operation), UNIQUE(correction_de_id) hors NULL, UNIQUE(id,revision_source_id), UNIQUE(id,commande_id,revision_source_id). FK(revision_source_id,commande_id) → revisions_commandes(id,commande_id) ; si incident renseigné, FK(incident_id,commande_id) → incidents_commande(id,commande_id). FK composite `(correction_de_id,commande_id,revision_source_id)` → `corrections_commerciales(id,commande_id,revision_source_id)` et CHECK `correction_de_id IS NULL OR correction_de_id<>id` : une correction de correction reste sur la même commande et la même révision source. `type_correction=retour|annulation|geste_commercial|echange|autre`. `statut=brouillon|finalisee|contrepassation`. `nature_hors_produits=aucune|livraison|geste_global|autre` et `delta_revenu_hors_produits` est signé. CHECK : nature=`aucune` ⇒ delta=0 ; nature différente de `aucune` ⇒ delta<>0. Une correction peut comporter uniquement des lignes produit, uniquement un impact hors produit, ou les deux ; à la finalisation, au moins un impact non nul doit exister. Exemple : remboursement commercial des seuls 650 DZD de livraison → `nature_hors_produits=livraison`, `delta_revenu_hors_produits=-650`, aucune ligne produit. `date_effet` est la période économique utilisée par les indicateurs ; `date_enregistrement` est l’instant où la décision est réellement enregistrée. Au MVP, une décision finalisée prend effet à sa date commerciale explicite ; elle ne réécrit pas silencieusement une période déjà publiée. Une ligne finalisée est immuable ; une erreur se corrige par un nouvel événement lié via `correction_de_id`, jamais par UPDATE destructif. L’ouverture d’un incident ou la réception d’un retour ne crée pas automatiquement cette correction.
 - **`lignes_corrections_commerciales` :** UNIQUE(correction_id,article_commande_id). FK(correction_id,revision_source_id) → corrections_commerciales(id,revision_source_id) et FK(article_commande_id,revision_source_id) → articles_commande(id,revision_id), avec clés parents UNIQUE ; la ligne concernée appartient donc obligatoirement à la révision source. `quantite_concernee>0`. Sous verrou de la commande/révision puis des lignes concernées, la **quantité corrigée nette cumulée** de chaque `article_commande_id` (corrections finalisées moins leurs contrepassations exactes) + la nouvelle quantité ne peut jamais dépasser la quantité admissible de la ligne. Une seconde correction quantité=1 sur une ligne vendue quantité=1 est donc refusée, sauf si elle constitue l’inverse documenté d’une correction précédente. Une contrepassation doit reprendre les mêmes lignes/quantités et inverser exactement les deltas correspondants ; elle ne crée pas un nouveau budget de correction tant qu’elle n’est pas finalisée. `montant_vente_reference>=0`. `delta_revenu` et `delta_cout_vendu` sont signés et expliquent exactement l’impact de gestion ; exemple d’annulation de 8 000 : `delta_revenu=-8000`. L’impact revenu total de l’événement = Σ `lignes_corrections_commerciales.delta_revenu` + `corrections_commerciales.delta_revenu_hors_produits`. Les quantités/statistiques produit utilisent uniquement les lignes produit ; une correction de livraison ne doit jamais être attribuée artificiellement à un article. Les montants fiscaux restent dans factures/avoirs et le mouvement de trésorerie dans `regularisations_clients`/journaux financiers : cette table ne simule ni document fiscal ni paiement.
