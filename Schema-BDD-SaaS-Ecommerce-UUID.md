@@ -2,7 +2,7 @@
 
 Version V3.2 consolidée du 24 septembre 2026 — intégration des corrections du document « les derniere modiff.docx », des correctifs AUD-01 à AUD-09 et des corrections complémentaires AUD-10, AUD-11, AUD-12, AUD-15, AUD-16, AUD-17 et AUD-18 du document « des bug et des truc encore.docx ». Les diagrammes, champs, contraintes, parcours et critères de validation sont mis à jour ensemble. Les choix fiscaux, juridiques et les capacités API restant à valider sont explicitement distingués des décisions métier retenues.
 
-Ce document contient **50 tables centrales et 69 tables par boutique**, dont `personnalisations_theme` réservée à une évolution. La table `accords_collecte_donnees` de la V3.1 est supprimée : la preuve d’information liée au checkout est portée directement par `commandes`, conformément à AUD-10. Les tables techniques Laravel (sessions, cache, jobs, migrations, réinitialisation de mot de passe) sont exclues du décompte.
+Ce document contient **49 tables centrales et 69 tables par boutique**, dont `personnalisations_theme` réservée à une évolution. La table `accords_collecte_donnees` de la V3.1 est supprimée : la preuve d’information liée au checkout est portée directement par `commandes`, conformément à AUD-10. Les tables techniques Laravel (sessions, cache, jobs, migrations, réinitialisation de mot de passe) sont exclues du décompte.
 
 Les diagrammes sont répartis en modules pour rester exploitables. **Les champs, les références et les contraintes écrites font ensemble le schéma** : Mermaid ne peut pas imposer toutes les règles transactionnelles. Ce document n’est pas une migration SQL déjà exécutée.
 
@@ -25,7 +25,7 @@ Les diagrammes sont répartis en modules pour rester exploitables. **Les champs,
 | Stock | Physique vendable, réservé, quarantaine et disponible non négatifs. Pas de survente ni précommande au MVP ; pas de multi-entrepôts. |
 | Argent | Montant COD global par colis, mais prix/coût détaillés par ligne dans ta BDD. Encaissement et reversement distincts. |
 | Abonnement | Rattaché au propriétaire ; paiements validés manuellement sur preuve/reçu ; arrêt demandé = fin de renouvellement et maintien des droits jusqu’à la fin de la période déjà payée, sauf décision administrative explicite. Aucun remboursement/décaissement automatique géré par le SaaS. Expiration payante → gratuit automatique, une boutique active, autres hors_quota, données conservées. Fonctionnalités, quotas et exceptions datées. |
-| Administrateurs | Root complet ; administrateurs délégués limitables par action, boutique et compte ciblé. |
+| Administrateurs | Root complet sur l’administration centrale ; administrateurs délégués limitables par action et cible centrale. Aucun accès d’assistance aux boutiques et aucune usurpation de compte. |
 | Statistiques | Mesure interne des visiteurs et événements ; ventes/retours fondés sur les événements métier. Les corrections commerciales utilisent un événement économique finalisé avec date d’effet explicite. Aucun GA4 requis. |
 | Site | Un template, profil public, plusieurs adresses et liens sociaux. Personnalisation CSS encadrée plus tard. |
 | Documents | Contrats par révision acceptée, preuves de transmission, factures et avoirs à snapshots fiscaux, preuve de réception indépendante de l’étiquette. Toute identité documentaire émise est aussi inscrite dans un registre central durable avant transmission. |
@@ -60,7 +60,7 @@ Les diagrammes sont répartis en modules pour rester exploitables. **Les champs,
 - `nullable` signifie que le champ est facultatif. Les autres champs sont requis, sauf phase transactionnelle explicitement mentionnée.
 - `PK` = clé primaire ; `FK` = clé étrangère **dans la même BDD** ; `UK` = unicité simple indiquée. Les unicités composites et conditionnelles sont précisées dans le texte.
 - Une référence `central.users`, `central.tenants`, `central.wilayas` ou `central.communes` dans une BDD tenant est une **référence logique**, pas une FK SQL inter-BDD. La connexion centrale valide l’existence ; les objets de référence sont archivés plutôt que supprimés.
-- Les acteurs centraux des journaux peuvent être NULL pour une action système. `origine` indique serveur, utilisateur, transporteur ou tâche ; `compte_represente_id` conserve une éventuelle session d’assistance.
+- Les acteurs des journaux peuvent être NULL pour une action système. `acteur_id` identifie le compte qui effectue réellement l’action. `origine` indique serveur, utilisateur, transporteur ou tâche. Aucune action ne s’effectue sous l’identité d’un autre compte.
 - `contexte_normalise`, `commune_normalisee`, `type_cible` et autres expressions d’unicité sont des expressions ou colonnes techniques calculées à créer dans les migrations. Ne pas se reposer sur une simple unicité SQL contenant NULL pour ces cas.
 - Les relations et requêtes tenant passent toujours par le contexte validé. Le visiteur public n’accède qu’aux données publiées et à son propre panier/suivi autorisé. Les APIs, tâches de fond, fichiers et clés de cache doivent conserver l’isolation autant que les BDD. Cache : préfixe tenants:{uuid}:..., espaces central:... séparés. Job : tenant UUID et version de contexte validés, connexion/cache/filesystem initialisés puis purgés en finally ; jamais de tenant résiduel dans un worker réutilisé. Les préfixes physiques de fichiers sont ceux de T2 ; sélectionner la BDD seule ne les isole pas.
 - Une BDD distincte n’est pas une instance complète de l’application déployée pour chaque commerçant : le code et les services peuvent être partagés. Tenancy fournit notamment la sélection de BDD ; il ne crée pas automatiquement toutes tes règles d’autorisation.
@@ -155,7 +155,7 @@ erDiagram
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
-- **`users` :** UNIQUE(email normalisé). Pays DZ par défaut. Password contient un hachage. Au maximum un compte racine actif, contrainte conditionnelle à prévoir. Seul le compte racine a le contournement global ; un administrateur délégué conserve toutes les restrictions explicites. La langue est une préférence, pas une table de traductions du catalogue.
+- **`users` :** UNIQUE(email normalisé). Pays DZ par défaut. Password contient un hachage. Au maximum un compte racine actif, contrainte conditionnelle à prévoir. Le compte racine possède les droits complets d’administration centrale ; un administrateur délégué conserve toutes les restrictions explicites. Le statut d’administrateur plateforme, racine compris, ne dispense pas des contrôles d’appartenance et d’autorisation pour utiliser le back-office marchand d’une boutique. La langue est une préférence, pas une table de traductions du catalogue.
 
 - **`tenants` :** proprietaire_id NOT NULL, FK RESTRICT vers users ; UNIQUE(id,proprietaire_id). BEFORE UPDATE refuse tout changement de propriétaire, également interdit par le service, même pour root. Propriétaire actif à la création ; suppression logique/physique de son compte bloquée tant qu’une boutique lui est rattachée. `nom_boutique` est la source centrale ; `nom_boutique_normalise` UNIQUE, NOT NULL, collation binaire UTF-8, normalisation serveur versionnée : NFC, espaces Unicode regroupés, trim, casefold. Exemple «  Alpha  Store » → « alpha store ». Rejeter le vide et toute longueur excessive, ne jamais tronquer pour indexer. Les noms des boutiques archivées restent réservés au MVP. `cle_creation` est NOT NULL, idempotente par propriétaire : UNIQUE(proprietaire_id,cle_creation), jamais UNIQUE(cle_creation) seul. `empreinte_creation` fige le SHA-256 du contenu canonique versionné de la demande ; même paire/même empreinte → même tenant, empreinte différente → conflit 409. Relire cette paire AVANT le contrôle du quota : une reprise ne consomme pas une nouvelle place. `prefixe_documents` est un code de série globalement unique, immuable après utilisation. `version_profil` augmente à chaque changement du profil central à répliquer. `data` porte les métadonnées Tenancy, dont le nom technique de BDD unique. Statut=en_provisionnement|actif|hors_quota|suspendu|suspendu_restauration|echec_provisionnement|archive. Une seule boutique principale non archivée par propriétaire via clé générée conditionnelle UNIQUE ; priorite_activation positive facultative mémorise son choix de conservation. Le quota ne réactive jamais une suspension administrative ou de restauration. La date hors_quota_depuis_at suit la projection de quota. Aucun accès SQL direct aux commerçants.
 
@@ -250,17 +250,17 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 - **`fonctionnalites` :** UNIQUE(code). type_valeur=booleen|quota ; portee_quota=compte|tenant ; periodicite=aucune|jour|mois. Les quotas journaliers utilisent une fenêtre calendaire explicite. Exemples boutiques.nombre, domaines.personnalises, design.personnalise, livraison.ecotrack, statistiques.lire. Les fonctionnalités doivent correspondre à des contrôles réellement implémentés.
 
-- **`permissions` :** UNIQUE(code). portee=plateforme|tenant. Exemples produits.creer, produits.modifier, produits.supprimer, stock.ajuster, commandes.confirmer, commandes.modifier, finances.valider_reversement, tenants.acceder, utilisateurs.usurper. Une fonctionnalité non commerciale peut ne pas avoir de fonctionnalite_id.
+- **`permissions` :** UNIQUE(code). portee=plateforme|tenant. Exemples produits.creer, produits.modifier, produits.supprimer, stock.ajuster, commandes.confirmer, commandes.modifier, finances.valider_reversement, tenants.consulter_fiche. Une fonctionnalité non commerciale peut ne pas avoir de fonctionnalite_id.
 
 - **`roles` :** portee=plateforme exige tenant_id NULL ; portee=tenant exige un tenant. UNIQUE(contexte_normalise,code), contexte_normalise vaut plateforme ou UUID du tenant. La simple contrainte UNIQUE(tenant_id,code) ne suffit pas pour les lignes globales avec NULL.
 
-- **`roles_permissions` :** UNIQUE(role_id,permission_id). Égalité obligatoire roles.portee=permissions.portee : tenant → tenant et plateforme → plateforme. Service Laravel ET triggers BEFORE INSERT/UPDATE sur le pivot refusent une différence avec SIGNAL SQLSTATE '45000'. Les portées des rôles et permissions sont immuables dès création (triggers BEFORE UPDATE), ce qui ferme le contournement par modification des parents. Pour l’assistance, créer des permissions plateforme dédiées et contrôlées par cible ; ne pas attacher une permission tenant à un rôle plateforme. Toute mutation invalide les caches. Les comptes SQL applicatifs n’ont aucun droit DDL.
+- **`roles_permissions` :** UNIQUE(role_id,permission_id). Égalité obligatoire roles.portee=permissions.portee : tenant → tenant et plateforme → plateforme. Service Laravel ET triggers BEFORE INSERT/UPDATE sur le pivot refusent une différence avec SIGNAL SQLSTATE '45000'. Les portées des rôles et permissions sont immuables dès création (triggers BEFORE UPDATE), ce qui ferme le contournement par modification des parents. Un rôle plateforme autorise uniquement les actions d’administration centrale prévues par ses permissions. Il ne donne aucun accès au back-office marchand d’une boutique. Ne pas attacher une permission tenant à un rôle plateforme. Toute mutation invalide les caches. Les comptes SQL applicatifs n’ont aucun droit DDL.
 
 - **`users_roles` :** UNIQUE(user_id,role_id). Réservé à la plateforme : CHECK(portee_role='plateforme') et FK(role_id,portee_role) → roles(id,portee), clé parent UNIQUE. Les rôles tenant sont uniquement dans membres_roles. Aucun administrateur délégué ne peut attribuer plus de droits que sa délégation.
 
 - **`membres_roles` :** UNIQUE(membre_tenant_id,role_id). FK(membre_tenant_id,tenant_id) → membres_tenants(id,tenant_id) et FK(role_id,tenant_id) → roles(id,tenant_id), avec clés parents UNIQUE. tenant_id NOT NULL exclut les rôles plateforme. L’appartenance doit être active à l’attribution et à chaque requête ; une révocation invalide immédiatement le cache des droits.
 
-### C3 — Exceptions et accès administratifs
+### C3 — Invitations, exceptions et restrictions administratives
 
 **`exceptions_permissions` — Autorisation ou interdiction ciblée pour une personne.**
 
@@ -268,7 +268,7 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 **`invitations_equipes` — Invitation d’un membre avec un premier rôle.**
 
-**`sessions_assistance` — Accès temporaire d’un administrateur au contexte d’une boutique ou d’un membre.**
+
 
 ```mermaid
 erDiagram
@@ -322,30 +322,17 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
-    sessions_assistance {
-        uuid id PK "UUID v4"
-        uuid admin_id FK "users.id"
-        uuid tenant_id FK "tenants.id"
-        uuid user_cible_id FK "nullable ; users.id"
-        varchar jeton_hash
-        text motif
-        datetime debute_at
-        datetime expire_at
-        datetime terminee_at "nullable"
-        datetime created_at
-        datetime updated_at
-    }
 ```
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
-- **`exceptions_permissions` :** effet=autoriser|interdire ; statut=active|expiree|revoquee. `contexte_normalise=COALESCE(tenant_id,'plateforme')` ; `actif_unique=CASE WHEN statut='active' AND deleted_at IS NULL THEN 1 ELSE NULL END`. UNIQUE(user_id,permission_id,contexte_normalise,actif_unique) conserve toutes les périodes anciennes. CHECK(expire_at IS NULL OR expire_at>commence_at). **Contrat de portée obligatoire :** si `permissions.portee='tenant'`, `tenant_id` est NOT NULL et le bénéficiaire doit disposer d’une appartenance valide à ce tenant ; si `permissions.portee='plateforme'`, `tenant_id` doit être NULL. Le service Laravel ET des triggers BEFORE INSERT/UPDATE lisant `permissions.portee` refusent les deux combinaisons incohérentes. Autorisation effective uniquement si statut actif, non supprimée et date dans [commence_at,expire_at) ; le cron n’est pas une garantie d’expiration. Avant renouvellement, verrouiller le user bénéficiaire, expirer une ancienne ligne échue puis insérer la nouvelle dans la même transaction. `terminee_at` trace révocation/expiration ; ne pas réécrire motif/auteur/période d’une ancienne attribution. Interdiction prioritaire sur les rôles ; aucun contournement du plan ou de l’appartenance. `attribue_par_id` doit posséder le **droit de déléguer** la permission dans ce contexte ; posséder la permission ne suffit pas. Le même contrôle s’applique à l’auto-attribution. Les permissions d’assistance restent des permissions plateforme distinctes. Invalidation du cache à chaque mutation/révocation/expiration et revalidation des droits par les jobs sensibles au moment de l’exécution. Pas de NOW() dans les colonnes générées.
+- **`exceptions_permissions` :** effet=autoriser|interdire ; statut=active|expiree|revoquee. `contexte_normalise=COALESCE(tenant_id,'plateforme')` ; `actif_unique=CASE WHEN statut='active' AND deleted_at IS NULL THEN 1 ELSE NULL END`. UNIQUE(user_id,permission_id,contexte_normalise,actif_unique) conserve toutes les périodes anciennes. CHECK(expire_at IS NULL OR expire_at>commence_at). **Contrat de portée obligatoire :** si `permissions.portee='tenant'`, `tenant_id` est NOT NULL et le bénéficiaire doit disposer d’une appartenance valide à ce tenant ; si `permissions.portee='plateforme'`, `tenant_id` doit être NULL. Le service Laravel ET des triggers BEFORE INSERT/UPDATE lisant `permissions.portee` refusent les deux combinaisons incohérentes. Autorisation effective uniquement si statut actif, non supprimée et date dans [commence_at,expire_at) ; le cron n’est pas une garantie d’expiration. Avant renouvellement, verrouiller le user bénéficiaire, expirer une ancienne ligne échue puis insérer la nouvelle dans la même transaction. `terminee_at` trace révocation/expiration ; ne pas réécrire motif/auteur/période d’une ancienne attribution. Interdiction prioritaire sur les rôles ; aucun contournement du plan ou de l’appartenance. `attribue_par_id` doit posséder le **droit de déléguer** la permission dans ce contexte ; posséder la permission ne suffit pas. Le même contrôle s’applique à l’auto-attribution. Invalidation du cache à chaque mutation/révocation/expiration et revalidation des droits par les jobs sensibles au moment de l’exécution. Pas de NOW() dans les colonnes générées.
 
-- **`restrictions_admins` :** Exactement une cible renseignée parmi tenant, user et rôle. La cible rôle limite la consultation/administration de ce rôle ; les comptes représentés se contrôlent séparément. Une interdiction visant un propriétaire peut bloquer l’accès à toutes ses boutiques selon la permission tenants.acceder. Une autorisation ciblée ne crée pas de permission globale absente. UNIQUE(admin_id,permission_id,type_cible,cible_normalisee,actif_unique). Même historisation active/expiree/revoquee et contrôle temporel que exceptions_permissions, sous verrou du compte administrateur ; actif_unique vaut 1 pour une ligne active non supprimée, NULL sinon. Les anciennes lignes ne sont pas réutilisées.
+- **`restrictions_admins` :** Exactement une cible renseignée parmi tenant, user et rôle. Ces restrictions s’appliquent uniquement aux actions d’administration centrale. Une cible tenant limite les actions sur la fiche administrative de cette boutique ; une cible user limite les actions sur ce compte ; une cible rôle limite la consultation ou l’administration de ce rôle. Aucune restriction ou autorisation ciblée ne donne accès au back-office marchand ni ne permet d’agir sous l’identité d’un autre utilisateur. Une autorisation ciblée ne crée pas de permission globale absente. UNIQUE(admin_id,permission_id,type_cible,cible_normalisee,actif_unique). Même historisation active/expiree/revoquee et contrôle temporel que exceptions_permissions, sous verrou du compte administrateur ; actif_unique vaut 1 pour une ligne active non supprimée, NULL sinon. Les anciennes lignes ne sont pas réutilisées.
 
 - **`invitations_equipes` :** UNIQUE(jeton_hash). Le rôle appartient au tenant invité. Plusieurs rôles peuvent ensuite être ajoutés par membres_roles. FK(role_initial_id,tenant_id) → roles(id,tenant_id). Jeton consommable une seule fois.
 
-- **`sessions_assistance` :** Les vérifications de permissions et restrictions restent actives à chaque action. Journaliser simultanément l’acteur réel et le compte représenté. L’usurpation ne doit jamais donner les droits supérieurs du compte cible à un administrateur limité.
+
 
 ### C4 — Plans et abonnements
 
@@ -528,7 +515,7 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### C6 — Audit SaaS
 
-**`journal_audit_central` — Historique des connexions sensibles, droits, plans, domaines et accès inter-boutiques.**
+**`journal_audit_central` — Historique des connexions sensibles, droits, plans, domaines et actions d’administration centrale.**
 
 **`verifications_contacts` — Défis temporaires pour vérifier le téléphone ou le canal WhatsApp du compte SaaS.**
 
@@ -538,7 +525,6 @@ erDiagram
     journal_audit_central {
         uuid id PK "UUID v4"
         uuid acteur_id FK "nullable ; users.id"
-        uuid compte_represente_id FK "nullable ; users.id"
         uuid tenant_id FK "nullable ; tenants.id"
         varchar action
         varchar cible_type
@@ -1077,7 +1063,6 @@ erDiagram
         uuid id PK
         uuid tenant_id FK "nullable ; tenants.id"
         uuid acteur_id FK "nullable ; users.id"
-        uuid compte_represente_id FK "nullable ; users.id"
         varchar type_operation
         varchar ressource_type
         uuid ressource_id "nullable pour lot"
@@ -1744,7 +1729,6 @@ erDiagram
         uuid revision_avant_id FK "nullable ; revisions_commandes.id"
         uuid revision_apres_id FK "nullable ; revisions_commandes.id"
         uuid acteur_id "nullable ; REF central.users.id"
-        uuid compte_represente_id "nullable ; REF central.users.id"
         varchar action
         varchar resultat_contact "nullable"
         datetime prochain_rappel_at "nullable"
@@ -2295,7 +2279,6 @@ erDiagram
     journal_audit {
         uuid id PK "UUID v4"
         uuid acteur_id "nullable ; REF central.users.id"
-        uuid compte_represente_id "nullable ; REF central.users.id"
         varchar action
         varchar cible_type
         uuid cible_id "nullable"
@@ -2616,7 +2599,6 @@ erDiagram
     journal_operations_donnees_personnelles {
         uuid id PK
         uuid acteur_id "nullable ; REF central.users.id"
-        uuid compte_represente_id "nullable ; REF central.users.id"
         varchar type_operation
         varchar ressource_type
         uuid ressource_id "nullable pour lot"
@@ -2948,9 +2930,9 @@ La FK composite ne peut pas vérifier « montant/deltas = inverse exact ». Cett
 
 **Propriétaire :** identifié uniquement par tenants.proprietaire_id, bénéficie des actions de gestion du tenant prévues par le serveur, sous réserve des restrictions explicites et du plan. Son compte ne peut pas céder la boutique. Un administrateur de boutique peut gérer catalogue/commandes sans devenir propriétaire.
 
-**Administrateur plateforme délégué :** rôle plateforme, permission métier, périmètre de cibles et restrictions vérifiés à chaque action. Les sessions d’assistance conservent acteur réel et compte représenté et ne donnent pas automatiquement les droits du compte représenté. Les permissions d’un tenant n’accordent aucun accès aux autres boutiques du compte transporteur partagé.
+**Administrateur plateforme délégué :** rôle plateforme, permission d’administration centrale, périmètre de cibles et restrictions vérifiés à chaque action. Aucun accès temporaire d’assistance et aucune usurpation de compte. L’accès au back-office marchand exige une appartenance active à la boutique et les droits tenant correspondants. Les permissions d’un tenant n’accordent aucun accès aux autres boutiques du compte transporteur partagé.
 
-**Racine :** contournement des limitations commerciales selon la politique de plateforme ; aucun contournement des FK, de la propriété immuable, des preuves de paiement ou des journaux immuables. Les modifications de rôles/permissions invalident les caches ; clés toujours préfixées par tenant et version des autorisations.
+**Racine :** droits complets d’administration centrale, sans accès automatique au back-office marchand des boutiques et sans usurpation de compte. Aucun contournement des FK, de la propriété immuable, des preuves de paiement ou des journaux immuables. Les modifications de rôles/permissions invalident les caches ; clés toujours préfixées par tenant et version des autorisations.
 
 ### 7.1 Provisionnement sous quota et renommage
 
@@ -3473,7 +3455,7 @@ Les sources juridiques motivent les besoins de données ; les choix de tables et
 
 ## Annexe Inventaire complet
 
-### BDD centrale — 50 tables
+### BDD centrale — 49 tables
 
 1. `users`
 2. `tenants`
@@ -3488,43 +3470,42 @@ Les sources juridiques motivent les besoins de données ; les choix de tables et
 11. `exceptions_permissions`
 12. `restrictions_admins`
 13. `invitations_equipes`
-14. `sessions_assistance`
-15. `plans`
-16. `plans_fonctionnalites`
-17. `abonnements`
-18. `exceptions_fonctionnalites`
-19. `consommations_fonctionnalites`
-20. `echeances_abonnement`
-21. `reglements_abonnement`
-22. `wilayas`
-23. `communes`
-24. `journal_audit_central`
-25. `verifications_contacts`
-26. `comptes_livraison`
-27. `boutiques_comptes_livraison`
-28. `tarifs_transporteur`
-29. `registre_colis_transporteur`
-30. `lots_reversement_transporteur`
-31. `parts_reversement_tenants`
-32. `deploiements_schema_tenants`
-33. `entites_legales`
-34. `politiques_retention`
-35. `executions_retention`
-36. `configurations_sauvegardes`
-37. `limites_sauvegardes_plans`
-38. `sauvegardes_tenants`
-39. `restaurations_tenants`
-40. `operations_centrales_tenants`
-41. `registre_documents_emis`
-42. `sequences_facturation_saas`
-43. `factures_saas`
-44. `lignes_factures_saas`
-45. `avoirs_saas`
-46. `lignes_avoirs_saas`
-47. `transmissions_documents_saas`
-48. `regles_facturation`
-49. `registre_activites_traitement`
-50. `journal_operations_donnees_personnelles_central`
+14. `plans`
+15. `plans_fonctionnalites`
+16. `abonnements`
+17. `exceptions_fonctionnalites`
+18. `consommations_fonctionnalites`
+19. `echeances_abonnement`
+20. `reglements_abonnement`
+21. `wilayas`
+22. `communes`
+23. `journal_audit_central`
+24. `verifications_contacts`
+25. `comptes_livraison`
+26. `boutiques_comptes_livraison`
+27. `tarifs_transporteur`
+28. `registre_colis_transporteur`
+29. `lots_reversement_transporteur`
+30. `parts_reversement_tenants`
+31. `deploiements_schema_tenants`
+32. `entites_legales`
+33. `politiques_retention`
+34. `executions_retention`
+35. `configurations_sauvegardes`
+36. `limites_sauvegardes_plans`
+37. `sauvegardes_tenants`
+38. `restaurations_tenants`
+39. `operations_centrales_tenants`
+40. `registre_documents_emis`
+41. `sequences_facturation_saas`
+42. `factures_saas`
+43. `lignes_factures_saas`
+44. `avoirs_saas`
+45. `lignes_avoirs_saas`
+46. `transmissions_documents_saas`
+47. `regles_facturation`
+48. `registre_activites_traitement`
+49. `journal_operations_donnees_personnelles_central`
 
 ### BDD boutique — 69 tables
 
@@ -3597,4 +3578,3 @@ Les sources juridiques motivent les besoins de données ; les choix de tables et
 67. `compensations_echanges`
 68. `corrections_commerciales`
 69. `lignes_corrections_commerciales`
-
