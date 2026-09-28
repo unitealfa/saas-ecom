@@ -65,7 +65,7 @@ flowchart TD
 
 **Sortie :** une boutique dans `tenants`, son propriétaire dans `membres_tenants`, sa BDD et son domaine.
 
-## 7. Version orale
+## 7. Version courte
 
 > C1 gère les utilisateurs et les boutiques. Quand un propriétaire crée une boutique, on vérifie d'abord son compte et son quota. Ensuite on crée la boutique dans `tenants`, on relie le propriétaire avec `membres_tenants`, on crée sa BDD et on lui associe son domaine.
 
@@ -138,7 +138,7 @@ flowchart TD
 
 **Sortie :** autorisé ou refusé.
 
-## 7. Version orale
+## 7. Version courte
 
 > C2 contrôle les droits. On regarde dans quelle boutique travaille la personne, son rôle et les permissions de ce rôle. Ensuite on applique les éventuelles exceptions et les limites du plan avant d'autoriser l'action.
 
@@ -222,7 +222,7 @@ flowchart TD
 
 **Sortie :** accès créé, accès temporaire ou refus.
 
-## 7. Version orale
+## 7. Version courte
 
 > C3 gère les accès particuliers. Il permet par exemple d'inviter un collaborateur ou d'ouvrir temporairement une session d'assistance pour un administrateur. Les permissions restent contrôlées et les actions importantes sont tracées.
 
@@ -291,7 +291,7 @@ flowchart TD
 
 **Sortie :** fonctionnalités et quotas autorisés.
 
-## 7. Version orale
+## 7. Version courte
 
 > C4 gère les abonnements. Il regarde quel plan possède le propriétaire et quelles fonctionnalités ou limites sont prévues par ce plan. Si le payant expire, le gratuit prend le relais.
 
@@ -374,7 +374,7 @@ flowchart TD
 
 **Sortie :** quota mesuré, état du paiement ou localisation validée.
 
-## 7. Version orale
+## 7. Version courte
 
 > C5 rassemble trois petits services communs : le suivi de certaines consommations, le suivi des paiements d'abonnement et le référentiel des wilayas et communes.
 
@@ -443,7 +443,7 @@ flowchart TD
 
 **Sortie :** trace d'audit ou contact vérifié.
 
-## 7. Version orale
+## 7. Version courte
 
 > C6 sert à savoir qui a effectué une action importante dans le SaaS. Il sert également à gérer les codes temporaires utilisés pour vérifier les contacts.
 
@@ -503,7 +503,7 @@ flowchart TD
 
 **Sortie :** compte autorisé et tarif applicable.
 
-## 7. Version orale
+## 7. Version courte
 
 > C7 centralise les comptes transporteur. Plusieurs boutiques du même propriétaire peuvent utiliser le même compte. Les anciens tarifs restent conservés pour éviter qu'un changement de prix modifie l'historique.
 
@@ -576,7 +576,7 @@ flowchart TD
 
 **Sortie :** information envoyée à la bonne boutique.
 
-## 7. Version orale
+## 7. Version courte
 
 > C8 évite de mélanger les colis et l'argent lorsque plusieurs boutiques utilisent le même compte transporteur. Chaque colis et chaque part de reversement sont rattachés à la bonne boutique.
 
@@ -632,7 +632,7 @@ flowchart TD
 
 **Sortie :** BDD créée/mise à jour ou erreur enregistrée.
 
-## 7. Version orale
+## 7. Version courte
 
 > C9 garde l'historique technique des BDD boutiques. Il permet de savoir si une base a été créée correctement, quelle version elle utilise et quelles erreurs ont eu lieu.
 
@@ -690,7 +690,7 @@ flowchart TD
 
 **Sortie :** identité légale utilisable dans les documents.
 
-## 7. Version orale
+## 7. Version courte
 
 > C10 contient l'identité légale du commerçant. Lorsqu'un document est émis, les informations utilisées sont figées afin qu'une modification future du profil ne change pas les anciens documents.
 
@@ -749,7 +749,7 @@ flowchart TD
 
 **Sortie :** traitement effectué et enregistré.
 
-## 7. Version orale
+## 7. Version courte
 
 > C11 gère la durée de conservation des données. Il vérifie quelles données peuvent être conservées, anonymisées ou supprimées et garde une trace de chaque traitement effectué.
 
@@ -831,7 +831,7 @@ flowchart TD
 
 **Sortie :** sauvegarde disponible ou boutique restaurée correctement.
 
-## 7. Version orale
+## 7. Version courte
 
 > C12 gère les sauvegardes et les restaurations. Après une restauration, on ne remet pas simplement un ancien fichier : on vérifie aussi les opérations et documents créés entre-temps avant de réactiver la boutique.
 
@@ -902,7 +902,7 @@ flowchart TD
 
 **Sortie :** facture SaaS ou avoir.
 
-## 7. Version orale
+## 7. Version courte
 
 > C13 sert à facturer le commerçant pour l'utilisation de notre SaaS. La facture possède un numéro, des lignes et une identité figée. Une facture déjà émise n'est plus modifiée : une correction passe par un avoir.
 
@@ -979,7 +979,7 @@ flowchart TD
 
 **Sortie :** règle appliquée ou opération de données tracée.
 
-## 7. Version orale
+## 7. Version courte
 
 > C14 contient les règles utilisées par la facturation et les informations sur les traitements de données personnelles. Il distingue ce qui est prévu par les règles de ce qui a réellement été exécuté et enregistré.
 
