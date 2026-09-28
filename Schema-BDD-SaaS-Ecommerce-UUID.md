@@ -170,7 +170,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`users` :**
 
@@ -352,8 +351,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
-
 **`fonctionnalites` :**
 
 - **`id`** : le numéro unique qui permet de reconnaître cette fonctionnalité dans la base.
@@ -501,8 +498,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
-
 **`exceptions_permissions` :**
 
 - **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
@@ -639,8 +634,6 @@ erDiagram
 ```
 
 #### Explication très simple des champs
-
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`plans` :**
 
@@ -800,8 +793,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
-
 **`consommations_fonctionnalites` :**
 
 - **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
@@ -912,8 +903,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
-
 **`journal_audit_central` :**
 
 - **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
@@ -987,8 +976,6 @@ erDiagram
 ```
 
 #### Explication très simple des champs
-
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`comptes_livraison` :**
 
@@ -1089,8 +1076,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
-
 **`registre_colis_transporteur` :**
 
 - **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
@@ -1166,8 +1151,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
-
 **`deploiements_schema_tenants` :**
 
 - **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
@@ -1228,7 +1211,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`entites_legales` :**
 
@@ -1308,7 +1290,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`politiques_retention` :**
 
@@ -1482,7 +1463,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`configurations_sauvegardes` :**
 
@@ -1741,7 +1721,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`sequences_facturation_saas` :**
 
@@ -1927,7 +1906,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`regles_facturation` :**
 
@@ -2085,8 +2063,6 @@ erDiagram
 ```
 
 #### Explication très simple des champs
-
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`boutique` :**
 
@@ -2279,8 +2255,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
-
 **`medias` :**
 
 - **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
@@ -2439,8 +2413,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
-
 **`options_produit` :**
 
 - **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
@@ -2551,8 +2523,6 @@ erDiagram
 ```
 
 #### Explication très simple des champs
-
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`etiquettes` :**
 
@@ -2670,8 +2640,6 @@ erDiagram
 ```
 
 #### Explication très simple des champs
-
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`pages_vente` :**
 
@@ -2802,8 +2770,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
-
 **`visiteurs` :**
 
 - **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
@@ -2902,8 +2868,6 @@ erDiagram
 ```
 
 #### Explication très simple des champs
-
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`paniers` :**
 
@@ -3073,8 +3037,6 @@ erDiagram
 ```
 
 #### Explication très simple des champs
-
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`commandes` :**
 
@@ -3300,8 +3262,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
-
 **`reservations_stock` :**
 
 - **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
@@ -3465,8 +3425,6 @@ erDiagram
 ```
 
 #### Explication très simple des champs
-
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`prestataires_livraison` :**
 
@@ -3649,7 +3607,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`correspondances_geo_transporteur` :**
 
@@ -3813,8 +3770,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
-
 **`operations_transporteur` :**
 
 - **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
@@ -3930,8 +3885,6 @@ erDiagram
 ```
 
 #### Explication très simple des champs
-
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`recouvrements` :**
 
@@ -4065,8 +4018,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
-
 **`depenses` :**
 
 - **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
@@ -4174,8 +4125,6 @@ erDiagram
 ```
 
 #### Explication très simple des champs
-
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`journal_audit` :**
 
@@ -4313,8 +4262,6 @@ erDiagram
 ```
 
 #### Explication très simple des champs
-
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`frais_transporteur` :**
 
@@ -4469,8 +4416,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
-
 **`indemnisations_transporteur` :**
 
 - **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
@@ -4568,8 +4513,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
-
 **`incidents_commande` :**
 
 - **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
@@ -4666,8 +4609,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
-
 **`contrats_commandes` :**
 
 - **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
@@ -4734,8 +4675,6 @@ erDiagram
 
 #### Explication très simple des champs
 
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
-
 **`sequences_documents` :**
 
 - **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
@@ -4789,8 +4728,6 @@ erDiagram
 ```
 
 #### Explication très simple des champs
-
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`acceptations_conditions_vente` :**
 
@@ -4879,8 +4816,6 @@ erDiagram
 ```
 
 #### Explication très simple des champs
-
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`obligations_facturation` :**
 
@@ -4989,8 +4924,6 @@ erDiagram
 ```
 
 #### Explication très simple des champs
-
-> Le but ici est de comprendre **à quoi sert chaque champ**, sans avoir besoin de connaître MySQL. Quand un champ peut être vide (`nullable`), cela signifie simplement que l’information n’est pas obligatoire à ce moment-là.
 
 **`corrections_commerciales` :**
 
