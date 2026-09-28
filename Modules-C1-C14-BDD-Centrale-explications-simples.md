@@ -10,12 +10,13 @@ Ce ne sont pas 14 bases de données différentes.
 
 ## 1. Rôle
 
-C1 répond surtout à 4 questions :
+C1 répond surtout à 5 questions :
 
 - Qui est l'utilisateur ?
 - Quelle boutique lui appartient ?
 - Dans quelles boutiques travaille-t-il ?
 - Quelle adresse web appartient à quelle boutique ?
+- L’utilisateur a-t-il accès au téléphone ou au canal WhatsApp indiqué ?
 
 ## 2. Tables
 
@@ -23,6 +24,7 @@ C1 répond surtout à 4 questions :
 - `tenants` : les boutiques.
 - `membres_tenants` : indique quels utilisateurs font partie de quelles boutiques.
 - `domains` : les adresses web des boutiques.
+- `verifications_contacts` : les codes temporaires pour vérifier les contacts du compte SaaS.
 
 ## 3. Tables venant d'autres modules
 
@@ -31,6 +33,8 @@ C1 répond surtout à 4 questions :
 - `boutique` — T1 : informations locales de la boutique dans sa propre BDD.
 
 ## 4. Fonctionnement simple
+
+### 1 — Créer une boutique
 
 Exemple : **un propriétaire clique sur « Créer une boutique ».**
 
@@ -44,7 +48,19 @@ Exemple : **un propriétaire clique sur « Créer une boutique ».**
 
 **En très simple :** on vérifie le propriétaire → on vérifie qu’il peut créer une boutique → on crée la boutique → on crée sa BDD → on lui donne son adresse web.
 
+### 2 — Vérifier un téléphone ou WhatsApp
+
+1. `verifications_contacts` crée un code temporaire.
+2. Le code est envoyé à l’utilisateur.
+3. L’utilisateur tape le code.
+4. Le système vérifie s’il est correct et encore valable.
+5. S’il est bon, le contact est marqué comme vérifié dans `users`.
+
+**En très simple :** le code permet de vérifier que l’utilisateur a accès au contact indiqué. Cette vérification est distincte de la création d’une boutique.
+
 ## 5. Diagramme
+
+### Création d’une boutique
 
 ```mermaid
 flowchart TD
@@ -59,15 +75,27 @@ flowchart TD
     I --> J["Boutique utilisable"]
 ```
 
+### Vérification d’un contact
+
+```mermaid
+flowchart TD
+    A["Demande de vérification du contact"] --> B["Créer verifications_contacts"]
+    B --> C["Envoyer le code"]
+    C --> D["Utilisateur saisit le code"]
+    D --> E{"Code correct, encore valable et essais autorisés ?"}
+    E -->|Oui| F["Consommer le code et marquer le contact vérifié dans users"]
+    E -->|Non| G["Refuser la vérification"]
+```
+
 ## 6. Entrée / sortie
 
-**Entrée :** un utilisateur veut créer une boutique.
+**Entrée :** un utilisateur veut créer une boutique ou vérifier son téléphone ou son canal WhatsApp.
 
-**Sortie :** une boutique dans `tenants`, son propriétaire dans `membres_tenants`, sa BDD et son domaine.
+**Sortie :** une boutique dans `tenants`, son propriétaire dans `membres_tenants`, sa BDD et son domaine ; ou un contact vérifié si le code est accepté.
 
 ## 7. Version courte
 
-> C1 gère les utilisateurs et les boutiques. Quand un propriétaire crée une boutique, on vérifie d'abord son compte et son quota. Ensuite on crée la boutique dans `tenants`, on relie le propriétaire avec `membres_tenants`, on crée sa BDD et on lui associe son domaine.
+> C1 gère les utilisateurs et les boutiques. Quand un propriétaire crée une boutique, on vérifie d'abord son compte et son quota. Ensuite on crée la boutique dans `tenants`, on relie le propriétaire avec `membres_tenants`, on crée sa BDD et on lui associe son domaine. C1 gère aussi les codes temporaires permettant de vérifier le téléphone ou le canal WhatsApp du compte.
 
 ---
 
@@ -388,15 +416,11 @@ flowchart TD
 
 ## 1. Rôle
 
-C6 permet surtout de :
-
-- garder une trace des actions sensibles ;
-- vérifier un numéro de téléphone ou un canal de contact.
+C6 garde une trace des actions sensibles dans le SaaS : **qui a fait quoi, quand et sur quoi**.
 
 ## 2. Tables
 
 - `journal_audit_central`
-- `verifications_contacts`
 
 ## 3. Tables externes
 
@@ -405,50 +429,33 @@ C6 permet surtout de :
 
 ## 4. Fonctionnement simple
 
-C6 fait **deux choses**.
-
-### 1 — Garder une trace
-
 1. Une action importante est faite, par exemple modifier un abonnement.
 2. `journal_audit_central` enregistre **qui l’a faite, quand et sur quoi**.
+3. Cet historique permet de retrouver ce qui s’est passé.
 
-### 2 — Vérifier un téléphone ou WhatsApp
-
-1. `verifications_contacts` crée un code temporaire.
-2. Le code est envoyé à l’utilisateur.
-3. L’utilisateur tape le code.
-4. Le système vérifie s’il est correct et encore valable.
-5. S’il est bon, le contact est marqué comme vérifié.
-
-**En très simple :** C6 garde l’historique des actions importantes et vérifie les contacts avec un code.
+**En très simple :** C6 est le carnet des actions importantes du SaaS. La vérification des contacts appartient à C1.
 
 ## 5. Diagramme
 
 ```mermaid
 flowchart TD
-    A["Événement central"] --> B{"Quel type ?"}
-
-    B -->|Action sensible| C["Identifier l'acteur"]
-    C --> D["Identifier la cible"]
-    D --> E["Ajouter une trace dans journal_audit_central"]
-
-    B -->|Vérification contact| F["Créer verifications_contacts"]
-    F --> G["Envoyer le code"]
-    G --> H["Utilisateur saisit le code"]
-    H --> I{"Code valide ?"}
-    I -->|Oui| J["Marquer le contact vérifié"]
-    I -->|Non| K["Refuser"]
+    A["Action importante dans le SaaS"] --> B{"Action faite par qui ?"}
+    B -->|Utilisateur| C["Identifier le compte dans users — C1"]
+    B -->|Système| D["Indiquer l’origine système, sans compte utilisateur"]
+    C --> E["Identifier la cible et les changements"]
+    D --> E
+    E --> F["Enregistrer qui, quoi et quand dans journal_audit_central"]
 ```
 
 ## 6. Entrée / sortie
 
-**Entrée :** action sensible ou vérification de contact.
+**Entrée :** une action sensible dans le SaaS.
 
-**Sortie :** trace d'audit ou contact vérifié.
+**Sortie :** une trace dans `journal_audit_central`.
 
 ## 7. Version courte
 
-> C6 sert à savoir qui a effectué une action importante dans le SaaS. Il sert également à gérer les codes temporaires utilisés pour vérifier les contacts.
+> C6 conserve l’historique des actions importantes du SaaS : qui a fait quoi, quand et sur quoi. La vérification du téléphone ou du canal WhatsApp est gérée dans C1.
 
 ---
 
@@ -1033,7 +1040,7 @@ flowchart TD
 
 | Module | À quoi il sert |
 |---|---|
-| **C1** | Savoir qui sont les utilisateurs et quelles boutiques leur appartiennent |
+| **C1** | Savoir qui sont les utilisateurs, quelles boutiques leur appartiennent et vérifier leurs contacts |
 | **C2** | Savoir ce qu'un utilisateur a le droit de faire |
 | **C3** | Gérer les invitations, droits exceptionnels et restrictions des administrateurs centraux |
 | **C4** | Gérer les plans, abonnements, fonctionnalités et quotas |
