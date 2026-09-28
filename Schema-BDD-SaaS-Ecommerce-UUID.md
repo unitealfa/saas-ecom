@@ -80,6 +80,8 @@ Les autorisations restent centrales pour qu’un seul compte puisse participer �
 
 **`membres_tenants` — Appartenance d’un compte à une équipe.**
 
+**`verifications_contacts` — Défis temporaires pour vérifier le téléphone ou le canal WhatsApp du compte SaaS.**
+
 ```mermaid
 erDiagram
     direction TB
@@ -147,6 +149,19 @@ erDiagram
         datetime updated_at
         datetime deleted_at "nullable"
     }
+    verifications_contacts {
+        uuid id PK "UUID v4"
+        uuid user_id FK "users.id"
+        varchar canal
+        varchar destination_normalisee
+        varchar code_hash
+        datetime expire_at
+        int nombre_essais
+        datetime consomme_at "nullable"
+        datetime created_at
+        datetime updated_at
+    }
+    users ||--o{ verifications_contacts : user_id
     users ||--o{ tenants : proprietaire_id
     tenants ||--o{ domains : tenant_id
     tenants ||--o{ membres_tenants : tenant_id
@@ -162,6 +177,8 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 - **`domains` :** UNIQUE(domain normalisé). Un domaine principal actif au maximum par tenant. type=sous_domaine|personnalise. Le domaine personnalisé exige la fonctionnalité correspondante. Adapter le modèle Domain et sa migration aux UUID. Pas de table sous_domaines distincte.
 
 - **`membres_tenants` :** UNIQUE(tenant_id,user_id), UNIQUE(id,tenant_id). Le provisionnement crée l’appartenance du propriétaire dans la transaction centrale de création du tenant. Interdire sa suppression, son changement de user_id/tenant_id et sa désactivation tant que le tenant existe, par triggers et service. Aucun rôle propriétaire assignable : la propriété et ses droits de gestion sont dérivés uniquement de tenants.proprietaire_id, avec limites du plan et contrôles sensibles. Les autres membres ont leurs rôles dans membres_roles ; une réinvitation restaure la même appartenance.
+
+- **`verifications_contacts` :** canal=telephone|whatsapp. Hachage du code, durée courte et nombre d’essais limité. Vérifier une destination ne prouve pas qu’une autre destination ou un autre canal l’est. Si le téléphone change, remettre à NULL les vérifications associées. L’email et le mot de passe peuvent utiliser les mécanismes standards Laravel.
 
 ### C2 — Permissions
 
@@ -517,8 +534,6 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 **`journal_audit_central` — Historique des connexions sensibles, droits, plans, domaines et actions d’administration centrale.**
 
-**`verifications_contacts` — Défis temporaires pour vérifier le téléphone ou le canal WhatsApp du compte SaaS.**
-
 ```mermaid
 erDiagram
     direction TB
@@ -535,25 +550,11 @@ erDiagram
         varchar origine
         datetime created_at
     }
-    verifications_contacts {
-        uuid id PK "UUID v4"
-        uuid user_id FK "users.id"
-        varchar canal
-        varchar destination_normalisee
-        varchar code_hash
-        datetime expire_at
-        int nombre_essais
-        datetime consomme_at "nullable"
-        datetime created_at
-        datetime updated_at
-    }
 ```
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **`journal_audit_central` :** Écriture append-only ; ne jamais journaliser mots de passe, OTP, tokens de connexion ou secrets API. Les cibles polymorphes sont des références logiques. Aucun bouton de suppression métier, même pour le root.
-
-- **`verifications_contacts` :** canal=telephone|whatsapp. Hachage du code, durée courte et nombre d’essais limité. Vérifier une destination ne prouve pas qu’une autre destination ou un autre canal l’est. Si le téléphone change, remettre à NULL les vérifications associées. L’email et le mot de passe peuvent utiliser les mécanismes standards Laravel.
 
 ### C7 — Comptes transporteur et tarifs versionnés
 
@@ -3578,3 +3579,4 @@ Les sources juridiques motivent les besoins de données ; les choix de tables et
 67. `compensations_echanges`
 68. `corrections_commerciales`
 69. `lignes_corrections_commerciales`
+
