@@ -144,7 +144,7 @@ flowchart TD
 
 ---
 
-# C3 — Exceptions et accès administratifs
+# C3 — Invitations, exceptions et restrictions administratives
 
 ## 1. Rôle
 
@@ -155,14 +155,13 @@ Par exemple :
 - inviter un nouveau membre ;
 - donner exceptionnellement une permission ;
 - retirer exceptionnellement une permission ;
-- permettre à un administrateur d'aider temporairement une boutique.
+- limiter les actions d’un administrateur dans l’administration centrale.
 
 ## 2. Tables
 
 - `exceptions_permissions`
 - `restrictions_admins`
 - `invitations_equipes`
-- `sessions_assistance`
 
 ## 3. Tables externes
 
@@ -187,44 +186,49 @@ C3 gère les **cas spéciaux d’accès**.
 1. `exceptions_permissions` peut dire : **cette personne a ce droit spécial** ou **ce droit lui est interdit**.
 2. Cette règle peut avoir une date de début et une date de fin.
 
-### Cas 3 — Un administrateur SaaS aide une boutique
+### Cas 3 — Limiter un administrateur SaaS
 
-1. `restrictions_admins` vérifie ce que cet administrateur SaaS a le droit de faire.
-2. S’il peut aider cette boutique, `sessions_assistance` ouvre un accès temporaire.
-3. Pendant l’aide, ses droits sont toujours vérifiés.
-4. C6 garde une trace de ses actions importantes.
+1. Un administrateur veut effectuer une action dans l’administration centrale.
+2. Ses permissions indiquent s’il peut faire cette action.
+3. `restrictions_admins` vérifie si elle est autorisée sur la cible choisie.
+4. Le système accepte ou refuse. C6 garde une trace des actions importantes.
 
-**En très simple :** C3 sert à inviter des membres, ajouter ou retirer un droit spécial, et permettre à un administrateur SaaS d’aider une boutique sans lui donner tous les pouvoirs.
+**En très simple :** C3 sert à inviter des collaborateurs, donner ou retirer un droit spécial, et limiter les actions des administrateurs dans l’administration centrale.
 
 ## 5. Diagramme
 
 ```mermaid
 flowchart TD
-    A["Demande d'accès"] --> B{"Quel type ?"}
+    A["Demande"] --> B{"Quel type ?"}
 
-    B -->|Invitation| C["Vérifier le propriétaire et ses droits"]
+    B -->|Invitation| C["Vérifier le droit d’inviter"]
     C --> D["Créer invitations_equipes"]
-    D --> E["Le membre accepte"]
-    E --> F["Créer membres_tenants"]
-    F --> G["Attribuer le rôle — membres_roles"]
+    D --> E["Le collaborateur accepte"]
+    E --> F["Créer ou réactiver membres_tenants"]
+    F --> G["Attribuer le rôle dans membres_roles"]
 
-    B -->|Assistance admin| H["Vérifier restrictions_admins"]
-    H --> I{"Assistance autorisée ?"}
-    I -->|Non| J["Refuser"]
-    I -->|Oui| K["Créer sessions_assistance"]
-    K --> L["Contrôler les actions"]
-    L --> M["Tracer dans C6"]
+    B -->|Droit spécial| H["Vérifier le droit de déléguer et le contexte"]
+    H --> I["Enregistrer exceptions_permissions"]
+
+    B -->|Action admin centrale| J["Vérifier permissions et restrictions_admins"]
+    J --> K{"Action autorisée ?"}
+    K -->|Oui| L["Effectuer l’action centrale"]
+    K -->|Non| M["Refuser"]
+
+    G --> N["Tracer les actions importantes dans C6"]
+    I --> N
+    L --> N
 ```
 
 ## 6. Entrée / sortie
 
-**Entrée :** invitation, exception ou demande d'assistance.
+**Entrée :** invitation, demande de droit spécial ou action d’administration centrale.
 
-**Sortie :** accès créé, accès temporaire ou refus.
+**Sortie :** membre ajouté, exception enregistrée ou action centrale autorisée/refusée.
 
 ## 7. Version courte
 
-> C3 gère les accès particuliers. Il permet par exemple d'inviter un collaborateur ou d'ouvrir temporairement une session d'assistance pour un administrateur. Les permissions restent contrôlées et les actions importantes sont tracées.
+> C3 gère les invitations d’équipe, les droits exceptionnels et les restrictions des administrateurs SaaS. Il ne permet pas d’entrer temporairement dans une boutique ni d’agir à la place de son propriétaire.
 
 ---
 
@@ -398,7 +402,6 @@ C6 permet surtout de :
 
 - `users` — C1.
 - `tenants` — C1.
-- `sessions_assistance` — C3.
 
 ## 4. Fonctionnement simple
 
@@ -991,7 +994,7 @@ flowchart TD
 flowchart TD
     C1["C1 — Utilisateurs et boutiques"]
     C2["C2 — Permissions"]
-    C3["C3 — Exceptions et assistance"]
+    C3["C3 — Invitations et exceptions"]
     C4["C4 — Plans et abonnements"]
     C5["C5 — Quotas, paiements et géographie"]
     C6["C6 — Audit"]
@@ -1032,7 +1035,7 @@ flowchart TD
 |---|---|
 | **C1** | Savoir qui sont les utilisateurs et quelles boutiques leur appartiennent |
 | **C2** | Savoir ce qu'un utilisateur a le droit de faire |
-| **C3** | Gérer les invitations, exceptions et accès d'assistance |
+| **C3** | Gérer les invitations, droits exceptionnels et restrictions des administrateurs centraux |
 | **C4** | Gérer les plans, abonnements, fonctionnalités et quotas |
 | **C5** | Suivre certaines consommations, paiements SaaS et wilayas/communes |
 | **C6** | Garder les traces des actions importantes |
