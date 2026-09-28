@@ -72,15 +72,15 @@ Les autorisations restent centrales pour qu’un seul compte puisse participer �
 
 ### C1 — Identités et boutiques
 
-**`users` — Commerçants, collaborateurs et administrateurs du SaaS ; aucun acheteur invité dans cette table.**
+**`users` — Les comptes des personnes qui utilisent le SaaS : propriétaires, employés et administrateurs. Exemple : le compte de Nazim avec son email et son mot de passe protégé. Les acheteurs invités n’ont pas de compte ici.**
 
-**`tenants` — Une boutique = un tenant = une BDD séparée.**
+**`tenants` — La liste des boutiques, avec leur propriétaire. Exemple : « Boutique Karim » appartient à Karim et possède sa propre base de données.**
 
-**`domains` — Sous-domaines gratuits et domaines personnalisés rattachés à une boutique.**
+**`domains` — Les adresses web qui permettent d’ouvrir chaque boutique. Exemple : boutique-karim.monsaas.dz mène à la boutique de Karim.**
 
-**`membres_tenants` — Appartenance d’un compte à une équipe.**
+**`membres_tenants` — Indique quelles personnes font partie de quelles boutiques. Exemple : Nazim travaille dans la boutique de Karim. Ses droits précis sont définis séparément par ses rôles.**
 
-**`verifications_contacts` — Défis temporaires pour vérifier le téléphone ou le canal WhatsApp du compte SaaS.**
+**`verifications_contacts` — Les codes temporaires utilisés pour vérifier un téléphone ou WhatsApp. Exemple : Nazim reçoit un code et le saisit pour montrer qu’il a accès au contact indiqué.**
 
 ```mermaid
 erDiagram
@@ -182,17 +182,17 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### C2 — Permissions
 
-**`fonctionnalites` — Catalogue des capacités activables et des quotas commerciaux.**
+**`fonctionnalites` — Ce que l’abonnement permet d’utiliser et en quelle quantité. Exemple : le plan Pro permet de créer jusqu’à 3 boutiques.**
 
-**`permissions` — Actions atomiques autorisées côté serveur.**
+**`permissions` — Les actions qu’un utilisateur peut faire. Exemple : ajouter un produit, modifier une commande ou consulter les statistiques.**
 
-**`roles` — Rôles globaux du SaaS ou rôles personnalisés d’une boutique.**
+**`roles` — Un groupe de permissions auquel on donne un nom. Exemple : « Gestionnaire des commandes » permet de consulter et confirmer les commandes. Un rôle concerne soit l’administration du SaaS, soit une boutique précise.**
 
-**`roles_permissions` — Permissions accordées à un rôle.**
+**`roles_permissions` — Indique quelles permissions sont comprises dans chaque rôle. Exemple : le rôle « Gestionnaire des commandes » contient « consulter les commandes » et « confirmer les commandes », mais pas « supprimer les produits ».**
 
-**`users_roles` — Attribution des seuls rôles plateforme à un compte.**
+**`users_roles` — Indique le rôle d’une personne dans l’administration du SaaS. Exemple : Ahmed a le rôle « Gestionnaire des abonnements » pour gérer les abonnements des commerçants.**
 
-**`membres_roles` — Attribution de rôles tenant à une appartenance de la même boutique.**
+**`membres_roles` — Indique le rôle d’une personne dans une boutique précise. Exemple : Nazim est « Gestionnaire des commandes » dans la boutique de Karim. Cela ne lui donne aucun droit dans les autres boutiques.**
 
 ```mermaid
 erDiagram
@@ -279,11 +279,11 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### C3 — Invitations, exceptions et restrictions administratives
 
-**`exceptions_permissions` — Autorisation ou interdiction ciblée pour une personne.**
+**`exceptions_permissions` — Ajoute ou interdit une action à une personne dans un contexte précis, éventuellement pour une durée limitée. Exemple : Nazim garde son rôle, mais on lui interdit de modifier les commandes de cette boutique.**
 
-**`restrictions_admins` — Exceptions ciblant des boutiques ou des comptes pour les administrateurs délégués.**
+**`restrictions_admins` — Limite les actions d’un administrateur dans l’administration centrale du SaaS. Exemple : Ahmed peut gérer les abonnements, mais pas celui de Karim. Cette table ne lui ouvre pas l’intérieur des boutiques.**
 
-**`invitations_equipes` — Invitation d’un membre avec un premier rôle.**
+**`invitations_equipes` — Les invitations pour rejoindre l’équipe d’une boutique avec un rôle choisi. Exemple : Karim invite Nazim par email comme gestionnaire des commandes ; Nazim doit accepter une invitation encore valable.**
 
 
 
@@ -353,13 +353,13 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### C4 — Plans et abonnements
 
-**`plans` — Offre commerciale versionnée et réutilisable.**
+**`plans` — Les offres d’abonnement proposées aux commerçants, avec leurs versions. Exemple : Gratuit et Pro. Une ancienne version reste conservée pour comprendre les anciens abonnements.**
 
-**`plans_fonctionnalites` — Activation et limite de chaque capacité dans un plan.**
+**`plans_fonctionnalites` — Indique ce que chaque offre permet et ses limites. Exemple : l’offre Gratuit autorise 1 boutique et l’offre Pro en autorise 3.**
 
-**`abonnements` — Abonnement du propriétaire ; couvre ses boutiques et son quota global.**
+**`abonnements` — Indique l’offre d’un propriétaire et sa période d’utilisation. Exemple : Karim possède un abonnement Pro qui couvre ses boutiques dans les limites de cette offre.**
 
-**`exceptions_fonctionnalites` — Activation, désactivation ou quota personnalisé, notamment un essai beta daté.**
+**`exceptions_fonctionnalites` — Un changement particulier aux possibilités ou aux limites habituelles de l’abonnement. Exemple : autoriser temporairement Karim à tester une fonction normalement absente de son offre.**
 
 ```mermaid
 erDiagram
@@ -434,15 +434,15 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### C5 — Suivi SaaS et référentiel
 
-**`consommations_fonctionnalites` — Compteur technique de quotas, uniquement lorsque nécessaire.**
+**`consommations_fonctionnalites` — Compte certaines utilisations quand un compteur est nécessaire pour vérifier une limite. Exemple : suivre le nombre d’utilisations d’une fonction pendant un mois. Le nombre de boutiques se calcule depuis les boutiques existantes.**
 
-**`echeances_abonnement` — Montants dus pour le service SaaS, distincts des encaissements des boutiques.**
+**`echeances_abonnement` — Les sommes que le commerçant doit payer pour son abonnement SaaS. Exemple : Karim doit payer 3 000 DA pour une période. Cela ne prouve pas encore qu’il a payé.**
 
-**`reglements_abonnement` — Paiements SaaS enregistrés et validés manuellement.**
+**`reglements_abonnement` — Les paiements d’abonnement enregistrés, puis vérifiés manuellement. Exemple : un administrateur valide les 3 000 DA versés par Karim après contrôle du reçu.**
 
-**`wilayas` — Référentiel algérien partagé.**
+**`wilayas` — La liste des wilayas, commune à toutes les boutiques. Exemple : Alger peut être sélectionnée dans une adresse de livraison.**
 
-**`communes` — Communes du référentiel partagé.**
+**`communes` — La liste des communes et la wilaya de chacune. Exemple : vérifier que la commune choisie appartient bien à la wilaya indiquée, sans vérifier l’existence de la maison.**
 
 ```mermaid
 erDiagram
@@ -532,7 +532,7 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### C6 — Audit SaaS
 
-**`journal_audit_central` — Historique des connexions sensibles, droits, plans, domaines et actions d’administration centrale.**
+**`journal_audit_central` — Le carnet des actions importantes dans l’administration du SaaS : qui a fait quoi et quand. Exemple : Ahmed a modifié l’abonnement de Karim à une date précise.**
 
 ```mermaid
 erDiagram
@@ -557,6 +557,12 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 - **`journal_audit_central` :** Écriture append-only ; ne jamais journaliser mots de passe, OTP, tokens de connexion ou secrets API. Les cibles polymorphes sont des références logiques. Aucun bouton de suppression métier, même pour le root.
 
 ### C7 — Comptes transporteur et tarifs versionnés
+
+**`comptes_livraison` — Les comptes utilisés par un propriétaire auprès des transporteurs, avec les informations de connexion protégées. Exemple : Karim utilise son compte EcoTrack pour plusieurs de ses boutiques.**
+
+**`boutiques_comptes_livraison` — Indique quelles boutiques utilisent quel compte transporteur. Exemple : les deux boutiques de Karim utilisent son même compte EcoTrack, sans partager leurs données commerciales.**
+
+**`tarifs_transporteur` — Les prix de retour convenus pour un compte transporteur, avec leurs dates d’application. Exemple : un retour coûte 300 DA pendant une période ; un nouveau tarif ne change pas les anciens frais.**
 
 Les comptes API sont mutualisés au niveau du propriétaire, jamais entre propriétaires différents. Le profil local `prestataires_livraison` référence le compte sans recopier ses secrets. Le pivot utilise `tenant_id` plutôt que `boutique_id` : l’identité centrale d’une boutique est `tenants.id`.
 
@@ -610,6 +616,12 @@ erDiagram
 
 ### C8 — Routage des colis et règlements partagés
 
+**`registre_colis_transporteur` — Indique à quelle boutique appartient chaque colis d’un compte transporteur. Exemple : le suivi reçu pour le colis X doit être envoyé à la boutique de Karim, pas à une autre.**
+
+**`lots_reversement_transporteur` — Les règlements globaux d’un compte transporteur, avant leur répartition entre boutiques. Exemple : un versement vérifié de 20 000 DA concerne les deux boutiques de Karim.**
+
+**`parts_reversement_tenants` — La part de chaque boutique dans un règlement global du transporteur. Exemple : sur 20 000 DA, 12 000 DA reviennent à la première boutique et 8 000 DA à la seconde.**
+
 Ces tables centrales contiennent des identifiants et des montants de routage, pas les produits ni les coordonnées des acheteurs. Elles empêchent qu’un polling de compte partagé attribue le même colis ou règlement à deux boutiques.
 
 ```mermaid
@@ -661,6 +673,8 @@ Il n’existe pas de transaction atomique couvrant arbitrairement les deux conne
 
 ### C9 — Historique des déploiements des BDD
 
+**`deploiements_schema_tenants` — L’historique de création et de mise à jour technique des bases des boutiques. Exemple : la mise à jour de la boutique de Karim a réussi, tandis qu’une autre doit être réessayée.**
+
 ```mermaid
 erDiagram
     direction TB
@@ -687,6 +701,8 @@ erDiagram
 **Contraintes :** UNIQUE(cle_operation), index(tenant_id,created_at). operation=provisionnement|migration|restauration_controle ; statut=en_attente|en_cours|reussi|echec. Une seule opération en cours par tenant via clé générée conditionnelle UNIQUE et verrou de déploiement. Chaque reprise conserve l’échec précédent et crée une nouvelle tentative. versions_runtime fige PHP, Laravel, stancl/tenancy, MySQL et version applicative réellement utilisés. tenants.version_schema est mis à jour seulement après succès ; la table technique migrations de chaque BDD reste le détail des migrations exécutées. Une migration échouée ne rend pas le tenant actif. Après restauration, contrôler références centrales, autorisations, registre transporteur, parts de règlements et jobs avant réactivation. Une intention externe incertaine reste à rapprocher ; ne pas la renvoyer aveuglément après restauration.
 
 ### C10 — Identité légale du vendeur
+
+**`entites_legales` — Les informations officielles du vendeur utilisées notamment sur les factures. Exemple : le nom de son entreprise, son adresse légale et ses identifiants. Dans ce modèle, un propriétaire a une seule identité légale pour ses boutiques.**
 
 **Hypothèse MVP retenue : un propriétaire correspond à une seule entité légale, commune à ses boutiques.** Ce choix reprend F9/G1 des notes ; il ne découle pas de la propriété technique du compte. Gérer plusieurs sociétés pour un même propriétaire nécessiterait un rattachement explicite par tenant et une migration dédiée.
 
@@ -724,6 +740,10 @@ UNIQUE(proprietaire_id) ; FK RESTRICT. Numéros conservés en chaînes, normalis
 La révision acceptée et les factures figent `entite_legale_id`, version et données requises dans leur snapshot vendeur. Cette copie est une preuve historique, pas un second profil modifiable. Lire l’identité centrale dans une courte transaction et utiliser ce snapshot déterminé pour l’opération locale ; aucune promesse de commit distribué. Un changement de société juridiquement distincte n’est pas traité comme une simple correction de libellé. Adresse commerciale, nom de boutique et identité légale sont trois notions distinctes.
 
 ### C11 — Politiques et exécutions de conservation
+
+**`politiques_retention` — Les règles qui indiquent combien de temps garder chaque catégorie de données et quoi faire ensuite. Exemple : supprimer certaines données à la fin d’une durée validée.**
+
+**`executions_retention` — L’historique des opérations qui appliquent ces règles de conservation. Exemple : une tâche a traité des données anciennes et indique combien de lignes ont été traitées ou ignorées.**
 
 ```mermaid
 erDiagram
@@ -768,6 +788,18 @@ erDiagram
 - `executions_retention` : scope central → tenant NULL ; scope tenant → tenant obligatoire, vérifié côté service. statut=en_attente|en_cours|reussie|echec ; UNIQUE(cle_operation), clé déterministe politique/tenant/fenêtre. Le lot local est idempotent, son ACK central peut être repris ; compteurs reconstruits depuis les lots techniques persistés, pas incrémentés aveuglément après un crash. Pas de copie des données effacées dans le journal. Les exécutions centrales n’ont accès qu’au tenant annoncé ; reprise avec curseur stable. Voir section 12 pour les dépendances, gels de conservation et sauvegardes.
 
 ### C12 — Sauvegardes/restaurations tenant, registre documentaire et reprise centrale
+
+**`configurations_sauvegardes` — Le planning des copies de sécurité d’une boutique. Exemple : sauvegarder chaque jour à une heure choisie et conserver les copies pendant la durée prévue.**
+
+**`limites_sauvegardes_plans` — Ce que chaque abonnement autorise pour les sauvegardes. Exemple : permettre ou non de choisir l’heure, et limiter le nombre de copies conservées.**
+
+**`sauvegardes_tenants` — La liste des copies de sécurité réalisées ou tentées pour les boutiques. Exemple : la sauvegarde de lundi a réussi ; on conserve sa date et l’emplacement de son fichier protégé.**
+
+**`restaurations_tenants` — L’historique des tentatives pour remettre une boutique dans l’état d’une sauvegarde. Exemple : restaurer la copie de lundi, puis vérifier les données avant de rouvrir la boutique.**
+
+**`operations_centrales_tenants` — Les opérations centrales à transmettre ou à réappliquer à une boutique, avec leur état. Exemple : après une restauration, retrouver une opération centrale que la copie restaurée ne contient pas encore.**
+
+**`registre_documents_emis` — La liste durable des documents déjà émis et de leurs numéros. Exemple : après une restauration, empêcher qu’un numéro de facture déjà utilisé soit attribué à une autre facture.**
 
 Les sauvegardes tenant sont pilotées au central, afin que leurs références et l’historique de restauration ne disparaissent pas avec la BDD tenant restaurée. Les fichiers sont privés, chiffrés et accompagnés d’une empreinte ; les clés de chiffrement ne sont pas conservées dans ces tables. **La BDD centrale possède en plus son propre backup/PITR et son propre runbook de reprise, stockés/pilotés hors de la BDD centrale elle-même.** C12 conserve aussi un registre durable des identités documentaires émises afin qu’une restauration tenant ne puisse pas réutiliser un numéro déjà sorti du système.
 
@@ -899,6 +931,18 @@ Une sauvegarde ancienne ne permet pas de reconstituer toute commande locale cré
 
 ### C13 — Facturation du SaaS au commerçant
 
+**`sequences_facturation_saas` — Les compteurs qui donnent les prochains numéros aux factures et aux avoirs du SaaS. Exemple : deux factures d’abonnement créées en même temps doivent recevoir des numéros différents.**
+
+**`factures_saas` — Les factures du SaaS adressées aux commerçants pour leurs abonnements ou options. Exemple : la facture de l’abonnement Pro de Karim ; ce n’est pas une facture pour un produit vendu dans sa boutique.**
+
+**`lignes_factures_saas` — Le détail de ce qui est facturé au commerçant. Exemple : une ligne pour l’abonnement et une autre pour une option, avec leurs prix et leurs taxes.**
+
+**`avoirs_saas` — Les documents qui corrigent à la baisse une facture du SaaS déjà émise. Exemple : retirer un montant facturé en trop. Un avoir ne prouve pas que de l’argent a été remboursé.**
+
+**`lignes_avoirs_saas` — Le détail des éléments corrigés sur une facture du SaaS. Exemple : préciser quelle option avait été facturée en trop et de combien son montant est réduit.**
+
+**`transmissions_documents_saas` — Le suivi de l’envoi des factures et des avoirs aux commerçants. Exemple : la facture de Karim est en attente d’envoi, envoyée ou en échec.**
+
 Cette facturation est indépendante des ventes de chaque boutique. Une échéance est une dette d’abonnement ; elle n’est pas automatiquement une facture. La règle fiscale d’émission est versionnée dans C14 et doit être validée avant activation commerciale.
 
 ```mermaid
@@ -1021,6 +1065,12 @@ erDiagram
 
 ### C14 — Règles de facturation et gouvernance des données
 
+**`regles_facturation` — Les règles validées qui indiquent quand et comment produire les documents de facturation. Exemple : quel événement doit déclencher une facture. Les anciennes versions restent conservées.**
+
+**`registre_activites_traitement` — Explique quelles données personnelles sont utilisées, pourquoi, par qui et pendant combien de temps. Exemple : documenter l’utilisation des coordonnées nécessaires à une livraison, sans lister tous les acheteurs.**
+
+**`journal_operations_donnees_personnelles_central` — Le carnet des opérations réellement faites sur les données personnelles au niveau central. Exemple : noter qui a exporté des données et quand, sans recopier toutes ces données dans le carnet.**
+
 ```mermaid
 erDiagram
     direction TB
@@ -1088,13 +1138,13 @@ Ce même modèle est migré dans chaque BDD tenant. Aucun `tenant_id` n’est aj
 
 ### T1 — Profil public
 
-**`boutique` — Profil public unique dans la BDD de la boutique.**
+**`boutique` — La fiche publique de la boutique : son nom affiché, son logo, ses contacts et sa présentation. Exemple : les informations que les visiteurs voient sur le site de Karim.**
 
-**`adresses_boutique` — Plusieurs adresses et localisations publiques ; ne crée pas de gestion de caisse.**
+**`adresses_boutique` — Les adresses publiques de la boutique et leur emplacement sur une carte. Exemple : une adresse pour le magasin et une autre pour un point de retrait. Cela n’ajoute pas une caisse de magasin.**
 
-**`liens_sociaux` — Plusieurs liens, y compris plusieurs pages sur un même réseau.**
+**`liens_sociaux` — Les liens vers les pages de la boutique sur les réseaux sociaux. Exemple : son compte Instagram et deux pages Facebook différentes.**
 
-**`pages_contenu` — Accueil, À propos, contact, conditions, politique de retour et confidentialité.**
+**`pages_contenu` — Le contenu des pages d’information du site. Exemple : Karim écrit le texte de « À propos », de « Contact » ou de sa politique de retour.**
 
 ```mermaid
 erDiagram
@@ -1188,13 +1238,13 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### T2 — Catalogue principal
 
-**`medias` — Métadonnées de fichiers images, vidéos, logos et documents.**
+**`medias` — Les informations permettant de retrouver les fichiers de la boutique : images, vidéos, logos ou documents. Exemple : l’emplacement et le type de la photo d’un produit ; le fichier lui-même est stocké séparément.**
 
-**`categories` — Catégories et sous-catégories avec une seule table.**
+**`categories` — Les familles de produits et leurs sous-familles. Exemple : « Vêtements » contient « T-shirts ». Une seule table permet d’organiser les deux niveaux.**
 
-**`produits` — Descriptif commercial commun à toutes les variantes.**
+**`produits` — La présentation commune d’un produit : son nom, sa description et les informations partagées par ses versions. Exemple : le modèle « T-shirt coton », proposé ensuite en plusieurs tailles et couleurs.**
 
-**`variantes_produits` — Unité vendable : une variante par combinaison ; une variante standard pour un produit sans options.**
+**`variantes_produits` — Les versions précises que l’on peut acheter, avec leur prix et leur stock. Exemple : « T-shirt rouge, taille M ». Un produit sans choix possède aussi une variante standard.**
 
 ```mermaid
 erDiagram
@@ -1299,13 +1349,13 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### T3 — Options et images
 
-**`options_produit` — Axes de variation propres au produit : taille, couleur, matière, modèle.**
+**`options_produit` — Les types de choix proposés pour un produit. Exemple : pour un t-shirt, le client peut choisir une taille et une couleur.**
 
-**`valeurs_options` — Valeurs possibles d’un axe.**
+**`valeurs_options` — Les choix disponibles pour chaque option. Exemple : M et L pour la taille ; rouge et bleu pour la couleur.**
 
-**`variantes_valeurs` — Composition normalisée de chaque variante.**
+**`variantes_valeurs` — Indique les choix qui composent chaque variante. Exemple : cette variante correspond à la taille M et à la couleur rouge.**
 
-**`medias_produits` — Galerie générale et médias spécifiques à une variante.**
+**`medias_produits` — Relie les photos ou vidéos à un produit ou à une variante précise. Exemple : montrer une photo générale du t-shirt et une photo particulière de sa version rouge.**
 
 ```mermaid
 erDiagram
@@ -1367,13 +1417,13 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### T4 — Classement et caractéristiques
 
-**`etiquettes` — Tags e-commerce réutilisables.**
+**`etiquettes` — Les petits mots utilisés pour classer ou mettre en avant les produits. Exemple : « Été » ou « Idée cadeau ».**
 
-**`produits_etiquettes` — Relation entre produits et tags.**
+**`produits_etiquettes` — Indique quelles étiquettes sont attachées à chaque produit. Exemple : le même t-shirt peut porter les étiquettes « Été » et « Idée cadeau ».**
 
-**`caracteristiques` — Dictionnaire de caractéristiques descriptives cohérentes.**
+**`caracteristiques` — La liste des informations servant à décrire les produits. Exemple : le poids ou le pays de fabrication ; ce ne sont pas forcément des choix proposés à l’achat.**
 
-**`produits_caracteristiques` — Valeur descriptive d’une caractéristique pour un produit.**
+**`produits_caracteristiques` — La valeur d’une caractéristique pour un produit précis. Exemple : le poids de ce pot de miel est de 500 grammes.**
 
 ```mermaid
 erDiagram
@@ -1430,11 +1480,11 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### T5 — Vente et avis
 
-**`pages_vente` — Landing page mono-produit avec URL partageable.**
+**`pages_vente` — Les pages qui présentent un seul produit pour donner envie de le commander. Exemple : une page partageable avec les avantages d’un produit, ses images et son formulaire de commande.**
 
-**`promotions_produits` — Réductions automatiques, sans code promo.**
+**`promotions_produits` — Les réductions appliquées automatiquement aux produits, sans code à saisir. Exemple : une réduction sur un produit pendant une période choisie.**
 
-**`avis_produits` — Avis déposés sans compte et modérés par la boutique.**
+**`avis_produits` — Les notes et commentaires laissés sur les produits, même sans compte acheteur. Exemple : un client écrit « Très bon produit » ; la boutique décide ensuite de publier ou de masquer cet avis.**
 
 ```mermaid
 erDiagram
@@ -1501,13 +1551,13 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### T6 — Visiteurs et statistiques
 
-**`visiteurs` — Identifiant pseudonyme d’un navigateur dans cette boutique ; aucun mot de passe.**
+**`visiteurs` — Un identifiant pour reconnaître un navigateur dans cette boutique, sans créer de compte acheteur. Exemple : reconnaître le même navigateur lors d’un retour sur le site, sans garantir qu’il s’agit de la même personne.**
 
-**`sessions_visite` — Une visite continue ; un visiteur peut avoir plusieurs sessions.**
+**`sessions_visite` — Les différentes visites d’un navigateur sur la boutique. Exemple : une visite le matin puis une autre le soir peuvent former deux sessions pour le même visiteur.**
 
-**`evenements_navigation` — Événements nécessaires aux vues, paniers et parcours de conversion.**
+**`evenements_navigation` — Les actions suivies pour comprendre le parcours sur le site. Exemple : ouvrir une fiche produit, ajouter un article au panier puis arriver à la commande.**
 
-**`preferences_visiteur` — Préférences de mesure et version du texte présenté, séparées de l’identité panier.**
+**`preferences_visiteur` — Les choix du visiteur concernant la mesure de sa navigation. Exemple : refuser cette mesure tout en continuant à utiliser le panier et à commander.**
 
 ```mermaid
 erDiagram
@@ -1576,9 +1626,9 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### T7 — Panier
 
-**`paniers` — Panier invité conservé côté serveur.**
+**`paniers` — Les paniers conservés par le site pour les acheteurs invités. Exemple : un visiteur ajoute deux produits avant de renseigner ses coordonnées ; cela ne réserve pas encore le stock.**
 
-**`articles_panier` — Lignes de panier avec variante et personnalisation.**
+**`articles_panier` — Le contenu détaillé de chaque panier. Exemple : deux t-shirts rouges taille M, avec une éventuelle personnalisation, forment une ligne du panier.**
 
 ```mermaid
 erDiagram
@@ -1616,13 +1666,13 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### T8 — Commande et versions
 
-**`commandes` — Identité stable et décision commerciale de la commande.**
+**`commandes` — La fiche principale de chaque commande, avec son identité et son état commercial. Exemple : la commande de Karim reste la même commande même si son contenu est modifié avant expédition.**
 
-**`revisions_commandes` — Photographie de la commande à chaque modification : destinataire, frais et totaux.**
+**`revisions_commandes` — Les copies successives du contenu d’une commande à chaque modification. Exemple : la première version contient une taille M ; une nouvelle version contient une taille L, sans effacer l’ancienne.**
 
-**`articles_commande` — Lignes d’une révision ; prix et coût historiques conservés.**
+**`articles_commande` — Les produits et quantités d’une version précise de commande, avec les prix et coûts conservés à ce moment-là. Exemple : deux t-shirts à 2 000 DA chacun, même si le prix du catalogue change ensuite.**
 
-**`historique_commandes` — Journal des décisions, appels, remplacements et changements de champs.**
+**`historique_commandes` — Le carnet des actions et décisions concernant une commande. Exemple : noter un appel sans réponse, une confirmation ou un changement de taille, avec sa date et son auteur.**
 
 ```mermaid
 erDiagram
@@ -1761,13 +1811,13 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### T9 — Stock et retours
 
-**`reservations_stock` — Quantités affectées dès l’acceptation client, puis consommées lors de la remise physique.**
+**`reservations_stock` — Les quantités mises de côté pour une commande après l’accord du client. Exemple : après confirmation téléphonique, réserver deux t-shirts ; leur sortie physique est enregistrée lors de la remise du colis.**
 
-**`mouvements_stock` — Journal des variations physiques, réservations et pertes.**
+**`mouvements_stock` — Le carnet de tous les changements de stock. Exemple : recevoir dix articles, en réserver deux, les expédier ou constater une perte, en gardant l’explication de chaque changement.**
 
-**`retours_commandes` — Dossier de retour physique ; le MVP exige le colis entier, mais la structure reste compatible avec un retour partiel futur.**
+**`retours_commandes` — Les dossiers des colis qui reviennent à la boutique. Exemple : un client refuse son colis. Au lancement, le retour porte sur tout le colis ; la structure permet une évolution future.**
 
-**`articles_retour` — Inspection par ligne/article du contenu effectivement attendu dans le retour.**
+**`articles_retour` — Le détail de ce qui est attendu et constaté dans un retour. Exemple : sur trois articles attendus, deux sont reçus et un manque ; les articles reçus peuvent être revendables ou abîmés.**
 
 ```mermaid
 erDiagram
@@ -1863,13 +1913,13 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### T10 — Livraison et prix
 
-**`prestataires_livraison` — Livreurs internes et sociétés de livraison, avec un même modèle de reversement.**
+**`prestataires_livraison` — Les personnes ou sociétés qui livrent pour la boutique. Exemple : un livreur interne ou EcoTrack, avec le suivi de l’argent qu’ils doivent reverser.**
 
-**`tarifs_livraison_client` — Ce que la boutique facture au client, séparé du coût du transporteur.**
+**`tarifs_livraison_client` — Le prix de livraison demandé à l’acheteur. Exemple : le client paie 600 DA pour une livraison dans une zone donnée ; ce prix peut différer du coût payé au transporteur.**
 
-**`tarifs_prestataires` — Estimation locale du service selon zone/mode ; hors tarif de retour des comptes société.**
+**`tarifs_prestataires` — Le coût estimé de la livraison pour la boutique selon la zone et le mode choisi. Exemple : estimer le coût d’une livraison à domicile. Les tarifs de retour des comptes société sont gérés séparément au central.**
 
-**`regles_livraison_gratuite` — Exceptions automatiques de livraison offerte.**
+**`regles_livraison_gratuite` — Les conditions qui rendent automatiquement la livraison gratuite pour le client. Exemple : offrir la livraison lorsque la commande remplit la règle définie par la boutique.**
 
 ```mermaid
 erDiagram
@@ -1945,13 +1995,13 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### T11 — Transporteur et colis
 
-**`correspondances_geo_transporteur` — Correspondance entre géographie interne et codes/libellés du transporteur.**
+**`correspondances_geo_transporteur` — Relie les wilayas et communes du SaaS aux noms ou codes utilisés par chaque transporteur. Exemple : traduire une commune choisie sur le site en code reconnu par EcoTrack.**
 
-**`points_relais` — Bureaux/stop desks disponibles chez un transporteur.**
+**`points_relais` — Les bureaux du transporteur où le client peut retirer son colis. Exemple : choisir un stop desk au lieu d’une livraison à domicile.**
 
-**`livraisons` — Un seul colis regroupant tous les articles d’une commande.**
+**`livraisons` — Le colis envoyé pour une commande et les informations permettant de le suivre. Exemple : une commande de trois produits part dans un seul colis avec un numéro de suivi.**
 
-**`evenements_livraison` — Événements normalisés et statuts bruts conservés.**
+**`evenements_livraison` — Les étapes reçues pendant le transport, avec le message original du transporteur. Exemple : « en livraison », puis « livré » ou « refusé ».**
 
 ```mermaid
 erDiagram
@@ -2062,9 +2112,9 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### T12 — Intégration Ecotrack
 
-**`operations_transporteur` — File durable des opérations à envoyer au transporteur.**
+**`operations_transporteur` — Les demandes à envoyer au transporteur, conservées pour pouvoir les suivre et les reprendre. Exemple : demander la création d’un colis sans créer un deuxième colis si la réponse est incertaine.**
 
-**`tentatives_operations_transporteur` — Trace de chaque tentative HTTP et de son résultat.**
+**`tentatives_operations_transporteur` — Le résultat de chaque essai de communication avec le transporteur. Exemple : le premier essai échoue ; une nouvelle tentative est enregistrée séparément sans effacer la précédente.**
 
 ```mermaid
 erDiagram
@@ -2122,11 +2172,11 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### T13 — Argent et reversements
 
-**`recouvrements` — État de l’argent d’un colis, distinct de sa livraison et de sa confirmation.**
+**`recouvrements` — Le suivi de l’argent lié à un colis : ce qui doit être encaissé et reversé. Exemple : le client a payé le livreur, mais le commerçant attend encore son argent.**
 
-**`bordereaux_reversement` — Règlement local ventilé entre recettes produits, frais commerçant et indemnisations.**
+**`bordereaux_reversement` — Les documents de suivi d’un règlement avec le livreur ou le transporteur pour cette boutique. Exemple : expliquer le montant reçu en distinguant ventes, frais et indemnisations.**
 
-**`lignes_reversement` — Ventilation d’un bordereau par colis, pour éviter les doubles reversements.**
+**`lignes_reversement` — Le détail d’un reversement pour chaque colis. Exemple : préciser que 4 000 DA du versement concernent le colis A et 6 000 DA le colis B, sans les compter deux fois.**
 
 ```mermaid
 erDiagram
@@ -2192,11 +2242,11 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### T14 — Coûts, remboursements et documents
 
-**`depenses` — Coûts réels hors frais transporteur et pertes de stock : publicité, emballage et frais généraux.**
+**`depenses` — Les autres dépenses réelles de la boutique, hors frais transporteur et pertes de stock déjà suivis ailleurs. Exemple : publicité, emballages ou frais généraux.**
 
-**`regularisations_clients` — Remboursements réels, sans portefeuille ni crédit client.**
+**`regularisations_clients` — Le suivi des remboursements aux acheteurs, avec leurs montants, motifs et états. Exemple : enregistrer un remboursement réellement effectué, sans créer de portefeuille client.**
 
-**`bons_commande` — Bon de commande facultatif, figé sur une révision précise.**
+**`bons_commande` — Les bons de commande facultatifs correspondant à une version précise de la commande. Exemple : conserver un document indiquant exactement les articles et les prix de cette version.**
 
 ```mermaid
 erDiagram
@@ -2270,9 +2320,9 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 ### T15 — Audit et évolution ciblée
 
-**`journal_audit` — Audit transversal de catalogue, stock, avis, contenus et finances.**
+**`journal_audit` — Le carnet des actions importantes à l’intérieur de la boutique. Exemple : noter qui a modifié un produit, ajusté le stock ou masqué un avis, et quand.**
 
-**`personnalisations_theme` — ÉVOLUTION : présentation personnalisée autorisée par abonnement ou essai.**
+**`personnalisations_theme` — ÉVOLUTION : les réglages de présentation personnalisée permis par l’abonnement ou un essai. Exemple : conserver une personnalisation du thème lorsque cette fonction sera activée.**
 
 ```mermaid
 erDiagram
@@ -2312,6 +2362,16 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 
 ### T16 — Frais transporteur, créances et preuve d’encaissement
+
+**`frais_transporteur` — Les frais liés au transport et la personne qui doit les payer. Exemple : des frais de retour à la charge du commerçant, distincts de la livraison payée par l’acheteur.**
+
+**`reglements_frais_transporteur` — Indique comment les frais dus par le commerçant au transporteur sont réglés. Exemple : un frais de retour est déduit d’un reversement ou payé séparément, sans compter une deuxième dépense.**
+
+**`creances_transporteur` — Les sommes que le transporteur doit rendre après correction de frais déjà payés. Exemple : 650 DA ont été payés au lieu de 600 DA ; le transporteur doit encore 50 DA au commerçant.**
+
+**`allocations_creances_transporteur` — Indique comment le transporteur règle les sommes qu’il doit après une correction de frais. Exemple : les 50 DA dus sont remboursés ou déduits d’un prochain frais.**
+
+**`ecritures_encaissement` — Les montants réellement encaissés auprès du client et vérifiés, avec leurs éventuelles corrections. Exemple : confirmer que le livreur a reçu 5 000 DA ; cela ne prouve pas encore leur reversement au commerçant.**
 
 ```mermaid
 erDiagram
@@ -2410,6 +2470,10 @@ Les tables ajoutées matérialisent des faits manquants dans les notes : allocat
 
 ### T17 — Indemnisations et factures historiques
 
+**`indemnisations_transporteur` — Les dédommagements du transporteur pour un problème comme une perte ou une casse. Exemple : un montant versé au commerçant pour un colis perdu, séparé de l’argent payé par le client.**
+
+**`factures` — Les factures de vente de la boutique et les avoirs qui les corrigent, avec leur contenu historique conservé. Exemple : garder la facture d’origine puis créer un avoir si son montant doit être réduit.**
+
 ```mermaid
 erDiagram
     direction TB
@@ -2466,6 +2530,10 @@ erDiagram
 
 ### T18 — Incidents par ligne et plafonds des remèdes
 
+**`incidents_commande` — Le dossier d’un problème concernant une ligne de produits expédiée et les limites de sa prise en charge. Exemple : un article cassé pour lequel on examine un remplacement ou un remboursement.**
+
+**`incidents_commande_details` — Les différents problèmes et quantités dans un dossier d’incident. Exemple : sur trois articles, un est cassé, un manque et le troisième est correct ; on ne compte pas deux fois le même article.**
+
 ```mermaid
 erDiagram
     direction TB
@@ -2513,6 +2581,10 @@ Mêmes contrôles sur les montants : somme des remboursements produits engagés 
 Après incident sur un remplacement ou un échange, le MVP ne crée pas automatiquement une chaîne de remplacements : traitement SAV manuel documenté et évolution à concevoir avant automatisation. Ne pas contourner cela en ouvrant un second dossier pour la ligne initiale. Les décisions, plafonds et preuves sont audités sans exposer inutilement les données de l’acheteur.
 
 ### T19 — Contrats acceptés et transmission des documents
+
+**`contrats_commandes` — Le contenu exact de la commande accepté par téléphone, avec la date de l’accord déclaré et la personne qui l’a enregistré. Exemple : le commerçant confirme les articles, les prix et la livraison annoncés au client.**
+
+**`transmissions_documents` — Le suivi de l’envoi des documents au client. Exemple : savoir si un contrat, une facture ou une copie de preuve de réception a été envoyé, livré ou reste en échec.**
 
 ```mermaid
 erDiagram
@@ -2564,6 +2636,8 @@ erDiagram
 
 ### T20 — Séquences de documents
 
+**`sequences_documents` — Les compteurs des numéros de factures et d’avoirs de la boutique. Exemple : attribuer un nouveau numéro à chaque document sans réutiliser un numéro déjà émis, même après restauration.**
+
 ```mermaid
 erDiagram
     direction TB
@@ -2581,6 +2655,10 @@ erDiagram
 UNIQUE(type_document,exercice) dans la BDD tenant ; prefixe_boutique fixé centralement et jamais réutilisé pour une autre boutique. type_document=facture|avoir. À l’émission locale : verrou sur cette ligne stable, lire/incrémenter `prochain_numero`, attribuer numéro et snapshots puis entrer en état `en_enregistrement`. **Avant que le document devienne `emis` ou soit transmis, son identité est enregistrée/retrouvée idempotemment dans `central.registre_documents_emis` et son snapshot/PDF durable est vérifié.** Initialiser les séquences avant usage ; en création concurrente, gérer l’unicité puis relire sous verrou. Pas de MAX(numero)+1. Après restauration tenant, `prochain_numero` n’est jamais accepté seul : rapprocher le registre central et reconstruire une borne sûre ; tout numéro déjà émis reste consommé. Format proposé : préfixe-type-exercice-numéro ; politique de séries par boutique pour une même entité légale à valider avant production. Si une séquence unique par société est requise, déplacer son allocation dans le central avec registre d’attribution idempotent avant activation, sans simulation de transaction distribuée. Le bon de commande peut utiliser numero_commande + version_document.
 
 ### T21 — Conditions de vente et opérations sur les données personnelles
+
+**`acceptations_conditions_vente` — Les acceptations des conditions de vente réellement recueillies pour une version précise de commande. Exemple : conserver la date et la version des conditions acceptées au checkout, séparément de la confirmation téléphonique.**
+
+**`journal_operations_donnees_personnelles` — Le carnet des opérations sur les données personnelles dans cette boutique. Exemple : noter l’envoi des coordonnées nécessaires au transporteur ou un export, sans recopier toutes les données dans le journal.**
 
 ```mermaid
 erDiagram
@@ -2623,6 +2701,10 @@ erDiagram
 - **Implémentation :** les modifications et leur audit local sont atomiques ; pour consultation/export, tracer avant remise des données selon la politique de disponibilité définie. Pour appel distant, tracer intention puis résultat corrélés ; ne pas prétendre que la transmission a réussi si son résultat est incertain. Les politiques fixent explicitement durée, accès, protection anti-altération et éventuel stockage externe immuable. L’empreinte n’est pas une anonymisation. Les traces d’analytics ne constituent pas la preuve de l’information fournie au checkout.
 
 ### T22 — Émission obligatoire et compensation d’échange
+
+**`obligations_facturation` — Les factures ou avoirs que le système doit produire après un événement prévu par une règle validée. Exemple : garder une facture à émettre dans la liste jusqu’à ce que son émission réussisse.**
+
+**`compensations_echanges` — La part d’un avoir utilisée pour payer une nouvelle commande d’échange précise. Exemple : affecter 8 000 DA à un échange coûtant 10 000 DA, avec 2 000 DA de produits restant à payer, sans portefeuille client.**
 
 `factures.type_document=facture|avoir` est le modèle de documents typés conservé. **Il n’y a pas une deuxième table `avoirs` dans la BDD boutique** : les avoirs y ont leur facture d’origine, leurs lignes/quantités/motifs dans les snapshots et leur séquence propre. La table centrale `avoirs_saas` concerne une autre relation commerciale.
 
@@ -2691,6 +2773,10 @@ erDiagram
 
 
 ### T23 — Reconnaissance économique et corrections commerciales
+
+**`corrections_commerciales` — Les décisions qui corrigent les montants des ventes, avec la date où elles comptent dans les statistiques. Exemple : enregistrer une réduction après un retour, séparément du retour physique et du remboursement réel.**
+
+**`lignes_corrections_commerciales` — Le détail d’une correction commerciale pour chaque ligne de produits concernée. Exemple : retirer 2 000 DA de ventes pour un article et indiquer aussi la correction de son coût dans les résultats.**
 
 La réception physique d’un retour, la décision économique, l’avoir et le remboursement sont quatre faits distincts. Les indicateurs commerciaux utilisent l’événement finalisé ci-dessous, pas la date de réception du colis ni la date du cash.
 
