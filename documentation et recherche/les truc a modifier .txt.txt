@@ -89,4 +89,4 @@ ajouter ou modifer ou imlementer : laravel morph relasionship ,
 une table media pour tout les tables   
 
 
-et avec ca ajoute plutôt  modifier Audit SaaS utiliser a ca place : https://spatie.be/docs/laravel-activitylog/v5/introduction  donc pareille comme avec les perms je veut utiliser avec ca laravel activitylog donc si jamais je peut modifier et adapter se que luis me donner avec se que jais déjà cets parfait comme avec les role et permision de spatie ont peut adapter sont shema de bdd et luis ajouter les truc que ont veut la cets pareille 
+et avec ca ajoute plutôt  modifier Audit SaaS et utiliser a ca place : https://spatie.be/docs/laravel-activitylog/v5/introduction  donc pareille comme avec les perms je veut utiliser avec ca laravel activitylog donc si jamais je peut modifier et adapter se que luis me donner avec se que jais déjà cets parfait comme avec les role et permision de spatie ont peut adapter sont shema de bdd et luis ajouter les truc que ont veut la cets pareille 
