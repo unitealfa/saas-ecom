@@ -1,0 +1,101 @@
+Compte transporteur — carrier_accounts
+Compte EcoTrack/autre du propriétaire : identifiant externe, API, secrets chiffrés, état, synchronisation. Peut servir à plusieurs boutiques du même propriétaire.  
+retirer cela et de metre que chaque boutique a sa propre api ecotrac et si le propritaire de la boutique veut utiliser le meme compte ecotrac pour ces 2 boutique il que a copier le meme api de la premiere boutique et de le metre dans ca 2 eme boutique aussi et ca marche sans probleme 
+
+
+Lien boutique ↔ transporteur — tenant_carrier_accounts   du coup ici ya ca qui se retire et ces deux elemtn vont dans la bdd boutique du coup (maintent esque Compte transporteur — carrier_accounts suffit si ont la met dans la bdd boutique et de suprimer entieemetnt Lien boutique ↔ transporteur je pense oui car chaque Compte transporteur sera dans la bdd de la boutique en quetion )
+
+
+pareille pour Tarifs transporteur centraux — carrier_rate_versions  Tarifs négociés liés au compte transporteur, par exemple tarif de retour et périodes d’application.
+
+
+pareille pour : Registre colis central — carrier_shipment_registry	tenant_id, UUID du colis local, référence marchand et numéro de tracking. Il sert surtout à savoir à quelle boutique router un événement transporteur. Il ne contient pas les produits ni les coordonnées de l’acheteur.
+Reversements transporteur — carrier_remittance_batches Les montants globaux reçus d’un compte transporteur partagé.
+
+
+
+
+Part de chaque boutique — tenant_remittance_allocations
+Combien du reversement global appartient à chaque boutique, avec tenant_id, montant alloué et UUID du bordereau local.
+
+Ça veut dire un cas très simple : un même compte transporteur peut servir à plusieurs boutiques, donc quand le transporteur verse un montant global, le SaaS doit savoir quelle part revient à chaque boutique.
+
+Exemple :
+
+Karim possède 2 boutiques :
+
+Boutique A
+Boutique B
+
+Les 2 utilisent le même compte EcoTrack.
+
+À la fin, EcoTrack verse en une seule fois :
+
+20 000 DA
+
+Mais ces 20 000 DA viennent de plusieurs boutiques :
+
+Boutique A → 12 000 DA
+Boutique B → 8 000 DA
+
+La table tenant_remittance_allocations sert juste à enregistrer cette répartition :
+
+tenant_id	montant attribué
+Boutique A	12 000 DA
+Boutique B	8 000 DA
+
+Donc :
+
+carrier_remittance_batches
+= "EcoTrack a versé 20 000 DA au total"
+
+tenant_remittance_allocations
+= "sur les 20 000 DA :
+   12 000 DA appartiennent à Boutique A
+   8 000 DA appartiennent à Boutique B"
+
+Le tenant_statement_uuid sert ensuite à dire :
+
+"Cette part de 12 000 DA correspond au bordereau
+créé dans la BDD de Boutique A."
+
+Important : cette table centrale ne contient pas les commandes ni les produits. Elle garde seulement :
+
+quelle boutique
++ quel montant
++ quelle référence de bordereau local
+
+Si chaque boutique possède toujours son propre compte transporteur séparé, cette table devient beaucoup moins utile.
+dans se cas alors cest faire le calcule automatiquemnt vue chaque colis a sont propre trassage ont peut tracer un colis du coup cets avec cela que ont fait le calcule dans chaque boutique avec le code de trasabilite qui ya dans chaque colis ont peut faire la diference et de le calculer avec cela ont peut savoir en fesant le calcule des produit livree avec secces et leur retours modification et tout de debuire les frait totale et de faire le trie avec le montant totale de savoir séparément de carrier_remittance_batches combien pour chaque boutique mais cette table aussi ont a rien a faire avec dans la table centrale cets des info dune boutique elle reste dans la bdd boutique 	
+
+
+
+
+ici Identité légale — legal_entities
+Identité légale du propriétaire utilisée pour ses boutiques : raison sociale, NIF, NIS, RC/carte artisan, adresse légale, téléphone, email, régime fiscal, etc. Dans ton modèle, une identité légale est commune aux boutiques du propriétaire.    je retire cette table jais déjà sont numero et mail sont nom ...ect dans la table users dans la bdd centrale pour quoi les repetition detect si ya une anomalie de cette sorte des info qui se repete comme cela (a retirer et suprimer entiereemtn cette table )
+
+
+
+
+Registre documents boutique — issued_document_registry
+La centrale peut connaître qu’un document d’une boutique a été émis : tenant, UUID du document, type, série, numéro, éventuellement UUID commande/révision/facture, hash et emplacement du document. C’est pour empêcher la réutilisation de numéros après restauration je veut retirer entierment la fonctionalite de backup cets trop complex et avec retirer tout les table et tout qui ont rapport avec la backup comme issued_document_registry et tout les autre et dans la bdd centrale et dans la bdd des boutique 
+
+
+
+
+billing_rules
+Dit quand et comment une boutique doit créer une facture ou un autre document. Exemple : “quand une vente est terminée, crée une facture”. pareille elle et dans la partie de chaque boutique dans la bdd boutique pas  centrale 
+
+
+
+pour processing_activity_register pareille ont stock les info et donnes dans ca propre boutique
+
+
+
+
+central_personal_data_operations implementer ces info dans activity_log cets dans cette table la : activity_log que ont trace se que il se passe dans le saas comme Exporter certaines données de Boutique A cets la que ils sont ecrite et plus quand ya un probleme ou ya eu un abonemetn donner mais il et incorect ou il se logs dans : activity_log 
+
+
+
+
+

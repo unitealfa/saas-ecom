@@ -1,0 +1,161 @@
+id + uuid 
+
+uuid dans les route et id pour les tables
+
+
+
+
+cree un etable pays-code pas dans user (5 pays) et metre country id 
+
+
+
+
+en englais les tables 
+
+
+
+retirer est_superadmin_racine et lajoutre dans l table role
+
+
+
+proprietaire_id metre user_id renomer pour simplifier 
+
+
+
+nom_boutique_normalise soit slug 
+
+
+varchar statut  la rendre => unnsignedetinyinteger  et ajouter une class ennum  : $table->unsignedTinyInteger('status')
+                ->default(1)
+                ->comment('1: Active, 2: Inactive, 3: Suspended, 4: Deleted')
+                ->index();
+<?php
+
+namespace App\Enums\Users;
+
+enum StatusEnum: int
+{
+    case ACTIVE   = 1;
+    case INACTIVE = 2;
+    case SUSPENDED = 3;
+    case DELETED   = 4;
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::ACTIVE    => __('user.status.active'),
+            self::INACTIVE  => __('user.status.inactive'),
+            self::SUSPENDED => __('user.status.suspended'),
+            self::DELETED   => __('user.status.deleted'),
+        };
+    }
+
+    public static function fromLabel(string $label): ?self
+    {
+        return match (strtolower($label)) {
+            'active'    => self::ACTIVE,
+            'inactive'  => self::INACTIVE,
+            'suspended' => self::SUSPENDED,
+            'deleted'   => self::DELETED,
+            default => null,
+        };
+    }
+
+    public function color(): string
+    {
+        return match($this) {
+            self::ACTIVE     => 'success',
+            self::INACTIVE   => 'warning',
+            self::SUSPENDED  => 'error',
+            self::DELETED    => 'error',
+            // self::info    => 'info',
+            // self::primary => 'primary',
+
+        };
+    }
+
+    public function icon(): string
+    {
+        return match($this) {
+            self::ACTIVE     => "bx bx-check-shield",
+            self::INACTIVE   => "bx bx-check-shield",
+            self::SUSPENDED  => "bx bx-check-shield",
+            self::DELETED    => "bx bx-check-shield",
+        };
+    }
+}
+ 
+
+
+ou ya multi champs partout dans l abdd ded preference faire comme au dessu 
+
+
+
+
+chauqe conection de user avce sa boutique se conect avec sont subdomain 
+
+membres_tenants dans les table de la bdd boutiques 
+
+
+retirer les tables role et utiliser un pakage "https://spatie.be/docs/laravel-permission/v8/installation-laravel"
+
+pour securiser les route e ttout utiliser get et policies "Authorization | Laravel 13.x - The clean stack for Artisans and agents"
+(role permision role has permision model has role )=> role comme on tas dis precedament
+
+
+
+dans la partei Invitations, exceptions et restrictions administratives ne pas inclure les role des boutiuques dans la bdd principale 
+les perme sont donne et enregistrer dans la bdd boutique 
+
+
+
+apartire que tu te conect a la boutique du comercant il et entierement isoler de la basedd principale il depend entierement de sa bdd  
+
+
+
+domaine et relier a bdd centralee dans la table tenente (il vas passer par le midleware)
+
+
+
+
+
+bdd principale elle a rapport avec domaine et tenente 
+
+
+
+
+avec le meme bdd boutque ont peut dire que pour 3 boutique avec les meme table ont peut donner que a une il a 2 role lautre ils a 5 role qui peut cree  (en gros le shema des bdd boutique il et strictement le meme que tout les bdd qui vont etre cree)
+
+
+
+dans la table abonement ajouter tenent_id 
+
+
+dans la table  reglements_abonnement la nomer envoice "facture"  
+
+
+
+modifier Audit SaaS utiliser a ca place : https://spatie.be/docs/laravel-activitylog/v5/introduction   
+
+
+
+savoir quand utiliser les models create et creating / update saving …. ect 
+
+
+
+
+
+
+
+
+
+
+laravel morph relasionship
+
+une table media pour tout les tables 
+
+
+
+
+
+
