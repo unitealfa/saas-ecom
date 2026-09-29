@@ -1,0 +1,92 @@
+1.	À clarifier : emplacement des comptes et connexion aux boutiques. : les compte des user qui ont les poutique qui cree les boutique il sont dans la bdd centrale mais les gent que se user contrôle cree donne des permes et tout ca cest entieremetn dans ca bdd de sa boutique la bdd centrale na rien avoir avec mais les user que le super admin peut cree comme cree un it qui peut cree des compte ou un rôle qui peut modifier ou donner des plan a ces user qui ont des boutique il sont dans la bdd centrale 
+2.	Ajouter id numérique pour les relations internes et uuid pour les routes ; préciser le traitement des tables de liaison. : Principe : chaque table métier possède un id (bigint auto-incrémenté, clé primaire) et un uuid (unique, indexé). L'id sert exclusivement en interne (clés étrangères, jointures). L'uuid sert exclusivement à l'extérieur (routes, API, réponses JSON). L'id n'est jamais exposé. Règle d'or : relations internes → id ; tout ce qui sort vers le client (URL, JSON, formulaires) → uuid.
+
+3.	Mettre les noms des tables et des champs en anglais. 
+4.	Créer countries, remplacer users.pays_code par country_id et définir les cinq pays. 
+5.	Renommer proprietaire_id en user_id, en conservant son sens de propriétaire.  Ici ont fait cela cets pour fasiliter la maintenence si le code et toucher par un dev junior pour pas luis mélanger les idée 
+6.	Remplacer nom_boutique_normalise par slug et préciser son lien avec le sous-domaine.  Ici le truc de slug la cest Un slug dans une base de données est une chaîne de caractères textuelle simplifiée, unique et propre aux URL, qui sert à identifier une ressource cets se que je veut dire moi 
+7.	Remplacer les statuts textuels par unsignedTinyInteger et des enums adaptés à chaque objet. ou ya multi champs partout dans l abdd ded preference uniliser :
+varchar statut  la rendre => unnsignedetinyinteger  et ajouter une class ennum  : $table->unsignedTinyInteger('status')
+                ->default(1)
+                ->comment('1: Active, 2: Inactive, 3: Suspended, 4: Deleted')
+                ->index();
+<?php
+
+namespace App\Enums\Users;
+
+enum StatusEnum: int
+{
+    case ACTIVE   = 1;
+    case INACTIVE = 2;
+    case SUSPENDED = 3;
+    case DELETED   = 4;
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::ACTIVE    => __('user.status.active'),
+            self::INACTIVE  => __('user.status.inactive'),
+            self::SUSPENDED => __('user.status.suspended'),
+            self::DELETED   => __('user.status.deleted'),
+        };
+    }
+
+    public static function fromLabel(string $label): ?self
+    {
+        return match (strtolower($label)) {
+            'active'    => self::ACTIVE,
+            'inactive'  => self::INACTIVE,
+            'suspended' => self::SUSPENDED,
+            'deleted'   => self::DELETED,
+            default => null,
+        };
+    }
+
+    public function color(): string
+    {
+        return match($this) {
+            self::ACTIVE     => 'success',
+            self::INACTIVE   => 'warning',
+            self::SUSPENDED  => 'error',
+            self::DELETED    => 'error',
+            // self::info    => 'info',
+            // self::primary => 'primary',
+
+        };
+    }
+
+    public function icon(): string
+    {
+        return match($this) {
+            self::ACTIVE     => "bx bx-check-shield",
+            self::INACTIVE   => "bx bx-check-shield",
+            self::SUSPENDED  => "bx bx-check-shield",
+            self::DELETED    => "bx bx-check-shield",
+        };
+    }
+}
+
+
+ 
+8.	Examiner les autres champs à choix limités pour appliquer cette même approche lorsque c’est pertinent. 
+9.	Déplacer membres_tenants dans chaque BDD boutique. Le saas nas pas le contrôle sur les compte qui yas dans les boutiques de ces clients
+10.	Remplacer les tables d’autorisation faites maison par celles de Spatie, avec les adaptations nécessaires. Dapres les documetn fournis 
+11.	Déplacer l’indicateur de super-admin racine de users vers les rôles, en distinguant administration centrale et administration boutique. 
+12.	Conserver les rôles, permissions et invitations de boutique dans sa propre BDD. 
+13.	Définir les échanges encore autorisés avec le central : domaines, tenants, plans et autres dépendances existantes. 
+14.	Garder le même schéma pour toutes les boutiques, avec des quotas différents : par exemple, deux rôles créables pour l’une, cinq pour l’autre. 
+15.	Définir les contrôles par middleware, Gates et Policies. 
+16.	Expliquer quand utiliser create() / update() et les événements creating, created, saving, saved, updating, updated. 
+17.	Mettre à jour ensemble les diagrammes, champs, relations, contraintes, explications et inventaires. 
+Point 1 — Où seront enregistrés les comptes permettant de se connecter aux boutiques ?
+•	A — Comptes indépendants dans chaque boutique : chaque BDD boutique possède sa table users, ses mots de passe et ses rôles. Un même e-mail présent dans deux boutiques correspond à deux comptes indépendants. Le compte central du propriétaire reste séparé. 
+
+
+
+
+ajouter ou modifer ou imlementer : laravel morph relasionship ,
+
+une table media pour tout les tables   
+
+
+et avec ca ajoute plutôt  modifier Audit SaaS utiliser a ca place : https://spatie.be/docs/laravel-activitylog/v5/introduction  donc pareille comme avec les perms je veut utiliser avec ca laravel activitylog donc si jamais je peut modifier et adapter se que luis me donner avec se que jais déjà cets parfait comme avec les role et permision de spatie ont peut adapter sont shema de bdd et luis ajouter les truc que ont veut la cets pareille 
