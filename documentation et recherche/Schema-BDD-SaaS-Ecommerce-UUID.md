@@ -1,8 +1,8 @@
 # Schéma BDD — SaaS e-commerce algérien
 
-Version V4.2 consolidée du 29 septembre 2026 — application complète des demandes de « les modiff a efectuer le jours 4.txt » sur la version du schéma modifiée par le propriétaire du projet. Les recherches, notes Markdown, TXT et DOCX du dépôt sont utilisées comme ressources ; les décisions du jour 4 priment lorsqu’elles remplacent une ancienne architecture. Les comptes/permissions Spatie, Activity Log v5, PK numériques/UUID publics et les corrections d’abonnement/facture déjà présentes sont conservés. Diagrammes, champs, contraintes, parcours et inventaires sont harmonisés avec les transports, règles de boutique et registres locaux, le profil professionnel dans users et le retrait de la sauvegarde/restauration.
+Version V4.4 consolidée du 30 septembre 2026 — dernière fusion demandée : saas_invoices est désormais l’unique table centrale pour séquences, factures, avoirs, lignes, règles, transmissions, paiements et remboursements. Les neuf rôles sont distingués par record_type ; les FK deviennent des liens typés entre lignes de cette table. Les fonctionnalités, droits, plafonds, numérotation, historiques et preuves PDF de V4.3 restent prévus. Abonnements/échéances et wilayas/communes restent fusionnés ; le module central de rétention reste retiré. Seul ce document est modifié, sans migration SQL exécutée.
 
-Ce document contient **33 tables centrales et 83 tables par boutique**, dont theme_customizations réservée à une évolution. Les tables techniques Laravel et le stockage optionnel des passkeys sont exclus du décompte. Les cinq tables Spatie Permission et activity_log sont incluses ; les trois pivots natifs n’ont pas d’identifiant autonome. Les tableaux de traçabilité V4.1 et V4.2 détaillent les demandes antérieures préservées, les changements du jour 4 et leurs vérifications.
+Ce document contient **23 tables centrales et 83 tables par boutique**, dont theme_customizations réservée à une évolution. Les tables techniques Laravel et le stockage optionnel des passkeys sont exclus du décompte. Les cinq tables Spatie Permission et activity_log sont incluses ; les trois pivots natifs n’ont pas d’identifiant autonome. Les tableaux de traçabilité V4.1/V4.2/V4.3 conservent les demandes antérieures ; V4.4 complète la fusion financière et documente les neuf types de lignes.
 
 Les diagrammes sont répartis en modules pour rester exploitables. **Les champs, les références et les contraintes écrites font ensemble le schéma** : Mermaid ne peut pas imposer toutes les règles transactionnelles. Ce document n’est pas une migration SQL déjà exécutée.
 
@@ -24,14 +24,14 @@ Les diagrammes sont répartis en modules pour rester exploitables. **Les champs,
 | Remplacement | Remplacement ou échange après expédition via une nouvelle commande liée à un incident et à sa ligne d’origine ; jamais une seconde livraison sur la commande initiale. Plafonds communs avec les remboursements. Compensation d’échange affectée à une seule vente, sans portefeuille client. |
 | Stock | Physique vendable, réservé, quarantaine et disponible non négatifs. Pas de survente ni précommande au MVP ; pas de multi-entrepôts. |
 | Argent | Montant COD global par colis, mais prix/coût détaillés par ligne dans ta BDD. Encaissement et reversement distincts. |
-| Abonnement | Rattaché au propriétaire, avec `tenant_id` facultatif pour cibler explicitement une boutique ; paiements validés manuellement sur preuve/reçu ; arrêt demandé = fin de renouvellement et maintien des droits jusqu’à la fin de la période déjà payée, sauf décision administrative explicite. Aucun remboursement/décaissement automatique géré par le SaaS. Expiration payante → gratuit automatique, une boutique active, autres hors_quota, données conservées. Fonctionnalités, quotas et exceptions datées. |
+| Abonnement | Rattaché au propriétaire, tenant_id facultatif sur l’abonnement type 1 ; échéances type 2 dans la même table. Paiements et remboursements manuels à distance banque/CCP/BaridiMob, reçus PDF privés et validation centrale ; aucun ordre bancaire automatique. Arrêt = fin du renouvellement avec maintien des droits payés jusqu’au terme ; corrections/remboursements affectant les droits motivés et audités. Expiration → gratuit, une boutique active, autres hors_quota, données conservées. |
 | Administrateurs | Root complet sur l’administration centrale ; administrateurs délégués limitables par action et cible centrale. Aucun accès d’assistance aux boutiques et aucune usurpation de compte. |
 | Statistiques | Mesure interne des visiteurs et événements ; ventes/retours fondés sur les événements métier. Les corrections commerciales utilisent un événement économique finalisé avec date d’effet explicite. Aucun GA4 requis. |
 | Site | Un template, profil public, plusieurs adresses et liens sociaux. Personnalisation CSS encadrée plus tard. |
 | Documents | Contrats par révision acceptée, preuves de transmission, factures et avoirs à snapshots fiscaux ; séquences et preuves dans la BDD émettrice, génération du PDF idempotente et transmission après émission. |
 | Propriété | Propriétaire fixé à la création et immuable ; gestion délégable. |
 | Comptes transporteur | Comptes, secrets, tarifs, colis et reversements dans chaque BDD boutique ; même clé EcoTrack copiable entre boutiques du propriétaire, avec filtrage par colis local. |
-| Conservation | Politiques versionnées par catégorie, durées à faire valider ; purge/anonymisation contrôlée des données éligibles, protection des preuves encore requises. La fonctionnalité de sauvegarde/restauration est retirée du périmètre au jour 4. |
+| Sécurité et preuves | Module central de politiques/exécutions de rétention retiré ; dates d’expiration propres aux jetons/diagnostics et protections des pièces requises conservées. Sauvegarde/restauration SaaS hors périmètre depuis le jour 4. |
 
 **Modules métier conservés et adaptés au jour 4 :** confirmation téléphonique et conditions distinctes (T19/T21), preuve d’information données dans orders (T8), manquants (T9), incidents multi-causes (T18), lignage et identité physique des variantes (T2/T3/T7/T8), données personnelles et audit (C6/T15/T21/T26), facturation SaaS, créances transporteur (T16), obligations de facturation et échanges (T22), corrections économiques (T23), contrepassations exactes et plafonds, déploiements multi-BDD et validation de l’API DHD/EcoTrack. Les prescriptions des anciennes notes propres aux sauvegardes/restaurations sont remplacées par la décision du jour 4.
 
@@ -58,7 +58,7 @@ Chaque table métier possède `id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY` et
 
 Routes, API, formulaires, événements transmis, exports et ressources JSON utilisent uuid et *_uuid. Aucun id numérique (y compris model_id, subject_id, causer_id et les FK internes) n’est envoyé au client. Resource/DTO construit une liste de champs publics ; cacher uniquement id via $hidden ne suffit pas à masquer toutes les FK ou les tableaux JSON. Les liens entrants sont validés comme UUID puis résolus dans la BDD du contexte autorisé ; le service écrit leur id interne. Une route utilise `getRouteKeyName(): string { return 'uuid'; }`, sans remplacer la clé primaire Eloquent. UUID n’est jamais une autorisation.
 
-Une référence entre BDD utilise le **UUID externe** (`province_uuid → central.provinces.uuid`, `central_user_uuid → central.users.uuid`) ; elle est notée REF, sans FK SQL inter-BDD. L’id central du tenant reste interne à central ; son UUID initialise tenancy, les jobs et les chemins de fichiers. Ces références ne sont pas des jointures d’identité : comparer une PK numérique centrale à une PK numérique locale est interdit. Les codes ISO, codes stables de fonctionnalités, références transporteur et numéros de documents restent des codes métier distincts.
+Une référence entre BDD utilise le **UUID externe** (`province_uuid → central.geographic_areas.uuid`, `central_user_uuid → central.users.uuid`) ; elle est notée REF, sans FK SQL inter-BDD. L’id central du tenant reste interne à central ; son UUID initialise tenancy, les jobs et les chemins de fichiers. Ces références ne sont pas des jointures d’identité : comparer une PK numérique centrale à une PK numérique locale est interdit. Les codes ISO, codes stables de fonctionnalités, références transporteur et numéros de documents restent des codes métier distincts.
 
 Exemple de migration documentaire, sur la connexion du modèle :
 
@@ -172,11 +172,15 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `OverrideStatusEnum` | 1 ACTIVE ; 2 REVOKED ; 3 EXPIRED ; 4 CLOSED |
 | `SubscriptionStatusEnum` | 1 SCHEDULED ; 2 TRIAL ; 3 ACTIVE ; 4 EXPIRED ; 5 CANCELLED |
 | `InstallmentStatusEnum` | 1 PENDING ; 2 PARTIALLY_PAID ; 3 PAID ; 4 CANCELLED |
+| `SubscriptionRecordTypeEnum` | 1 SUBSCRIPTION ; 2 INSTALLMENT |
+| `SaasInvoiceRecordTypeEnum` | 1 SEQUENCE ; 2 INVOICE ; 3 CREDIT_NOTE ; 4 INVOICE_LINE ; 5 CREDIT_NOTE_LINE ; 6 RULE ; 7 DELIVERY ; 8 PAYMENT ; 9 REFUND |
+| `SaasTransferMethodEnum` | 1 BANK_TRANSFER ; 2 CCP_TRANSFER ; 3 BARIDIMOB ; 4 OTHER_MANUAL |
+| `SaasTransferStatusEnum` | 1 DECLARED ; 2 APPROVED ; 3 VERIFIED ; 4 REJECTED ; 5 CANCELLED ; 6 UNCERTAIN ; 7 REVERSED |
+| `SaasRefundReasonEnum` | 1 CREDIT_NOTE ; 2 OVERPAYMENT ; 3 DUPLICATE_TRANSFER ; 4 APPROVED_EXCEPTION |
 | `RemittanceBatchStatusEnum` | 1 DECLARED ; 2 VERIFIED ; 3 REVERSED |
 | `ExecutionStatusEnum` | 1 PENDING ; 2 RUNNING ; 3 SUCCEEDED ; 4 FAILED ; 5 CANCELLED |
 | `DeploymentOperationEnum` | 1 PROVISIONING ; 2 MIGRATION |
 | `PolicyStatusEnum` | 1 DRAFT ; 2 VALIDATED ; 3 ACTIVE ; 4 RETIRED |
-| `RetentionRunStatusEnum` | 1 PENDING ; 2 RUNNING ; 3 SUCCEEDED ; 4 FAILED ; 5 PARTIAL |
 | `DocumentStatusEnum` | 1 DRAFT ; 2 ISSUED ; 3 CANCELLED ; 4 PREPARING |
 | `DocumentDeliveryStatusEnum` | 1 PENDING ; 2 RUNNING ; 3 SENT ; 4 DELIVERED ; 5 RETRYABLE_FAILURE ; 6 PERMANENT_FAILURE ; 7 UNCERTAIN ; 8 CANCELLED |
 | `DocumentDeliveryChannelEnum` | 1 EMAIL ; 2 SMS_LINK ; 3 WHATSAPP_LINK ; 4 DOCUMENTED_HANDOFF |
@@ -201,7 +205,6 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `CommercialCorrectionStatusEnum` | 1 DRAFT ; 2 FINALIZED ; 3 CANCELLED ; 4 REVERSED |
 | `MediaVisibilityEnum` | 1 PUBLIC ; 2 PRIVATE |
 | `ActivityOriginEnum` | 1 USER ; 2 SYSTEM ; 3 CARRIER ; 4 JOB |
-| `DeploymentScopeEnum` | 1 CENTRAL ; 2 TENANT |
 | `DocumentTypeEnum` | 1 INVOICE ; 2 CREDIT_NOTE ; 3 ORDER_DOCUMENT ; 4 CONTRACT ; 5 DELIVERY_PROOF |
 | `ProductTypeEnum` | 1 STANDARD ; 2 CUSTOMIZED |
 | `OptionDisplayTypeEnum` | 1 SELECT ; 2 COLOR ; 3 BUTTON |
@@ -233,7 +236,6 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `TermsAcceptanceModeEnum` | 1 CHECKOUT ; 2 PHONE |
 | `CommercialCorrectionTypeEnum` | 1 RETURN ; 2 PRICE_REDUCTION ; 3 CANCELLATION ; 4 EXCHANGE ; 5 GOODWILL ; 6 REVERSAL ; 7 OTHER |
 | `NonProductKindEnum` | 1 NONE ; 2 SHIPPING ; 3 GLOBAL_GOODWILL ; 4 OTHER |
-| `ExpirationActionEnum` | 1 PURGE ; 2 ANONYMIZE ; 3 RETAIN |
 
 | Table.champ | Enum | Null permis |
 |---|---|---|
@@ -250,24 +252,25 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `permission_overrides.status` | `OverrideStatusEnum` | non |
 | `admin_restrictions.effect` | `RestrictionEffectEnum` | non |
 | `admin_restrictions.status` | `OverrideStatusEnum` | non |
-| `subscriptions.status` | `SubscriptionStatusEnum` | non |
-| `subscriptions.period` | `BillingPeriodEnum` | non |
-| `subscription_installments.status` | `InstallmentStatusEnum` | non |
+| `subscriptions.record_type` | `SubscriptionRecordTypeEnum` | non |
+| `subscriptions.status` | `SubscriptionStatusEnum` | oui hors type 1 |
+| `subscriptions.installment_status` | `InstallmentStatusEnum` | oui hors type 2 |
+| `subscriptions.period` | `BillingPeriodEnum` | oui hors type 1 |
 | `activity_log.origin` | `ActivityOriginEnum` | non |
 | `carrier_remittance_batches.status` | `RemittanceBatchStatusEnum` | non |
 | `tenant_schema_deployments.operation` | `DeploymentOperationEnum` | non |
 | `tenant_schema_deployments.status` | `ExecutionStatusEnum` | non |
 | `central.users.legal_verification_status` | `VerificationStatusEnum` | oui pour compte sans profil vendeur |
-| `retention_policies.scope` | `DeploymentScopeEnum` | non |
-| `retention_policies.expiration_action` | `ExpirationActionEnum` | non |
-| `retention_policies.status` | `PolicyStatusEnum` | non |
-| `retention_runs.status` | `RetentionRunStatusEnum` | non |
-| `saas_document_sequences.document_type` | `DocumentTypeEnum` | non |
-| `saas_invoices.status` | `DocumentStatusEnum` | non |
-| `saas_credit_notes.status` | `DocumentStatusEnum` | non |
-| `saas_document_deliveries.channel` | `DocumentDeliveryChannelEnum` | non |
-| `saas_document_deliveries.status` | `DocumentDeliveryStatusEnum` | non |
-| `saas_billing_rules.status` | `PolicyStatusEnum` | non |
+| `saas_invoices.record_type` | `SaasInvoiceRecordTypeEnum` | non |
+| `saas_invoices.document_type` | `DocumentTypeEnum` | oui hors compteur/en-têtes 1/2/3 |
+| `saas_invoices.status` | `DocumentStatusEnum` | oui hors en-têtes 2/3 |
+| `saas_invoices.policy_status` | `PolicyStatusEnum` | oui hors règle 6 |
+| `saas_invoices.channel` | `DocumentDeliveryChannelEnum` | oui hors envoi 7 |
+| `saas_invoices.delivery_status` | `DocumentDeliveryStatusEnum` | oui hors envoi 7 |
+| `saas_invoices.transfer_method` | `SaasTransferMethodEnum` | oui hors paiement/remboursement |
+| `saas_invoices.transfer_status` | `SaasTransferStatusEnum` | oui hors paiement/remboursement |
+| `saas_invoices.refund_reason` | `SaasRefundReasonEnum` | oui hors remboursement 9 |
+| `geographic_areas.type` | `GeoZoneTypeEnum` | non |
 | `billing_rules.status` | `PolicyStatusEnum` | non |
 | `processing_activity_register.status` | `PolicyStatusEnum` | non |
 | `media.visibility` | `MediaVisibilityEnum` | non |
@@ -344,7 +347,7 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 
 Les structures centrales et locales homonymes utilisent leurs enums dans la connexion concernée. Les enums ci-dessus formalisent les choix décrits dans les modules ; une extension métier passe par une nouvelle valeur et les contrôles correspondants, jamais par un changement silencieux de sens.
 
-**Champs qui restent textuels après vérification :** `name/guard_name` des packages ; `log_name`, `event`, `action` et `navigation_events.type` car leurs catalogues sont extensibles ; `content_pages.type` car le commerçant peut ajouter de nouveaux types/blocs de page sans migration ; `shop.business_type` car l’activité commerciale n’est pas une liste fermée ; `billing_rules.numbering_scope`, `saas_billing_rules.numbering_scope`, `retention_policies.data_type`, `personal_data_operations.operation_type/resource_type`, `shipment_events.event_type`, `carrier_fees.date_source`, `expenses.category` et les champs `source` externes car ce sont des codes métier/techniques extensibles ; états/codes bruts des transporteurs, MIME, locale, social network, SKU et fiscalité/forme juridique. Les booleans restent des booleans. Les montants et pourcentages restent DECIMAL. Conserver une chaîne lorsque le domaine n’est pas fermé ou que le package l’exige ; vérifier les valeurs autorisées au serveur.
+**Champs qui restent textuels après vérification :** `name/guard_name` des packages ; `log_name`, `event`, `action` et `navigation_events.type` car leurs catalogues sont extensibles ; `content_pages.type` car le commerçant peut ajouter de nouveaux types/blocs de page sans migration ; `shop.business_type` car l’activité commerciale n’est pas une liste fermée ; `billing_rules.numbering_scope`, `saas_invoices.numbering_scope`, `personal_data_operations.operation_type/resource_type`, `shipment_events.event_type`, `carrier_fees.date_source`, `expenses.category` et les champs `source` externes car ce sont des codes métier/techniques extensibles ; états/codes bruts des transporteurs, MIME, locale, social network, SKU et fiscalité/forme juridique. Les booleans restent des booleans. Les montants et pourcentages restent DECIMAL. Conserver une chaîne lorsque le domaine n’est pas fermé ou que le package l’exige ; vérifier les valeurs autorisées au serveur.
 
 ### 3.4 Connexions et isolation
 
@@ -690,7 +693,7 @@ Les invitations d’équipe ont été déplacées intégralement en T24. La raci
 
 **`plan_features` — Indique ce que chaque offre permet et ses limites. Exemple : l’offre Gratuit autorise 1 boutique et l’offre Pro en autorise 3.**
 
-**`subscriptions` — Indique l’offre d’un propriétaire, sa période d’utilisation et, si nécessaire, la boutique ciblée par `tenant_id`. Exemple : Karim possède un abonnement Pro ; `tenant_id` peut préciser une boutique particulière, sinon l’abonnement reste au niveau du propriétaire.**
+**`subscriptions` — Une seule table contient les abonnements et leurs échéances. Une ligne de type 1 décrit « Karim a le plan Pro ». Ses lignes de type 2 décrivent « Karim doit payer 3 000 DA pour septembre », puis octobre, etc. Les échéances gardent leurs propres UUID, montants, dates et états ; elles ne remplacent pas la ligne d’abonnement. tenant_id reste facultatif sur l’abonnement et désigne une boutique du même propriétaire.**
 
 **`feature_overrides` — Un changement particulier aux possibilités ou aux limites habituelles de l’abonnement. Exemple : autoriser temporairement Karim à tester une fonction normalement absente de son offre.**
 
@@ -724,20 +727,28 @@ erDiagram
     subscriptions {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        bigint_unsigned user_id FK "users.id"
-        bigint_unsigned tenant_id FK "nullable ; tenants.id ; boutique cible si l'abonnement est spécifique"
-        bigint_unsigned plan_id FK "plans.id"
-        tinyint_unsigned status "SubscriptionStatusEnum"
-        tinyint_unsigned period "BillingPeriodEnum"
-        decimal agreed_amount
-        datetime started_at
-        datetime period_starts_at
-        datetime period_ends_at "nullable"
-        datetime trial_ends_at "nullable"
-        datetime ended_at "nullable"
-        boolean auto_renew
-        bigint_unsigned assigned_by_id FK "nullable pour attribution systeme ; users.id"
-        varchar operation_key
+        tinyint_unsigned record_type "SubscriptionRecordTypeEnum ; NOT NULL"
+        bigint_unsigned user_id FK "users.id ; proprietaire des deux types"
+        bigint_unsigned parent_subscription_id FK "nullable ; subscriptions.id ; obligatoire pour echeance"
+        tinyint_unsigned parent_record_type "generated STORED ; 1 pour echeance, sinon NULL"
+        bigint_unsigned tenant_id FK "nullable ; tenants.id ; abonnement seulement"
+        bigint_unsigned plan_id FK "nullable ; plans.id ; abonnement seulement"
+        tinyint_unsigned status "nullable ; SubscriptionStatusEnum ; abonnement seulement"
+        tinyint_unsigned period "nullable ; BillingPeriodEnum ; abonnement seulement"
+        decimal agreed_amount "nullable ; abonnement seulement"
+        datetime started_at "nullable ; abonnement seulement"
+        datetime period_starts_at "requis ; periode de droit ou periode facturee"
+        datetime period_ends_at "nullable pour abonnement gratuit ; requis pour echeance"
+        datetime trial_ends_at "nullable ; abonnement seulement"
+        datetime ended_at "nullable ; abonnement seulement"
+        boolean auto_renew "nullable ; abonnement seulement"
+        bigint_unsigned assigned_by_id FK "nullable ; users.id ; attribution abonnement"
+        varchar(191) installment_number UK "nullable ; echeance seulement"
+        decimal installment_amount "nullable ; echeance seulement ; DZD"
+        datetime due_at "nullable ; echeance seulement"
+        tinyint_unsigned installment_status "nullable ; InstallmentStatusEnum ; echeance seulement"
+        tinyint_unsigned active_owner_slot "generated STORED ; 1 si record_type=1 et status=3, sinon NULL"
+        varchar(191) operation_key UK
         datetime created_at
         datetime updated_at
     }
@@ -759,7 +770,8 @@ erDiagram
     plans ||--o{ plan_features : plan_id
     users ||--o{ subscriptions : user_id
     tenants |o--o{ subscriptions : tenant_id
-    plans ||--o{ subscriptions : plan_id
+    plans |o--o{ subscriptions : plan_id
+    subscriptions |o--o{ subscriptions : parent_subscription_id
 ```
 
 #### Explication très simple des champs
@@ -790,26 +802,19 @@ erDiagram
 - **`created_at`** : la date où cette ligne a été créée dans la base.
 - **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
 
-**`subscriptions` :**
+**subscriptions, explication des champs fusionnés :**
 
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`user_id`** : l’identifiant du propriétaire central auquel l’abonnement appartient.
-- **`tenant_id`** : l’identifiant de la boutique concernée quand l’abonnement ou l’option est ciblé sur une boutique précise. Il peut rester vide pour un abonnement porté au niveau du propriétaire. Lorsqu’il est renseigné, cette boutique doit appartenir à `user_id`.
-- **`plan_id`** : l’identifiant du plan d’abonnement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`status`** : code entier de l’enum propre à cet objet, défini au §3.3 ; les libellés sont traduits à l’affichage et les transitions contrôlées par le service.
-- **`period`** : indique la durée choisie pour l’abonnement payant. Exemple : `mensuel` pour payer par mois ou `annuel` pour payer par année, selon les valeurs prévues par le SaaS.
-- **`agreed_amount`** : le montant qui a été décidé pour cet abonnement, afin de garder le prix réellement accepté même si le tarif du plan change plus tard.
-- **`started_at`** : la date et l’heure où la période ou l’action commence.
-- **`period_starts_at`** : le début de la période concernée. Exemple : début du mois payé.
-- **`period_ends_at`** : la fin de la période concernée. Exemple : fin du mois payé. Peut rester vide lorsque la période n’a pas de fin prévue.
-- **`trial_ends_at`** : la date où la période d’essai se termine. Elle peut rester vide s’il n’y a pas d’essai.
-- **`ended_at`** : la date et l’heure où elle s’est terminée. Peut rester vide tant que ce n’est pas terminé.
-- **`auto_renew`** : indique si l’abonnement payant doit être renouvelé automatiquement selon la règle prévue. `false` signifie qu’on ne prépare pas un nouveau renouvellement payant.
-- **`assigned_by_id`** : l’identifiant de la personne qui a donné ce droit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`operation_key`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
-- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+| Groupe | Contenu |
+|---|---|
+| id, uuid, record_type | Identité propre et nature de la ligne : 1 SUBSCRIPTION ou 2 INSTALLMENT |
+| user_id | Propriétaire central ; identique entre une échéance et son abonnement |
+| parent_subscription_id, parent_record_type | L’échéance retrouve son abonnement parent, obligatoirement de type 1 ; NULL pour l’abonnement |
+| tenant_id, plan_id | Boutique ciblée facultative et offre choisie, seulement sur la ligne abonnement ; une échéance les obtient depuis son parent |
+| status, period, agreed_amount | État du droit, durée mensuelle/annuelle et prix convenu de l’abonnement |
+| started_at, period_starts_at, period_ends_at, trial_ends_at, ended_at | Début/fin du droit ou période de dette ; essai et clôture seulement sur l’abonnement |
+| auto_renew, assigned_by_id | Préparation du prochain renouvellement payant et auteur de l’attribution ; aucun prélèvement bancaire automatique |
+| installment_number, installment_amount, due_at, installment_status | Numéro de dette unique, montant dû, date limite et état PENDING/PARTIALLY_PAID/PAID/CANCELLED de chaque échéance |
+| active_owner_slot, operation_key, created_at, updated_at | Une seule attribution active par propriétaire, déduplication des créations/renouvellements et historique technique |
 
 **`feature_overrides` :**
 
@@ -835,19 +840,23 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 - **`plan_features` :** Une fonctionnalité ne peut apparaître qu’une seule fois dans un même plan. Pour un quota : `is_active=false` signifie que la fonction est interdite ; `is_active=true` avec `limit=NULL` signifie qu’elle est illimitée ; sinon `limit` contient le maximum autorisé et doit être positif ou nul. Pour une fonctionnalité oui/non, `limit` reste vide. Si une fonctionnalité n’apparaît pas dans le plan, elle est considérée comme désactivée. Quand un plan a déjà été utilisé, ces règles restent figées avec cette version du plan.
 
-- **`subscriptions` :** Un abonnement payant est attribué manuellement par un administrateur autorisé. `tenant_id` est facultatif : NULL signifie portée propriétaire ; lorsqu’il est renseigné, la relation `(tenant_id,user_id) → tenants(id,user_id)` garantit que la boutique appartient au même propriétaire. Le plan gratuit est donné automatiquement lors de la création du compte et après la fin d’un abonnement payant. Le SaaS ne prélève pas automatiquement l’argent et ne rembourse pas automatiquement : les paiements sont vérifiés dans `saas_invoices`. Si le commerçant demande l’arrêt, on coupe seulement le prochain renouvellement payant ; il garde les droits jusqu’à la fin de la période qu’il a déjà payée. On garde la trace de cette demande. Changer de formule crée une nouvelle attribution au bon moment au lieu de réécrire l’ancien abonnement. `auto_renew=false` signifie seulement « ne pas renouveler le payant » ; cela n’empêche pas le passage automatique au gratuit. Les statuts utilisent exactement `SubscriptionStatusEnum` : `1 SCHEDULED`, `2 TRIAL`, `3 ACTIVE`, `4 EXPIRED`, `5 CANCELLED`. `operation_key` est unique afin qu’un retry ne crée pas deux abonnements. Un propriétaire ne peut avoir qu’un seul abonnement actif à la fois. Pour activer un nouveau plan, on verrouille son compte, on ferme l’ancien abonnement puis on active le nouveau dans la même transaction. Les droits ne sont valables que si le statut est actif ET si la date actuelle se trouve dans la période autorisée ; le système ne dépend donc pas d’un cron pour savoir qu’un abonnement est fini. À l’expiration du payant, on crée le gratuit une seule fois, puis les boutiques qui dépassent le nouveau quota passent `hors_quota` sans supprimer leurs données. Les montants et périodes historiques restent conservés.
+- **subscriptions — types et rattachements :** record_type=1 SUBSCRIPTION ou 2 INSTALLMENT est immuable. UNIQUE(id,user_id,record_type), UNIQUE(id,parent_subscription_id,user_id,record_type), UNIQUE(user_id,active_owner_slot), UNIQUE(installment_number) hors NULL et UNIQUE(operation_key). parent_record_type est GENERATED ALWAYS AS (CASE WHEN record_type=2 THEN 1 ELSE NULL END) STORED. La FK(parent_subscription_id,user_id,parent_record_type) → subscriptions(id,user_id,record_type) impose le même propriétaire et un vrai abonnement parent. Pour type 1 : parent_subscription_id=NULL, plan_id/status/period/agreed_amount/started_at/auto_renew requis et tous les champs installment_* / due_at NULL. Pour type 2 : parent_subscription_id/parent_record_type/installment_number/installment_amount/due_at/installment_status requis ; tenant_id/plan_id/status/period/agreed_amount/started_at/trial_ends_at/ended_at/auto_renew/assigned_by_id NULL. Les états restent deux enums distincts. Les références à un abonnement ciblent toujours type 1, jamais une échéance ; tenant_id facultatif reste protégé par FK(tenant_id,user_id) → tenants(id,user_id).
+
+**Abonnement et droits inchangés :** attribution payante par un administrateur autorisé, gratuit à la création et à l’expiration du payant, historique des anciennes attributions, arrêt du renouvellement sans perdre une période déjà payée. Verrouiller users du propriétaire puis l’abonnement avant activation/rétrogradation ; fermer l’ancien type 1 avant d’activer le nouveau, avec UNIQUE(user_id,active_owner_slot) où active_owner_slot=1 uniquement pour type 1/status=3. Dates [period_starts_at,period_ends_at), droits contrôlés à chaque action sans dépendre d’un cron. Les requêtes de plan/quota/gratuit et les modèles Eloquent d’abonnement filtrent impérativement record_type=1. Les comptes, permissions, quotas et choix des boutiques restent ceux de §7.
+
+**Échéances dans la même table :** un abonnement peut avoir autant de lignes type 2 que nécessaire ; ne pas écraser septembre par octobre. installment_number reste globalement unique ; installment_amount>=0, period_ends_at>period_starts_at et due_at non NULL. Une occurrence utilise une operation_key stable contenant le UUID de l’abonnement et la période/occurrence. Deux occurrences commerciales distinctes peuvent couvrir la même période, par exemple une option, mais leurs clés sont différentes. Échéance et intention de facture sont écrites dans une transaction centrale ; un balayage retrouve les types 2 sans facture attendue et reprend avec la même clé. La FK d’une facture vers son échéance conserve le parent abonnement et le propriétaire exacts (C8/§6.7).
+
+**État du dû :** installment_status est une projection reconstruisible depuis factures/avoirs émis et virements vérifiés C8. Le montant initial de dette et sa période restent historiques ; un avoir réduit le dû documenté, un paiement prouvé l’acquitte, un remboursement diminue les fonds conservés. Une annulation d’échéance exige que ses pièces et obligations soient traitées, sans effacer facture ou paiement. Sous les mêmes verrous, 1 PENDING avant règlement, 2 PARTIALLY_PAID pour une part acquittée, 3 PAID lorsque le dû net est soldé, 4 CANCELLED pour dette annulée ; zéro dû documenté est soldé sans inventer un paiement. L’échéance ne se confond jamais avec le document ni avec l’argent transféré.
+
+**Modèles logiques :** Subscription (type 1) et SubscriptionInstallment (type 2) utilisent tous deux subscriptions et la connexion centrale, avec scopes, créations typées et Policies distincts. Une route de plan refuse le UUID d’une échéance. Les Resource publient des UUID ; les lignes de type 2 ne créent pas un deuxième abonnement actif. Paiement client et remboursement admin s’effectuent à distance hors application, puis sont déclarés/vérifiés avec preuve PDF dans C8 ; aucun virement automatique n’est supposé.
 
 - **`feature_overrides` :** Une exception change temporairement une fonctionnalité pour un propriétaire ou pour une boutique. Sa période commence à `started_at` et s’arrête avant `expires_at` lorsqu’une date de fin existe. `is_active=false` peut servir à interdire une fonction pendant cette période ; ce champ ne dit pas si l’exception est « expirée ». Deux exceptions qui concernent le même propriétaire, la même fonctionnalité et le même contexte ne doivent pas se chevaucher dans le temps. Pour éviter les collisions, on verrouille le propriétaire, on vérifie les périodes existantes puis on écrit le changement dans la même transaction. `tenant_id=NULL` signifie que l’exception concerne tout le compte. Une exception de boutique est plus précise et passe avant l’exception du compte, qui passe elle-même avant le plan. Si un quota est défini au niveau du compte, on n’autorise pas une exception au niveau d’une seule boutique. La boutique indiquée doit réellement appartenir à ce propriétaire. Les changements de dates sont audités et on ne réécrit pas une ancienne période déjà utilisée.
 
-### C5 — Suivi SaaS et référentiel
+### C5 — Suivi SaaS et référentiel géographique fusionné
 
-**`feature_usage` — Compte certaines utilisations quand un compteur est nécessaire pour vérifier une limite. Exemple : suivre le nombre d’utilisations d’une fonction pendant un mois. Le nombre de boutiques se calcule depuis les boutiques existantes.**
+**feature_usage** conserve les quantités utilisées pour une fonctionnalité et une période. Le nombre réel de boutiques reste calculé depuis tenants ; ce compteur ne remplace pas cette autorité.
 
-**`subscription_installments` — Les sommes que le commerçant doit payer pour son abonnement SaaS. Exemple : Karim doit payer 3 000 DA pour une période. La facture et la validation du paiement sont enregistrées dans l’unique table `saas_invoices` de C9.**
-
-**`provinces` — La liste des wilayas, commune à toutes les boutiques. Exemple : Alger peut être sélectionnée dans une adresse de livraison.**
-
-**`municipalities` — La liste des communes et la wilaya de chacune. Exemple : vérifier que la commune choisie appartient bien à la wilaya indiquée, sans vérifier l’existence de la maison.**
+**geographic_areas** remplace les deux listes séparées de wilayas et communes. Une ligne type=1 est une wilaya ; une ligne type=2 est une commune reliée à sa wilaya. Toutes gardent leurs noms, codes, UUID publics, source, version et date d’effet. Le pays provient de countries.
 
 ```mermaid
 erDiagram
@@ -864,23 +873,15 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
-    subscription_installments {
+    geographic_areas {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        bigint_unsigned subscription_id FK "subscriptions.id"
-        varchar number
-        datetime period_starts_at
-        datetime period_ends_at
-        decimal amount
-        datetime due_at
-        tinyint_unsigned status "InstallmentStatusEnum"
-        datetime created_at
-        datetime updated_at
-    }
-    provinces {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        varchar code
+        bigint_unsigned country_id FK "countries.id"
+        tinyint_unsigned type "GeoZoneTypeEnum"
+        bigint_unsigned parent_id FK "nullable ; geographic_areas.id ; wilaya de la commune"
+        tinyint_unsigned parent_type "generated STORED ; 1 pour commune, sinon NULL"
+        bigint_unsigned parent_key "generated STORED ; COALESCE(parent_id,0)"
+        varchar(32) code
         varchar name_fr
         varchar name_ar "nullable"
         boolean is_active
@@ -891,97 +892,17 @@ erDiagram
         datetime updated_at
         datetime deleted_at "nullable"
     }
-    municipalities {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        bigint_unsigned province_id FK "provinces.id"
-        varchar code
-        varchar name_fr
-        varchar name_ar "nullable"
-        boolean is_active
-        varchar reference_source
-        date effective_at
-        varchar reference_version
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
-    }
-    provinces ||--o{ municipalities : province_id
+    countries ||--o{ geographic_areas : country_id
+    geographic_areas |o--o{ geographic_areas : parent_id
 ```
 
-#### Explication très simple des champs
+**Contraintes :** UNIQUE(id,country_id,type), UNIQUE(country_id,type,parent_key,code). parent_type=CASE WHEN type=2 THEN 1 ELSE NULL END, et parent_key=COALESCE(parent_id,0), deux colonnes GENERATED STORED. Pour une wilaya, parent_id=NULL ; pour une commune, parent_id et parent_type non NULL. FK(parent_id,country_id,parent_type) → geographic_areas(id,country_id,type) : une commune appartient obligatoirement à une wilaya du même pays, jamais à une autre commune. type/country_id/parent_id et identités géographiques utilisées sont immuables ; un changement administratif produit une évolution explicite et conserve les références historiques. Le contrôle de forme exige exactement ces valeurs NULL/non NULL et refuse l’auto-rattachement ; les parents d’un autre type rendent un cycle impossible.
 
-**`feature_usage` :**
+**Même sélection d’adresses :** liste des wilayas WHERE country_id=DZ et type=1 ; communes WHERE type=2 et parent_id=wilaya.id. Les champs locaux province_uuid et municipality_uuid restent lisibles et gardent leur sens métier ; ils référencent désormais geographic_areas.uuid avec contrôle du type 1/2 et de l’appartenance, sans FK SQL entre BDD. Accepter seulement les zones actives pour une nouvelle adresse ; une adresse/doc historique conserve ses noms/codes et références. Le code postal reste distinct du code de commune. Les mappings de transporteur restent locaux T11 et ne remplacent pas cette hiérarchie officielle.
 
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`user_id`** : l’identifiant du propriétaire. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`feature_id`** : l’identifiant de la fonctionnalité. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`period_starts_at`** : le début de la période concernée. Exemple : début du mois payé.
-- **`period_ends_at`** : la fin de la période concernée. Exemple : fin du mois payé. Peut rester vide lorsque la période n’a pas de fin prévue.
-- **`quantity`** : le nombre d’éléments concernés. Exemple : `2` signifie deux unités du produit.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
-- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+**Import et histoire :** seed DZ par countries.code, sans id numérique codé en dur. Utiliser les annexes officielles [S10] de la version de référentiel retenue ; aucun plafond 58/69 ni nombre de lignes figé en contrainte. Importer les wilayas avant leurs communes ; vérifier code/parent/pays et garder reference_source/reference_version/effective_at. Les noms et codes envoyés aux transporteurs suivent leur mapping vérifié, pas un code géographique deviné.
 
-**`subscription_installments` :**
-
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`subscription_id`** : l’identifiant de l’abonnement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`number`** : le numéro lisible de l’élément. Exemple : numéro d’échéance ou de facture selon la table.
-- **`period_starts_at`** : le début de la période concernée. Exemple : début du mois payé.
-- **`period_ends_at`** : la fin de la période concernée. Exemple : fin du mois payé. Peut rester vide lorsque la période n’a pas de fin prévue.
-- **`amount`** : la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA.
-- **`due_at`** : la date et l’heure liées à **exigible**. Elle permet de savoir exactement quand cette étape a eu lieu.
-- **`status`** : code entier de l’enum propre à cet objet, défini au §3.3 ; les libellés sont traduits à l’affichage et les transitions contrôlées par le service.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
-- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
-
-
-**`provinces` :**
-
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`code`** : le petit nom utilisé par le programme pour reconnaître l’élément. Exemple : `boutiques.nombre` ou `product.create`.
-- **`name_fr`** : le nom en français.
-- **`name_ar`** : le nom en arabe. Il peut rester vide si cette traduction n’est pas encore renseignée.
-- **`is_active`** : indique si cette possibilité est autorisée. `true` = oui, `false` = non.
-- **`reference_source`** : indique d’où vient la liste officielle utilisée. Exemple : le texte officiel ayant servi à importer les wilayas.
-- **`effective_at`** : la date à partir de laquelle l’information ou la correction doit compter. Exemple : une correction enregistrée aujourd’hui peut devoir compter pour la vente d’hier.
-- **`reference_version`** : indique quelle version de cette liste officielle a été utilisée.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
-- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
-- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
-
-**`municipalities` :**
-
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`province_id`** : l’identifiant de la wilaya. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`code`** : le petit nom utilisé par le programme pour reconnaître l’élément. Exemple : `boutiques.nombre` ou `product.create`.
-- **`name_fr`** : le nom en français.
-- **`name_ar`** : le nom en arabe. Il peut rester vide si cette traduction n’est pas encore renseignée.
-- **`is_active`** : indique si cette possibilité est autorisée. `true` = oui, `false` = non.
-- **`reference_source`** : indique d’où vient la liste officielle utilisée. Exemple : le texte officiel ayant servi à importer les wilayas.
-- **`effective_at`** : la date à partir de laquelle l’information ou la correction doit compter. Exemple : une correction enregistrée aujourd’hui peut devoir compter pour la vente d’hier.
-- **`reference_version`** : indique quelle version de cette liste officielle a été utilisée.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
-- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
-- **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
-
-
-
-Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
-
-- **`feature_usage` :** Pour une même fonctionnalité, un même propriétaire, un même contexte et une même période, il n’existe qu’un seul compteur. Sa mise à jour doit être atomique : deux requêtes en même temps ne doivent pas pouvoir dépasser le quota. Quand on vérifie `boutiques.nombre` pour créer une nouvelle boutique, on compte toutes les boutiques non supprimées du propriétaire, même celles qui sont `hors_quota`, en cours de création, suspendues ou en échec récupérable. On verrouille le propriétaire pendant ce contrôle. Si un plan devient plus petit, on ne supprime pas les boutiques en trop : on garde seulement jusqu’au quota comme actives et les autres passent `hors_quota`. Un échec récupérable continue de prendre une place tant qu’on n’a pas explicitement abandonné cette création. On n’entretient pas un deuxième compteur séparé du vrai nombre de boutiques. Un membre d’équipe utilise toujours les quotas du propriétaire de sa boutique.
-
-- **`subscription_installments` :** Chaque échéance possède un `number` unique. Les montants sont en DZD. Son état `PENDING`, `PARTIALLY_PAID`, `PAID` ou `CANCELLED` se calcule à partir des factures/paiements réellement validés dans `saas_invoices`. Cette table dit simplement « combien le commerçant doit payer » ; la facture correspondante est `saas_invoices`.
-
-
-- **`provinces` :** Chaque `code` de wilaya est unique. Le référentiel initial doit venir des annexes officielles citées en [S10], avec 69 wilayas et 1 541 communes dans la version utilisée par ce document. On garde aussi la source, la version et la date d’effet du référentiel. Il ne faut jamais coder en dur « maximum 58 » ni obliger la table à contenir exactement 69 lignes, car le découpage administratif peut évoluer. Les codes utilisés par un transporteur restent séparés des codes officiels.
-
-- **`municipalities` :** Dans une même wilaya, deux communes ne peuvent pas avoir le même `code`. Quand une commune est choisie, on vérifie qu’elle appartient bien à la wilaya indiquée. Le code postal ne remplace pas l’identifiant de la commune : deux notions différentes restent deux informations différentes.
+**feature_usage :** UNIQUE(user_id,feature_id,tenant normalisé,period_starts_at), quantity>=0 et fin NULL ou >début ; FK(tenant_id,user_id) → tenants(id,user_id). Utilisation par propriétaire ou boutique selon features.quota_scope. Mise à jour atomique/idempotente sous le verrou de quota approprié, périodes non chevauchantes. Les compteurs ne sont pas une copie des commandes ou des comptes locaux.
 
 ### C6 — Activités centrales avec Spatie Laravel Activity Log v5
 
@@ -1089,408 +1010,206 @@ erDiagram
 
 
 
-### C8 — Politiques et exécutions de conservation
-
-**`retention_policies` — Les règles qui indiquent combien de temps garder chaque catégorie de données et quoi faire ensuite. Exemple : supprimer certaines données à la fin d’une durée validée.**
-
-**`retention_runs` — L’historique des opérations qui appliquent ces règles de conservation. Exemple : une tâche a traité des données anciennes et indique combien de lignes ont été traitées ou ignorées.**
-
-```mermaid
-erDiagram
-    direction TB
-    retention_policies {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        varchar data_type
-        tinyint_unsigned scope "DeploymentScopeEnum"
-        int version
-        int duration_days "nullable seulement si duree conditionnelle justifiee"
-        varchar start_event
-        tinyint_unsigned expiration_action "ExpirationActionEnum"
-        text justification_basis
-        varchar implementation_version
-        tinyint_unsigned status "PolicyStatusEnum"
-        datetime effective_at "nullable"
-        datetime reviewed_at "nullable"
-        bigint_unsigned validated_by_id FK "nullable ; users.id"
-        datetime created_at
-    }
-    retention_runs {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        bigint_unsigned policy_id FK "retention_policies.id"
-        bigint_unsigned tenant_id FK "nullable ; tenants.id"
-        varchar operation_key UK
-        tinyint_unsigned status "RetentionRunStatusEnum"
-        datetime started_at "nullable"
-        datetime ended_at "nullable"
-        bigint rows_count
-        bigint files_count
-        bigint skipped_count
-        json resume_cursor "nullable sans donnees personnelles"
-        varchar error_code "nullable"
-        text sanitized_error "nullable"
-        datetime created_at
-        datetime updated_at
-    }
-    retention_policies ||--o{ retention_runs : policy_id
-```
-
-#### Explication très simple des champs
 
 
-**`retention_policies` :**
+### C8 — Facturation, règles, transmissions, paiements et remboursements SaaS : une seule table
 
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`data_type`** : le type de données concerné par la règle. Exemple : données de commande ou données de contact.
-- **`scope`** : indique dans quel endroit la règle s’applique. Exemple : `plateforme` pour l’administration du SaaS ou `tenant` pour une boutique.
-- **`version`** : le numéro de version de cet élément. Exemple : version 1, puis version 2 après une évolution ; l’ancienne version peut rester conservée pour comprendre l’historique.
-- **`duration_days`** : le nombre de jours pendant lesquels les données doivent être gardées lorsque la règle utilise une durée fixe. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`start_event`** : l’événement à partir duquel on commence à compter la durée. Exemple : fermeture d’une commande.
-- **`expiration_action`** : ce qu’il faut faire à la fin de la durée. Exemple : supprimer, anonymiser ou conserver si une raison validée l’exige.
-- **`justification_basis`** : le texte qui explique pourquoi cette règle de conservation existe.
-- **`implementation_version`** : la version du traitement informatique qui applique cette règle.
-- **`status`** : code entier de l’enum propre à cet objet, défini au §3.3 ; les libellés sont traduits à l’affichage et les transitions contrôlées par le service.
-- **`effective_at`** : la date à partir de laquelle cette version devient réellement applicable. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`reviewed_at`** : la date prévue ou réalisée pour revoir cette règle. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`validated_by_id`** : l’identifiant de la personne qui a validé. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
+**saas_invoices fusionne toute la facturation et les opérations financières du SaaS dans une seule table physique.** Une ligne porte un seul rôle, distingué par record_type : compteur, facture, avoir, ligne, règle, transmission, paiement ou remboursement. Une facture garde plusieurs lignes, paiements et avoirs ; un paiement peut financer plusieurs remboursements partiels. Les liens sont des FK numériques vers d’autres lignes de cette même table, avec type et propriétaire contrôlés. Les UUID publics, les pièces PDF privées, l’historique et les fonctionnalités prévus restent conservés. La BDD de chaque boutique garde sa facturation locale indépendante.
 
-**`retention_runs` :**
+| record_type | Ce que contient la ligne |
+|---|---|
+| 1 SEQUENCE | Compteur d’une série facture/avoir pour un exercice |
+| 2 INVOICE | En-tête d’une facture SaaS : propriétaire, abonnement, échéance, identité, totaux et PDF |
+| 3 CREDIT_NOTE | En-tête d’un avoir qui réduit la facture d’origine, avec motif et totaux |
+| 4 INVOICE_LINE | Une ligne détaillée de facture : description, quantité, prix, remise, HT/taxes/TTC |
+| 5 CREDIT_NOTE_LINE | Une ligne d’avoir reliée à son avoir et à la vraie ligne de facture corrigée |
+| 6 RULE | Une version de règle qui décide quand/comment émettre une facture SaaS |
+| 7 DELIVERY | Une transmission de facture ou avoir à un destinataire, avec canal et suivi des tentatives |
+| 8 PAYMENT | Un paiement reçu à distance du propriétaire, déclaré puis vérifié sur preuve |
+| 9 REFUND | Un remboursement effectué à distance par un administrateur, avec paiement source et preuve |
 
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`policy_id`** : l’identifiant de la règle de conservation. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`operation_key`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
-- **`status`** : code entier de l’enum propre à cet objet, défini au §3.3 ; les libellés sont traduits à l’affichage et les transitions contrôlées par le service.
-- **`started_at`** : la date et l’heure où la période ou l’action commence. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`ended_at`** : la date et l’heure où elle s’est terminée. Peut rester vide tant que ce n’est pas terminé.
-- **`rows_count`** : le nombre de lignes de base traitées par l’opération.
-- **`files_count`** : le nombre de fichiers traités par l’opération.
-- **`skipped_count`** : le nombre d’éléments laissés de côté parce qu’ils ne pouvaient pas encore être supprimés ou traités.
-- **`resume_cursor`** : une petite information technique qui indique où reprendre après une coupure, sans recommencer tout le travail depuis le début. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`error_code`** : un petit code qui permet de reconnaître le type d’erreur sans stocker un long message sensible. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`sanitized_error`** : un message d’erreur nettoyé pour ne pas enregistrer de mot de passe, jeton ou autre secret. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
-- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
-
-
-
-- `retention_policies` : UNIQUE(data_type,scope,version). `scope=1 CENTRAL | 2 TENANT` (`DeploymentScopeEnum`) ; `expiration_action=1 PURGE | 2 ANONYMIZE | 3 RETAIN` (`ExpirationActionEnum`) ; `status=1 DRAFT | 2 VALIDATED | 3 ACTIVE | 4 RETIRED` (`PolicyStatusEnum`). Durée positive lorsqu’elle existe ; `RETAIN` exige un fondement et une date/condition de revue, jamais « pour toujours » par défaut. La définition appliquée est immuable ; nouvelle version pour toute évolution. La version applicable à une exécution est choisie explicitement selon effective_at et enregistrée dans policy_id ; une seule version courante résolue par catégorie/portée. L’implémentation est une allowlist de traitements serveur, pas du SQL administrable. Les durées ne sont pas inventées ici : elles sont validées avant collecte réelle.
-- `retention_runs` : scope central → tenant NULL ; scope tenant → tenant obligatoire, vérifié côté service. `status=1 PENDING | 2 RUNNING | 3 SUCCEEDED | 4 FAILED | 5 PARTIAL` (`RetentionRunStatusEnum`) ; UNIQUE(operation_key), clé déterministe politique/tenant/fenêtre. Le lot local est idempotent, son ACK central peut être repris ; compteurs reconstruits depuis les lots techniques persistés, pas incrémentés aveuglément après un crash. Pas de copie des données effacées dans le journal. Les exécutions centrales n’ont accès qu’au tenant annoncé ; reprise avec curseur stable. Voir section 12 pour les dépendances et gels de conservation.
-
-
-
-### C9 — Facturation du SaaS au commerçant
-
-**`saas_document_sequences` — Les compteurs qui donnent les prochains numéros aux factures et aux avoirs du SaaS. Exemple : deux factures d’abonnement créées en même temps doivent recevoir des numéros différents.**
-
-**`saas_invoices` — Les factures du SaaS adressées aux commerçants pour leurs abonnements ou options. Exemple : la facture de l’abonnement Pro de Karim ; ce n’est pas une facture pour un produit vendu dans sa boutique.**
-
-**`saas_invoice_lines` — Le détail de ce qui est facturé au commerçant. Exemple : une ligne pour l’abonnement et une autre pour une option, avec leurs prix et leurs taxes.**
-
-**`saas_credit_notes` — Les documents qui corrigent à la baisse une facture du SaaS déjà émise. Exemple : retirer un montant facturé en trop. Un avoir ne prouve pas que de l’argent a été remboursé.**
-
-**`saas_credit_note_lines` — Le détail des éléments corrigés sur une facture du SaaS. Exemple : préciser quelle option avait été facturée en trop et de combien son montant est réduit.**
-
-**`saas_document_deliveries` — Le suivi de l’envoi des factures et des avoirs aux commerçants. Exemple : la facture de Karim est en attente d’envoi, envoyée ou en échec.**
-
-Cette facturation est indépendante des ventes de chaque boutique. La table demandée autrefois sous le nom `reglements_abonnement` est désormais nommée **`saas_invoices`** : aucune seconde table de paiement d’abonnement n’est créée. Une échéance reste le montant dû pour une période ; `saas_invoices` porte la facture et les informations nécessaires à la vérification manuelle de son paiement. La règle d’émission SaaS est versionnée dans saas_billing_rules (C10) et doit être validée avant activation commerciale.
+Les codes fiscaux 1–5 gardent leur sens. Les quatre anciens rôles de la table d’opérations sont intégrés sous les codes 6–9 : RULE 1→6, DELIVERY 2→7, PAYMENT 3→8, REFUND 4→9. Ce changement concerne record_type seulement ; les codes des enums d’état, de canal et de moyen de transfert restent inchangés.
 
 ```mermaid
 erDiagram
     direction TB
-    saas_document_sequences {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        tinyint_unsigned document_type "DocumentTypeEnum"
-        int fiscal_year
-        varchar prefix
-        bigint next_number
-        datetime created_at
-        datetime updated_at
-    }
     saas_invoices {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        bigint_unsigned user_id FK "users.id"
-        bigint_unsigned subscription_id FK "subscriptions.id"
-        bigint_unsigned installment_id FK "subscription_installments.id"
-        bigint_unsigned billing_rule_id FK "saas_billing_rules.id"
-        json billing_rule_snapshot "version et parametres figes de la regle SaaS"
-        bigint_unsigned sequence_id FK "nullable before emission ; saas_document_sequences.id"
-        bigint sequence_number "nullable before emission"
-        varchar number "nullable before emission"
-        datetime period_starts_at
-        datetime period_ends_at
-        char(3) currency
-        decimal net_amount
-        json taxes
-        decimal tax_amount
-        decimal total_amount
-        tinyint_unsigned status "DocumentStatusEnum"
-        datetime issued_at "nullable before emission"
-        datetime due_at
-        varchar payment_method "nullable"
-        varchar payment_reference "nullable"
-        bigint_unsigned payment_proof_media_id FK "nullable ; media.id"
-        datetime payment_received_at "nullable"
-        bigint_unsigned payment_validated_by_id FK "nullable ; users.id"
-        datetime payment_validated_at "nullable"
-        datetime payment_cancelled_at "nullable"
-        json saas_identity_snapshot
-        json customer_identity_snapshot
-        varchar immutable_document_key "nullable before generation ; cle privee"
-        char(64) document_hash "nullable before generation"
-        varchar operation_key UK
+        tinyint_unsigned record_type "SaasInvoiceRecordTypeEnum ; 1 a 9 ; NOT NULL"
+        bigint_unsigned user_id FK "nullable types 1/6 ; users.id ; requis types 2/3/4/5/7/8/9"
+        bigint_unsigned subscription_id FK "nullable ; subscriptions.id ; en-tetes types 2/3"
+        tinyint_unsigned subscription_record_type "generated STORED ; 1 si subscription_id non NULL"
+        bigint_unsigned installment_id FK "nullable ; subscriptions.id ; echeance type 2"
+        tinyint_unsigned installment_record_type "generated STORED ; 2 si installment_id non NULL"
+        bigint_unsigned billing_rule_id FK "nullable hors en-tetes 2/3 ; saas_invoices.id ; regle type 6"
+        tinyint_unsigned billing_rule_record_type "generated STORED ; 6 si billing_rule_id non NULL"
+        json billing_rule_snapshot "nullable hors en-tetes ; regle figee"
+        bigint_unsigned parent_document_id FK "nullable ; saas_invoices.id ; requis lignes types 4/5"
+        tinyint_unsigned parent_document_record_type "generated STORED ; 2 pour type 4, 3 pour type 5"
+        bigint_unsigned original_invoice_id FK "nullable ; saas_invoices.id ; requis types 3/5"
+        tinyint_unsigned original_invoice_record_type "generated STORED ; 2 si original_invoice_id non NULL"
+        bigint_unsigned original_invoice_line_id FK "nullable ; saas_invoices.id ; requis type 5"
+        tinyint_unsigned original_line_record_type "generated STORED ; 4 si original_invoice_line_id non NULL"
+        bigint_unsigned sequence_id FK "nullable ; saas_invoices.id ; compteur type 1"
+        tinyint_unsigned sequence_record_type "generated STORED ; 1 si sequence_id non NULL"
+        tinyint_unsigned document_type "nullable hors types 1/2/3 ; DocumentTypeEnum ; facture ou avoir"
+        int fiscal_year "nullable lignes/brouillon non numerote"
+        varchar(32) prefix "nullable ; compteur seulement"
+        bigint next_number "nullable ; compteur seulement"
+        tinyint_unsigned sequence_slot "generated STORED ; 1 si record_type=1, sinon NULL"
+        bigint sequence_number "nullable ; en-tete numerote seulement"
+        varchar(191) number UK "nullable ; en-tete numerote seulement"
+        int line_number "nullable ; lignes types 4/5 seulement"
+        varchar description "nullable ; lignes seulement"
+        decimal quantity "nullable ; lignes seulement"
+        decimal net_unit_price "nullable ; ligne facture seulement"
+        decimal net_discount "nullable ; ligne facture seulement"
+        decimal net_amount "nullable hors types 2/3/4/5 ; HT document ou ligne"
+        json taxes "nullable hors types 2/3/4/5 ; ventilation document ou ligne"
+        decimal tax_amount "nullable hors types 2/3/4/5"
+        decimal total_amount "nullable hors types 2/3/4/5"
+        char(3) currency "requis types 2/3/8/9 ; NULL autres types ; DZD au lancement"
+        tinyint_unsigned status "nullable hors en-tetes 2/3 ; DocumentStatusEnum"
+        text reason "nullable ; requis avoir/ligne avoir, remboursement, refus ou correction"
+        datetime period_starts_at "nullable hors en-tetes"
+        datetime period_ends_at "nullable hors en-tetes"
+        datetime due_at "nullable ; facture seulement"
+        json saas_identity_snapshot "nullable hors en-tetes"
+        json customer_identity_snapshot "nullable hors en-tetes"
+        bigint_unsigned document_media_id FK "nullable avant generation ; media.id ; PDF prive"
+        varchar immutable_document_key "nullable avant generation"
+        char(64) document_hash "nullable avant generation"
+        datetime issued_at "nullable avant emission"
+        datetime cancelled_at "nullable ; brouillon annule"
+        text cancellation_reason "nullable"
+        bigint_unsigned document_id FK "nullable hors types 7/8/9 ; saas_invoices.id ; en-tete seulement"
+        tinyint_unsigned document_record_type "nullable hors types 7/8/9 ; 2/3 pour envoi, 2 pour paiement/remboursement ; serveur"
+        bigint_unsigned original_payment_id FK "nullable hors type 9 ; saas_invoices.id ; paiement source type 8"
+        tinyint_unsigned original_payment_record_type "generated STORED ; 8 si original_payment_id non NULL"
+        bigint_unsigned credit_note_id FK "nullable ; type 9 seulement ; saas_invoices.id ; avoir type 3"
+        tinyint_unsigned credit_note_record_type "generated STORED ; 3 si credit_note_id non NULL"
+        varchar(100) code "nullable ; regle seulement"
+        int version "nullable ; regle seulement"
+        varchar trigger_event "nullable ; regle seulement"
+        varchar numbering_scope "nullable ; regle seulement ; saas_issuer"
+        json parameters "nullable ; regle seulement"
+        tinyint_unsigned policy_status "nullable ; PolicyStatusEnum ; regle seulement"
+        text validation_reference "nullable avant validation regle"
+        datetime effective_at "nullable ; regle seulement"
+        datetime ends_at "nullable ; regle seulement"
+        tinyint_unsigned channel "nullable ; DocumentDeliveryChannelEnum ; envoi seulement"
+        text encrypted_recipient "nullable ; envoi seulement"
+        tinyint_unsigned delivery_status "nullable ; DocumentDeliveryStatusEnum ; envoi seulement"
+        int attempts_count "nullable ; envoi seulement"
+        json delivery_attempts "nullable ; historique technique filtre des essais d'envoi"
+        datetime next_attempt_at "nullable ; envoi seulement"
+        datetime sent_at "nullable ; envoi seulement"
+        datetime delivered_at "nullable ; envoi seulement"
+        varchar provider_reference "nullable ; envoi seulement"
+        varchar error_code "nullable ; envoi ou virement incertain"
+        tinyint_unsigned transfer_method "nullable hors types 8/9 ; SaasTransferMethodEnum"
+        tinyint_unsigned transfer_status "nullable hors types 8/9 ; SaasTransferStatusEnum"
+        tinyint_unsigned refund_reason "nullable hors type 9 ; SaasRefundReasonEnum"
+        decimal amount "nullable hors types 8/9 ; signe, positif hors contrepassation"
+        varchar(191) transfer_reference "nullable avant verification ; reference bancaire/CCP"
+        varchar(64) financial_account_key "nullable avant verification ; alias serveur du compte SaaS"
+        char(64) transaction_fingerprint "nullable avant verification ; empreinte normalisee de transaction"
+        char(64) active_transaction_fingerprint UK "generated STORED ; transaction physique verifiee non contre-passee"
+        text encrypted_transfer_details "nullable ; informations bancaires minimales protegees"
+        bigint_unsigned proof_media_id FK "nullable avant preuve ; media.id ; PDF prive"
+        bigint_unsigned source_proof_media_id FK "nullable ; media.id ; original image si converti en PDF"
+        char(64) proof_hash "nullable avant verification ; empreinte PDF"
+        datetime occurred_at "nullable avant preuve ; date du virement reel"
+        datetime sending_started_at "nullable ; avant envoi documentaire ou virement sortant manuel"
+        bigint_unsigned created_by_id FK "nullable systeme ; users.id ; acteur central"
+        bigint_unsigned validated_by_id FK "nullable avant validation ; users.id ; admin central"
+        datetime validated_at "nullable avant validation"
+        bigint_unsigned performed_by_id FK "nullable ; users.id ; admin auteur du remboursement"
+        bigint_unsigned reversal_of_id FK "nullable ; types 8/9 ; saas_invoices.id ; erreur de verification"
+        varchar(191) operation_key UK
+        uuid correlation_id "nullable types 1 a 5 ; requis types 6 a 9 ; correlation stable"
         datetime created_at
         datetime updated_at
     }
-    saas_invoice_lines {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        bigint_unsigned invoice_id FK "saas_invoices.id"
-        int line_number
-        varchar description
-        decimal quantity
-        decimal net_unit_price
-        decimal net_discount
-        decimal net_amount
-        json taxes
-        decimal tax_amount
-        decimal total_amount
-        datetime created_at
-    }
-    saas_credit_notes {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        bigint_unsigned original_invoice_id FK "saas_invoices.id"
-        bigint_unsigned sequence_id FK "nullable before emission ; saas_document_sequences.id"
-        bigint sequence_number "nullable before emission"
-        varchar number "nullable before emission"
-        tinyint_unsigned status "DocumentStatusEnum"
-        text reason
-        decimal net_amount
-        json taxes
-        decimal tax_amount
-        decimal total_amount
-        char(3) currency
-        json saas_identity_snapshot
-        json customer_identity_snapshot
-        datetime issued_at "nullable before emission"
-        varchar immutable_document_key "nullable before generation ; cle privee"
-        char(64) document_hash "nullable before generation"
-        varchar operation_key UK
-        datetime created_at
-        datetime updated_at
-    }
-    saas_credit_note_lines {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        bigint_unsigned credit_note_id FK "saas_credit_notes.id"
-        bigint_unsigned original_invoice_id FK "saas_invoices.id"
-        bigint_unsigned original_invoice_line_id FK "saas_invoice_lines.id"
-        decimal quantity
-        decimal net_amount
-        json taxes
-        decimal tax_amount
-        decimal total_amount
-        text reason
-        datetime created_at
-    }
-    saas_document_deliveries {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        bigint_unsigned invoice_id FK "nullable ; saas_invoices.id"
-        bigint_unsigned credit_note_id FK "nullable ; saas_credit_notes.id"
-        tinyint_unsigned channel "DocumentDeliveryChannelEnum"
-        text encrypted_recipient
-        tinyint_unsigned status "DocumentDeliveryStatusEnum"
-        varchar operation_key UK
-        int attempts_count
-        datetime next_attempt_at "nullable"
-        datetime sent_at "nullable"
-        datetime delivered_at "nullable"
-        varchar provider_reference "nullable"
-        datetime created_at
-        datetime updated_at
-    }
-    subscription_installments ||--o{ saas_invoices : installment_id
-    users ||--o{ saas_invoices : payment_validated_by_id
-    media |o--o{ saas_invoices : payment_proof_media_id
-    saas_invoices ||--o{ saas_invoice_lines : invoice_id
-    saas_invoices ||--o{ saas_credit_notes : original_invoice_id
-    saas_credit_notes ||--o{ saas_credit_note_lines : credit_note_id
-    saas_invoice_lines ||--o{ saas_credit_note_lines : original_invoice_line_id
+    subscriptions |o--o{ saas_invoices : subscription_id
+    saas_invoices |o--o{ saas_invoices : parent_document_id
+    saas_invoices |o--o{ saas_invoices : original_invoice_id
+    saas_invoices |o--o{ saas_invoices : sequence_id
+    saas_invoices |o--o{ saas_invoices : billing_rule_id
+    saas_invoices |o--o{ saas_invoices : document_id
+    saas_invoices |o--o{ saas_invoices : original_payment_id
+    saas_invoices |o--o{ saas_invoices : credit_note_id
+    saas_invoices |o--o{ saas_invoices : reversal_of_id
+    media |o--o{ saas_invoices : document_media_id
+    media |o--o{ saas_invoices : proof_media_id
+    media |o--o{ saas_invoices : source_proof_media_id
 ```
 
-#### Explication très simple des champs
+**Champs communs et champs exclusifs :** id/uuid/record_type/operation_key/created_at/updated_at décrivent chaque ligne. user_id est NULL uniquement pour SEQUENCE et RULE, et requis pour les sept autres rôles. correlation_id conserve le contexte stable des opérations 6–9 ; il peut aussi relier les étapes fiscales lorsqu’il est renseigné. currency est obligatoire pour les en-têtes 2/3 et les virements 8/9 ; les lignes fiscales la prennent depuis leur parent. reason justifie l’avoir, la ligne d’avoir, le remboursement, le refus ou la correction selon son rôle. Les autres groupes ci-dessous sont strictement NULL hors rôle ; on ne duplique pas une ligne de facture en paiement.
 
+| Groupe de champs | Rôles autorisés |
+|---|---|
+| subscription_id, installment_id, billing_rule_id/snapshot, période, identités, status, document_media_id/hash, émission/annulation | En-têtes fiscaux 2/3 seulement, avec les particularités facture/avoir ci-dessous |
+| document_type, fiscal_year, sequence_id/number, number | Compteur 1 et en-têtes 2/3 selon le champ ; aucun numéro fiscal sur règle/envoi/virement |
+| prefix, next_number | Compteur 1 seulement ; sequence_slot est généré à 1 pour ce rôle et NULL sinon |
+| parent_document_id, line_number, description, quantity, net_unit_price/net_discount | Lignes 4/5 selon leur rôle ; prix/remise réservés à la ligne de facture 4 |
+| original_invoice_id, original_invoice_line_id | Avoir 3 et ligne d’avoir 5 selon le champ |
+| net_amount, taxes, tax_amount, total_amount | En-têtes/lignes 2/3/4/5 ; jamais un paiement ni un remboursement |
+| code, version, trigger_event, numbering_scope, parameters, policy_status, validation_reference, effective_at, ends_at | Règle 6 seulement |
+| document_id, document_record_type | Envoi 7, paiement 8 et remboursement 9 seulement ; ne pas confondre avec parent_document_id des lignes |
+| channel, encrypted_recipient, delivery_status, attempts_count, delivery_attempts, next_attempt_at, sent_at, delivered_at, provider_reference | Envoi 7 seulement |
+| transfer_method/status/reference, financial_account_key, transaction_fingerprint, encrypted_transfer_details, amount, occurred_at, reversal_of_id | Paiement 8 et remboursement 9 seulement ; active_transaction_fingerprint est généré et NULL hors virement ordinaire VERIFIED |
+| original_payment_id, credit_note_id, refund_reason, performed_by_id | Remboursement 9 seulement, avec les conditions de crédit/phase ci-dessous |
+| proof_media_id, proof_hash | Envoi 7 si preuve de remise, paiement 8, remboursement 9 ; document_media_id reste le PDF fiscal |
+| source_proof_media_id | Paiement 8/remboursement 9 seulement, si un original a été converti en PDF |
+| created_by_id | Auteur central des opérations 6–9, nullable pour le système ; requis pour préparer un remboursement |
+| validated_by_id, validated_at | Validation de règle 6 ou vérification financière 8/9 seulement |
+| sending_started_at, error_code | Envoi 7 ou virement sortant/incertain selon le parcours ; pas de marqueur d’envoi sur une contrepassation comptable |
 
-**`saas_document_sequences` :**
+Les colonnes de FK *_record_type sont dérivées des colonnes de base selon §6.7 et ne sont jamais saisies par l’utilisateur. document_record_type est l’exception non générée : le serveur renseigne 2/3 selon l’en-tête d’un envoi, ou 2 pour un virement ; le trigger valide cette valeur avec le rôle. Les triggers de forme vérifient les colonnes de base et laissent SQL calculer les colonnes générées ; ils ne lisent pas NEW/OLD sur une colonne générée. Les champs hors rôle et les discriminants doivent rester cohérents même lors d’un accès SQL direct ; les migrations traduisent ces invariants en contraintes/triggers autorisés par MySQL. [S7]
 
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`document_type`** : indique quel document c’est. Exemple : facture, avoir ou autre type prévu.
-- **`fiscal_year`** : l’année ou période de numérotation concernée. Exemple : `2026`.
-- **`prefix`** : le début fixe ajouté devant les numéros. Exemple : `FAC` pour les factures.
-- **`next_number`** : le prochain nombre disponible dans cette série. Exemple : si le dernier document était 102, le prochain peut être 103.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
-- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+**Forme des éléments fiscaux, types 1 à 5 :** le compteur type 1 a document_type=1/2, fiscal_year, prefix et next_number>0 ; user_id, documents/parents, lignes, montants, status, PDF et période sont NULL. L’en-tête facture type 2 a user_id, subscription_id, installment_id, billing_rule_id/snapshot, document_type=1, période, due_at, devise, identités, totaux et status ; aucun parent de ligne ni origine d’avoir. L’en-tête avoir type 3 a les mêmes rattachements de propriétaire/abonnement/échéance que son original, document_type=2, original_invoice_id et reason ; due_at=NULL. Les lignes types 4/5 ont user_id, parent_document_id, line_number, description, quantity>0, HT/taxes/TTC ; elles n’ont ni abonnement/échéance/règle copiés, ni status, série, période, devise, identité ou PDF : elles les obtiennent depuis l’en-tête. Type 4 exige net_unit_price/net_discount>=0 et ses origines d’avoir NULL ; type 5 exige original_invoice_id/original_invoice_line_id/reason, net_unit_price/net_discount=NULL. Les en-têtes n’utilisent pas description/quantity/line_number ; prefix/next_number sont exclus de tous les autres types. Les champs conditionnels sont réellement NULL hors rôle, contrôlés par triggers de forme et validations explicites, pas par convention seule.
 
-**`saas_invoices` :**
+**Intégrité exacte :** record_type et rattachements utilisés sont immuables. Les FK composites de §6.7 empêchent une facture reliée à une échéance d’un autre abonnement/propriétaire, une ligne rattachée à un compteur, un avoir visant un autre propriétaire et une ligne d’avoir visant une autre facture que son parent. Tous les discriminants de FK indiqués GENERATED STORED sont calculés côté SQL, non fournis par le navigateur. Aucune FK métier n’est remplacée par une référence dans du JSON. status concerne exclusivement les en-têtes 2/3 et reste DocumentStatusEnum ; une ligne hérite de l’état du parent.
 
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`user_id`** : l’identifiant du propriétaire. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`subscription_id`** : l’identifiant de l’abonnement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`installment_id`** : l’identifiant de l’échéance à payer. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`billing_rule_id`** : la version de règle résolue dans la BDD de ce document ; saas_billing_rules pour le SaaS, billing_rules pour une obligation de boutique.
-- **`billing_rule_snapshot`** : version et paramètres exacts de la règle SaaS, figés à l’émission ; ne pas relire une règle modifiée pour expliquer une ancienne facture.
-- **`sequence_id`** : l’identifiant du compteur de numérotation. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`sequence_number`** : le nombre utilisé à l’intérieur de la série du document. Exemple : `123` dans `FAC-2026-000123`. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`number`** : le numéro lisible de l’élément. Exemple : numéro d’échéance ou de facture selon la table. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`period_starts_at`** : le début de la période concernée. Exemple : début du mois payé.
-- **`period_ends_at`** : la fin de la période concernée. Exemple : fin du mois payé. Peut rester vide lorsque la période n’a pas de fin prévue.
-- **`currency`** : la monnaie utilisée. Exemple : `DZD` pour le dinar algérien.
-- **`net_amount`** : le montant avant taxes.
-- **`taxes`** : plusieurs petits réglages liés à **taxes**, regroupés ensemble de manière structurée.
-- **`tax_amount`** : le montant total des taxes.
-- **`total_amount`** : le montant final avec les taxes.
-- **`status`** : code entier de l’enum propre à cet objet, défini au §3.3 ; les libellés sont traduits à l’affichage et les transitions contrôlées par le service.
-- **`issued_at`** : la date officielle d’émission du document. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`due_at`** : la date utilisée pour **echeance**.
-- **`payment_method`** : le moyen de paiement déclaré pour cette facture d’abonnement. Il peut rester vide tant qu’aucun paiement n’a été reçu.
-- **`payment_reference`** : la référence du paiement ou du reçu. Elle peut rester vide si aucun identifiant externe n’existe.
-- **`payment_proof_media_id`** : la preuve de paiement stockée dans la table centrale `media`, par exemple l’image ou le PDF d’un reçu. Elle peut rester vide avant réception.
-- **`payment_received_at`** : la date où le paiement a été reçu ou déclaré reçu.
-- **`payment_validated_by_id`** : l’administrateur central qui a vérifié le paiement ; facultatif avant validation.
-- **`payment_validated_at`** : la date de validation manuelle du paiement.
-- **`payment_cancelled_at`** : la date d’annulation auditée d’une validation de paiement erronée ; elle n’annule pas la facture fiscale ni un transfert bancaire. La preuve initiale et les activités restent conservées. Une correction du montant facturé passe séparément par un avoir.
-- **`saas_identity_snapshot`** : une copie figée des informations légales du SaaS au moment de la facture. Si le profil change plus tard, l’ancienne facture garde les anciennes informations.
-- **`customer_identity_snapshot`** : une copie figée du nom, téléphone et adresse nécessaires à cette commande. Si le client donne plus tard une autre adresse, l’ancienne commande garde ce qu’elle utilisait.
-- **`immutable_document_key`** : indique que le document, une fois officiellement émis, ne doit plus être modifié comme un simple brouillon. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`document_hash`** : une signature du contenu du document qui permet de vérifier qu’il est resté identique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`operation_key`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
-- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+**Unicités :** UNIQUE(operation_key), UNIQUE(number), UNIQUE(document_type,fiscal_year,sequence_slot) avec sequence_slot=1 uniquement pour type 1, UNIQUE(sequence_id,sequence_number), UNIQUE(parent_document_id,line_number), UNIQUE(parent_document_id,original_invoice_line_id) hors NULL. Les compteurs et lignes ont number=NULL, les lignes ont sequence_id=NULL : ils ne prennent pas un numéro fiscal. Réserver une seule occurrence de facture pour l’échéance et le fait générateur avec une clé stable. Les séquences année/type existent avant usage ; collision de création concurrente : relire le même compteur sous verrou. Après première réservation, type/exercice/préfixe de la série sont immuables et next_number progresse strictement sous verrou ; ni reset ni réutilisation d’un numéro annulé. Aucun MAX+1.
 
-**`saas_invoice_lines` :**
+**Calcul et avoirs :** quantité>0, montants de document/ligne non négatifs, HT+taxes=TTC, totaux en-tête égaux à la somme de ses vraies lignes. DZD au lancement, calcul décimal et taxes structurées ; contrôler la forme, la ventilation et la somme du JSON taxes. Les périodes d’en-tête sont [period_starts_at,period_ends_at) avec fin>début, dérivées de l’échéance ou de la facture d’origine. Une facture doit avoir au moins une ligne et les identités complètes avant émission ; un avoir également au moins une ligne justifiée. La version de plan, l’option et la période restent dans la désignation/snapshot utile. Un avoir exige une facture déjà émise de même devise ; sa ligne vise la ligne type 4 exacte, les quantités et HT/taxes/TTC cumulés des avoirs émis et des réserves DRAFT/PREPARING ne dépassent pas les valeurs originales. Verrouiller le propriétaire puis la facture originale et ses lignes avant réservation ; annuler un brouillon libère seulement sa réserve. Une correction fiscale produit un nouvel avoir/document lié, sans réécrire la facture.
 
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`invoice_id`** : l’identifiant de la facture. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`line_number`** : la position de cette ligne dans le document. Exemple : 1 pour la première ligne, 2 pour la deuxième.
-- **`description`** : le nom ou texte qui explique ce qui est facturé sur cette ligne. Exemple : « Abonnement Pro — septembre 2026 ».
-- **`quantity`** : le nombre d’éléments concernés. Exemple : `2` signifie deux unités du produit.
-- **`net_unit_price`** : le prix correspondant à **unitaire HT**.
-- **`net_discount`** : la réduction appliquée avant taxes sur cette ligne.
-- **`net_amount`** : le montant avant taxes.
-- **`taxes`** : plusieurs petits réglages liés à **taxes**, regroupés ensemble de manière structurée.
-- **`tax_amount`** : le montant total des taxes.
-- **`total_amount`** : le montant final avec les taxes.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
+**Émission préservée :** dans la transaction centrale, retrouver operation_key, verrouiller compteur et en-tête, vérifier document_type/fiscal_year, réserver sequence_number/number une fois, figer règle/identités/lignes et passer à status=4 PREPARING. Générer le PDF privé hors transaction SQL, avec clé déterministe liée au UUID ; vérifier fichier et empreinte. Une transaction courte renseigne document_media_id/immutable_document_key/document_hash, passe à status=2 ISSUED et crée l’envoi durable de C8. Un crash reprend le même numéro/UUID/fichier. La préparation ne permet plus d’éditer les données qui ont alimenté le PDF ; une erreur ferme le brouillon ou crée un nouveau document. Aucun numéro réservé n’est réutilisé, même après annulation. Après émission, identités, totaux, lignes, numérotation, règle et pièce sont immuables. Les vérifications de paiement/remboursement se font dans C8 et ne changent pas le document.
 
-**`saas_credit_notes` :**
+**Forme des opérations, types 6 à 9 :** RULE exige code/version/trigger_event/numbering_scope/parameters/policy_status non NULL ; seuls validation, dates d’effet et métadonnées de règle complètent ce groupe ; user_id/document_id, champs d’envoi/virement/preuve sont NULL. DELIVERY exige user_id/document_id/document_record_type=2 ou 3, channel, delivery_status, attempts_count>=0 ; règle/virement/original_payment_id/credit_note_id/reversal_of_id sont NULL. PAYMENT exige propriétaire, document type 2, méthode, devise, amount et transfer_status ; les champs de règle/envoi/credit_note_id/refund_reason/original_payment_id/performed_by_id sont NULL. REFUND exige les mêmes champs financiers, original_payment_id, refund_reason, reason et created_by_id de l’administrateur préparateur ; performed_by_id reste NULL avant exécution et devient obligatoire pour un virement sortant VERIFIED. credit_note_id est requis pour refund_reason=1 CREDIT_NOTE, et reste NULL pour un simple trop-payé non facturé. Tous les autres champs métiers hors rôle sont NULL, contrôlés par triggers de forme. validated_by_id/validated_at servent à la validation de règle ou à la vérification d’argent, jamais à une fausse livraison de message. Les quatre enums d’état sont distincts ; aucun status générique n’assimile une règle active à un paiement reçu. Une contrepassation est la variante comptable explicitement définie plus bas : elle ne déclare pas un nouveau virement.
 
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`original_invoice_id`** : l’identifiant de la facture d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`sequence_id`** : l’identifiant du compteur de numérotation. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`sequence_number`** : le nombre utilisé à l’intérieur de la série du document. Exemple : `123` dans `FAC-2026-000123`. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`number`** : le numéro lisible de l’élément. Exemple : numéro d’échéance ou de facture selon la table. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`status`** : code entier de l’enum propre à cet objet, défini au §3.3 ; les libellés sont traduits à l’affichage et les transitions contrôlées par le service.
-- **`reason`** : explique pourquoi l’action ou la décision a été faite.
-- **`net_amount`** : le montant avant taxes.
-- **`taxes`** : plusieurs petits réglages liés à **taxes**, regroupés ensemble de manière structurée.
-- **`tax_amount`** : le montant total des taxes.
-- **`total_amount`** : le montant final avec les taxes.
-- **`currency`** : la monnaie utilisée. Exemple : `DZD` pour le dinar algérien.
-- **`saas_identity_snapshot`** : une copie figée des informations légales du SaaS au moment de la facture. Si le profil change plus tard, l’ancienne facture garde les anciennes informations.
-- **`customer_identity_snapshot`** : une copie figée du nom, téléphone et adresse nécessaires à cette commande. Si le client donne plus tard une autre adresse, l’ancienne commande garde ce qu’elle utilisait.
-- **`issued_at`** : la date officielle d’émission du document. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`immutable_document_key`** : indique que le document, une fois officiellement émis, ne doit plus être modifié comme un simple brouillon. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`document_hash`** : une signature du contenu du document qui permet de vérifier qu’il est resté identique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`operation_key`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
-- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+**Règles préservées :** UNIQUE(code,version) hors NULL, version>0. policy_status=1 DRAFT, 2 VALIDATED, 3 ACTIVE ou 4 RETIRED ; validation/activation exige validated_by_id/validated_at/validation_reference et paramètres autorisés ; effective_at requis pour ACTIVE, ends_at NULL ou >début. La première version de chaque code, de type 6, est une ligne stable de verrou ; toutes les activations/fermetures du code la verrouillent et relisent les périodes courantes, sans chevauchement. Version validée/utilisée immuable ; nouvelle version pour changer la règle. Une fermeture future auditée n’altère pas les paramètres historiques. Les factures C8 gardent billing_rule_id vers une vraie RULE et leur billing_rule_snapshot. Les règles de ventes de boutique restent uniquement billing_rules local T26.
 
-**`saas_credit_note_lines` :**
+**Transmissions préservées :** document_id cible un en-tête émis, jamais compteur ou ligne ; les FK de §6.7 protègent type et propriétaire. Créer l’envoi dans la transaction d’émission, operation_key stable par document/canal/destinataire/occurrence. encrypted_recipient est requis pour une ligne DELIVERY et contient la destination réellement utilisable pour son canal ; ne jamais inventer e-mail/téléphone pour remplir le champ. Envoyer hors verrou SQL long ; réserver l’essai et sending_started_at avant l’appel externe, ajouter sa trace technique filtrée à delivery_attempts sous verrou. delivery_status garde les codes de DocumentDeliveryStatusEnum, attempts_count et next_attempt_at les retries. Timeout après effet possible → UNCERTAIN, rapprochement avant répétition ; un simple portail consultable ne prouve pas l’envoi. Plusieurs destinataires/canaux utilisent plusieurs lignes type 7. sent_at/delivered_at et provider_reference ne sont jamais inventés. proof_media_id peut conserver une preuve privée de remise documentée ; tous les champs financiers restent NULL.
 
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`credit_note_id`** : l’identifiant de l’avoir. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`original_invoice_id`** : l’identifiant de la facture d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`original_invoice_line_id`** : l’identifiant de la ligne de facture d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`quantity`** : le nombre d’éléments concernés. Exemple : `2` signifie deux unités du produit.
-- **`net_amount`** : le montant avant taxes.
-- **`taxes`** : plusieurs petits réglages liés à **taxes**, regroupés ensemble de manière structurée.
-- **`tax_amount`** : le montant total des taxes.
-- **`total_amount`** : le montant final avec les taxes.
-- **`reason`** : explique pourquoi l’action ou la décision a été faite.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
+**Paiement client à distance :** le propriétaire effectue le virement via banque, CCP ou BaridiMob, puis dépose le reçu dans son espace SaaS. Créer une ligne PAYMENT DECLARED avec montant, date/référence déclarés et preuve ; l’admin vérifie destinataire, fonds réellement reçus, montant/devise, référence et facture. Un reçu téléchargé seul n’active aucun droit. La preuve canonique est un PDF privé dans media, avec proof_hash ; conserver l’original séparément si une image a été convertie, sans altérer la source ni inventer une signature bancaire. Seul un administrateur habilité passe à VERIFIED après rapprochement réel, renseigne validated_by_id/validated_at/occurred_at et journalise l’action. Refus ou justificatif insuffisant restent REJECTED/DECLARED avec motif minimal. Plusieurs paiements partiels ou paiements pour une même facture restent plusieurs lignes type 8 ; l’état de l’échéance n’est pas écrasé par le dernier reçu.
 
-**`saas_document_deliveries` :**
+**Remboursement admin à distance :** créer une ligne REFUND liée à sa facture et au PAYMENT réellement vérifié, avec amount>0, méthode, motif, administrateur, et avoir si réduction de facture. Réserver son budget avant toute instruction de virement ; un autre admin ne peut dépenser cette même réserve. Le virement réel est effectué manuellement hors application sur le service bancaire/CCP/BaridiMob ; le SaaS ne prétend pas posséder une API bancaire. Marquer sending_started_at avant cette étape, puis conserver le reçu PDF et la référence réellement utilisés. VERIFIED exige fonds effectivement reversés, proof_media_id/proof_hash, occurred_at, performed_by_id et validated_by_id/validated_at. Une opération au résultat inconnu reste UNCERTAIN et réserve son budget ; ne jamais relancer automatiquement un virement. Annulation possible seulement avant envoi, ou après preuve certaine qu’aucun transfert n’a eu lieu. Plusieurs remboursements partiels restent plusieurs lignes type 9. Un avoir corrige le dû mais ne transfère pas d’argent ; les deux actes restent traçables séparément.
 
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`invoice_id`** : l’identifiant de la facture. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`credit_note_id`** : l’identifiant de l’avoir. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`channel`** : code de `DocumentDeliveryChannelEnum` : `EMAIL`, `SMS_LINK`, `WHATSAPP_LINK` ou `DOCUMENTED_HANDOFF`.
-- **`encrypted_recipient`** : les coordonnées du destinataire enregistrées de manière protégée lorsqu’elles doivent être conservées.
-- **`status`** : code entier de l’enum propre à cet objet, défini au §3.3 ; les libellés sont traduits à l’affichage et les transitions contrôlées par le service.
-- **`operation_key`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
-- **`attempts_count`** : le nombre de **tentatives**. Exemple : `3` signifie qu’il y en a trois.
-- **`next_attempt_at`** : la date prévue pour retenter l’opération après un échec récupérable. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`sent_at`** : la date où l’envoi a été effectué. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`delivered_at`** : la date où la réception ou livraison du message a été confirmée quand cette information existe. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`provider_reference`** : le numéro de facture, reçu ou référence donné par le fournisseur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
-- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+**Transitions financières :** une ligne de virement ordinaire a amount>0 ; un inverse seul porte le montant négatif exact. PAYMENT naît DECLARED et atteint VERIFIED seulement après contrôle réel ; REFUND naît DECLARED, réserve son montant, passe APPROVED après autorisation puis VERIFIED après exécution prouvée, ou UNCERTAIN si le résultat est inconnu. REJECTED/CANCELLED libèrent uniquement une réserve dont l’absence de transfert est établie ; un virement vérifié ne redevient pas brouillon. Pour tout PAYMENT/REFUND ordinaire VERIFIED, exiger amount/currency/transfer_method, transfer_reference qualifiée, financial_account_key, transaction_fingerprint, PDF privé existant dont proof_hash correspond aux octets, occurred_at et validated_by_id/validated_at ; REFUND exige aussi son exécutant et sending_started_at. Sous verrou, vérifier que le PAYMENT source d’un remboursement est un original positif toujours VERIFIED, de même devise/facture/propriétaire, et que l’avoir CREDIT_NOTE est émis. Les contrepassations passent exclusivement par le service de correction décrit plus bas. Refus, annulation et résultat incertain gardent une raison minimale et leur activité ; les états ne se changent pas librement depuis un formulaire.
 
+**Plafonds et trop-payé :** verrouiller users du propriétaire, abonnement type 1, échéance type 2, facture puis paiement(s), avoir(s) et remboursement(s), dans l’ordre commun et en lecture courante. Somme des remboursements engagés (DECLARED/APPROVED/UNCERTAIN) et VERIFIED, nette seulement des contrepassations effectives, <= paiement initial vérifié net pour chaque original_payment_id. Vérifier aussi le cumul sur la facture, tous paiements et avoirs confondus. Pour CREDIT_NOTE : avoir émis de cette facture, même devise/propriétaire, budget de chaque avoir non déjà remboursé/réservé et restitution limitée à la part réellement payée devenue indue. Pour OVERPAYMENT/DUPLICATE_TRANSFER : montant limité au surplus vérifié de la facture après dû net des avoirs et remboursements/réserves existants ; aucun avoir fictif sur une somme jamais facturée. Un cumul de paiements peut dépasser le dû : il signale un trop-payé à traiter, sans portefeuille utilisable entre boutiques. EXCEPTION exige une décision administrative motivée et une pièce fiscale si elle réduit le prix dû ; aucun dépassement des fonds reçus. Les mêmes sommes plafonnent deux remboursements concurrents et interdisent un remboursement sur un autre propriétaire/paiement.
 
+**Argent, dette et droits :** P est la somme signée des lignes PAYMENT VERIFIED et des originaux PAYMENT REVERSED accompagnés de leur inverse VERIFIED ; R est la même somme pour REFUND. Chaque ligne entre une seule fois : original REVERSED positif + inverse VERIFIED négatif = zéro. Un original n’atteint REVERSED que dans la transaction qui crée son unique inverse. DECLARED/APPROVED/UNCERTAIN/REJECTED/CANCELLED sont exclus des sommes de cash vérifié. Fonds conservés=P-R. Dû documenté D = factures ISSUED moins avoirs ISSUED pour l’échéance. Reste à acquitter=max(D-(P-R),0), surplus=max((P-R)-D,0). Les remboursements en attente réservés ne comptent pas comme cash sorti mais ne peuvent soutenir une nouvelle extension payante de droits. Une échéance est PARTIALLY_PAID si une part du dû est acquittée et PAID si le dû net est soldé ; annulation et litige restent des décisions explicites. Activer/prolonger un abonnement exige sa période/attribution et le paiement vérifié requis ; payer n’attribue pas arbitrairement un plan. L’arrêt du renouvellement garde les droits déjà payés jusqu’à leur terme. Une restitution qui retire le financement d’une période déclenche la décision de suspension/raccourcissement motivée sous le même verrou, sans effacer l’historique. Les flux SaaS ne sont jamais additionnés aux ventes des boutiques.
 
-- **Factures :** UNIQUE(number) hors NULL, UNIQUE(sequence_id,sequence_number), UNIQUE(operation_key). `status=1 DRAFT | 2 ISSUED | 3 CANCELLED | 4 PREPARING` (`DocumentStatusEnum` ; PREPARING correspond à la génération de la pièce sur une clé stable). La période est [debut,fin), fin>debut ; montants>=0, HT+taxes=TTC et égalité aux sommes de lignes. DZD au MVP. Contrôler structure et somme du JSON taxes. FK(subscription_id,user_id) → subscriptions(id,user_id), clé parent UNIQUE ; FK(installment_id,subscription_id) → subscription_installments(id,subscription_id), clé parent UNIQUE. Le fait générateur durable déclenche obligatoirement une facture par échéance/occurrence validée avec une clé stable ; aucun doublon au retry. L’échéance conserve son sens de dette ; la facture et la vérification manuelle de son paiement sont réunies dans `saas_invoices`, tandis que les rectifications fiscales passent par avoir. Une correction du dû après facture/avoir doit être rapprochée, jamais changée silencieusement pour correspondre au paiement. Aucun remboursement SaaS automatique n’est inféré d’un avoir. **Décision AUD-16 : le SaaS n’exécute ni ne suit comme trésorerie interne les remboursements réels d’abonnement.** Les paiements sont validés manuellement sur reçu/preuve ; une résiliation normale laisse la période déjà payée active jusqu’à son terme, puis empêche le renouvellement payant. Un remboursement exceptionnel, s’il est décidé, reste une procédure manuelle externe à l’application et ne crée donc pas de table `decaissements_saas` dans le périmètre actuel. Un avoir reste un document de correction et non une preuve que de l’argent a été remis. Ne pas utiliser une contrepassation de paiement pour prétendre que le paiement initial n’a jamais eu lieu. Si le produit commence un jour à exécuter ou suivre ces remboursements réels, un journal de décaissements dédié deviendra obligatoire.
-- **Lignes :** UNIQUE(invoice_id,line_number), UNIQUE(id,invoice_id), quantité>0, prix/remise/base/taxes/TTC>=0. Version du plan, période et nature de l’option incluses dans la désignation/snapshot document ; aucun recalcul historique depuis le plan courant. Émission seulement avec au moins une ligne et identité légale du SaaS et du client complètes.
-- **Avoirs :** origine obligatoire, facture émise de même devise ; montants positifs exprimant la réduction, pas un règlement. UNIQUE(number), UNIQUE(sequence_id,sequence_number), UNIQUE(id,original_invoice_id). FK(credit_note_id,original_invoice_id) → saas_credit_notes(id,original_invoice_id) et FK(original_invoice_line_id,original_invoice_id) → saas_invoice_lines(id,invoice_id). UNIQUE(credit_note_id,original_invoice_line_id). Sous verrou facture puis lignes, les avoirs émis et brouillons réservés ne dépassent ni quantités ni HT/taxes/TTC facturés ; annuler un brouillon libère sa réserve. Période, propriétaire et abonnement sont obtenus depuis la facture d’origine ; ne pas maintenir des copies modifiables concurrentes.
-- **Numérotation et immutabilité SaaS :** UNIQUE(document_type,fiscal_year), document_type=1 INVOICE ou 2 CREDIT_NOTE, next_number>0 ; allocation sous verrou, jamais MAX+1. Contrôler le type de séquence et réserver une fois numéro, snapshots et operation_key dans la transaction centrale avec status=4 PREPARING. Produire le PDF privé sur une clé stable liée au UUID du document, puis vérifier son empreinte. Dans une transaction centrale courte, figer immutable_document_key/document_hash, passer à status=2 ISSUED et créer la transmission durable. Un échec de génération reprend le même UUID/numéro ; aucune émission ni transmission avant existence de la pièce vérifiée. Contenu fiscal, identité, numéro, lignes et fichier des factures/avoirs émis immuables ; correction fiscale par nouveau document lié. Les champs de vérification du paiement de saas_invoices suivent séparément le service manuel contrôlé et audité, sans modifier la pièce émise. Un numéro réservé n’est jamais réutilisé, même si la préparation est annulée. Les factures SaaS utilisent uniquement leur BDD, leurs séquences et leur émetteur SaaS.
-- **Transmission :** exactement une FK facture/avoir non NULL ; même protocole durable que T19, créé à l’émission, reprise avec clé stable, `status=1 PENDING | 2 RUNNING | 3 SENT | 4 DELIVERED | 5 RETRYABLE_FAILURE | 6 PERMANENT_FAILURE | 7 UNCERTAIN | 8 CANCELLED` (`DocumentDeliveryStatusEnum`). PDF ou lien accessible après autorisation ; un portail consultable seul ne prouve pas l’envoi. Les flux SaaS ne sont jamais additionnés aux recettes des boutiques.
+**Doublons, corrections et preuves :** UNIQUE(operation_key), UNIQUE(reversal_of_id) hors NULL. Une transaction physique vérifiée possède transaction_fingerprint dérivée côté serveur de réseau financier normalisé, compte SaaS, direction et référence réelle ; les canaux CCP/BaridiMob d’un même transfert sont normalisés vers le même réseau/compte pour éviter un doublon. active_transaction_fingerprint est GENERATED STORED, égale à cette empreinte uniquement pour record_type IN(8,9), transfer_status=3 VERIFIED et reversal_of_id IS NULL ; NULL sinon. Son UNIQUE interdit de valider deux fois le même transfert, même pour deux propriétaires. Pas d’unicité sur le seul nom de fichier, le hash PDF ou une référence non qualifiée. Une réutilisation trouvée retourne l’opération existante ou un conflit, sans nouveau paiement.
 
-**Validation du paiement SaaS :** payment_method, payment_reference, payment_proof_media_id, payment_received_at, payment_validated_by_id, payment_validated_at et payment_cancelled_at décrivent la vérification manuelle, séparément de DocumentStatusEnum. Valider exige une preuve centrale privée, le vérificateur habilité et des dates cohérentes ; annuler exige une validation existante et un motif dans activity_log, avec ancienne preuve et anciens faits préservés. Verrouiller propriétaire, abonnement, échéance et facture dans l’ordre commun avant de recalculer les droits/périodes. Un retry reconnu ne valide ni n’annule deux fois ; une validation annulée ne compte plus comme paiement validé courant. Ces opérations ne changent ni HT/taxes/TTC, ni numéro, ni snapshots, ni PDF d’une facture émise et ne prétendent jamais rembourser l’argent. Les corrections fiscales et les événements de paiement sont distincts.
+Un original financier VERIFIED est immuable en montant, facture, propriétaire, référence, méthode et preuve. Une erreur de saisie/vérification ne se corrige ni par DELETE ni par écrasement du PDF : une ligne du même type avec reversal_of_id vise le même document/propriétaire/paiement source et, pour REFUND, le même avoir/motif de remboursement ; elle inverse exactement amount, garde devise, corrélation et motif de correction, puis la saisie correcte est distincte. La contrepassation est comptable, n’est jamais une preuve de virement opposé ; elle reprend les références et liens des preuves originales comme contexte historique, sans nouvelle transaction bancaire/empreinte active ni nouvel envoi. created_by_id/validated_by_id tracent les administrateurs de correction, tandis que performed_by_id/occurred_at, s’ils sont repris, décrivent exclusivement le virement d’origine. L’original passe à transfer_status=7 REVERSED dans la même transaction que l’inverse VERIFIED ; les totaux incluent l’original historique REVERSED et son inverse VERIFIED une seule fois (zéro net), plus les autres VERIFIED. Une contrepassation ne cible pas une contrepassation et ne se produit qu’une fois. Une vraie restitution d’argent utilise REFUND avec preuve, sans effacer le PAYMENT réel. Refuser une correction qui invaliderait un remboursement déjà effectué/réservé sans résolution coordonnée. Garder la référence historique même si l’empreinte active est libérée pour corriger une fausse validation ; ne pas fabriquer un reçu ou prétendre qu’un transfert réel n’a jamais eu lieu.
 
-### C10 — Règles de facturation propres au SaaS
+**Autorisation et audit :** le propriétaire voit/déclare ses paiements et ses PDF centraux après contrôle user_id ; il ne peut pas s’auto-valider, modifier une règle, confirmer un remboursement ou lire un autre propriétaire. Les administrateurs utilisent saas.billing.rules, saas.documents.send, saas.payments.verify, saas.refunds.prepare/approve/verify selon leur permission et les restrictions de cible. Le root reste soumis aux invariants financiers. Activity Log central trace déclaration, vérification, refus, préparation/approbation/envoi/remboursement, contrepassation et échec avec acteur réel, UUID, amount/currency autorisés, motif minimisé et correlation_id, jamais coordonnées bancaires ni contenu PDF. Logs et mutation obligatoire restent dans la même transaction centrale ; retry de même operation_key ne produit aucun second succès. Les notifications et PDF respectent le contexte central et l’accès privé.
 
-**saas_billing_rules** concerne uniquement les factures du SaaS adressées au propriétaire pour ses abonnements/options. Les règles des ventes de produits de chaque boutique sont dans sa propre table billing_rules (T26) ; elles ne sont ni administrées ni copiées dans cette table centrale. Cette distinction conserve la règle d’émission de saas_invoices sans ramener la facturation boutique au central.
+**Exemple complet :** échéance 3 000 DA → facture type 2 et lignes type 4 ; le client paie 1 000 puis 2 000 avec deux preuves PAYMENT, donc PARTIALLY_PAID puis PAID. Réduction décidée de 500 → avoir type 3/ligne type 5, puis REFUND 500 lié au paiement choisi et à l’avoir, avec reçu du virement de l’admin. D=2 500, P=3 000, R=500, fonds conservés=2 500 et reste dû=0. Le PDF de facture initial est identique ; les cinq types fiscaux et les quatre types d’opération utilisent tous la même table physique saas_invoices.
 
-```mermaid
-erDiagram
-    direction TB
-    saas_billing_rules {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        varchar code
-        int version
-        varchar trigger_event
-        varchar numbering_scope "saas_issuer"
-        json parameters
-        tinyint_unsigned status "PolicyStatusEnum"
-        text validation_reference "nullable avant validation"
-        bigint_unsigned validated_by_id FK "nullable ; users.id ; administrateur central"
-        datetime validated_at "nullable"
-        datetime effective_at "nullable"
-        datetime ends_at "nullable"
-        datetime created_at
-    }
-    saas_billing_rules ||--o{ saas_invoices : billing_rule_id
-```
+**Neuf modèles logiques, une table :** SaasSequence(1), SaasInvoice(2), SaasCreditNote(3), SaasInvoiceLine(4), SaasCreditNoteLine(5), SaasBillingRule(6), SaasDocumentDelivery(7), SaasPayment(8) et SaasRefund(9) utilisent tous saas_invoices sur la connexion centrale. Leurs scopes, créations, relations, routes, morph aliases et Policies imposent le type et le propriétaire. Un UUID de paiement ne peut pas ouvrir la route d’une facture, un UUID de compteur ne peut pas devenir une règle. record_type ne change jamais après création.
 
-UNIQUE(code,version). status=1 DRAFT, 2 VALIDATED, 3 ACTIVE ou 4 RETIRED. Une version validée/utilisée est immuable ; retirer une version ferme son usage futur par une transition auditée sans changer les paramètres historiques. Les périodes effectives [effective_at,ends_at) ne se chevauchent pas pour le même code, sous verrou de la version 1 du même code dans saas_billing_rules, conservée comme ligne stable. Initialiser cette ligne avant activation ; gérer la collision UNIQUE d’une création concurrente puis relire sous verrou. Toutes les activations/fermetures du même code utilisent ce verrou et une lecture courante. Une activation exige validated_by_id, validated_at, validation_reference et des paramètres complets, avec événement et implémentation serveur autorisés. L’émetteur est celui du SaaS : aucune FK propriétaire vendeur ni scope tenant. Une facture conserve la FK vers sa version et un billing_rule_snapshot exact. Une occurrence d’échéance retrouve la même facture par operation_key ; une tâche de rapprochement détecte les échéances/faits générateurs sans facture. Aucun e-mail, téléphone ou document boutique n’est recopié dans la règle. Le fait générateur et les règles fiscales restent à faire valider avant activation.
+**Sommes et immutabilité par rôle :** calculer les totaux fiscaux depuis les lignes 4/5 et les dettes depuis les en-têtes 2/3, sans additionner les deux représentations. Calculer les fonds reçus/reversés exclusivement depuis les virements 8/9 et transfer_status, sans compter compteur/règle/envoi/ligne fiscale. Une facture émise reste immuable ; l’admin vérifie un paiement en modifiant la ligne PAYMENT liée, jamais le PDF ni les montants de la facture. Une nouvelle version de règle ou un nouvel envoi reste une nouvelle ligne de son type. Le refus métier d’un versement n’annule pas automatiquement le document fiscal.
 
-Les opérations sur les données centrales et les décisions d’abonnement sont désormais enregistrées dans activity_log C6/§7.7. Le registre décrivant les traitements de boutique est local en T26 ; les événements sensibles effectivement réalisés dans une boutique restent locaux.
+**Clés et reprise :** operation_key est unique sur toute la table, avec un espace de noms de rôle et d’occurrence (par exemple saas:invoice:..., saas:payment:..., saas:delivery:...), et reste stable lors d’un retry. Une clé appartenant à un autre rôle/propriétaire est un conflit, jamais un succès réutilisable. Numérotation, réservations d’avoirs/remboursements, versions de règles et empreinte de transaction gardent leurs unicités propres. Les traitements utilisent des intentions durables ; aucun JSON ne remplace les lignes ou FK des neuf rôles.
 
-### C11 — Fichiers centraux et relations polymorphes
+### C9 — Fichiers centraux et relations polymorphes
 
 Une table `media` centrale sert aux reçus d’abonnement, pièces SaaS et contenus de plateforme. Elle ne contient aucun fichier privé d’une boutique. Le schéma est identique à celui de T2 ; model_id et created_by_id appartiennent ici au central.
 
@@ -1575,8 +1294,8 @@ erDiagram
         bigint_unsigned shop_id FK "shop.id"
         varchar label
         text address
-        uuid province_uuid "REF central.provinces.uuid"
-        uuid municipality_uuid "REF central.municipalities.uuid"
+        uuid province_uuid "REF central.geographic_areas.uuid"
+        uuid municipality_uuid "REF central.geographic_areas.uuid"
         varchar postal_code "nullable"
         decimal_geo latitude "nullable"
         decimal_geo longitude "nullable"
@@ -2553,8 +2272,8 @@ erDiagram
         varchar secondary_phone "nullable"
         varchar email "nullable"
         text address
-        uuid province_uuid "REF central.provinces.uuid"
-        uuid municipality_uuid "REF central.municipalities.uuid"
+        uuid province_uuid "REF central.geographic_areas.uuid"
+        uuid municipality_uuid "REF central.geographic_areas.uuid"
         varchar province_name
         varchar municipality_name
         varchar postal_code "nullable"
@@ -2987,8 +2706,8 @@ erDiagram
     customer_shipping_rates {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        uuid province_uuid "REF central.provinces.uuid"
-        uuid municipality_uuid "nullable ; REF central.municipalities.uuid"
+        uuid province_uuid "REF central.geographic_areas.uuid"
+        uuid municipality_uuid "nullable ; REF central.geographic_areas.uuid"
         tinyint_unsigned delivery_mode "DeliveryModeEnum"
         decimal amount
         boolean is_active
@@ -3000,8 +2719,8 @@ erDiagram
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned provider_id FK "shipping_providers.id"
-        uuid province_uuid "REF central.provinces.uuid"
-        uuid municipality_uuid "nullable ; REF central.municipalities.uuid"
+        uuid province_uuid "REF central.geographic_areas.uuid"
+        uuid municipality_uuid "nullable ; REF central.geographic_areas.uuid"
         tinyint_unsigned delivery_mode "DeliveryModeEnum"
         tinyint_unsigned service_type "ServiceTypeEnum"
         decimal amount
@@ -3017,7 +2736,7 @@ erDiagram
         uuid uuid UK "UUID v4 ; public"
         varchar name
         bigint_unsigned product_id FK "nullable ; products.id"
-        uuid province_uuid "nullable ; REF central.provinces.uuid"
+        uuid province_uuid "nullable ; REF central.geographic_areas.uuid"
         tinyint_unsigned delivery_mode "nullable ; DeliveryModeEnum"
         decimal minimum_cart_amount "nullable"
         datetime started_at "nullable"
@@ -3127,8 +2846,8 @@ erDiagram
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned provider_id FK "shipping_providers.id"
         tinyint_unsigned zone_type "GeoZoneTypeEnum"
-        uuid province_uuid "REF central.provinces.uuid"
-        uuid municipality_uuid "nullable ; REF central.municipalities.uuid"
+        uuid province_uuid "REF central.geographic_areas.uuid"
+        uuid municipality_uuid "nullable ; REF central.geographic_areas.uuid"
         varchar external_code
         varchar external_name
         varchar external_province_code
@@ -3146,8 +2865,8 @@ erDiagram
         bigint_unsigned provider_id FK "shipping_providers.id"
         varchar external_code
         varchar name
-        uuid province_uuid "REF central.provinces.uuid"
-        uuid municipality_uuid "nullable ; REF central.municipalities.uuid"
+        uuid province_uuid "REF central.geographic_areas.uuid"
+        uuid municipality_uuid "nullable ; REF central.geographic_areas.uuid"
         text address
         varchar phone "nullable"
         varchar map_url "nullable"
@@ -3440,7 +3159,7 @@ erDiagram
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
-- **`carrier_operations` :** `operation_key` est unique pour qu’un retry ne crée pas deux opérations. Les types couvrent la création, validation, modification, suivi, frais, géographie, étiquette, demande/validation de retour et note. Les statuts utilisent exactement `CarrierOperationStatusEnum` : `1 PENDING`, `2 RUNNING`, `3 SUCCEEDED`, `4 RETRYABLE_FAILURE`, `5 PERMANENT_FAILURE`, `6 UNCERTAIN`, `7 SUPERSEDED`, `8 CANCELLED`. Une opération qui touche un colis doit pointer vers la bonne livraison, la bonne commande et la bonne révision ; seules les opérations générales comme `fees` ou `geographie` peuvent exister sans commande. Avant de modifier un colis non encore expédié, on vérifie que la révision visée est toujours la révision courante ; sinon l’opération devient `7 SUPERSEDED` et n’est pas envoyée. Après remise, le suivi, les retours et les étiquettes utilisent toujours la révision réellement expédiée. Juste avant l’appel HTTP, on enregistre `sending_started_at`. À partir de ce moment, on bloque les modifications de commande jusqu’à avoir un résultat certain ou avoir fait un rapprochement. Si on ne sait pas si l’appel a été exécuté chez le transporteur — timeout, coupure réseau, 502/503/504 après effet possible, réponse incompréhensible ou crash au mauvais moment — on met `6 UNCERTAIN`. On ne renvoie surtout pas aveuglément la création, sinon on pourrait créer deux colis. Les retries automatiques des opérations qui modifient l’extérieur restent désactivés tant qu’on n’a pas prouvé qu’ils sont sûrs. Si une nouvelle opération remplace l’ancienne, `superseded_by_operation_id` peut pointer vers elle. On garde durablement l’intention et le résultat, mais l’appel HTTP lui-même ne doit pas garder une longue transaction SQL ouverte. L’empreinte SHA-256 de la requête initiale permet de vérifier qu’une même `operation_key` n’est pas réutilisée avec un autre contenu. `merchant_reference` reste stable et correspond à shipments.merchant_reference du colis local. Les coordonnées personnelles éventuellement nécessaires à une reprise sont stockées chiffrées dans `encrypted_personal_request`, jamais en JSON clair. Après `request_expires_at`, ce payload est effacé par le processus de rétention et `request_purged_at` garde la date de purge, tandis que les identifiants techniques minimaux restent. Une opération restée incertaine ne devient pas certaine simplement parce que le payload a été supprimé ; on ne reconstruit pas les données depuis une commande actuelle pour renvoyer l’appel.
+- **`carrier_operations` :** `operation_key` est unique pour qu’un retry ne crée pas deux opérations. Les types couvrent la création, validation, modification, suivi, frais, géographie, étiquette, demande/validation de retour et note. Les statuts utilisent exactement `CarrierOperationStatusEnum` : `1 PENDING`, `2 RUNNING`, `3 SUCCEEDED`, `4 RETRYABLE_FAILURE`, `5 PERMANENT_FAILURE`, `6 UNCERTAIN`, `7 SUPERSEDED`, `8 CANCELLED`. Une opération qui touche un colis doit pointer vers la bonne livraison, la bonne commande et la bonne révision ; seules les opérations générales comme `fees` ou `geographie` peuvent exister sans commande. Avant de modifier un colis non encore expédié, on vérifie que la révision visée est toujours la révision courante ; sinon l’opération devient `7 SUPERSEDED` et n’est pas envoyée. Après remise, le suivi, les retours et les étiquettes utilisent toujours la révision réellement expédiée. Juste avant l’appel HTTP, on enregistre `sending_started_at`. À partir de ce moment, on bloque les modifications de commande jusqu’à avoir un résultat certain ou avoir fait un rapprochement. Si on ne sait pas si l’appel a été exécuté chez le transporteur — timeout, coupure réseau, 502/503/504 après effet possible, réponse incompréhensible ou crash au mauvais moment — on met `6 UNCERTAIN`. On ne renvoie surtout pas aveuglément la création, sinon on pourrait créer deux colis. Les retries automatiques des opérations qui modifient l’extérieur restent désactivés tant qu’on n’a pas prouvé qu’ils sont sûrs. Si une nouvelle opération remplace l’ancienne, `superseded_by_operation_id` peut pointer vers elle. On garde durablement l’intention et le résultat, mais l’appel HTTP lui-même ne doit pas garder une longue transaction SQL ouverte. L’empreinte SHA-256 de la requête initiale permet de vérifier qu’une même `operation_key` n’est pas réutilisée avec un autre contenu. `merchant_reference` reste stable et correspond à shipments.merchant_reference du colis local. Les coordonnées personnelles éventuellement nécessaires à une reprise sont stockées chiffrées dans `encrypted_personal_request`, jamais en JSON clair. Après `request_expires_at`, ce payload est effacé par le traitement d’expiration propre à cette intégration et `request_purged_at` garde la date de purge, tandis que les identifiants techniques minimaux restent. Une opération restée incertaine ne devient pas certaine simplement parce que le payload a été supprimé ; on ne reconstruit pas les données depuis une commande actuelle pour renvoyer l’appel.
 
 - **`carrier_operation_attempts` :** Pour une même opération, chaque `attempt_number` est unique. On garde seulement les réponses et erreurs utiles, après avoir retiré secrets et données personnelles inutiles. Les gros payloads de diagnostic ont une durée de vie courte définie par C8. Les corps HTTP bruts ne sont pas conservés par défaut. Quand l’opération est terminée, les faits et le résultat restent `append-only`; seule la partie de diagnostic autorisée peut être purgée, et `payload_purged_at` indique quand cette purge a eu lieu.
 
@@ -3969,7 +3688,7 @@ erDiagram
 - **`carrier_fee_payments` :** UNIQUE(operation_key), UNIQUE(reversal_of_id) hors NULL. mode=3 OFFSET | 2 SEPARATE_PAYMENT. Frais du même prestataire que le bordereau, payer=2 (MERCHANT), déjà constatés. Sous verrou du frais, 0<=somme nette des allocations sur bordereaux rapprochés<=montant effectif du frais (original + contrepassation). Pour corriger un frais déjà payé, contrepasser/réaffecter son allocation sans créer de mouvement bancaire fictif ; le trop-payé reconnu devient une `carrier_receivables`. Une écriture d’allocation n’est jamais une seconde charge.
 - **`carrier_receivables` — AUD-02 :** représente un montant reconnu dû par le transporteur après correction d’un frais déjà payé, sans présumer qu’il a été encaissé. UNIQUE(operation_key), UNIQUE(reversal_of_id) hors NULL. `initial_amount>0`, `0<=remaining_amount<=initial_amount`; `remaining_amount` est une projection vérifiable depuis les allocations nettes. status=`1 OPEN | 2 PARTIALLY_SETTLED | 3 SETTLED | 4 CANCELLED | 5 REVERSED`. La manière de règlement (remboursement bancaire, compensation de frais, compensation de bordereau, autre) est portée uniquement par `carrier_receivable_allocations.settlement_type`, pas dupliquée dans le statut. Exemple : paiement réel 650, frais corrigé 600 → charge nette 600, trésorerie -650, créance 50. La création de la créance ne produit aucun `+50` bancaire. Une erreur sur une créance finalisée se corrige par contrepassation puis nouvelle écriture, pas par réécriture silencieuse.
 - **`carrier_receivable_allocations` :** UNIQUE(operation_key), UNIQUE(reversal_of_id) hors NULL. `settlement_type=1 BANK_REFUND | 2 FEE_OFFSET | 3 STATEMENT_OFFSET | 4 OTHER_VALID_SETTLEMENT`. Sous `FOR UPDATE` sur la créance, exiger que la somme nette des allocations ne dépasse jamais `initial_amount`. Un remboursement bancaire exige un bordereau/preuve réellement rapproché ; une compensation de frais référence le frais futur effectivement réduit. Une réaffectation interne sans cash n’entre jamais dans le net bancaire. Quand le net des allocations atteint `initial_amount`, `remaining_amount=0` et la créance est soldée.
-- **`collection_entries` :** UNIQUE(operation_key), UNIQUE(reversal_of_id) hors NULL, UNIQUE(id,collection_id). FK composite `(reversal_of_id,collection_id)` → `collection_entries(id,collection_id)` ; appliquer la même contrainte à `correction_of_id` lorsqu’il est renseigné ; CHECK `reversal_of_id IS NULL OR reversal_of_id<>id`. Un inverse/correctif reste donc sur le même recouvrement. Append-only dès insertion ; seuls des montants vérifiés y entrent. Un encaissement ordinaire est positif ; un refus impayé donne somme=0 sans fausse écriture positive. Un inverse négatif conserve le même recouvrement. Somme nette>=0 et <=COD attendu ; un trop-perçu exige une investigation et une régularisation contrôlée plutôt qu’une augmentation silencieuse de la vente. La référence/preuve atteste l’encaissement chez le transporteur, pas sa réception par le commerçant. Une diminution ne peut rendre les reversements déjà rapprochés supérieurs au nouveau plafond : correction coordonnée sous verrous.
+- **`collection_entries` :** UNIQUE(operation_key), UNIQUE(reversal_of_id) hors NULL, UNIQUE(id,collection_id). FK composite `(reversal_of_id,collection_id)` → `collection_entries(id,collection_id)` ; appliquer la même contrainte à `correction_of_id` lorsqu’il est renseigné ; trigger/validation interdisant reversal_of_id=id. Un inverse/correctif reste donc sur le même recouvrement. Append-only dès insertion ; seuls des montants vérifiés y entrent. Un encaissement ordinaire est positif ; un refus impayé donne somme=0 sans fausse écriture positive. Un inverse négatif conserve le même recouvrement. Somme nette>=0 et <=COD attendu ; un trop-perçu exige une investigation et une régularisation contrôlée plutôt qu’une augmentation silencieuse de la vente. La référence/preuve atteste l’encaissement chez le transporteur, pas sa réception par le commerçant. Une diminution ne peut rendre les reversements déjà rapprochés supérieurs au nouveau plafond : correction coordonnée sous verrous.
 
 Les tables ajoutées matérialisent des faits manquants dans les notes : allocation de paiement à un frais précis et journal des encaissements vérifiés. Elles évitent des compteurs financiers modifiables sans historique.
 
@@ -4406,7 +4125,7 @@ erDiagram
 
 **`exchange_offsets` — La part d’un avoir utilisée pour payer une nouvelle commande d’échange précise. Exemple : affecter 8 000 DA à un échange coûtant 10 000 DA, avec 2 000 DA de produits restant à payer, sans portefeuille client.**
 
-`invoices.document_type=1 INVOICE | 2 CREDIT_NOTE` est le modèle de documents typés conservé. **Il n’y a pas une deuxième table `avoirs` dans la BDD boutique** : les avoirs y ont leur facture d’origine, leurs lignes/quantités/motifs dans les snapshots et leur séquence propre. La table centrale `saas_credit_notes` concerne une autre relation commerciale.
+`invoices.document_type=1 INVOICE | 2 CREDIT_NOTE` est le modèle de documents typés conservé. **Il n’y a pas une deuxième table `avoirs` dans la BDD boutique** : les avoirs y ont leur facture d’origine, leurs lignes/quantités/motifs dans les snapshots et leur séquence propre. Les lignes centrales saas_invoices record_type=3 CREDIT_NOTE concernent la relation commerciale du SaaS avec le propriétaire.
 
 ```mermaid
 erDiagram
@@ -4457,7 +4176,7 @@ erDiagram
 - **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
 - **`order_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
 - **`revision_id`** : l’identifiant de la version de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`billing_rule_id`** : la version de règle résolue dans la BDD de ce document ; saas_billing_rules pour le SaaS, billing_rules pour une obligation de boutique.
+- **`billing_rule_id`** : la version de règle résolue dans la BDD de ce document ; saas_invoices de type 6 RULE pour le SaaS, billing_rules pour une obligation de boutique.
 - **`rule_snapshot`** : une **copie figée** de regle au moment important de l’opération. Si l’information d’origine change plus tard, cette ancienne ligne garde la valeur utilisée à ce moment-là.
 - **`event_type`** : le type d’événement qui a créé l’obligation de facturer. Exemple : vente finalisée, avoir à produire ou autre événement prévu.
 - **`event_id`** : l’identifiant de l’événement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
@@ -4598,7 +4317,7 @@ erDiagram
 
 
 
-- **`commercial_corrections` — AUD-06/AUD-12 :** UNIQUE(operation_key), UNIQUE(correction_of_id) hors NULL, UNIQUE(id,source_revision_id), UNIQUE(id,order_id,source_revision_id). FK(source_revision_id,order_id) → order_revisions(id,order_id) ; si incident renseigné, FK(incident_id,order_id) → order_incidents(id,order_id). FK composite `(correction_of_id,order_id,source_revision_id)` → `commercial_corrections(id,order_id,source_revision_id)` et CHECK `correction_of_id IS NULL OR correction_of_id<>id` : une correction de correction reste sur la même commande et la même révision source. `correction_type=1 RETURN | 2 PRICE_REDUCTION | 3 CANCELLATION | 4 EXCHANGE | 5 GOODWILL | 6 REVERSAL | 7 OTHER` (`CommercialCorrectionTypeEnum`). `status=1 DRAFT | 2 FINALIZED | 3 CANCELLED | 4 REVERSED` (`CommercialCorrectionStatusEnum`). `non_product_kind=1 NONE | 2 SHIPPING | 3 GLOBAL_GOODWILL | 4 OTHER` (`NonProductKindEnum`) et `non_product_revenue_delta` est signé. CHECK : nature=`aucune` ⇒ delta=0 ; nature différente de `aucune` ⇒ delta<>0. Une correction peut comporter uniquement des lignes produit, uniquement un impact hors produit, ou les deux ; à la finalisation, au moins un impact non nul doit exister. Exemple : remboursement commercial des seuls 650 DZD de livraison → `non_product_kind=livraison`, `non_product_revenue_delta=-650`, aucune ligne produit. `effective_at` est la période économique utilisée par les indicateurs ; `recorded_at` est l’instant où la décision est réellement enregistrée. Au MVP, une décision finalisée prend effet à sa date commerciale explicite ; elle ne réécrit pas silencieusement une période déjà publiée. Une ligne finalisée est immuable ; une erreur se corrige par un nouvel événement lié via `correction_of_id`, jamais par UPDATE destructif. L’ouverture d’un incident ou la réception d’un retour ne crée pas automatiquement cette correction.
+- **`commercial_corrections` — AUD-06/AUD-12 :** UNIQUE(operation_key), UNIQUE(correction_of_id) hors NULL, UNIQUE(id,source_revision_id), UNIQUE(id,order_id,source_revision_id). FK(source_revision_id,order_id) → order_revisions(id,order_id) ; si incident renseigné, FK(incident_id,order_id) → order_incidents(id,order_id). FK composite `(correction_of_id,order_id,source_revision_id)` → `commercial_corrections(id,order_id,source_revision_id)` et trigger/validation interdisant correction_of_id=id : une correction de correction reste sur la même commande et la même révision source. `correction_type=1 RETURN | 2 PRICE_REDUCTION | 3 CANCELLATION | 4 EXCHANGE | 5 GOODWILL | 6 REVERSAL | 7 OTHER` (`CommercialCorrectionTypeEnum`). `status=1 DRAFT | 2 FINALIZED | 3 CANCELLED | 4 REVERSED` (`CommercialCorrectionStatusEnum`). `non_product_kind=1 NONE | 2 SHIPPING | 3 GLOBAL_GOODWILL | 4 OTHER` (`NonProductKindEnum`) et `non_product_revenue_delta` est signé. CHECK : nature=`aucune` ⇒ delta=0 ; nature différente de `aucune` ⇒ delta<>0. Une correction peut comporter uniquement des lignes produit, uniquement un impact hors produit, ou les deux ; à la finalisation, au moins un impact non nul doit exister. Exemple : remboursement commercial des seuls 650 DZD de livraison → `non_product_kind=livraison`, `non_product_revenue_delta=-650`, aucune ligne produit. `effective_at` est la période économique utilisée par les indicateurs ; `recorded_at` est l’instant où la décision est réellement enregistrée. Au MVP, une décision finalisée prend effet à sa date commerciale explicite ; elle ne réécrit pas silencieusement une période déjà publiée. Une ligne finalisée est immuable ; une erreur se corrige par un nouvel événement lié via `correction_of_id`, jamais par UPDATE destructif. L’ouverture d’un incident ou la réception d’un retour ne crée pas automatiquement cette correction.
 - **`commercial_correction_lines` :** UNIQUE(correction_id,order_item_id). FK(correction_id,source_revision_id) → commercial_corrections(id,source_revision_id) et FK(order_item_id,source_revision_id) → order_items(id,revision_id), avec clés parents UNIQUE ; la ligne concernée appartient donc obligatoirement à la révision source. `affected_quantity>0`. Sous verrou de la commande/révision puis des lignes concernées, la **quantité corrigée nette cumulée** de chaque `order_item_id` (corrections finalisées moins leurs contrepassations exactes) + la nouvelle quantité ne peut jamais dépasser la quantité admissible de la ligne. Une seconde correction quantité=1 sur une ligne vendue quantité=1 est donc refusée, sauf si elle constitue l’inverse documenté d’une correction précédente. Une contrepassation doit reprendre les mêmes lignes/quantités et inverser exactement les deltas correspondants ; elle ne crée pas un nouveau budget de correction tant qu’elle n’est pas finalisée. `reference_sale_amount>=0`. `revenue_delta` et `sold_cost_delta` sont signés et expliquent exactement l’impact de gestion ; exemple d’annulation de 8 000 : `revenue_delta=-8000`. L’impact revenu total de l’événement = Σ `commercial_correction_lines.revenue_delta` + `commercial_corrections.non_product_revenue_delta`. Les quantités/statistiques produit utilisent uniquement les lignes produit ; une correction de livraison ne doit jamais être attribuée artificiellement à un article. Les montants fiscaux restent dans factures/avoirs et le mouvement de trésorerie dans `customer_adjustments`/journaux financiers : cette table ne simule ni document fiscal ni paiement.
 
 **Convention temporelle :** vente en janvier, colis reçu en février, décision commerciale finalisée en mars, remboursement en avril → vente initiale en janvier, correction commerciale en mars (`effective_at`), cash en avril. Les exports exposent séparément `date_retour_physique`, `date_effet_correction`, `date_emission_document` et `date_remboursement` lorsqu’elles existent.
@@ -4967,7 +4686,7 @@ tenants.user_id est le propriétaire central immuable. tenant users.central_user
 
 **AUD-05 adapté :** les exceptions temporaires sont locales à leur BDD et leur guard. permission_overrides ne contient plus une portée plateforme/tenant ni un tenant_id ; le DENY et les dates restent prioritaires et contrôlés par le service. admin_restrictions reste exclusivement au central et ses cibles ne désignent que des objets centraux.
 
-Unicités conditionnelles : domaine principal actif, abonnement actif du propriétaire, panier actif, adresse principale, média principal par parent/collection, déploiement en cours, exception/restriction active. Les expressions utilisent un état explicite, jamais NOW(). Les cibles facultatives et quotas sont normalisés avec une sentinelle numérique interdite comme PK réelle (0), et non un UUID fictif. Le rôle racine unique est porté par roles.super_admin_slot ; la gestion de son attribution verrouille ce rôle et préserve un administrateur valide dans sa BDD. Le central n’entretient aucune unicité sur les collaborateurs de boutique.
+Unicités conditionnelles : domaine principal actif, abonnement actif type 1 du propriétaire, panier actif, adresse principale, média principal par parent/collection, déploiement en cours, exception/restriction active. Les expressions utilisent un état explicite, jamais NOW(). Les cibles facultatives et quotas sont normalisés avec une sentinelle numérique interdite comme PK réelle (0), et non un UUID fictif. Le rôle racine unique est porté par roles.super_admin_slot ; la gestion de son attribution verrouille ce rôle et préserve un administrateur valide dans sa BDD. Le central n’entretient aucune unicité sur les collaborateurs de boutique.
 
 ### 6.4 Exemples de protections supplémentaires
 
@@ -4997,7 +4716,7 @@ Le trigger de variante compare OLD.product_id et NEW.product_id avec `<=>` et é
 
 ### 6.5 Compléments obligatoires de la V3.2
 
-Les liens simples présents dans les nouveaux diagrammes sont des FK SQL locales, sauf les champs marqués REF central/tenant. Les FK composites supplémentaires de C9 et T22 sont obligatoires comme celles des tableaux précédents ; T21 ne contient plus de table d’accord de collecte. Les nouvelles FK composites de contrepassation sont définies en 6.6. Créer les UNIQUE parents déclarés avant les FK, et ajouter les références cycliques ensuite. Les liens polymorphes des autorisations, activités, médias et références génériques sont validés par service/morph map, pas par une FK SQL fictive ; les FK métier exactes et composites restent obligatoires.
+Les liens simples présents dans les nouveaux diagrammes sont des FK SQL locales, sauf les champs marqués REF central/tenant. Les FK composites supplémentaires de C8 et T22 sont obligatoires comme celles des tableaux précédents ; T21 ne contient plus de table d’accord de collecte. Les nouvelles FK composites de contrepassation sont définies en 6.6. Créer les UNIQUE parents déclarés avant les FK, et ajouter les références cycliques ensuite. Les liens polymorphes des autorisations, activités, médias et références génériques sont validés par service/morph map, pas par une FK SQL fictive ; les FK métier exactes et composites restent obligatoires.
 
 **AUD-03 — exemple de correspondance obligation/document :**
 
@@ -5063,9 +4782,36 @@ Une self-FK simple `reversal_of_id → même_table.id` ne suffit pas : elle prou
 | `customer_adjustments` | `(id,order_id,incident_id)` | `(reversal_of_id,order_id,incident_id)` → même table |
 | `commercial_corrections` | `(id,order_id,source_revision_id)` | `(correction_of_id,order_id,source_revision_id)` → même table |
 
-Quand une table possède aussi `correction_of_id`, appliquer le même rattachement composite à ce lien. `UNIQUE(reversal_of_id)` hors NULL empêche d’annuler deux fois la même écriture. Ajouter `CHECK(reversal_of_id IS NULL OR reversal_of_id<>id)` (ou l’équivalent sur `correction_of_id`) pour interdire l’auto-référence.
+Quand une table possède aussi `correction_of_id`, appliquer le même rattachement composite à ce lien. `UNIQUE(reversal_of_id)` hors NULL empêche d’annuler deux fois la même écriture. Interdire l’auto-référence sur reversal_of_id/correction_of_id par trigger/validation avec l’id effectif : ces id AUTO_INCREMENT ne peuvent pas être utilisés dans un CHECK MySQL.
 
 La FK composite ne peut pas vérifier « montant/deltas = inverse exact ». Cette égalité reste contrôlée sous verrou par le service ou un trigger : même parent, mêmes références métier exigées, montant et tous les deltas exactement opposés, original ordinaire non déjà contrepassé, contrepassation elle-même non contrepassable.
+
+### 6.7 Fusions centrales : type, propriétaire et origine exacts
+
+Une table physique fusionnée conserve des entités métier distinctes. Les discriminants sont immuables ; leurs colonnes *_record_type / parent_type indiquées générées sont GENERATED ALWAYS AS (...) STORED. Chaque colonne générée participant à une FK est stockée, jamais VIRTUAL. Les champs requis par rôle sont contrôlés explicitement avec IS NULL/IS NOT NULL pour empêcher le contournement d’une FK composite par NULL. Les références de §7 restent UUID entre BDD ; ces nouveaux rattachements sont SQL dans la BDD centrale.
+
+| Clé parent UNIQUE à créer | FK enfant exacte |
+|---|---|
+| subscriptions(id,user_id,record_type) | subscriptions(parent_subscription_id,user_id,parent_record_type=1) ; saas_invoices(subscription_id,user_id,subscription_record_type=1) |
+| subscriptions(id,parent_subscription_id,user_id,record_type) | saas_invoices(installment_id,subscription_id,user_id,installment_record_type=2) |
+| geographic_areas(id,country_id,type) | geographic_areas(parent_id,country_id,parent_type=1) |
+| saas_invoices(id,user_id,record_type) | saas_invoices(parent_document_id,user_id,parent_document_record_type=2/3) ; saas_invoices(document_id,user_id,document_record_type=2/3) |
+| saas_invoices(id,installment_id,subscription_id,user_id,record_type) | saas_invoices(original_invoice_id,installment_id,subscription_id,user_id,original_invoice_record_type=2), en-tête avoir de même échéance/abonnement/propriétaire |
+| saas_invoices(id,user_id,record_type) | saas_invoices(original_invoice_id,user_id,original_invoice_record_type=2), pour toute origine renseignée |
+| saas_invoices(id,document_type,fiscal_year,record_type) | saas_invoices(sequence_id,document_type,fiscal_year,sequence_record_type=1), série du bon type/exercice |
+| saas_invoices(id,original_invoice_id,user_id,record_type) | saas_invoices(parent_document_id,original_invoice_id,user_id,parent_document_record_type=3), ligne d’avoir et même origine ; saas_invoices(credit_note_id,document_id,user_id,credit_note_record_type=3) |
+| saas_invoices(id,parent_document_id,user_id,record_type) | saas_invoices(original_invoice_line_id,original_invoice_id,user_id,original_line_record_type=4) |
+| saas_invoices(id,record_type) | saas_invoices(billing_rule_id,billing_rule_record_type=6) |
+| saas_invoices(id,document_id,user_id,record_type) | saas_invoices(original_payment_id,document_id,user_id,original_payment_record_type=8) ; saas_invoices(reversal_of_id,document_id,user_id,record_type) |
+| saas_invoices(id,document_id,user_id,original_payment_id,record_type) | saas_invoices(reversal_of_id,document_id,user_id,original_payment_id,record_type), ajout pour contrepassation de remboursement |
+
+Les valeurs =1/2/3/4/6/8 dans le tableau expliquent le discriminateur ; elles ne sont pas une syntaxe de déclaration de FK. Les noms de colonnes seuls sont utilisés dans la migration. La FK sur billing_rule_id impose une RULE type 6 ; celle sur original_payment_id impose un PAYMENT type 8. document_record_type vaut 2/3 pour DELIVERY type 7, et obligatoirement 2 pour PAYMENT/REFUND types 8/9. Les contrôles de forme rendent document_id/user_id/document_record_type non NULL pour 7/8/9 ; hors de ces rôles, ces champs sont NULL. Tous les id/FK sont BIGINT UNSIGNED, tous les types TINYINT UNSIGNED. billing_rule_record_type=CASE WHEN billing_rule_id IS NOT NULL THEN 6 ELSE NULL END et original_payment_record_type=CASE WHEN original_payment_id IS NOT NULL THEN 8 ELSE NULL END. Pour les autres discriminants liés aux id, calculer NULL si la FK est NULL ; pour parent_document_record_type, CASE record_type WHEN 4 THEN 2 WHEN 5 THEN 3 ELSE NULL END. sequence_slot=CASE WHEN record_type=1 THEN 1 ELSE NULL END dans saas_invoices. subscriptions.active_owner_slot=CASE WHEN record_type=1 AND status=3 THEN 1 ELSE NULL END. geographic_areas.parent_type=CASE WHEN type=2 THEN 1 ELSE NULL END et parent_key=COALESCE(parent_id,0). La définition d’active_transaction_fingerprint est celle de C8, avec transfer_status=3 et aucune contrepassation. Chaque clé parent UNIQUE du tableau est créée une seule fois, même si plusieurs FK l’utilisent. Types et tailles sont identiques des deux côtés, et les index UNIQUE parents précèdent l’ajout des FK vers cette même table.
+
+**Contrôles MySQL à traduire correctement :** les sommes entre lignes, l’état du parent, les plafonds d’avoirs/remboursements, les NULL requis par rôle et les rattachements autorisés sont imposés par services transactionnels et triggers ciblés. Un CHECK de codes simples ne remplace pas ces validations. MySQL 8.4 interdit l’utilisation d’une colonne AUTO_INCREMENT dans CHECK ; les conditions « ne pas se référencer soi-même » passent donc par trigger/validation avec l’id effectif, pas CHECK(reversal_of_id<>id). Les colonnes utilisées dans des actions référentielles de FK ont également des restrictions CHECK : utiliser un trigger de forme pour les variantes où un CHECK ne serait pas accepté. Les FK utilisent RESTRICT et n’effacent aucun document/flux historique. Les triggers calculent leurs conditions à partir des colonnes de base : MySQL n’autorise pas NEW/OLD pour lire une colonne générée. Un contrôle d’intégrité après insertion refuse toute auto-référence, y compris id explicitement fourni ; l’insertion ordinaire cible un parent préexistant du type requis. [S1–S3, S7, S14]
+
+**Ordre des verrous :** un même service central prend users du propriétaire → abonnement type 1 → échéance type 2 → facture et lignes originales → paiements/avoirs/remboursements ; règles de série et compteur sont verrouillés au moment de réserver le document selon un ordre déterministe commun. Aucune transaction n’attend un transfert bancaire, une génération de PDF ou un HTTP. Marqueur durable avant effet externe, reprise par operation_key et résultat incertain à rapprocher. Les types de lignes ne sont pas modifiables par mass assignment, et les modèles/Policies/routes imposent les scopes de type.
+
+**Préparation d’une migration future :** ce document prépare le projet et n’exécute aucun déplacement de données. Si des données existent avant migration, les id numériques des anciennes tables peuvent se chevaucher : reconstruire une correspondance (ancienne table, ancien id) → nouvel id et réécrire toutes les FK numériques, ainsi que model_id/subject_id des médias/activités suivant leur alias morph. Pour la dernière fusion, les codes fiscaux 1–5 restent identiques ; les anciens codes d’opération 1/2/3/4 deviennent 6/7/8/9. Préserver les UUID publics, les dates, les montants, les clés d’opération et les pièces originales ; résoudre explicitement toute collision réelle de UUID/clés avant validation. La clé d’opération devient globale : si deux faits distincts utilisaient la même clé dans les deux anciennes tables, attribuer des clés avec espace de noms de rôle, conserver la correspondance historique et adapter les producteurs/reprises ; ne jamais fusionner ou abandonner un fait à cause de cette collision. Une fusion ne supprime aucune échéance, ligne, avoir, version de règle, tentative d’envoi ou preuve. Contrôler compteurs, origines typées, totaux et droits avant bascule.
 
 ## 7. Autorisations, propriété et intégration Laravel
 
@@ -5079,13 +4825,13 @@ La FK composite ne peut pas vérifier « montant/deltas = inverse exact ». Cett
 
 ### 7.1 Provisionnement sous quota et renommage
 
-Toutes les mutations pouvant changer le quota ou son occupation utilisent **la même ligne users du propriétaire comme verrou stable** : créations de tenants, libération définitive de place, activation/rétrogradation d’abonnement et exceptions fonctionnelles. Une désactivation simple ne libère aucune place.
+Toutes les mutations pouvant changer le quota ou son occupation utilisent **la même ligne users du propriétaire comme verrou stable** : créations de tenants, libération définitive de place, activation/rétrogradation d’abonnement type 1 et exceptions fonctionnelles. Une désactivation simple ne libère aucune place.
 
 ```text
 TRANSACTION sur connexion centrale
   verrouiller la ligne users WHERE id = user_id du propriétaire FOR UPDATE
   rechercher (user_id,creation_key) ; si existe, comparer hash et reprendre
-  résoudre abonnement et exceptions à la date courante
+  résoudre abonnement record_type=1 et exceptions à la date courante
   lire en lecture courante les tenants non supprimés du propriétaire
   compter ces lignes, y compris provisionnements en cours/échoués
   si quota disponible : INSERT tenant status=1 (PROVISIONING), sans membre central
@@ -5102,11 +4848,11 @@ Renommage : modifier shop_name et incrémenter profile_version sur la connexion 
 
 ### 7.2 Expiration du payant et choix des boutiques actives
 
-Le gratuit est le plan de repli obligatoire, même si aucune souscription payante n’est active. Sous verrou users du propriétaire : clôturer le payant échu, retrouver/créer le gratuit avec une clé déterministe de transition, résoudre quota et exceptions, puis sélectionner les boutiques éligibles. La date d’expiration est contrôlée à chaque décision sensible ; un cron arrêté ne prolonge pas les droits payants.
+Le gratuit est le plan de repli obligatoire, même si aucune souscription payante n’est active. Sous verrou users du propriétaire : clôturer le payant type 1 échu, retrouver/créer le gratuit type 1 avec une clé déterministe de transition, résoudre quota et exceptions, puis sélectionner les boutiques éligibles. La date d’expiration est contrôlée à chaque décision sensible ; un cron arrêté ne prolonge pas les droits payants.
 
 Ordre de sélection : choix explicite `activation_priority`, sinon boutique `is_primary`, sinon active la plus ancienne ; UUID départage les égalités. Pour le quota gratuit=1, un seul tenant éligible reste actif. L’éligibilité exclut archive, échec/provisionnement et suspensions administratives ; un recalcul de quota ne les annule pas. Excédentaires → hors_quota et date ; aucune suppression des commandes, médias, catalogue ou BDD. Le choix principal et les priorités appartiennent au propriétaire et restent uniques/cohérents sous son verrou.
 
-Hors quota : propriétaire autorisé à consulter/exporter ses données et gérer son abonnement/choix, catalogue éventuellement public, mais checkout, nouvelles commandes, nouvelles confirmations/expéditions et modifications commerciales importantes refusés côté serveur. Désactiver aussi les jobs commerciaux premium. Les traitements techniques de preuve, sécurité, rétention, rapprochement des colis déjà envoyés et clôture d’obligations existantes continuent sous un périmètre système/SAV contrôlé ; une expiration ne doit pas effacer une dette ni faire perdre un remboursement dû. Aucun nouveau commerce n’est autorisé par cette exception de clôture.
+Hors quota : propriétaire autorisé à consulter/exporter ses données et gérer son abonnement/choix, catalogue éventuellement public, mais checkout, nouvelles commandes, nouvelles confirmations/expéditions et modifications commerciales importantes refusés côté serveur. Désactiver aussi les jobs commerciaux premium. Les traitements techniques de preuve, sécurité, rapprochement des colis déjà envoyés et clôture d’obligations existantes continuent sous un périmètre système/SAV contrôlé ; une expiration ne doit pas effacer une dette ni faire perdre un remboursement dû. Aucun nouveau commerce n’est autorisé par cette exception de clôture.
 
 Changer de boutique active se fait dans UNE transaction centrale : ancienne hors_quota puis nouvelle active, quota recontrôlé. Invalider caches, routage checkout et droits ; tous les points d’entrée, API et jobs recontrôlent le droit central avant une nouvelle action. À upgrade, réactiver les hors_quota éligibles dans la limite du quota, en conservant leurs données ; conserver les autres suspensions. Une nouvelle boutique reste refusée tant que le nombre de tenants existants non supprimés atteint le quota : désactiver n’ouvre pas une place artificielle.
 
@@ -5120,11 +4866,11 @@ Une requête de création déjà acceptée retrouve son tenant via (user_id,crea
 | Résolution d’un domaine, tenant, statut et versions | Central domains/tenants | Lecture contrôlée et initialisation de la bonne BDD par UUID |
 | Propriété, profil public et préfixe documentaire | Central tenants/users | Projection versionnée dans shop et vérification du propriétaire local ; aucun partage de mot de passe |
 | Plan, fonctionnalités, quotas et exceptions fonctionnelles | Central subscriptions/features/plan_features | Résolution serveur des droits d’usage ; lecture minimale/cache versionné ; aucun compte d’équipe envoyé |
-| Pays, wilayas et communes | Central countries/provinces/municipalities | Références externes par UUID, validation serveur, snapshots des noms/codes au moment métier |
+| Pays, wilayas et communes | Central countries/geographic_areas | Références externes par UUID, validation serveur, snapshots des noms/codes au moment métier |
 | Profil professionnel vendeur | Central users/countries | Lecture minimale et snapshot professionnel versionné, sans duplication des contacts ni partage des credentials |
 | Règles de facturation boutique, documents et registre des traitements | BDD boutique T17/T20/T22/T26 | Gestion locale, FK numériques et snapshots locaux ; aucun appel à un registre documentaire ou à une règle de boutique centrale |
 | Comptes transporteur, secrets, tarifs, suivi et reversements | BDD boutique T10–T13/T16/T17/T25 | Traitement local ; aucune dépendance à un compte, secret ou lot central |
-| Provisioning, schéma et rétention | Central exploitation et BDD concernée | Déploiement/migration et orchestration technique ; traitement métier local dans le contexte explicite |
+| Provisioning et schéma | Central exploitation et BDD concernée | Déploiement/migration ; traitement métier local dans le contexte explicite |
 | Comptes, membres, rôles, permissions, invitations, passkeys et activités internes | BDD boutique | Gestion et autorisation exclusivement locales ; aucune synchronisation vers le central |
 
 Ces échanges ne sont pas des FK inter-BDD. Un service central est appelé avec le tenant UUID résolu par le serveur et une intention autorisée, jamais avec un tenant arbitraire transmis par le navigateur. Un membre local déclenche une intention de livraison dans sa BDD ; le connecteur tenant charge son compte transporteur local et conserve son activité dans le journal local. Les réglages de propriété, domaine et abonnement sont effectués avec la session centrale du propriétaire ; les livraisons et reversements utilisent uniquement la BDD de leur boutique.
@@ -5184,7 +4930,7 @@ Les attributions Spatie via attach/sync et les pivots natifs ne doivent pas êtr
 
 ### 7.6 Relations polymorphes Laravel et bibliothèque media
 
-Source complémentaire : [Laravel — relations polymorphes](https://laravel.com/framework/docs/13.x/eloquent-relationships#polymorphic-relationships). Une morph map définit des alias anglais stables : central_user, shop_user, tenant, product, product_variant, category, shop, invoice, saas_invoice, subscription, order_contract, shipment, carrier_account, carrier_rate_version, carrier_remittance_batch, billing_rule, processing_activity_register, etc. Tous les modèles effectivement attachables/auditables ont un alias et un périmètre autorisé explicites avant migrations. Relation::enforceMorphMap est utilisé ; les relations existantes d’un package sont testées pour qu’elles enregistrent les mêmes alias, au lieu de supposer un nom PHP brut. Les noms model_type/subject_type/causer_type sont conservés pour compatibilité des packages. Les colonnes morph *_id sont définies en BIGINT UNSIGNED ; ne pas activer un type morph UUID global alors que les PK restent numériques.
+Source complémentaire : [Laravel — relations polymorphes](https://laravel.com/framework/docs/13.x/eloquent-relationships#polymorphic-relationships). Une morph map définit des alias anglais stables : central_user, shop_user, tenant, product, product_variant, category, shop, invoice, saas_invoice, saas_credit_note, saas_invoice_line, saas_credit_note_line, saas_sequence, subscription, subscription_installment, saas_billing_rule, saas_document_delivery, saas_payment, saas_refund, order_contract, shipment, carrier_account, carrier_rate_version, carrier_remittance_batch, billing_rule, processing_activity_register, etc. Tous les modèles effectivement attachables/auditables ont un alias et un périmètre autorisé explicites avant migrations. Les modèles logiques partageant une table imposent record_type ; un alias saas_invoice ne peut résoudre un UUID de compteur ou de ligne, et subscription refuse une échéance. Un PDF fiscal est attaché au modèle d’en-tête correspondant, une preuve de virement à saas_payment/saas_refund. Relation::enforceMorphMap est utilisé ; les relations existantes d’un package sont testées pour qu’elles enregistrent les mêmes alias, au lieu de supposer un nom PHP brut. Les noms model_type/subject_type/causer_type sont conservés pour compatibilité des packages. Les colonnes morph *_id sont définies en BIGINT UNSIGNED ; ne pas activer un type morph UUID global alors que les PK restent numériques.
 
 ```php
 // Extraits des modèles tenant, connexion tenant explicite sur leurs bases communes.
@@ -5204,7 +4950,7 @@ public function media(): MorphMany // dans Product, ProductVariant, Shop, Invoic
 
 Les pointeurs explicites logo_media_id, favicon_media_id, category.media_id, invoice.media_id, proof_media_id et autres pièces restent des FK numériques locales lorsqu’ils identifient une pièce précise. Le service vérifie que le parent polymorphe du média correspond au véritable objet et à la collection attendue, sous verrou ; une FK simple vers media ne suffit pas. Les modèles Product/Category/Invoice/etc. conservent leurs relations métier ordinaires. Ne pas remplacer par morph une FK de commande, de révision, de stock ou de finance qui doit imposer un parent exact.
 
-Unicité du principal : colonne générée nullable primary_slot=1 si is_primary=true ET deleted_at IS NULL, sinon NULL ; UNIQUE(model_type,model_id,collection_name,primary_slot). Changer un principal verrouille le parent, désactive l’ancien puis active le nouveau dans la même transaction. model_id doit exister dans la même BDD selon model_type ; aucun lien polymorphe ne dispose d’une FK SQL générique. Une tâche d’intégrité contrôle les liens orphelins, tandis qu’un service de rétention protège les pièces encore requises. Les suppressions de documents historiques sont régies par leurs obligations, pas par une cascade des médias.
+Unicité du principal : colonne générée nullable primary_slot=1 si is_primary=true ET deleted_at IS NULL, sinon NULL ; UNIQUE(model_type,model_id,collection_name,primary_slot). Changer un principal verrouille le parent, désactive l’ancien puis active le nouveau dans la même transaction. model_id doit exister dans la même BDD selon model_type ; aucun lien polymorphe ne dispose d’une FK SQL générique. Une tâche d’intégrité contrôle les liens orphelins, et les services métier protègent les pièces encore requises. Les suppressions de documents historiques sont régies par leurs obligations, pas par une cascade des médias.
 
 Le stockage reste physiquement isolé : tenants/{tenant_uuid}/public/{media_uuid}/... ou tenants/{tenant_uuid}/private/{media_uuid}/..., et central/public|private/... pour la plateforme. disk/storage_key ne sont jamais des paramètres libres du navigateur. Signature et Policy sont vérifiées à chaque accès privé ; l’URL signée d’une boutique ne permet aucun accès à une autre. L’UUID protège le routage, pas l’accès. Fichiers validés (taille, MIME réel, contenu), conversions contrôlées ; secret ou pièce privée jamais publié par une simple collection. Cette bibliothèque est un modèle applicatif polymorphe ; elle n’impose pas l’installation de spatie/laravel-medialibrary ni ne prétend reprendre sa migration.
 
@@ -5251,7 +4997,7 @@ public function getActivitylogOptions(): LogOptions
 }
 ```
 
-**Explicite :** actions métier, lecture sensible/export, connexion/déconnexion/échec, attribution/révocation de rôle, invitation, changement de plan, confirmation, annulation, prix manuel, correction de stock, envoi transporteur, émission/transmission documentaire et rétention. performedOn cible le modèle local ; causedBy désigne l’acteur réel local ; causedByAnonymous représente un système ; event désigne le code de l’action ; withProperties ajoute seulement un contexte autorisé. beforeLogging ou l’action personnalisée enrichit correlation_id/origin et masque les champs sensibles, pour les chemins automatiques et manuels. Un causer défini pour un job est limité à son exécution et nettoyé ensuite.
+**Explicite :** actions métier, lecture sensible/export, connexion/déconnexion/échec, attribution/révocation de rôle, invitation, changement de plan, confirmation, annulation, prix manuel, correction de stock, envoi transporteur, émission/transmission documentaire et virements SaaS vérifiés. performedOn cible le modèle local ; causedBy désigne l’acteur réel local ; causedByAnonymous représente un système ; event désigne le code de l’action ; withProperties ajoute seulement un contexte autorisé. beforeLogging ou l’action personnalisée enrichit correlation_id/origin et masque les champs sensibles, pour les chemins automatiques et manuels. Un causer défini pour un job est limité à son exécution et nettoyé ensuite.
 
 ```php
 // Exemple après confirmation métier, dans la transaction tenant.
@@ -5291,7 +5037,7 @@ La confirmation/réservation du stock reste effectuée par le service existant ;
 
 **Lecture :** viewer central réservé aux permissions saas.audit.view/export ; viewer boutique réservé à audit.view/export local. Filtrer log_name, event, période, acteur/sujet public UUID, correlation_id ; index (log_name,created_at,id), (subject_type,subject_id,created_at), (causer_type,causer_id,created_at), (event,created_at) et correlation_id. Pagination, eager loading des morphs et données minimales, aucune résolution dans une autre base. La consultation/export sensible du journal est elle-même une action explicite ; elle n’est pas relancée automatiquement lors du rendu de cette activité.
 
-**Conservation :** logs sans SoftDeletes, écriture append-only pour le rôle applicatif ordinaire ; pas d’édition/suppression depuis le viewer, pas de LogsActivity sur Activity lui-même. Le modèle conserve updated_at pour compatibilité technique. Le paquet ne garantit pas à lui seul l’immutabilité : privilèges/triggers et archive externe conforme aux besoins de preuve doivent être réalisés et testés. Le nettoyeur de logs est orchestré par retention_policies/retention_runs et les gels probatoires ; la commande native activitylog:clean n’est pas lancée globalement sans sélection de contexte, durée, log_name et dépendances. Les logs éligibles sont archivés/purgés dans un processus dédié et tracé, sans effacer les journaux de stock/finance/documents encore requis. Si les durées diffèrent par catégorie, personnaliser l’action de nettoyage plutôt qu’appliquer la durée par défaut à tous les journaux.
+**Conservation des activités :** logs sans SoftDeletes, écriture append-only pour le rôle applicatif ordinaire ; pas d’édition/suppression depuis le viewer, pas de LogsActivity sur Activity lui-même. updated_at reste présent pour compatibilité technique. Les privilèges/triggers protègent les traces et pièces requises. Le module central de politiques/exécutions de rétention est retiré ; aucun ordonnanceur de ce module ni lancement global automatique de activitylog:clean n’est prévu. Les expirations techniques explicitement décrites sur jetons et diagnostics restent appliquées dans leur contexte et auditées lorsqu’elles affectent des données sensibles ; aucune purge en cascade des documents/flux n’est introduite.
 
 ### 7.8 Authentification, sessions et passkeys
 
@@ -5486,7 +5232,7 @@ Aucune clé d’idempotence distante garantie dans les notes pour create/order. 
 
 Token Bearer chiffré dans carrier_accounts de la boutique, jamais journalisé ni envoyé au navigateur. Filtrer requêtes/réponses/erreurs et limiter les URLs appelables. Fait générateur des frais retour, preuves POD, prise en charge du COD zéro, codes géographiques actuels et structure des bordereaux restent à valider en essais réels. Le mapping indépendant gère le décalage éventuel entre les 69 wilayas internes et les anciens codes 1–58 cités dans la documentation ; aucune adresse n’est remappée automatiquement vers une zone supposée équivalente.
 
-## 12. Vitrine, statistiques et conservation
+## 12. Vitrine, statistiques, sécurité et preuves
 
 Le commerçant modifie textes/blocs via content_pages.content et sales_pages.content, couleurs/logo via shop et fichiers via media. Un seul template pour le MVP ; theme_customizations reste une évolution. Le JSON suit une structure serveur versionnée ; aucun code arbitraire ni montant commercial indépendant dans une page. SEO : slugs, titres, descriptions, alt et données structurées générées depuis le catalogue. Les menus, FAQ et sections visuelles ne nécessitent pas chacun une table.
 
@@ -5507,26 +5253,11 @@ Les acheteurs restent invités. visitors identifie un navigateur dans une boutiq
 
 Filtres heure/jour/mois/année en Africa/Algiers avec dates stockées UTC. Séparer cohorte de commandes créées et événements survenus dans la période. Les retours physiques tardifs ne réécrivent pas silencieusement les événements antérieurs ; la correction économique apparaît selon `commercial_corrections.effective_at`, distincte de la date de réception, de l’avoir et du remboursement. Les exports conservent aussi `recorded_at` afin de reconstruire ce qui était connu à chaque clôture.
 
-**Conservation :** remplacer l’ancienne règle de conservation indéfinie par C8. Les durées sont validées avant production, avec finalité, point de départ, action, base justificative et version ; l’absence de durée validée est un point à résoudre avant collecte, pas une autorisation de tout garder. La loi 18-07, art. 9, prévoit une limitation à la durée nécessaire ; tenir compte de sa modification par 25-11 [S11–S12].
+**Module de rétention retiré à la demande du 30 septembre :** plus de table de politiques ou d’exécutions, ni de planification, lot/reprise ou compteur central de nettoyage. Aucun service ou FK ne les attend. Les anciennes prescriptions du corpus sur ce module sont remplacées par cette décision ; elles ne sont pas réintroduites sous un autre nom.
 
-| Catégorie | Politique à configurer |
-|---|---|
-| Factures, avoirs, contrats et écritures financières | Conservation probatoire/comptable selon régime et obligations validées ; pas de purge sur la durée analytics |
-| Commandes et coordonnées nécessaires au SAV | Durée justifiée par exécution, preuve et litige ; accès restreint après usage opérationnel |
-| Stock et quantités métier | Historique durable, données personnelles minimisées |
-| Visiteurs/sessions/événements | Durée limitée ; anonymisation réelle ou purge après fin de finalité |
-| Paniers abandonnés et jetons | Expiration de l’usage séparée de l’effacement des données éligibles |
-| Payloads transporteur, traces HTTP et diagnostics | Courte durée ; purge du payload sans supprimer les écritures issues d’un fait vérifié |
-| Audits et traces de transmission | Durée documentée, allowlist et références ; pas de duplication des documents |
-| Fichiers métier | Politique par catégorie et protection des pièces encore requises ; aucun effacement silencieux d’un document historique |
+**Sécurité et preuves conservées :** les jetons de session/vérification/invitation, paniers et diagnostics transporteur gardent leurs dates d’expiration décrites dans leurs propres tables. request_expires_at/request_purged_at et payload_expires_at/payload_purged_at servent à limiter les requêtes personnelles/diagnostics de leur intégration, sans dépendre d’une politique centrale. Les registres locaux des traitements gardent leurs informations documentaires de durée, sans FK ni appel à un ordonnanceur retiré. orders.retention_hold et son motif/date de revue décrivent une protection de preuve en litige dans le service commande ; ce n’est pas un job de rétention. Les durées et règles opérationnelles de traitement restent des validations de préparation, pas une fonction centrale de nettoyage automatique.
 
-Un gel probatoire (`orders.retention_hold`, motif, date de revue) protège les données liées lors d’un litige ; il n’autorise pas une conservation sans revue. Le job de rétention résout ces dépendances avant traitement, journalise seulement compteurs/identifiants techniques et version, puis purge/anonymise par lots idempotents. Une empreinte ou un UUID corrélable ne garantit pas à lui seul l’anonymat.
-
-Pas de cascade qui efface commande/stock/finance à cause d’un visiteur. Si un panier converti ou une référence obligatoire empêche une suppression, anonymiser les données personnelles de l’objet tout en conservant sa clé technique, ou traiter explicitement ses dépendances éligibles. Ne pas mettre à NULL un champ requis par sa migration. Les références d’attribution facultatives peuvent être détachées de façon contrôlée ; les métriques doivent signaler la période réellement disponible après purge.
-
-Les request_expires_at/request_purged_at de carrier_operations couvrent aussi la requête personnelle chiffrée ; les payload_expires_at/payload_purged_at autorisent la suppression du diagnostic filtré tout en conservant type, dates, empreinte et effets métier. L’immutabilité métier est maintenue pour quantités, montants, preuves encore requises et transitions. La rétention utilise un rôle/processus dédié aux seules colonnes/données autorisées ; ne pas désactiver globalement les triggers et ne pas créer une porte de suppression métier pour root. Après expiration des obligations, tout traitement des pièces/snapshots est une opération de rétention tracée, pas une « correction » de leur contenu historique ; une pièce anonymisée n’est plus présentée comme l’original dont l’empreinte a été vérifiée.
-
-`deleted_at` n’est ni anonymisation ni purge. Une suppression logique de boutique ne déclenche aucun DROP DATABASE. Contrôler stockage, archives métier et accès aux pièces, puis appliquer les politiques aux seules données éligibles.
+Pas de cascade effaçant commande, stock, finance ou pièce à cause d’un visiteur, média ou compte supprimé. Les preuves de paiement/remboursement SaaS sont privées et liées à leur opération ; les originales restent disponibles pour l’historique. Une suppression logique de boutique ne déclenche aucun DROP DATABASE. Les opérations techniques explicitement autorisées sur des champs expirés sont tracées, avec contrôle des dépendances et accès ; une modification de coordonnées ou une correction financière ne réécrit jamais un ancien PDF.
 
 ## 13. Index, exploitation et vérification
 
@@ -5543,9 +5274,9 @@ Créer les index des FK et des contraintes UNIQUE, puis les index de lecture sui
 - expenses(expense_date,product_id), expenses(shipment_id), expenses(return_id).
 - tenant_schema_deployments(tenant_id,created_at), carrier_remittance_batches(carrier_account_id,status,received_at), remittance_statements(carrier_remittance_batch_id,status).
 
-Index complémentaires : tenants(user_id,deleted_at,status), permission_overrides(user_id,status,expires_at), feature_overrides(user_id,feature_id,tenant_id,started_at), order_incidents(order_id,status), orders(original_incident_id,commercial_status), customer_adjustments(incident_id,status), order_contracts(order_id,created_at), document_deliveries(status,next_attempt_at), retention_runs(status,created_at), shipment_events(shipment_id,occurred_at), et payload_expires_at sur les diagnostics purgés. Valider la longueur des clés composées de plusieurs VARCHAR avant migration ; les empreintes et UUID ont des types fixes.
+Index complémentaires : tenants(user_id,deleted_at,status), permission_overrides(user_id,status,expires_at), feature_overrides(user_id,feature_id,tenant_id,started_at), order_incidents(order_id,status), orders(original_incident_id,commercial_status), customer_adjustments(incident_id,status), order_contracts(order_id,created_at), document_deliveries(status,next_attempt_at), shipment_events(shipment_id,occurred_at), et payload_expires_at sur les diagnostics purgés. Valider la longueur des clés composées de plusieurs VARCHAR avant migration ; les empreintes et UUID ont des types fixes.
 
-Index complémentaires métier : order_incident_details(incident_id), billing_obligations(status,next_attempt_at), exchange_offsets(original_credit_note_id,status), carrier_receivables(provider_id,status,remaining_amount), carrier_receivable_allocations(receivable_id,performed_at), commercial_corrections(status,effective_at), commercial_correction_lines(order_item_id), carrier_operations(request_expires_at), personal_data_operations(performed_at,operation_type), saas_invoices(user_id,issued_at), billing_rules(code,status,effective_at), saas_billing_rules(code,status,effective_at), processing_activity_register(code,status,effective_at), carrier_rate_versions(carrier_account_id,is_active,starts_at).
+Index complémentaires métier : order_incident_details(incident_id), billing_obligations(status,next_attempt_at), exchange_offsets(original_credit_note_id,status), carrier_receivables(provider_id,status,remaining_amount), carrier_receivable_allocations(receivable_id,performed_at), commercial_corrections(status,effective_at), commercial_correction_lines(order_item_id), carrier_operations(request_expires_at), personal_data_operations(performed_at,operation_type), saas_invoices(record_type,user_id,issued_at), saas_invoices(parent_document_id,record_type,line_number), subscriptions(record_type,user_id,status), subscriptions(parent_subscription_id,installment_status,due_at), geographic_areas(country_id,type,parent_id,is_active), saas_invoices(record_type,transfer_status,created_at), saas_invoices(document_id,record_type,transfer_status), saas_invoices(record_type,delivery_status,next_attempt_at), billing_rules(code,status,effective_at), saas_invoices(code,policy_status,effective_at), processing_activity_register(code,status,effective_at), carrier_rate_versions(carrier_account_id,is_active,starts_at).
 
 Confirmer les index avec EXPLAIN sur données représentatives. Pour reconstituer un historique strict à timestamp égal, utiliser variant_sequence allouée sous verrou, et contrôler la chaîne avant/après ; un UUID v4 ne fournit pas un ordre de commit.
 
@@ -5618,8 +5349,7 @@ Confirmer les index avec EXPLAIN sur données représentatives. Pour reconstitue
 | Wilaya interne nouvelle sans mapping vérifié | Route bloquée, aucun code fournisseur inventé |
 | Étiquette disponible sans POD | Preuve de réception encore manquante |
 | Audit d’une modification d’adresse | Références de révision, aucun secret ou copie inutile |
-| Rétention avec commande liée ou gel probatoire | Dépendances préservées ; pas de cascade destructive |
-| Crash pendant un lot de rétention | Reprise idempotente sans double comptage |
+| Suppression d’un compte/média avec pièce requise ou litige | Références et preuve préservées ; aucune cascade documentaire/financière |
 | Tentative de lecture tenant B depuis A | Refus BDD/cache/jobs/médias/export, y compris compte transporteur partagé |
 | Accord sur B puis proposition C concurrente | Contrat cible B ou conflit de version ; C jamais confirmée implicitement |
 | Hash de B avant/après confirmation | Identique ; date et auteur uniquement dans le contrat |
@@ -5652,11 +5382,11 @@ Confirmer les index avec EXPLAIN sur données représentatives. Pour reconstitue
 | Échange 8 000 vers 10 000 | Nouvelle commande/facture, affectation 8 000, complément 2 000 hors frais |
 | Échange 10 000 vers 8 000 | Affectation 8 000, différence remboursable 2 000 sous plafond, aucune double unité compensée |
 | Remboursement et affectation simultanés d’un avoir | Cumul plafonné sous le même verrou |
-| Deux avoirs SaaS concurrents sur dernière ligne disponible | Un seul budget consommé ; mêmes parent facture et ligne |
-| Facture SaaS, échéance et validation du paiement | Dette dans subscription_installments, document et validation dans saas_invoices ; aucun revenu tenant ni seconde table de paiement |
+| Deux avoirs SaaS concurrents sur dernière ligne disponible | Un seul budget consommé ; types 3/5 et mêmes facture/ligne types 2/4 dans saas_invoices |
+| Facture SaaS, échéance et validation du paiement | subscriptions type 2 = dette ; saas_invoices type 2 = facture ; saas_invoices type 8 = paiement prouvé ; aucun revenu tenant |
 | Contrepassation de collection_entries du recouvrement A tentée sur B | Échec SQL par FK composite de même collection_id avant Laravel |
 | Contrepassation stock variante A tentée sur variante B | Échec SQL ; même variante obligatoire |
-| Même écriture contrepassée deux fois / auto-contrepassation | Échec d’unicité ou CHECK |
+| Même écriture contrepassée deux fois / auto-contrepassation | Échec d’unicité ou contrôle par trigger/validation |
 | Correction livraison seule -650 DZD | T23 finalisable sans ligne produit, `non_product_kind=livraison`, quantités produit inchangées |
 | Deux corrections quantité 1 sur une ligne vendue quantité 1 | Deuxième refusée sous verrou, sauf contrepassation exacte de la première |
 | Retour partiel B sur commande A+B+C au MVP | Refus par règle métier versionnée ; structure BDD reste capable de l’accepter si la politique future change |
@@ -5705,7 +5435,7 @@ La ressource présente dans le dépôt est « les derniere modiff toujour les no
 | DZ-01 / F13 — traitements | processing_activity_register local T26 ; opérations centrales dans activity_log C6, actions de boutique dans activity_log local et preuve spécialisée T21 ; catégories minimisées et corrélation |
 | DZ-02 / F13 — collecte | Remplacé en V3.2 par AUD-10 : information versionnée liée directement à la commande ; plus de table d’accord de collecte séparée ; conditions et téléphone restent distincts |
 | DZ-04 / F14 — boutiques | Règle fiscale à valider, obligation durable d’émission, factures/avoirs typés immuables, retours/SAV/paiement séparés, échanges et différences affectées |
-| DZ-04 / F15 — SaaS | `saas_invoices` est l’unique table issue du renommage de `reglements_abonnement` ; elle porte la facture et la validation manuelle du paiement, avec lignes, avoirs, séquences et transmission |
+| DZ-04 / F15 — SaaS | saas_invoices conserve le nom facture et regroupe les neuf rôles : séquences/en-têtes/lignes/avoirs/règles/transmissions/virements entrants-sortants manuels vérifiés |
 
 ### Corrections complémentaires « des bug et des truc encore.docx »
 
@@ -5714,16 +5444,16 @@ Le fichier fourni contient AUD-10, AUD-11, AUD-12, AUD-15, AUD-16, AUD-17 et AUD
 | Correction | Intégration V3.2 |
 |---|---|
 | AUD-10 — information données de commande | Suppression de `accords_collecte_donnees` et `orders.accord_collecte_id` ; version/horodatage/hash portés directement par `orders` ; consentements marketing éventuels séparés |
-| AUD-11 — même objet métier | FK composites sur variante, recouvrement, commande+incident, commande+révision et compte transporteur local ; unicité et anti-auto-référence. Pour le paiement d’abonnement réuni dans saas_invoices, correction de validation auditée sans journal de règlement séparé |
+| AUD-11 — même objet métier | FK composites sur variante, recouvrement, commande+incident, commande+révision et compte transporteur local ; unicité et anti-auto-référence. Pour les virements d’abonnement dans saas_invoices, original/inverse exact sur même document/propriétaire/paiement source, sans effacement de la preuve |
 | AUD-12 — correction hors produit | `non_product_revenue_delta`, `non_product_kind`, correction livraison sans ligne produit et plafond cumulé de quantité corrigée |
 | AUD-15 — retour complet réversible | Politique MVP « colis entier » conservée dans le service ; structure `return_items` compatible avec retour partiel futur |
-| AUD-16 — décaissements SaaS | Aucun `decaissements_saas` au périmètre actuel ; remboursements exceptionnels traités manuellement hors application |
+| AUD-16 — décaissements SaaS, décision remplacée le 30 septembre | Le SaaS suit désormais les remboursements réels manuels à distance dans saas_invoices type 9, avec PDF, référence, acteur, validation et plafonds. La décision historique de ne pas suivre ces sorties est remplacée explicitement ; aucune API bancaire automatique n’est supposée |
 | AUD-17 — scalabilité | Paliers de benchmark multi-BDD et capacité supportée définie par mesures réelles |
 | AUD-18 — DHD/EcoTrack | Architecture prudente conservée ; connecteur bloqué avant validation de l’API réelle |
 
 ### Décisions métier fixées
 
-Incidents multi-causes autorisés ; retour physique partiel hors MVP mais structure réversible ; identité physique des variantes figée après première utilisation ; créances transporteur explicites ; expiration payante vers gratuit/hors_quota ; paiements d’abonnement validés manuellement, sans décaissement automatique SaaS ; comptes/clés, colis, tarifs et reversements locaux ; profil professionnel unique dans users ; séquences et documents dans leur BDD émettrice ; corrections économiques et contrepassations sur le même objet ; isolation des fichiers ; timeout ambigu=incertain ; factures émises et propriétaire immuables ; un colis par commande. Stock réservé à la confirmation téléphonique atomique ; échange après expédition via une nouvelle commande liée. La fonctionnalité de sauvegarde/restauration et ses registres ont été retirés au jour 4.
+Incidents multi-causes autorisés ; retour physique partiel hors MVP mais structure réversible ; identité physique des variantes figée après première utilisation ; créances transporteur explicites ; expiration payante vers gratuit/hors_quota ; paiements d’abonnement et remboursements SaaS à distance, effectués manuellement et suivis sur preuves PDF ; comptes/clés, colis, tarifs et reversements locaux ; profil professionnel unique dans users ; séquences et documents dans leur BDD émettrice ; corrections économiques et contrepassations sur le même objet ; isolation des fichiers ; timeout ambigu=incertain ; factures émises et propriétaire immuables ; un colis par commande. Stock réservé à la confirmation téléphonique atomique ; échange après expédition via une nouvelle commande liée. La fonctionnalité de sauvegarde/restauration et ses registres ont été retirés au jour 4.
 
 ### Décisions et validations encore requises
 
@@ -5758,7 +5488,7 @@ La présence de tables et de critères de test ne constitue pas une conformité 
 | 15 : middleware/Gates/Policies | §7.4, ordre central/tenant et exception de capacité bornée |
 | 16 : create/update et événements | §7.5, atomicité et traitements groupés explicites |
 | 17 : cohérence générale | Diagrammes, contraintes, scénarios, sources et inventaires V4 |
-| Morph et media commun | C11/T2/T3, §7.6, parent/collection et stockage isolés |
+| Morph et media commun | C9/T2/T3, §7.6, parent/collection et stockage isolés |
 | Remplacement d’Audit SaaS | C6/T15, §7.7, schéma/API v5 et maintien des preuves métier |
 
 Les anciennes tables d’attribution maison, l’appartenance centrale d’équipe, les invitations centrales et le pivot media exclusivement produit ne font plus partie du modèle actif. Les anciens noms apparaissent seulement lorsque la migration d’une archive est expliquée ; les objets actifs utilisent l’inventaire ci-dessous. Les garanties commande/stock/finance/documents restent adaptées au modèle actif. Le retrait explicite de la sauvegarde/restauration au jour 4 remplace les mécanismes historiques AUD-04/AUD-09 ; ce retrait n’est pas présenté comme un effet du changement de package.
@@ -5777,7 +5507,7 @@ Les anciennes tables d’attribution maison, l’appartenance centrale d’équi
 10. Activité automatique/explicite conserve acteur réel, sujet, changements filtrés et correlation_id ; exception de transaction annule activité de succès et mutation ; échec de log obligatoire annule l’action sensible.
 11. Mutation groupée/pivot/import produit ses activités explicites ; aucun double succès lors d’un retry idempotent ; un job système a un causer NULL sans usurpation.
 12. Worker A puis B, y compris après exception, n’utilise aucun cache, rôle, causer, callback, média ou journal de A dans B.
-13. Viewer central voit seulement le journal central, viewer tenant seulement le sien ; secrets/PII exclus, export autorisé/audité et rétention protégée par les gels/preuves.
+13. Viewer central voit seulement le journal central, viewer tenant seulement le sien ; secrets/PII exclus, export autorisé/audité et protection des pièces en litige sans ordonnanceur central de rétention.
 14. Déploiement/migration repris après échec garde le tenant, sa place de quota et les étapes déjà réussies ; aucun membre, rôle ou secret local n’est remplacé depuis un état central ancien.
 
 Ces critères sont à traduire en tests réels pendant le développement ; cette révision a seulement fait l’objet de contrôles documentaires et structurels.
@@ -5793,13 +5523,13 @@ La liste du jour 4 n’est pas numérotée ; les identifiants J4 ci-dessous couv
 | J4-03 — suivi/registre des colis local | Tracking et merchant_reference dans shipments T11 ; rôle du registre absorbé par cette table existante, sans copie ni registre central ; filtrage des colis étrangers §11/T25 |
 | J4-04 — lots locaux, calcul de la part par suivi plutôt qu’allocation centrale | carrier_remittance_batches local relié à remittance_statements ; calcul depuis les seuls colis/lignes locaux T13/T16/T17. Exemple 20 000 = 12 000 A + 8 000 B ; détail/preuve exigés, total global hors revenu |
 | J4-05 — retirer la table d’identité légale et analyser les répétitions | Source professionnelle unique users C1 ; contacts/pays existants réutilisés, seulement les champs professionnels manquants ajoutés ; anciennes FK supprimées, snapshots historiques justifiés |
-| J4-06 — retirer entièrement la sauvegarde/restauration et les registres liés | Toutes les tables, champs, états, index, jobs et scénarios de cette fonctionnalité retirés. Émission/séquences/preuves restent dans la BDD émettrice T17/T19/T20 et C9 ; aucune inscription documentaire centrale des boutiques |
-| J4-07 — règles des factures de boutique dans chaque BDD | billing_rules local T26 et billing_obligations.billing_rule_id numérique local T22 ; snapshots/versions/validations locaux. saas_billing_rules central C10 sert uniquement aux abonnements/options du SaaS |
+| J4-06 — retirer entièrement la sauvegarde/restauration et les registres liés | Toutes les tables, champs, états, index, jobs et scénarios de cette fonctionnalité retirés. Émission/séquences/preuves restent dans la BDD émettrice T17/T19/T20 et C8 ; aucune inscription documentaire centrale des boutiques |
+| J4-07 — règles des factures de boutique dans chaque BDD | billing_rules local T26 et billing_obligations.billing_rule_id numérique local T22 ; snapshots/versions/validations locaux. saas_invoices type 6 RULE central C8 sert uniquement aux abonnements/options du SaaS |
 | J4-08 — registre des traitements dans chaque BDD | processing_activity_register local T26, sans tenant_id ni miroir central ; responsabilités, catégories, destinataires, protections, conservation et validations versionnés |
 | J4-09 — remplacer le journal personnel central par activity_log | C6/T15/§7.7 : mapping complet auteur/action/ressource/date/motif/destinataire/contexte ; logs d’export et d’abonnement attribué/corrigé/refusé/échoué, connexions isolées, déduplication et confidentialité |
-| Notes de suivi — corrections d’abonnement/facture et conventions | subscriptions.tenant_id et FK(tenant_id,user_id) conservés ; saas_invoices reste la seule table facture/validation du paiement. PK numériques, UUID publics, anglais, enums, cinq pays, Spatie, comptes locaux, media et morphs préservés |
+| Notes de suivi — corrections d’abonnement/facture et conventions | subscriptions.tenant_id et FK(tenant_id,user_id) conservés ; saas_invoices est désormais la table unique de fiscalité/règles/envois/virements, avec types 1–9 et preuve propre à chaque opération. PK numériques, UUID publics, anglais, enums, cinq pays, Spatie, comptes locaux, media et morphs préservés |
 
-**Vérification par étapes :** après chaque groupe de changements, relecture des champs, références, contraintes et parcours concernés avant le groupe suivant. Passe finale sur toutes les tables/relations, usages d’enums, renvois, anciens objets retirés et inventaires : 33 tables centrales et 83 tables par boutique. Les ressources restent des fichiers de référence inchangés. Les scénarios suivants expriment les résultats exigés à tester pendant le développement ; ils ne prétendent pas avoir exécuté une API, une migration ou un test de concurrence.
+**Vérification par étapes :** après chaque groupe de changements, relecture des champs, références, contraintes et parcours concernés avant le groupe suivant. Passe finale V4.2 sur toutes les tables/relations, usages d’enums, renvois, anciens objets retirés et inventaires : cette version comptait 33 tables centrales et 83 tables par boutique. Les fusions V4.3 avaient ramené le schéma à 24 tables centrales et 83 tables par boutique ; la fusion finale V4.4 donne désormais 23 tables centrales et 83 tables par boutique. Les ressources restent des fichiers de référence inchangés. Les scénarios suivants expriment les résultats exigés à tester pendant le développement ; ils ne prétendent pas avoir exécuté une API, une migration ou un test de concurrence.
 
 ### Scénarios d’acceptation du jour 4
 
@@ -5823,6 +5553,75 @@ La liste du jour 4 n’est pas numérotée ; les identifiants J4 ci-dessous couv
 | Validation d’un paiement SaaS après émission puis annulation d’une saisie erronée | Pièce fiscale inchangée ; preuve, vérificateur, raison et étapes conservés dans le journal ; recalcul des droits sous verrou, aucun remboursement fictif |
 | Rejouer une même activité explicite ou changer de boutique dans un worker | Un seul événement par clé/phase ; connexion, acteur, cache, fichiers et propriétés ne traversent jamais les boutiques |
 
+### Traçabilité V4.3 — demandes conservées et adaptées à la fusion finale V4.4
+
+| Demande | Réalisation complète |
+|---|---|
+| Fusion abonnement + échéances | subscriptions types 1/2, parents et états distincts, échéances multiples, dette/numéro/période/dates/historique, paiements partiels, gratuit/quota et FK exactes §6.7 |
+| Fusion wilayas + communes | geographic_areas type 1/2, parent wilaya du même pays, codes/UUID/noms/source/version/date/activation conservés ; tous les champs externes province_uuid/municipality_uuid adaptés |
+| Retrait des deux tables de rétention | Tables, relations, états propres, index et ordonnanceur/parcours central de nettoyage supprimés ; aucun remplacement sous un autre nom |
+| Fusion des cinq éléments de facturation en une table | saas_invoices types 1–5 ; compteur stable, plusieurs lignes, plusieurs avoirs, type/exercice/numéro, origines exactes, taxes/totaux, PDF, préparation/émission/corrections et plafonds conservés |
+| Fusion règles + transmissions | saas_invoices types 6 RULE / 7 DELIVERY avec versions/validation/activation des règles, nombreuses transmissions, canaux, destinataires, retries et preuve de réception |
+| Paiement et remboursement à distance avec reçu PDF | Même table saas_invoices types 8 PAYMENT / 9 REFUND ; banque/CCP/BaridiMob, preuves privées, vérification réelle, virements partiels/multiples, plafonds, motifs, acteurs, corrections et Activity Log central |
+| Cohérence générale | Enums, modèles typés/Policies/morphs, FK simples/composites, références géographiques locales, scénarios, index, droits/gratuit et inventaires harmonisés ; autres fichiers inchangés |
+
+**Lecture simple :** 1 abonnement parent + 12 échéances = 13 lignes dans subscriptions, pas 13 abonnements. Une facture de 2 lignes = 1 en-tête type 2 + 2 lignes type 4 ; son compteur est une autre ligne type 1 dans saas_invoices. Un avoir possède son en-tête type 3 et ses lignes type 5. Une règle type 6, un envoi type 7, deux reçus de paiement type 8 et un remboursement type 9 sont 5 lignes distinctes supplémentaires dans cette même table saas_invoices. Fusionner les tables réduit le nombre de tables physiques, sans supprimer ces informations ni les mélanger dans les totaux.
+
+**Scénarios à implémenter pour vérifier les fusions :**
+
+| Cas | Résultat attendu |
+|---|---|
+| Abonnement avec échéances septembre/octobre, puis retry du renouvellement | Même parent type 1, deux échéances type 2 historiques ; aucun doublon ni second abonnement actif |
+| UUID d’échéance donné à une route d’attribution de plan | Refus de type ; quota/gratuit ne compte que les abonnements type 1 |
+| Facture de A liée à échéance ou abonnement de B | Refus de FK composite avant validation financière |
+| Commune sous une autre commune, autre pays ou mauvaise wilaya sélectionnée | Refus SQL ou validation de référence externe ; anciennes adresses/snapshots conservés |
+| Deux émissions simultanées, compteur ou exercice incorrect fourni | Numéros distincts dans la bonne série ; mauvaise association refusée, aucun MAX+1 |
+| Ligne rattachée à compteur/avoir, ligne d’avoir d’une autre facture | Refus du type/parent/origine exacts |
+| Deux avoirs concurrents sur une dernière quantité disponible | Un seul budget consommé, brouillons réservés inclus |
+| PDF réservé puis crash, envoi échoué ou résultat ambigu | Même UUID/numéro/PDF et intention durable ; retries sûrs ou UNCERTAIN à rapprocher, jamais faux reçu |
+| Règle remplacée, même document envoyé par deux canaux | Ancienne facture garde sa version/snapshot ; deux lignes DELIVERY indépendantes |
+| Reçu PDF client déposé sans vérification des fonds | PAYMENT DECLARED ; aucun paiement confirmé ni droit payant attribué automatiquement |
+| Facture 3 000, paiements vérifiés 1 000 puis 2 000 | Deux preuves historiques, échéance PARTIALLY_PAID puis PAID, total reçu 3 000 |
+| Même transaction déposée deux fois, y compris deux canaux ou propriétaires | Une seule validation physique active ; opération existante ou conflit explicite |
+| Avoir 500 puis remboursement bancaire réel 500 | Dû net 2 500, reçus 3 000, reversés 500, solde 0 ; facture initiale inchangée, deux actes prouvés |
+| Trop-payé réel de 500 non facturé | REFUND OVERPAYMENT plafonné au surplus, sans avoir inventé ; preuve du versement sortant conservée |
+| Deux administrateurs remboursent simultanément le même disponible | Une seule réserve disponible ; cumul par paiement/facture/avoir respecté |
+| Remboursement préparé puis banque incertaine, ou justificatif absent | Budget réservé, UNCERTAIN/APPROVED ; aucun second virement ni faux VERIFIED |
+| Erreur de vérification corrigée après validation | Original conservé, inverse exact unique et motif, nouvelle saisie distincte ; aucune suppression de PDF ni virement fictif |
+| Propriétaire tente auto-validation, compte/avoir étranger, édition d’une facture émise | Refus de permission/type/propriétaire ou d’immutabilité, avec activité centrale minimisée |
+| Inventaire et dépendances du module de rétention | Aucun objet actif, FK, index, enum dédié ou job central restant |
+
+Contrôles de cette livraison : conception et structure du document, pas exécution MySQL ni transfert bancaire. Les critères ci-dessus deviennent les tests des migrations/services au développement. Les fonctionnalités demandées sont conservées dans les lignes typées ; les contraintes de leurs différents rôles font partie du schéma, pas une promesse automatique d’Eloquent.
+
+### Traçabilité V4.4 — toute la facturation SaaS dans une table
+
+| Demande / contrôle | Résultat de conception |
+|---|---|
+| Fusion finale des documents et des opérations | Une seule table saas_invoices ; neuf rôles 1–9, un seul record_type, champs communs uniques et états métiers distincts |
+| Préserver toutes les possibilités | Plusieurs lignes par facture, plusieurs avoirs, règles versionnées, nombreux envois/destinataires, plusieurs paiements et remboursements partiels avec leurs preuves |
+| Protéger les rattachements | FK vers la même table imposant type, propriétaire, facture et paiement d’origine ; règle type 6, paiement source type 8 ; aucune relation métier stockée à la place dans un JSON |
+| Conserver argent et documents séparément lisibles | Totaux fiscaux calculés sur les types 2–5 ; argent reçu/reversé uniquement sur 8/9 et transfer_status ; PDF de facture immuable malgré vérification de paiement |
+| Préserver reprise, audit et accès | operation_key globale avec espace de noms de rôle, morph aliases/Policies/scopes exacts, preuves privées, compteurs/verrous et contrepassations conservés |
+| Mettre tout le document en cohérence | Diagramme unique C8, media C9, enums/FK/index/renvois/parcours/inventaire adaptés ; 23 tables centrales et 83 tables boutique |
+
+**Exemple simple dans une seule table :** une règle type 6 décide de facturer septembre. Une facture type 2 de 3 000 DA a deux lignes type 4, son compteur type 1 et un envoi type 7. Le client règle 1 000 puis 2 000 : deux lignes PAYMENT type 8 avec deux reçus. Un avoir type 3 et sa ligne type 5 réduisent le prix de 500 ; l’admin rembourse 500 par une ligne REFUND type 9 reliée à l’un des paiements et à l’avoir, avec son reçu PDF. Toutes ces lignes sont dans saas_invoices et gardent leur identité propre ; les sommes restent D=2 500, P=3 000, R=500, reste dû=0.
+
+**Contrôles à implémenter lors du développement :**
+
+| Cas | Résultat attendu |
+|---|---|
+| Facture liée à un compteur donné comme règle, ou remboursement lié à un avoir donné comme paiement | Refus des FK de type 6/8 et du contrôle de forme |
+| Paiement/reçu d’un autre propriétaire ou remboursement visant une autre facture | Refus des FK composites et de l’autorisation |
+| Paiement type 8 fourni à une route facture type 2 | Refus de type, même si l’id/UUID existe dans la table |
+| Règle ACTIVE, facture ISSUED et paiement VERIFIED ont des codes numériques proches | Champs policy_status/status/transfer_status distincts ; aucun mélange dans les filtres et totaux |
+| Paiement déclaré seul ou envoi DELIVERED | Aucun argent validé ni droit payant accordé ; seuls les types financiers vérifiés participent aux fonds |
+| Deux lignes portent la même operation_key mais des rôles ou propriétaires différents | Conflit explicite ; aucune réutilisation silencieuse d’une autre ligne |
+| Deux remboursements concurrents, reçu doublonné ou correction comptable | Réserves/empreinte unique/inverse exact protègent les montants, preuves originales et audit conservés |
+| UPDATE d’un document émis ou champ financier rempli sur compteur/règle | Refus d’immutabilité/forme ; les opérations prévues utilisent leur propre ligne typée |
+| Conversion d’anciennes données | Mapping type/id/clés/morphs vérifié ; aucun document, paiement, preuve ou historique perdu |
+
+La livraison vérifie le document et sa structure. Aucun test de migrations/services MySQL ni transfert bancaire n’est exécuté à ce stade de préparation.
+
 ## 15. Ordre de mise en œuvre
 
 | Lot | Modules |
@@ -5831,14 +5630,14 @@ La liste du jour 4 n’est pas numérotée ; les identifiants J4 ci-dessous couv
 | Catalogue et vitrine | Profil, médias, variantes/options, pages, prix/promotion |
 | Vente | Panier, information données versionnée portée par `orders`, checkout en attente idempotent, conditions distinctes, révisions, confirmation téléphonique/réservation atomique, contrats et transmission |
 | Stock et logistique | Réservations, mouvements, livraison entière, retours/quarantaine, remplacements |
-| Finance et documents | Incidents multi-causes et budgets, encaissements, frais, remboursements, règles/obligations de facturation locales T26/T22 et règles SaaS C10, avoirs, échanges affectés, preuves et transmissions |
+| Finance et documents | Incidents multi-causes et budgets, encaissements, frais, remboursements, règles/obligations locales T26/T22 ; table SaaS unique C8, virements manuels prouvés, avoirs, preuves et transmissions |
 | Comptes et API | Comptes/clés et tarifs locaux T25, référence marchand dans shipments, lots/bordereaux/lignes locaux, outbox, suivi et rapprochement par tracking |
-| Mesure et exploitation | Analytics, registre des traitements local T26 et rétention, migrations par tenant, mesures de capacité et contrôles de concurrence/isolation |
+| Mesure et exploitation | Analytics, registre des traitements local T26, expirations techniques explicites et migrations par tenant, mesures de capacité et contrôles de concurrence/isolation |
 | Évolution | Personnalisation avancée, agrégats après mesure ; pas de sharding/microservices requis |
 
 ## 16. Sources et limites
 
-**Sources de cette révision, par ordre de priorité :** la version du schéma principal modifiée par le propriétaire du projet, [les consignes du jour 4](<les modiff a efectuer le jours 4.txt>) et [les notes de suivi](<les note pendans le suivie.txt>) fixent le périmètre et les décisions actuelles. [La précédente liste de modifications](<les truc a modifier .txt.txt>), [Documentation Laravel, Spatie Permission et Passkeys](Documentation-Laravel-Spatie-Permissions-Passkeys.md) et [Recherche complète Activity Log](Recherche_complete_Spatie_Laravel_Activity_Log.md) restent les références des conventions et packages. Les cinq ressources antérieures — [last one notes](<last one notes.md>), [premières remarques](<les notes et remarque deja apliquer pour ameliorer le premiere version du shema.docx>), [notes v2](<note et machin v2.docx>), [dernières notes](<les derniere modiff toujour les notes.docx>) et [bugs complémentaires](<des bug et des truc encore.docx>) — sont analysées pour préserver les besoins commande, stock, finance, preuves, isolation et API. Seul le présent schéma est modifié.
+**Sources de cette révision, par ordre de priorité :** les instructions explicites du propriétaire du projet du 30 septembre 2026 sur les fusions centrales, le retrait du module de rétention et les remboursements à distance, complétées par sa demande de fusionner les deux dernières tables financières, fixent la V4.4. Les versions principales V4.2/V4.3 et [les consignes du jour 4](<les modiff a efectuer le jours 4.txt>), [les notes de suivi](<les note pendans le suivie.txt>), [la précédente liste](<les truc a modifier .txt.txt>) restent les ressources métier. [Documentation Laravel/Spatie/Passkeys](Documentation-Laravel-Spatie-Permissions-Passkeys.md), [Recherche Activity Log](Recherche_complete_Spatie_Laravel_Activity_Log.md), [last one notes](<last one notes.md>), [premières remarques](<les notes et remarque deja apliquer pour ameliorer le premiere version du shema.docx>), [notes v2](<note et machin v2.docx>), [dernières notes](<les derniere modiff toujour les notes.docx>) et [bugs complémentaires](<des bug et des truc encore.docx>) conservent leur rôle de préparation. Aucune de ces dix ressources n’est modifiée. Les décisions remplacées sont signalées dans la traçabilité, notamment AUD-16 : les remboursements SaaS sont désormais suivis dans le journal fusionné, bien que leur exécution bancaire reste manuelle.
 
 **Décisions remplacées au jour 4 :** les anciennes notes sur comptes/tarifs/colis/reversements partagés au central, table d’identité légale séparée, règles/registre de boutique centraux, journal personnel central autonome et sauvegarde/restauration avec ses registres ne décrivent plus le modèle actif. Leurs besoins encore utiles sont transposés dans les modules locaux ou activity_log ; la fonctionnalité de sauvegarde/restauration est retirée. Les anciennes mentions de comptes/permissions centraux d’équipe restent remplacées par les comptes indépendants déjà décidés. Aucun contenu des documents de recherche n’est réécrit pour masquer ces changements.
 
@@ -5865,15 +5664,17 @@ Les sources juridiques motivent les besoins de données ; les choix de tables et
 
 Références techniques ciblées de V4 :
 
+Les références officielles MySQL S1/S2/S3/S7 ont été relues pour les fusions V4.3/V4.4 : self-FK et types, index UNIQUE parents, colonnes générées STORED, restrictions CHECK et verrouillage. Le choix d’utiliser des lignes typées est une conception du projet déduite de ces possibilités, pas une architecture imposée par MySQL.
+
 - [S15 — Activity Log v5 : introduction](https://spatie.be/docs/laravel-activitylog/v5/introduction), [migration native](https://github.com/spatie/laravel-activitylog/blob/main/database/migrations/create_activity_log_table.php.stub) et [guide v5](https://github.com/spatie/laravel-activitylog/blob/main/UPGRADING.md) : schema subject/causer, attribute_changes, namespaces et regroupement applicatif.
 - [S16 — Permission : migration native](https://github.com/spatie/laravel-permission/blob/main/database/migrations/create_permission_tables.php.stub) et [documentation v8](https://spatie.be/docs/laravel-permission/v8/installation-laravel) : tables, PK composites, models/guards/cache. L’exemple du dépôt main doit être confronté au tag réellement verrouillé.
 - [S17 — Laravel : relations Eloquent](https://laravel.com/framework/docs/13.x/eloquent-relationships#polymorphic-relationships) et [événements](https://laravel.com/framework/docs/13.x/eloquent#events) : morph map, PK/FK et limites des écritures groupées.
 
-Les noms/adaptations et décisions de connexion/quota/délégation décrits ici sont des choix de projet appuyés par le corpus, pas des fonctionnalités automatiques de Spatie. Les sections passkeys restent conditionnelles. Aucun accès à un compte transporteur, installation de package ou migration réelle n’a été effectué.
+Les noms/adaptations et décisions de connexion/quota/délégation, ainsi que les fusions physiques par lignes typées de V4.3/V4.4, sont des choix de projet appuyés par le corpus, pas des fonctionnalités automatiques de Spatie. Les sections passkeys restent conditionnelles. Aucun accès à un compte transporteur, installation de package ou migration réelle n’a été effectué.
 
 ## Annexe Inventaire complet
 
-### BDD centrale — 33 tables
+### BDD centrale — 23 tables
 
 1. `countries`
 2. `users`
@@ -5893,21 +5694,11 @@ Les noms/adaptations et décisions de connexion/quota/délégation décrits ici 
 16. `subscriptions`
 17. `feature_overrides`
 18. `feature_usage`
-19. `subscription_installments`
-20. `provinces`
-21. `municipalities`
-22. `activity_log`
-23. `tenant_schema_deployments`
-24. `retention_policies`
-25. `retention_runs`
-26. `saas_document_sequences`
-27. `saas_invoices`
-28. `saas_invoice_lines`
-29. `saas_credit_notes`
-30. `saas_credit_note_lines`
-31. `saas_document_deliveries`
-32. `saas_billing_rules`
-33. `media`
+19. `geographic_areas`
+20. `activity_log`
+21. `tenant_schema_deployments`
+22. `saas_invoices`
+23. `media`
 
 ### BDD boutique — 83 tables
 
