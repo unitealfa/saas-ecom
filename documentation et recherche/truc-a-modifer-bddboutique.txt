@@ -1,0 +1,82 @@
+**2\. Pourquoi ne pas mettre directement la catégorie dans `products` ?**
+
+**C’est déjà prévu : `products` contient `category_id`.** Chaque produit indique donc sa catégorie.
+
+La table `categories` garde les catégories elles-mêmes : leur nom, leur image et leur organisation.
+
+Exemple :
+
+- La catégorie « T-shirts » appartient à « Vêtements ».
+- Dix produits appartiennent à « T-shirts ».
+- Tu renommes cette catégorie une seule fois, et les dix produits restent correctement classés.
+
+Si tu écrivais seulement le texte « T-shirts » dans chaque produit, tu devrais gérer les répétitions et les sous-catégories autrement. **Je recommande de garder cette séparation.**   pour quoi ya 2 table alors je retire une ?
+
+
+
+ont peut pas donc fusioner sertaine table par rapport a : **3\. Les sept tables du catalogue, avec un seul exemple**
+
+Prenons un t-shirt vendu en plusieurs tailles et couleurs :
+
+| Table | Ce qu’elle représente |
+|---|---|
+| **`categories`** | Le rayon où ranger le produit : « Vêtements → T-shirts ». |
+| **`products`** | La fiche générale : « T-shirt coton », sa description et sa marque. |
+| **`product_variants`** | L’article précis vendu : « Rouge, taille M », à 2 000 DA, avec 8 exemplaires en stock. |
+| **`product_options`** | Les choix disponibles : « Taille » avec M/L, et « Couleur » avec Rouge/Bleu. Les questions et leurs réponses sont dans cette même table. |
+| **`variant_option_values`** | Le lien qui précise : « Cette variante utilise Taille M et Couleur Rouge ». |
+| **`tags`** | Les étiquettes disponibles : « Été », « Idée cadeau », « Nouveauté ». |
+| **`product_tags`** | Les liens qui disent : « Ce t-shirt porte les étiquettes Été et Nouveauté ». |
+
+La différence principale : **la catégorie indique le rayon, les tags ajoutent des étiquettes, les options proposent des choix, et la variante est ce qu’on achète réellement.**
+
+
+
+
+
+retire moi : **5\. À quoi sert `visitor_preferences` ?**
+
+Elle mémorise le choix du visiteur concernant les statistiques de navigation.
+
+Exemple : un visiteur choisit « Je refuse la mesure de ma navigation ». La boutique garde ce choix et sa date pour le respecter.
+
+Il peut toujours remplir son panier et commander. Les commandes et ventes restent comptées à partir des faits commerciaux ; ce choix concerne la mesure facultative de sa navigation.
+
+**Je recommande de la conserver si tu gardes cette mesure avec un choix accepter/refuser**
+
+
+
+
+
+
+dans se cas la alors ajouter 
+**7\. Pourquoi garder `pickup_points` séparée ?**
+
+Ce sont **les bureaux du transporteur**, pas les adresses de ta boutique.
+
+Exemple : EcoTrack possède plusieurs bureaux dans une wilaya. Chaque bureau a son adresse et son code, utilisé pour envoyer le colis au bon endroit.
+
+- `shipping_providers` décrit le transporteur.
+- `pickup_points` décrit ses nombreux bureaux.
+- `shop_addresses` décrit les lieux et liens publics de ta boutique.
+
+**Je recommande de garder `pickup_points` puisque tu proposes le stop desk.** La fusion compliquerait la distinction entre tes lieux et ceux des transporteurs. dans la table principale pas dans boutique et eviter de repeter a chaque fois le contenue de cette table
+ya til des table autre que ont peut deplacer dans la bdd centrale avec des valeurs comme cela qui ne chnage pas dapres chaque boutique 
+
+
+
+
+
+
+bah non dans ce cas : 1. Le client avait payé un article à 8 000 DA.
+2. Il le rend et choisit un nouvel article à 10 000 DA.
+3. Tu utilises les 8 000 DA de l’ancienne vente pour la nouvelle.
+4. Il paie seulement les 2 000 DA de différence.   quand le client veut chnager un produit bah il paye rien tanque que il a pas pris sont produit donc il paye pas 8000 puis le produit et chnager puis lors de la 2eme livraison il luis donne se quil manque non au debut il paye rien jusqua se que il prend le produit quil veut donc dans se cas la premiere livraison elle et sur le comercant mais ajoute la posibiliter si le comercant modife le prix pour ajouter les frais de la premiere livraison sur la 2eme livraison si il veut 
+
+
+
+
+
+
+
+
