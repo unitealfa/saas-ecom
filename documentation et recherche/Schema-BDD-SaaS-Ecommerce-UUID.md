@@ -1,8 +1,8 @@
 # Schéma BDD — SaaS e-commerce algérien
 
-Version V4.5 consolidée du 30 septembre 2026 — optimisation demandée : la facturation centrale utilise cinq tables complémentaires, avec un nombre limité de tables. saas_invoices conserve seulement les factures/avoirs et passe de 97 à 38 champs ; lignes, réglages, transmissions et virements gardent leurs fonctionnalités, preuves et historiques dans leurs tables liées. Abonnements/échéances et wilayas/communes restent fusionnés ; le module central de rétention reste retiré. Le schéma et son diagramme sont synchronisés, sans migration SQL exécutée.
+Version V4.6 — 4 octobre 2026. Optimisation et choix de la BDD boutique ; la BDD centrale conserve strictement sa définition V4.5.
 
-Ce document contient **27 tables centrales et 83 tables par boutique**, dont theme_customizations réservée à une évolution. Les tables techniques Laravel et le stockage optionnel des passkeys sont exclus du décompte. Les cinq tables Spatie Permission et activity_log sont incluses ; les trois pivots natifs n’ont pas d’identifiant autonome. Les tableaux de traçabilité conservent les demandes antérieures ; V4.5 remplace la fusion financière V4.4 par cinq tables et documente la conservation de chaque fonctionnalité.
+Ce document contient **27 tables centrales et 77 tables par boutique**. Les tables techniques Laravel et les passkeys facultatives restent hors décompte. Les cinq tables Spatie Permission et activity_log sont incluses ; les trois pivots natifs gardent leurs clés composites. La section centrale et son diagramme sont inchangés ; V4.6 adapte uniquement les boutiques et leurs références connexes.
 
 Les diagrammes sont répartis en modules pour rester exploitables. **Les champs, les références et les contraintes écrites font ensemble le schéma** : Mermaid ne peut pas imposer toutes les règles transactionnelles. Ce document n’est pas une migration SQL déjà exécutée.
 
@@ -28,14 +28,14 @@ Les diagrammes sont répartis en modules pour rester exploitables. **Les champs,
 | Administrateurs | Root complet sur l’administration centrale ; administrateurs délégués limitables par action et cible centrale. Aucun accès d’assistance aux boutiques et aucune usurpation de compte. |
 | Statistiques | Mesure interne des visiteurs et événements ; ventes/retours fondés sur les événements métier. Les corrections commerciales utilisent un événement économique finalisé avec date d’effet explicite. Aucun GA4 requis. |
 | Site | Un template, profil public, plusieurs adresses et liens sociaux. Personnalisation CSS encadrée plus tard. |
-| Documents | Contrats par révision acceptée, preuves de transmission, factures et avoirs à snapshots fiscaux ; séquences et preuves dans la BDD émettrice, génération du PDF idempotente et transmission après émission. |
+| Documents | Boutique : bons de commande facultatifs, factures et avoirs internes à snapshots fiscaux, PDF privé et numérotation idempotents ; validation après appel dans orders/activity_log, sans contrat ou PDF d’accord ni envoi aux acheteurs. Les documents et transmissions SaaS centrales restent définis en C8. |
 | Propriété | Propriétaire fixé à la création et immuable ; gestion délégable. |
 | Comptes transporteur | Comptes, secrets, tarifs, colis et reversements dans chaque BDD boutique ; même clé EcoTrack copiable entre boutiques du propriétaire, avec filtrage par colis local. |
 | Sécurité et preuves | Module central de politiques/exécutions de rétention retiré ; dates d’expiration propres aux jetons/diagnostics et protections des pièces requises conservées. Sauvegarde/restauration SaaS hors périmètre depuis le jour 4. |
 
-**Modules métier conservés et adaptés au jour 4 :** confirmation téléphonique et conditions distinctes (T19/T21), preuve d’information données dans orders (T8), manquants (T9), incidents multi-causes (T18), lignage et identité physique des variantes (T2/T3/T7/T8), données personnelles et audit (C6/T15/T21/T26), facturation SaaS, créances transporteur (T16), obligations de facturation et échanges (T22), corrections économiques (T23), contrepassations exactes et plafonds, déploiements multi-BDD et validation de l’API DHD/EcoTrack. Les prescriptions des anciennes notes propres aux sauvegardes/restaurations sont remplacées par la décision du jour 4.
+**Modules métier conservés et adaptés au jour 4 :** validation après appel et conditions distinctes (T8/T15/T21), preuve d’information données dans orders (T8), manquants (T9), incidents multi-causes (T18), lignage et identité physique des variantes (T2/T3/T7/T8), données personnelles et audit (C6/T15/T26), facturation SaaS, créances transporteur (T16), obligations de facturation et échanges (T22), corrections économiques (T23), contrepassations exactes et plafonds, déploiements multi-BDD et validation de l’API DHD/EcoTrack. Les prescriptions des anciennes notes propres aux sauvegardes/restaurations sont remplacées par la décision du jour 4.
 
-**Parcours retenu :** ni le panier ni la soumission au checkout ne réservent le stock. La soumission crée une commande `a_confirmer`, avec révision et lignes immuables. Le commerçant appelle, annonce le contenu et le total, puis saisit l’accord téléphonique : contrat et réservations sont créés dans une seule transaction. Le contrôle opérationnel ne réserve pas une deuxième fois ; seule la remise physique sort les produits. Cette règle remplace explicitement la réservation au checkout de la V2. Les prix affichés ne garantissent pas une disponibilité jusqu’à l’appel : recontrôle obligatoire avant confirmation. Tarif de livraison par colis. Ventes en caisse, multi-entrepôts, comptes acheteurs, codes promo, cartes et marketplace restent hors MVP.
+**Parcours retenu :** ni le panier ni la soumission au checkout ne réservent le stock. La soumission crée une commande `a_confirmer`, avec révision et lignes immuables. Le commerçant appelle, annonce le contenu et le total, puis clique « Valider » sur la révision annoncée : confirmed_revision_id, validated_at, réservations, mouvements et activité officielle sont écrits dans une seule transaction. Le contrôle opérationnel ne réserve pas une deuxième fois ; seule la remise physique sort les produits. Cette règle remplace explicitement la réservation au checkout de la V2. Les prix affichés ne garantissent pas une disponibilité jusqu’à l’appel : recontrôle obligatoire avant confirmation. Tarif de livraison par colis. Ventes en caisse, multi-entrepôts, comptes acheteurs, codes promo, cartes et marketplace restent hors MVP.
 
 ## 2. Corrections nécessaires par rapport à ton premier modèle
 
@@ -48,7 +48,7 @@ Les diagrammes sont répartis en modules pour rester exploitables. **Les champs,
 7. **Préserver les versions.** Changer une variante avant expédition produit une nouvelle révision ; après expédition, l’ancien contenu reste intact.
 8. **Distinguer les trois cycles.** Commercial, logistique et argent n’ont pas les mêmes événements ni la même fin.
 9. **Pas de tables par heure/jour/mois/année.** Des dates et événements bien indexés permettent ces regroupements. Ne pas stocker `nombre_ventes` dans chaque produit comme source de vérité.
-10. **`deleted_at` n’est pas universel.** Catalogue et contenu peuvent être archivés/restaurés. Les rôles Spatie suivent leur procédure de révocation et suppression contrôlée (C2), sans SoftDeletes. Commandes, audits et mouvements sont conservés avec annulation, clôture ou contrepassation, sans effacement métier.
+10. **`deleted_at` n’est pas universel.** Catalogue et contenu peuvent être archivés/restaurés. Les rôles Spatie suivent leur procédure de révocation et suppression contrôlée (C2), sans SoftDeletes. Commandes et audits sont conservés sans annulation ni clôture commerciale manuelle ; les mouvements et écritures financières se corrigent par contrepassation, sans effacement métier.
 
 ## 3. Conventions de lecture et d’intégrité
 
@@ -152,7 +152,7 @@ protected function casts(): array
 }
 ```
 
-Le même principe s'applique aux autres champs : `products.status => PublicationStatusEnum::class`, `carrier_operations.type => CarrierOperationTypeEnum::class`, `document_deliveries.channel => DocumentDeliveryChannelEnum::class`, etc. Un champ `tinyint_unsigned` déclaré enum dans les diagrammes doit donc avoir le même enum dans la migration/commentaire, le registre ci-dessous, le cast Eloquent et les règles métier.
+Le même principe s'applique aux autres champs : `products.status => PublicationStatusEnum::class`, `carrier_operations.type => CarrierOperationTypeEnum::class`, `shipment_events.source => ShipmentEventSourceEnum::class`, etc. Un champ `tinyint_unsigned` déclaré enum dans les diagrammes doit donc avoir le même enum dans la migration/commentaire, le registre ci-dessous, le cast Eloquent et les règles métier.
 
 | Enum | Codes stables (TINYINT UNSIGNED) |
 |---|---|
@@ -188,7 +188,7 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `PublicationStatusEnum` | 1 DRAFT ; 2 PUBLISHED ; 3 ARCHIVED |
 | `ReviewModerationStatusEnum` | 1 PENDING ; 2 APPROVED ; 3 HIDDEN ; 4 REJECTED |
 | `CartStatusEnum` | 1 ACTIVE ; 2 CONVERTED ; 3 EXPIRED ; 4 ABANDONED |
-| `OrderStatusEnum` | 1 AWAITING_CONFIRMATION ; 2 CONFIRMED ; 3 CANCELLED ; 4 CLOSED |
+| `OrderStatusEnum` | 1 AWAITING_CONFIRMATION ; 2 CONFIRMED ; 5 DRAFT ; anciens codes 3/4 retirés, non réattribués |
 | `StockReservationStatusEnum` | 1 ACTIVE ; 2 RELEASED ; 3 CONSUMED |
 | `ReturnStatusEnum` | 1 REQUESTED ; 2 IN_TRANSIT ; 3 RECEIVED ; 4 INSPECTING ; 5 CLOSED ; 6 CANCELLED |
 | `ShipmentStatusEnum` | 1 PENDING ; 2 PREPARED ; 3 HANDED_OVER ; 4 IN_TRANSIT ; 5 OUT_FOR_DELIVERY ; 6 DELIVERED ; 7 RETURNING ; 8 RETURNED ; 9 LOST ; 10 CANCELLED ; 11 INCIDENT |
@@ -206,7 +206,7 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `CommercialCorrectionStatusEnum` | 1 DRAFT ; 2 FINALIZED ; 3 CANCELLED ; 4 REVERSED |
 | `MediaVisibilityEnum` | 1 PUBLIC ; 2 PRIVATE |
 | `ActivityOriginEnum` | 1 USER ; 2 SYSTEM ; 3 CARRIER ; 4 JOB |
-| `DocumentTypeEnum` | 1 INVOICE ; 2 CREDIT_NOTE ; 3 ORDER_DOCUMENT ; 4 CONTRACT ; 5 DELIVERY_PROOF |
+| `DocumentTypeEnum` | 1 INVOICE ; 2 CREDIT_NOTE ; 3 ORDER_DOCUMENT ; anciens codes 4 CONTRACT et 5 DELIVERY_PROOF retirés de la boutique, non réattribués ; centrale limitée à 1/2 |
 | `ProductTypeEnum` | 1 STANDARD ; 2 CUSTOMIZED |
 | `OptionDisplayTypeEnum` | 1 SELECT ; 2 COLOR ; 3 BUTTON |
 | `AttributeValueTypeEnum` | 1 TEXT ; 2 NUMBER ; 3 BOOLEAN ; 4 DATE |
@@ -214,7 +214,6 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `DeviceTypeEnum` | 1 DESKTOP ; 2 MOBILE ; 3 TABLET ; 4 OTHER |
 | `OrderTypeEnum` | 1 SALE ; 2 REPLACEMENT ; 3 EXCHANGE |
 | `OrderChannelEnum` | 1 STOREFRONT ; 2 MANUAL |
-| `CustomerConfirmationModeEnum` | 1 PHONE |
 | `DeliveryModeEnum` | 1 HOME ; 2 PICKUP |
 | `ShippingChargeBearerEnum` | 1 CUSTOMER ; 2 MERCHANT ; 3 SHARED |
 | `PriceOriginEnum` | 1 CATALOG ; 2 PROMOTION ; 3 MANUAL |
@@ -235,7 +234,8 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `ReceivableSettlementTypeEnum` | 1 BANK_REFUND ; 2 FEE_OFFSET ; 3 STATEMENT_OFFSET ; 4 OTHER_VALID_SETTLEMENT |
 | `IncidentTypeEnum` | 1 DAMAGED ; 2 DEFECTIVE ; 3 INCORRECT ; 4 MISSING ; 5 LOST ; 6 OTHER |
 | `TermsAcceptanceModeEnum` | 1 CHECKOUT ; 2 PHONE |
-| `CommercialCorrectionTypeEnum` | 1 RETURN ; 2 PRICE_REDUCTION ; 3 CANCELLATION ; 4 EXCHANGE ; 5 GOODWILL ; 6 REVERSAL ; 7 OTHER |
+| `TenantBillingRecordTypeEnum` | 1 SEQUENCE ; 2 RULE |
+| `CommercialCorrectionTypeEnum` | 1 RETURN ; 2 PRICE_REDUCTION ; 4 EXCHANGE ; 5 GOODWILL ; 6 REVERSAL ; 7 OTHER ; ancien code 3 retiré, non réattribué |
 | `NonProductKindEnum` | 1 NONE ; 2 SHIPPING ; 3 GLOBAL_GOODWILL ; 4 OTHER |
 
 | Table.champ | Enum | Null permis |
@@ -276,7 +276,11 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `saas_transfers.transfer_status` | `SaasTransferStatusEnum` | non |
 | `saas_transfers.refund_reason` | `SaasRefundReasonEnum` | oui hors remboursement |
 | `geographic_areas.type` | `GeoZoneTypeEnum` | non |
-| `billing_rules.status` | `PolicyStatusEnum` | non |
+| `billing_rules.policy_status` | `PolicyStatusEnum` | oui ; seulement RULE |
+| `billing_rules.record_type` | `TenantBillingRecordTypeEnum` | non ; 1 SEQUENCE / 2 RULE |
+| `billing_rules.document_type` | `DocumentTypeEnum` | oui ; seulement SEQUENCE |
+| `invoices.sequence_record_type` | `TenantBillingRecordTypeEnum` | oui ; généré 1 selon sequence_id |
+| `billing_obligations.billing_rule_record_type` | `TenantBillingRecordTypeEnum` | non ; généré 2 |
 | `processing_activity_register.status` | `PolicyStatusEnum` | non |
 | `media.visibility` | `MediaVisibilityEnum` | non |
 | `products.type` | `ProductTypeEnum` | non |
@@ -290,7 +294,6 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `orders.order_type` | `OrderTypeEnum` | non |
 | `orders.channel` | `OrderChannelEnum` | non |
 | `orders.commercial_status` | `OrderStatusEnum` | non |
-| `orders.customer_confirmation_mode` | `CustomerConfirmationModeEnum` | oui |
 | `order_revisions.delivery_mode` | `DeliveryModeEnum` | non |
 | `order_revisions.shipping_charge_bearer` | `ShippingChargeBearerEnum` | non |
 | `order_items.price_origin` | `PriceOriginEnum` | non |
@@ -324,7 +327,6 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `customer_adjustments.amount_kind` | `AmountKindEnum` | non |
 | `customer_adjustments.type` | `AdjustmentTypeEnum` | non |
 | `customer_adjustments.status` | `AdjustmentStatusEnum` | non |
-| `theme_customizations.status` | `PublicationStatusEnum` | non |
 | `carrier_fees.fee_type` | `CarrierFeeTypeEnum` | non |
 | `carrier_fees.payer` | `FeePayerEnum` | non |
 | `carrier_fees.settlement_mode` | `FeeSettlementModeEnum` | non |
@@ -336,11 +338,6 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `invoices.status` | `DocumentStatusEnum` | non |
 | `order_incidents.status` | `IncidentStatusEnum` | non |
 | `order_incident_details.type` | `IncidentTypeEnum` | non |
-| `order_contracts.confirmation_mode` | `CustomerConfirmationModeEnum` | non |
-| `order_contracts.delivery_channel` | `DocumentDeliveryChannelEnum` | oui |
-| `document_deliveries.channel` | `DocumentDeliveryChannelEnum` | non |
-| `document_deliveries.status` | `DocumentDeliveryStatusEnum` | non |
-| `document_sequences.document_type` | `DocumentTypeEnum` | non |
 | `sales_terms_acceptances.acceptance_mode` | `TermsAcceptanceModeEnum` | non |
 | `billing_obligations.document_type` | `DocumentTypeEnum` | non |
 | `billing_obligations.status` | `BillingObligationStatusEnum` | non |
@@ -348,11 +345,11 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `commercial_corrections.correction_type` | `CommercialCorrectionTypeEnum` | non |
 | `commercial_corrections.status` | `CommercialCorrectionStatusEnum` | non |
 | `commercial_corrections.non_product_kind` | `NonProductKindEnum` | non |
-| `shop_members.status` | `MemberStatusEnum` | non |
+| `users.membership_status` | `MemberStatusEnum` | non |
 
 Les structures centrales et locales homonymes utilisent leurs enums dans la connexion concernée. Les enums ci-dessus formalisent les choix décrits dans les modules ; une extension métier passe par une nouvelle valeur et les contrôles correspondants, jamais par un changement silencieux de sens.
 
-**Champs qui restent textuels après vérification :** `name/guard_name` des packages ; `log_name`, `event`, `action` et `navigation_events.type` car leurs catalogues sont extensibles ; `content_pages.type` car le commerçant peut ajouter de nouveaux types/blocs de page sans migration ; `shop.business_type` car l’activité commerciale n’est pas une liste fermée ; `billing_rules.numbering_scope`, `saas_billing_settings.numbering_scope`, `personal_data_operations.operation_type/resource_type`, `shipment_events.event_type`, `carrier_fees.date_source`, `expenses.category` et les champs `source` externes car ce sont des codes métier/techniques extensibles ; états/codes bruts des transporteurs, MIME, locale, social network, SKU et fiscalité/forme juridique. Les booleans restent des booleans. Les montants et pourcentages restent DECIMAL. Conserver une chaîne lorsque le domaine n’est pas fermé ou que le package l’exige ; vérifier les valeurs autorisées au serveur.
+**Champs qui restent textuels après vérification :** `name/guard_name` des packages ; `log_name`, `event`, `action` et `navigation_events.type` car leurs catalogues sont extensibles ; `content_pages.type` car le commerçant peut ajouter de nouveaux types/blocs de page sans migration ; `shop.business_type` car l’activité commerciale n’est pas une liste fermée ; `billing_rules.numbering_scope`, `saas_billing_settings.numbering_scope`, `activity_log.properties.operation_type/resource_kind` dans le contrat local privacy, `shipment_events.event_type`, `carrier_fees.date_source`, `expenses.category` et les champs `source` externes car ce sont des codes métier/techniques extensibles ; états/codes bruts des transporteurs, MIME, locale, social network, SKU et fiscalité/forme juridique. Les booleans restent des booleans. Les montants et pourcentages restent DECIMAL. Conserver une chaîne lorsque le domaine n’est pas fermé ou que le package l’exige ; vérifier les valeurs autorisées au serveur.
 
 ### 3.4 Connexions et isolation
 
@@ -1412,6 +1409,8 @@ Tous les champs ont le sens défini en T2 et au §7.6, avec chemins `central/pub
 
 ## 5. BDD de chaque boutique : `tenant_<uuid>`
 
+Le décompte actuel est de **77 tables locales**. Le [diagramme boutique complet](Diagramme-BDD-Boutique-Complet.md) les réunit en un seul dessin et explique chaque champ. Les décomptes cités dans les annotations V4.2–V4.5 restent historiques.
+
 Ce même modèle est migré dans chaque BDD tenant. Aucun `tenant_id` n’est ajouté à toutes les lignes : le contexte de connexion assure déjà la séparation. La ligne unique `shop` conserve la référence de rattachement.
 
 ### T1 — Profil public
@@ -1431,6 +1430,8 @@ erDiagram
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
         uuid tenant_uuid "REF central.tenants.uuid"
+        bigint_unsigned logo_media_id FK "nullable ; media.id"
+        bigint_unsigned favicon_media_id FK "nullable ; media.id"
         tinyint singleton UK "NOT NULL DEFAULT 1 CHECK egal 1"
         bigint central_profile_version
         varchar name
@@ -1440,8 +1441,6 @@ erDiagram
         varchar contact_email "nullable"
         varchar contact_phone "nullable"
         varchar contact_whatsapp "nullable"
-        bigint_unsigned logo_media_id FK "nullable ; media.id"
-        bigint_unsigned favicon_media_id FK "nullable ; media.id"
         varchar locale
         char(3) currency
         varchar timezone
@@ -1456,10 +1455,10 @@ erDiagram
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned shop_id FK "shop.id"
-        varchar label
-        text address
         uuid province_uuid "REF central.geographic_areas.uuid"
         uuid municipality_uuid "REF central.geographic_areas.uuid"
+        varchar label
+        text address
         varchar postal_code "nullable"
         decimal_geo latitude "nullable"
         decimal_geo longitude "nullable"
@@ -1618,8 +1617,9 @@ erDiagram
     media {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        varchar(64) model_type "alias morph ; parent local"
         bigint_unsigned model_id "clé du parent local"
+        bigint_unsigned created_by_id FK "nullable ; users.id"
+        varchar(64) model_type "alias morph ; parent local"
         varchar(64) collection_name "logo, gallery, invoice, proof..."
         varchar(64) disk
         varchar storage_key UK
@@ -1634,7 +1634,6 @@ erDiagram
         int position
         boolean is_primary
         tinyint_unsigned primary_slot "generated nullable ; 1 si principal actif"
-        bigint_unsigned created_by_id FK "nullable ; users.id"
         char(64) file_hash "nullable"
         datetime created_at
         datetime updated_at
@@ -1644,10 +1643,10 @@ erDiagram
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned parent_id FK "nullable ; categories.id"
+        bigint_unsigned media_id FK "nullable ; media.id"
         varchar name
         varchar slug
         text description "nullable"
-        bigint_unsigned media_id FK "nullable ; media.id"
         int position
         boolean is_active
         varchar meta_title "nullable"
@@ -2080,11 +2079,11 @@ erDiagram
         bigint_unsigned product_id FK "products.id"
         bigint_unsigned visitor_id FK "nullable ; visitors.id"
         bigint_unsigned order_item_id FK "nullable ; order_items.id"
+        bigint_unsigned moderated_by_id FK "nullable ; users.id"
         varchar display_name
         int note
         text comment
         tinyint_unsigned moderation_status "ReviewModerationStatusEnum"
-        bigint_unsigned moderated_by_id FK "nullable ; users.id"
         datetime moderated_at "nullable"
         datetime published_at "nullable"
         datetime created_at
@@ -2159,7 +2158,7 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 - **`product_promotions` :** Une promotion utilise `DiscountTypeEnum` : `1 PERCENTAGE`, `2 UNIT_AMOUNT` (montant unitaire retiré) ou `3 FIXED_UNIT_PRICE` (prix unitaire fixe). La quantité minimale doit être au moins 1, un pourcentage doit rester entre 0 et 100 et le prix final ne peut jamais être négatif. Si la promotion vise une variante ou une page précise, cette variante et cette page doivent appartenir au même produit. Une seule promotion est retenue pour une ligne de commande. S’il y en a plusieurs, on regarde d’abord la priorité, puis la plus avantageuse, puis l’UUID pour départager de manière stable. Le serveur décide si une page autorise la promotion ; il ne fait jamais confiance à un simple `page_id` envoyé par le navigateur.
 
-- **`product_reviews` :** La note est un entier de 1 à 5. Le statut utilise exactement `ReviewModerationStatusEnum` : `1 PENDING`, `2 APPROVED`, `3 HIDDEN`, `4 REJECTED`. Seuls les avis publiés entrent dans la note publique. Si un avis dit « achat vérifié », `order_item_id` doit réellement appartenir à ce produit ET le système doit avoir une preuve que l’auteur possède l’accès à la commande livrée. Saisir seulement le même nom ou le même téléphone ne suffit pas. La FK prouve que l’article concernait ce produit, pas automatiquement l’identité de la personne qui écrit. Un avis masqué reste conservé pour audit.
+- **`product_reviews` :** La note est un entier de 1 à 5. Le statut utilise exactement `ReviewModerationStatusEnum` : `1 PENDING`, `2 APPROVED`, `3 HIDDEN`, `4 REJECTED`. Seuls les avis publiés entrent dans la note publique. Si un avis dit « achat vérifié », `order_item_id` doit réellement appartenir à ce produit ET le serveur doit vérifier la possession du secret fonctionnel du navigateur lié à orders.visitor_id de cette commande déclarée livrée par le livreur. La vérification concerne seulement l’envoi de l’avis, sans écran ni endpoint de suivi client ; si le navigateur n’est plus reconnaissable, l’avis reste non vérifié. Saisir seulement le même nom ou le même téléphone ne suffit pas. La FK prouve que l’article concernait ce produit, pas automatiquement l’identité de la personne qui écrit. Un avis masqué reste conservé pour audit.
 
 ### T6 — Visiteurs et statistiques
 
@@ -2167,7 +2166,7 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 **`visit_sessions` — Les différentes visites d’un navigateur sur la boutique. Exemple : une visite le matin puis une autre le soir peuvent former deux sessions pour le même visiteur.**
 
-**`navigation_events` — Les actions suivies pour comprendre le parcours sur le site. Exemple : ouvrir une fiche produit, ajouter un article au panier puis arriver à la commande.**
+**`navigation_events` — Les actions minimales servant aux statistiques globales de la vitrine. Exemple : compter les vues de produits, ajouts au panier et débuts de commande, sans afficher le parcours individuel d’un navigateur.**
 
 **`visitor_preferences` — Les choix du visiteur concernant la mesure de sa navigation. Exemple : refuser cette mesure tout en continuant à utiliser le panier et à commander.**
 
@@ -2236,7 +2235,7 @@ erDiagram
 
 - **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
 - **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`token_hash`** : la version protégée du jeton d’invitation. Si la base est lue, le vrai lien secret n’est pas directement récupérable.
+- **`token_hash`** : empreinte du secret du navigateur ; elle permet de retrouver son panier sans compte acheteur et ne représente pas une identité certaine.
 - **`first_visited_at`** : la date de la première visite connue de ce visiteur.
 - **`last_visited_at`** : la date de sa dernière visite connue.
 - **`expires_at`** : la date où l’élément n’est plus valable.
@@ -2249,10 +2248,10 @@ erDiagram
 - **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
 - **`visitor_id`** : l’identifiant du visiteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
 - **`started_at`** : la date et l’heure où la période ou l’action commence.
-- **`last_activity_at`** : la date et l’heure liées à **derniere activite**. Elle permet de savoir exactement quand cette étape a eu lieu.
+- **`last_activity_at`** : la dernière activité connue de cette visite ; elle aide à déterminer quand une session devient inactive.
 - **`ended_at`** : la date et l’heure où elle s’est terminée. Peut rester vide tant que ce n’est pas terminé.
 - **`entry_path`** : la première page visitée dans cette session. Exemple : `/produit/chaussure-noire`.
-- **`source`** : indique d’où vient l’information. Exemple : saisie manuelle ou réponse de l’API. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`source`** : l’origine connue de la visite, par exemple une campagne, un moteur de recherche ou un réseau social. C’est une étiquette de mesure facultative ; elle ne connecte pas la boutique à ce service.
 - **`medium`** : une information sur le support utilisé pour arriver sur le site, par exemple une source marketing ou un canal suivi. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`campaign`** : le nom ou code d’une campagne marketing utilisé pour savoir d’où vient la visite. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`referrer_host`** : le site ou domaine qui a envoyé le visiteur vers la boutique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
@@ -2271,10 +2270,10 @@ erDiagram
 - **`content_page_id`** : l’identifiant de la page de contenu. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`cart_id`** : l’identifiant du panier. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`type`** : code d’événement de navigation extensible, par exemple `product_view`, `add_to_cart` ou `checkout_started`. Il reste textuel car de nouveaux événements analytiques peuvent être ajoutés sans migration.
-- **`path`** : l’endroit où le fichier est rangé dans le stockage privé.
+- **`path`** : le chemin de la page visitée sur le site, sans paramètres sensibles.
 - **`quantity`** : le nombre d’éléments concernés. Exemple : `2` signifie deux unités du produit. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`occurred_at`** : la date et l’heure où l’événement s’est produit.
-- **`received_at`** : la date et l’heure liées à **recu**. Elle permet de savoir exactement quand cette étape a eu lieu.
+- **`received_at`** : la date à laquelle le serveur a reçu cet événement ; elle peut être différente de la date où le navigateur l’a produit.
 - **`created_at`** : la date où cette ligne a été créée dans la base.
 
 **`visitor_preferences` :**
@@ -2284,7 +2283,7 @@ erDiagram
 - **`visitor_id`** : l’identifiant du visiteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
 - **`allows_analytics`** : indique si la mesure d’audience prévue par le site peut être utilisée pour ce visiteur selon la règle retenue.
 - **`notice_version`** : la version du texte d’information montrée au client.
-- **`chosen_at`** : la date et l’heure liées à **choisi**. Elle permet de savoir exactement quand cette étape a eu lieu.
+- **`chosen_at`** : la date à laquelle le navigateur a enregistré ce choix de mesure d’audience ; une modification crée un nouveau choix daté.
 - **`created_at`** : la date où cette ligne a été créée dans la base.
 
 
@@ -2298,6 +2297,8 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 - **`navigation_events` :** L’UUID de l’événement sert aussi à éviter d’enregistrer deux fois le même événement. Les types prévus sont `page_vue`, `produit_vu`, `recherche`, `ajout_panier`, `retrait_panier` et `checkout_commence`. Les achats et les retours ne sont pas déclarés par le navigateur : ils viennent du serveur métier pour être fiables. Les références envoyées par le client et leurs dates sont vérifiées avant enregistrement. Pour une fiche produit, un seul événement `produit_vu` suffit ; on ne crée pas en plus un deuxième événement `page_vue` pour compter deux fois la même visite.
 
 - **`visitor_preferences` :** On conserve l’historique des choix faits par le visiteur lorsque cette collecte est activée. Le panier doit continuer à fonctionner même si la mesure d’audience n’est pas utilisée. La durée de conservation et les conditions exactes de collecte doivent être décidées avant la mise en ligne. La présence de cette table ne signifie pas à elle seule que le traitement est juridiquement conforme.
+
+**Quatre sources conservées, sans parcours individuel :** `visitors` retrouve le panier du navigateur et permet le décompte d’uniques ; `visit_sessions` fournit les périodes et origines agrégées ; `navigation_events` compte les événements dédupliqués ; `visitor_preferences` conserve les choix de mesure. Aucun écran, endpoint ou export de parcours individuel n’est proposé au lancement. Les refus de mesure n’empêchent ni panier ni commande ; les rapports commerciaux fiables viennent des faits serveur, pas d’une déclaration d’achat du navigateur. Une évolution vers une consultation individuelle exige une nouvelle décision de périmètre et de droits.
 
 ### T7 — Panier
 
@@ -2327,8 +2328,8 @@ erDiagram
         bigint_unsigned product_id FK "products.id"
         bigint_unsigned sales_page_id FK "nullable ; sales_pages.id"
         int quantity
-        json customization "nullable"
-        varchar customization_signature
+        text customization_text "nullable ; demande libre du client"
+        char(64) customization_signature
         datetime created_at
         datetime updated_at
     }
@@ -2358,8 +2359,8 @@ erDiagram
 - **`product_id`** : l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
 - **`sales_page_id`** : l’identifiant de la page de vente. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`quantity`** : le nombre d’éléments concernés. Exemple : `2` signifie deux unités du produit.
-- **`customization`** : les choix personnalisés du client pour cet article. Exemple : texte à imprimer ou couleur spéciale. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`customization_signature`** : une signature calculée à partir des choix personnalisés de l’article. Elle permet de savoir si deux articles ont exactement la même personnalisation.
+- **`customization_text`** : le texte libre demandé pour cet article, par exemple le message d’un bouquet ; aucune option de personnalisation payante automatique.
+- **`customization_signature`** : empreinte du texte normalisé, pour distinguer deux lignes du même article ayant des demandes différentes.
 - **`created_at`** : la date où cette ligne a été créée dans la base.
 - **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
 
@@ -2371,6 +2372,10 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 - **`cart_items` :** Dans un même panier, une ligne est unique selon la variante, la personnalisation et la page d’origine. Deux bouquets de la même variante avec deux messages personnalisés différents restent donc deux lignes différentes. `quantity` doit être supérieure à 0. Le navigateur n’est jamais la source de vérité du prix : le serveur recalcule les prix au moment nécessaire. `product_id` est obligatoire. La variante choisie doit appartenir à ce produit, et si une `sales_page_id` est fournie, elle doit elle aussi présenter ce même produit. Une page de vente facultative ne peut donc pas être utilisée pour faire commander un autre produit.
 
+
+
+**Personnalisation texte libre :** customization_text est un texte facultatif, normalisé au serveur et limité en longueur, sans JSON de champs configurables ni supplément automatique. Le prix reste celui de la variante/promotion ou le prix exceptionnel motivé de la commande. customization_signature=SHA-256 du texte normalisé (chaîne vide si aucune demande) sert uniquement à l’unicité de la ligne panier ; deux textes différents restent deux lignes. order_items.customization_text conserve le texte exact validé de cette révision.
+
 ### T8 — Commande et versions
 
 **`orders` — La fiche principale de chaque commande, avec son identité et son état commercial. Exemple : la commande de Karim reste la même commande même si son contenu est modifié avant expédition.**
@@ -2379,7 +2384,7 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 **`order_items` — Les produits et quantités d’une version précise de commande, avec les prix et coûts conservés à ce moment-là. Exemple : deux t-shirts à 2 000 DA chacun, même si le prix du catalogue change ensuite.**
 
-**`order_history` — Le carnet des actions et décisions concernant une commande. Exemple : noter un appel sans réponse, une confirmation ou un changement de taille, avec sa date et son auteur.**
+**`order_history` — Le carnet des appels, rappels, propositions et changements concernant une commande. Exemple : noter un appel sans réponse ou un changement de taille ; le clic « Valider » est audité séparément dans `activity_log`.**
 
 ```mermaid
 erDiagram
@@ -2387,29 +2392,28 @@ erDiagram
     orders {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        varchar number
         bigint_unsigned visitor_id FK "nullable ; visitors.id"
         bigint_unsigned cart_id FK "nullable ; carts.id"
-        varchar data_policy_version
-        datetime data_notice_acknowledged_at
-        char(64) notice_text_hash "SHA-256 hex nullable si snapshot/version suffisamment probants"
         bigint_unsigned original_session_id FK "nullable ; visit_sessions.id"
         bigint_unsigned original_sales_page_id FK "nullable ; sales_pages.id"
         bigint_unsigned original_return_id FK "nullable ; order_returns.id"
         bigint_unsigned original_order_id FK "nullable ; orders.id"
         bigint_unsigned original_incident_id FK "nullable ; order_incidents.id"
+        bigint_unsigned current_revision_id FK "nullable ; order_revisions.id"
+        bigint_unsigned confirmed_revision_id FK "nullable ; order_revisions.id ; revision validee"
+        bigint_unsigned confirmation_owner_id FK "nullable ; users.id"
+        bigint_unsigned operationally_confirmed_by_id FK "nullable ; users.id"
+        varchar number
+        varchar data_policy_version
+        datetime data_notice_acknowledged_at
+        char(64) notice_text_hash "SHA-256 hex nullable si snapshot/version suffisamment probants"
         int original_incident_quantity "nullable"
         varchar replacement_reason "nullable"
-        bigint_unsigned current_revision_id FK "nullable ; order_revisions.id"
         tinyint_unsigned order_type "OrderTypeEnum"
         tinyint_unsigned channel "OrderChannelEnum"
-        tinyint_unsigned commercial_status "OrderStatusEnum"
-        bigint_unsigned confirmation_owner_id FK "nullable ; users.id"
-        datetime customer_confirmed_at "nullable before acceptation"
-        tinyint_unsigned customer_confirmation_mode "nullable ; CustomerConfirmationModeEnum"
+        tinyint_unsigned commercial_status "OrderStatusEnum ; AWAITING_CONFIRMATION/CONFIRMED/DRAFT"
+        datetime validated_at "nullable ; date du clic Valider"
         datetime operationally_confirmed_at "nullable"
-        bigint_unsigned operationally_confirmed_by_id FK "nullable ; users.id"
-        datetime cancelled_at "nullable"
         varchar submission_key
         char(64) submission_hash "SHA-256 hex 64"
         int lock_version
@@ -2423,12 +2427,16 @@ erDiagram
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned order_id FK "orders.id"
+        bigint_unsigned author_id FK "nullable ; users.id"
+        bigint_unsigned pickup_point_id FK "nullable ; pickup_points.id"
+        bigint_unsigned free_shipping_rule_id FK "nullable ; free_shipping_rules.id"
+        uuid province_uuid "REF central.geographic_areas.uuid"
+        uuid municipality_uuid "REF central.geographic_areas.uuid"
         int revision_number
         char(3) currency
         char(2) country_code
         json legal_seller_snapshot
         json shipping_tax_snapshot
-        bigint_unsigned author_id FK "nullable ; users.id"
         text reason "nullable"
         varchar recipient_last_name
         varchar recipient_first_name "nullable"
@@ -2436,13 +2444,10 @@ erDiagram
         varchar secondary_phone "nullable"
         varchar email "nullable"
         text address
-        uuid province_uuid "REF central.geographic_areas.uuid"
-        uuid municipality_uuid "REF central.geographic_areas.uuid"
         varchar province_name
         varchar municipality_name
         varchar postal_code "nullable"
         tinyint_unsigned delivery_mode "DeliveryModeEnum"
-        bigint_unsigned pickup_point_id FK "nullable ; pickup_points.id"
         json pickup_point_snapshot "nullable"
         decimal catalog_subtotal
         decimal applied_subtotal
@@ -2453,7 +2458,6 @@ erDiagram
         decimal order_total
         decimal exchange_offset_amount "DEFAULT 0"
         decimal amount_to_collect
-        bigint_unsigned free_shipping_rule_id FK "nullable ; free_shipping_rules.id"
         text customer_note "nullable"
         varchar sales_terms_version
         json sales_terms_snapshot
@@ -2471,7 +2475,7 @@ erDiagram
         varchar variant_name
         varchar sku
         json options_snapshot "nullable"
-        json customization_snapshot "nullable"
+        text customization_text "nullable ; texte libre fige"
         int quantity
         decimal catalog_unit_price
         decimal applied_unit_price
@@ -2503,6 +2507,7 @@ erDiagram
         datetime created_at
     }
     order_revisions |o--o{ orders : current_revision_id
+    order_revisions |o--o{ orders : confirmed_revision_id
     orders ||--o{ order_revisions : order_id
     order_revisions ||--o{ order_items : revision_id
     orders ||--o{ order_history : order_id
@@ -2530,15 +2535,14 @@ erDiagram
 - **`original_incident_quantity`** : le nombre d’unités correspondant à **incident origine**. Exemple : `2` signifie deux unités. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`replacement_reason`** : explique la raison de **remplacement**. Cela permet de comprendre plus tard pourquoi la décision a été prise. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`current_revision_id`** : l’identifiant de la version actuelle de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`confirmed_revision_id`** : la version précise que le commerçant a validée après son appel. Si une nouvelle proposition est préparée, cette ancienne version validée reste connue jusqu’au prochain clic « Valider ».
+- **`confirmation_owner_id`** : l’identifiant de la personne responsable de la confirmation. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`validated_at`** : la date du dernier clic « Valider » réussi pour `confirmed_revision_id`. La personne qui a cliqué, l’événement et la clé de validation sont conservés dans `activity_log`.
 - **`order_type`** : indique la catégorie de **commande** utilisée pour cette ligne.
 - **`channel`** : code de `OrderChannelEnum` qui indique l’origine de la commande : `STOREFRONT` ou `MANUAL`.
 - **`commercial_status`** : code entier de l’enum propre à cet objet, défini au §3.3 ; les libellés sont traduits à l’affichage et les transitions contrôlées par le service.
-- **`confirmation_owner_id`** : l’identifiant de la personne responsable de la confirmation. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`customer_confirmed_at`** : la date et l’heure liées à **confirmation client**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`customer_confirmation_mode`** : la manière dont l’accord du client a été confirmé. Dans le MVP, cela peut être la confirmation téléphonique saisie par le commerçant. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`operationally_confirmed_at`** : la date et l’heure liées à **confirme operationnellement**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`operationally_confirmed_by_id`** : l’identifiant de la personne qui a validé le contrôle opérationnel. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`cancelled_at`** : la date et l’heure liées à **annulee**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`submission_key`** : une clé qui reconnaît une soumission précise. Elle évite qu’un double clic ou un nouvel envoi réseau crée deux fois la même chose.
 - **`submission_hash`** : une empreinte du contenu envoyé. Exemple : si la même clé revient avec un autre panier, le système voit que le contenu n’est pas identique.
 - **`lock_version`** : le numéro de version de verrou. Exemple : version 1, puis version 2 après une évolution ; l’ancienne version peut rester conservée pour comprendre l’historique.
@@ -2602,7 +2606,7 @@ erDiagram
 - **`variant_name`** : le nom de **variante** affiché ou conservé pour cette ligne.
 - **`sku`** : la référence utilisée pour reconnaître **SKU** sans se baser seulement sur son nom.
 - **`options_snapshot`** : une **copie figée** de options au moment important de l’opération. Si l’information d’origine change plus tard, cette ancienne ligne garde la valeur utilisée à ce moment-là. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`customization_snapshot`** : une **copie figée** de personnalisation au moment important de l’opération. Si l’information d’origine change plus tard, cette ancienne ligne garde la valeur utilisée à ce moment-là. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`customization_text`** : le texte libre de personnalisation demandé pour cet article, conservé tel qu’il était dans cette version de commande. Exemple : « Joyeux anniversaire Lina ». Ce champ peut rester vide ; aucun JSON, questionnaire structuré ou fichier de personnalisation n’est prévu.
 - **`quantity`** : le nombre d’éléments concernés. Exemple : `2` signifie deux unités du produit.
 - **`catalog_unit_price`** : le prix du produit tel qu’il était dans le catalogue au moment de l’ajout.
 - **`applied_unit_price`** : le prix réellement utilisé pour cette ligne de commande. Il peut être différent du prix actuel du catalogue.
@@ -2638,17 +2642,19 @@ erDiagram
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
-- **`orders` :** `number` et `submission_key` sont uniques, et un même panier ne peut créer qu’une seule commande. `order_type` utilise `OrderTypeEnum` : `1 SALE`, `2 REPLACEMENT`, `3 EXCHANGE`. `channel` utilise `OrderChannelEnum` : `1 STOREFRONT` pour le parcours public (boutique, panier ou page de vente) et `2 MANUAL` pour une saisie manuelle. Une commande standard n’a aucune commande ou incident d’origine. Un remplacement ou un échange doit au contraire pointer vers une commande standard déjà expédiée et vers l’incident précis qui l’a provoqué. Il traite un seul incident d’une seule ligne au MVP ; plusieurs lignes en problème donnent donc plusieurs commandes de remplacement. La quantité totale de la nouvelle commande doit correspondre à la quantité reconnue dans l’incident. Pour un remplacement gratuit, on garde normalement la même variante et la même personnalisation sauf si une substitution est clairement documentée. Un échange valorisé peut utiliser une variante différente et possède une vraie valeur commerciale annoncée au client ; sa compensation est gérée par T22. Si un remplacement identique doit finalement être facturé comme une nouvelle vente, on utilise ce mécanisme d’échange valorisé au lieu de mettre artificiellement un prix sur une commande de remplacement gratuite. Toute nouvelle commande issue d’un checkout avec coordonnées doit garder `data_policy_version` et `data_notice_acknowledged_at`; `notice_text_hash` peut garder l’empreinte exacte du texte présenté. Il n’existe plus de case facultative de consentement permettant quand même de commander : la soumission garde la preuve de l’information affichée. Les consentements vraiment facultatifs, comme une future newsletter, restent séparés. Si un retour d’origine est indiqué, il doit être celui du même incident. Dès qu’un remplacement ou un échange non annulé est créé, sa quantité consomme le budget disponible de l’incident. Une annulation avant remise le libère une seule fois ; après remise il reste consommé. `customer_confirmed_at` et `customer_confirmation_mode` sont seulement un résumé de la première confirmation téléphonique ; le détail complet est dans `order_contracts`. Le contrôle opérationnel du commerçant n’est pas une acceptation du client. `current_revision_id` ne peut être vide que pendant la très courte transaction de création. La clé et l’empreinte de soumission servent à éviter les doublons, mais connaître cette clé seule ne donne pas accès à la commande.
+- **`orders` :** `number` et `submission_key` sont uniques, et un même panier ne peut créer qu’une seule commande. `order_type` utilise `OrderTypeEnum` : `1 SALE`, `2 REPLACEMENT`, `3 EXCHANGE`. `channel` utilise `OrderChannelEnum` : `1 STOREFRONT` pour le parcours public et `2 MANUAL` pour une saisie manuelle. `commercial_status` utilise uniquement `OrderStatusEnum` : `1 AWAITING_CONFIRMATION`, `2 CONFIRMED`, `5 DRAFT` ; les anciens codes 3 et 4 sont retirés et ne sont pas réutilisés ; aucune fonction d’annulation ou de clôture commerciale de commande n’est prévue. `confirmation_owner_id` garde l’employé affecté au suivi interne de confirmation ; rappels et résultats d’appel restent dans `order_history`. Aucun lien ou écran public de suivi de commande destiné à l’acheteur n’est prévu. Le refus du client reste un résultat d’appel dans `order_history`, sans inventer un nouvel état d’annulation. Une commande standard n’a aucune commande ou incident d’origine. Un remplacement ou un échange pointe vers une commande standard déjà expédiée et vers l’incident précis qui l’a provoqué. Il traite un seul incident d’une seule ligne au MVP ; plusieurs lignes en problème donnent plusieurs commandes de remplacement ou d’échange. La quantité totale de la nouvelle commande correspond à la quantité affectée de l’incident. Pour un remplacement gratuit, on conserve normalement la même variante et le même texte de personnalisation, sauf substitution documentée. Un échange valorisé peut changer de variante et possède une vraie valeur commerciale annoncée au client ; sa compensation est gérée par T22. Si un remplacement identique doit être facturé comme une nouvelle vente, utiliser l’échange valorisé au lieu de mettre artificiellement un prix sur un remplacement gratuit. Si un retour d’origine est indiqué, il appartient au même incident. Dès sa création, la commande de remplacement ou d’échange consomme le budget de quantité de l’incident ; un refus d’appel, une modification d’affichage ou une libération technique de stock ne restitue pas ce budget. Toute nouvelle commande avec coordonnées conserve `data_policy_version` et `data_notice_acknowledged_at`, et éventuellement `notice_text_hash` ; ces champs prouvent l’information fournie, sans consentement marketing implicite. `current_revision_id` identifie la version préparée ou affichée et ne peut être NULL qu’à l’intérieur de la transaction de création. `confirmed_revision_id` identifie exclusivement la dernière version validée après l’appel ; une proposition ultérieure ne la remplace pas automatiquement. Les deux liens sont renforcés par FK composites `(current_revision_id,id)` et `(confirmed_revision_id,id)` vers `order_revisions(id,order_id)` et par UNIQUE(id,order_id) sur les révisions. `confirmed_revision_id` et `validated_at` sont NULL ensemble avant la première validation, renseignés ensemble après succès ; `commercial_status=2` exige ces deux projections. Connaître la clé de soumission ne donne jamais accès à la commande.
 
-- **`order_revisions` :** Une commande peut avoir plusieurs révisions numérotées, mais chaque numéro de révision n’existe qu’une fois pour cette commande. Une révision devient immuable dès qu’elle est créée : si quelque chose change, on crée une nouvelle révision au lieu de modifier l’ancienne. `catalog_subtotal` additionne quantité × prix catalogue ; `applied_subtotal` additionne les vrais totaux de lignes après promotions ou prix manuels. `order_total = applied_subtotal + customer_shipping_fee - shipping_discount`. `amount_to_collect = order_total - exchange_offset_amount`. La compensation ne peut jamais être négative ni dépasser la valeur des produits, et elle vaut 0 hors échange. Les montants doivent rester cohérents et non négatifs. La devise, le pays, l’identité légale du vendeur et les règles fiscales utilisées sont copiés dans la révision pour garder exactement ce qui était vrai au moment de la commande. Un snapshot fiscal vide ne veut jamais dire automatiquement « taxe = 0 ». `customer_shipping_fee` est ce qu’on demande au client pour la livraison. `shipping_charge_bearer` indique qui supporte ce coût. `merchant_shipping_amount` est seulement une estimation figée ; les vrais frais du transporteur sont dans `carrier_fees`. Le mode de livraison vaut seulement `domicile` ou `stop_desk`. À domicile, aucun point relais ne doit être choisi ; en `stop_desk`, un point relais est obligatoire et son snapshot est conservé. Il n’existe pas de portefeuille client : seule la compensation d’échange prévue dans T22 est autorisée. `sales_terms_snapshot` garde exactement les conditions montrées au client ; modifier plus tard la page « conditions » ne change pas les anciennes commandes. L’acceptation éventuelle de ces conditions est stockée séparément dans T21 avec sa propre date et sa propre version. Une commande reste `a_confirmer` tant que l’accord téléphonique n’a pas été enregistré. Si le produit, la quantité, le prix, l’adresse ou les conditions changent, il faut une nouvelle révision et un nouvel accord avant envoi.
+- **`order_revisions` :** UNIQUE(order_id,revision_number) ; chaque révision est immuable dès sa création. Un changement crée une nouvelle révision et ses lignes, sans modifier les anciennes. `catalog_subtotal` additionne quantité × prix catalogue ; `applied_subtotal` additionne les vrais totaux de lignes après promotions ou prix manuels. `order_total = applied_subtotal + customer_shipping_fee - shipping_discount` et `amount_to_collect = order_total - exchange_offset_amount`. La compensation est non négative, ne dépasse pas la valeur des produits et vaut 0 hors échange. Les montants restent cohérents et non négatifs. Devise, pays, identité légale du vendeur, fiscalité et conditions présentées sont copiés dans cette version ; un snapshot fiscal vide ne signifie jamais automatiquement « taxe = 0 ». `customer_shipping_fee` est la livraison annoncée au client, `shipping_charge_bearer` indique qui la supporte et `merchant_shipping_amount` reste une estimation figée ; les vrais frais sont dans `carrier_fees`. À domicile, `pickup_point_id` est NULL ; en `stop_desk`, le point et son snapshot sont obligatoires. Aucun portefeuille client : seule la compensation dédiée T22 est admise. L’acceptation éventuelle des conditions reste dans T21. Le commerçant téléphone au client puis clique « Valider » sur la révision exacte dont il a convenu avec lui. Il n’existe aucune table de contrat ni PDF d’accord téléphonique. Lors d’une nouvelle proposition avant figement distant, l’ancienne `confirmed_revision_id` et ses réservations restent engagées ; le clic sur la nouvelle version transfère les réservations et met à jour les projections dans une seule transaction. Une proposition jamais validée n’est pas expédiable. Une version déjà figée auprès du transporteur n’est plus remplacée localement sans procédure de rapprochement et correction compatible.
 
-- **`order_items` :** `quantity` doit être supérieure à 0. Les prix catalogue, prix appliqué et coût ne peuvent pas être négatifs. `line_total` correspond à `quantity × applied_unit_price`, arrondi à 2 décimales. `price_origin` utilise `PriceOriginEnum` : `1 CATALOG`, `2 PROMOTION`, `3 MANUAL`. Un remplacement n’est pas une quatrième origine de prix ; lorsqu’un prix est volontairement forcé, par exemple à 0 pour un remplacement gratuit, l’origine est `3 MANUAL` avec la justification métier correspondante. Un prix manuel n’est autorisé que pour un utilisateur qui possède ce droit, avec `is_price_overridden=true` et un motif obligatoire. Il remplace la promotion au lieu de s’y ajouter sans règle explicite. Les snapshots gardent l’ancien calcul. Dans un remplacement gratuit reconnu, `applied_unit_price=0`, mais le vrai coût du produit et son prix catalogue restent mémorisés. Une ligne de commande est immuable. La variante, le produit et éventuellement la page de vente doivent tous être cohérents entre eux. Modifier une commande ne modifie jamais le prix actuel stocké dans `product_variants`.
+- **`order_items` :** `quantity>0`, prix catalogue/appliqué et coût non négatifs ; `line_total = quantity × applied_unit_price`, arrondi à 2 décimales. `price_origin` utilise `PriceOriginEnum` : `1 CATALOG`, `2 PROMOTION`, `3 MANUAL`. Un prix forcé, notamment 0 pour un remplacement gratuit, utilise `3 MANUAL` avec sa justification métier. Un prix manuel exige le droit approprié, `is_price_overridden=true` et un motif ; il remplace la promotion, sans cumul implicite. Les snapshots gardent le calcul historique. Dans un remplacement gratuit reconnu, `applied_unit_price=0`, mais coût réel et prix catalogue restent mémorisés. `customization_text` conserve uniquement le texte libre de cette ligne ; deux textes différents donnent des lignes distinctes, sans signature ou structure JSON de personnalisation. La ligne est immuable. Variante, produit et éventuelle page de vente restent cohérents. Modifier une commande ne modifie jamais le prix courant de `product_variants`.
 
-- **`order_history` :** Le résultat d’un appel utilise `ContactOutcomeEnum` : `1 ACCEPTED`, `2 NO_ANSWER`, `3 CALLBACK`, `4 REFUSED`, `5 INVALID_CONTACT`. Un résultat d’appel ne devient pas automatiquement un statut de livraison. Quand plusieurs changements appartiennent à la même opération, par exemple variante + quantité + prix + stock, ils partagent le même `correlation_id` pour pouvoir les relier. Ce journal est `append-only` : on ajoute des événements, on ne réécrit pas les anciens.
+- **`order_history` :** Le journal métier conserve les propositions, notes et résultats d’appel : `ContactOutcomeEnum` = `1 ACCEPTED`, `2 NO_ANSWER`, `3 CALLBACK`, `4 REFUSED`, `5 INVALID_CONTACT`, avec rappel facultatif. Un résultat d’appel ne valide pas à lui seul la commande et ne devient pas un statut logistique. Les actions d’annulation et de clôture commerciale de commande sont absentes. L’événement officiel du clic « Valider », son auteur, sa date, sa révision et sa clé sont écrits une seule fois dans `activity_log`, sans copie de cet événement dans `order_history`. Des changements métier liés à une même opération peuvent partager le `correlation_id` de l’audit. Les références aux anciennes et nouvelles révisions appartiennent à la même commande. Ce journal est append-only.
+
+**Validation simple, atomique et idempotente :** le commerçant téléphone puis clique « Valider » sur une révision précise. Le service autorisé reçoit les UUID de commande/révision et la version attendue ; il dérive lui-même la clé canonique `order.validate:<order_uuid>:<revision_uuid>`, indépendante d’un nonce fourni par le navigateur. Sous verrou de la commande, il recherche d’abord l’activité officielle `order.validated` de cette clé, avant de tester la version de concurrence ou le stock : même sujet, même révision et même `request_hash` du contenu immuable → résultat déjà acquis sans nouvelle réservation, nouvelle date ou nouvelle activité de succès ; contexte ou contenu différent → conflit. Le `request_hash` canonique versionné exclut l’acteur du retry, l’heure et la version de concurrence mutable. Les refus et échecs ont des clés distinctes de phase/tentative et n’occupent jamais la clé du succès. Sans activité déjà commise, exiger la proposition `current_revision_id` visée, la version attendue, les droits, l’état de boutique et l’absence d’effet distant incompatible, puis verrouiller les variantes dans l’ordre commun. Pour une première validation, exiger `P-R>=q`. Pour un transfert, pour chaque variante calculer `R_ancienne` depuis les seules réservations encore actives de l’ancienne révision validée et exiger `P-(R-R_ancienne)>=q_nouvelle` ; ne pas compter des réservations libérées ou consommées. Libérer les anciennes actives puis réserver toutes les nouvelles lignes, écrire les mouvements, actualiser `confirmed_revision_id`, `validated_at` et `commercial_status=2`, et écrire l’activité officielle avec sa clé canonique unique, son `causer`, l’UUID de révision et `request_hash`, dans UNE transaction locale. Les clés de mouvements sont dérivées de cette validation, du type de mouvement et de la ligne. Une projection déjà validée sans son activité requise est une anomalie à résoudre, jamais une autorisation de réserver de nouveau. Après perte technique, rejouer l’ancienne activité ne recrée aucun stock : signaler l’engagement indisponible et préparer une nouvelle révision complète avec de nouvelles lignes pour une nouvelle validation. Tout conflit ou manque de stock fait rollback de l’ensemble, en conservant les anciens engagements encore actifs. Le contrôle opérationnel distinct reste dans `operationally_confirmed_at`/`operationally_confirmed_by_id` et est réinitialisé si nécessaire au changement validé.
 
 ### T9 — Stock et retours
 
-**`stock_reservations` — Les quantités mises de côté pour une commande après l’accord du client. Exemple : après confirmation téléphonique, réserver deux t-shirts ; leur sortie physique est enregistrée lors de la remise du colis.**
+**`stock_reservations` — Les quantités mises de côté au clic « Valider » du commerçant après son appel. Exemple : réserver deux t-shirts ; leur sortie physique est enregistrée lors de la remise du colis au transporteur.**
 
 **`stock_movements` — Le carnet de tous les changements de stock. Exemple : recevoir dix articles, en réserver deux, les expédier ou constater une perte, en gardant l’explication de chaque changement.**
 
@@ -2674,10 +2680,11 @@ erDiagram
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned variant_id FK "product_variants.id"
-        bigint variant_sequence
         bigint_unsigned order_item_id FK "nullable ; order_items.id"
         bigint_unsigned return_item_id FK "nullable ; return_items.id"
         bigint_unsigned actor_id FK "nullable ; users.id"
+        bigint_unsigned reversal_of_id FK "nullable ; stock_movements.id"
+        bigint variant_sequence
         tinyint_unsigned type "StockMovementTypeEnum"
         int physical_delta
         int reserved_delta
@@ -2694,7 +2701,6 @@ erDiagram
         int quarantine_after
         decimal unit_cost_snapshot
         decimal loss_amount
-        bigint_unsigned reversal_of_id FK "nullable ; stock_movements.id"
         varchar operation_key
         uuid correlation_id
         text note "nullable"
@@ -2706,12 +2712,12 @@ erDiagram
         bigint_unsigned shipment_id FK "shipments.id"
         bigint_unsigned order_id FK "orders.id"
         bigint_unsigned shipped_revision_id FK "order_revisions.id"
+        bigint_unsigned received_by_id FK "nullable ; users.id"
         tinyint_unsigned reason "ReturnReasonEnum"
         text detail "nullable"
         tinyint_unsigned status "ReturnStatusEnum"
         datetime requested_at "nullable"
         datetime received_at "nullable"
-        bigint_unsigned received_by_id FK "nullable ; users.id"
         datetime closed_at "nullable"
         datetime created_at
         datetime updated_at
@@ -2723,6 +2729,7 @@ erDiagram
         bigint_unsigned order_item_id FK "order_items.id"
         bigint_unsigned shipped_revision_id FK "order_revisions.id"
         bigint_unsigned variant_id FK "product_variants.id"
+        bigint_unsigned inspected_by_id FK "nullable ; users.id"
         int expected_quantity
         int received_quantity
         int restocked_quantity
@@ -2731,7 +2738,6 @@ erDiagram
         int documented_missing_quantity
         text discrepancy_reason "nullable"
         decimal unit_cost_snapshot
-        bigint_unsigned inspected_by_id FK "nullable ; users.id"
         datetime inspected_at "nullable"
         text note "nullable"
         datetime created_at
@@ -2830,7 +2836,7 @@ erDiagram
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
-- **`stock_reservations` :** Une ligne de commande ne peut avoir qu’une seule réservation de stock. Le statut utilise `StockReservationStatusEnum` : `1 ACTIVE`, `2 RELEASED`, `3 CONSUMED`. Quand la réservation est active, sa quantité doit être exactement celle de la ligne de commande. Le stock est réservé au moment de la confirmation téléphonique, dans la même transaction que cette confirmation ; le contrôle opérationnel qui vient après ne réserve rien une deuxième fois. Un remplacement gratuit accepté réserve lui aussi son stock sans permettre la survente. Si on remplace une révision avant expédition, les anciennes réservations sont libérées et les nouvelles sont créées dans la même transaction. Les variantes sont verrouillées dans un ordre stable pour éviter que deux commandes simultanées se bloquent mutuellement. Pour chaque variante, la somme des réservations actives doit être égale à `reserved_stock`. Quand le colis est réellement remis au transporteur, la réservation est consommée ; si la commande est annulée avant cette remise, elle est libérée.
+- **`stock_reservations` :** UNIQUE(order_item_id). `StockReservationStatusEnum` : `1 ACTIVE`, `2 RELEASED`, `3 CONSUMED`. Une réservation active porte exactement la quantité de sa ligne. Le stock est réservé au clic « Valider » après l’appel, dans la même transaction que `confirmed_revision_id`, `validated_at`, les mouvements et l’événement idempotent `activity_log` ; le contrôle opérationnel ne réserve rien une deuxième fois. Un remplacement accepté suit les mêmes contraintes et n’autorise pas la survente. À la validation d’une nouvelle révision avant figement distant, libérer les anciennes réservations puis créer les nouvelles atomiquement ; un échec conserve l’ancien engagement entier. Une indisponibilité physique réelle peut imposer une libération technique documentée des réservations touchées, sans annuler la commande ni restituer son budget SAV. Elle bloque l’expédition ; le rejeu de l’activité d’une ancienne validation ne réactive aucun stock. La reprise exige une nouvelle révision complète, de nouvelles lignes et une nouvelle validation canonique, avec transfert des seules anciennes réservations encore actives. Si une intention distante est incertaine ou la révision distante déjà figée, rapprocher et résoudre cet effet avant toute réallocation incompatible. Variantes verrouillées dans un ordre stable ; pour chaque variante, somme des réservations actives = `reserved_stock`. À la remise physique au transporteur, la réservation est consommée. Une réservation libérée ou consommée n’est jamais réactivée silencieusement : la reprise crée une nouvelle révision et de nouvelles lignes.
 
 - **`stock_movements` :** Cette table est le journal officiel de tous les mouvements de stock. Chaque variante possède sa propre séquence `1, 2, 3...`, toujours croissante, et `operation_key` évite d’enregistrer deux fois la même opération. Un mouvement ne peut annuler qu’un mouvement de la même variante et ne peut jamais s’annuler lui-même. On ne modifie jamais un ancien mouvement : pour corriger une erreur, on écrit une contrepassation qui fait exactement l’inverse, puis éventuellement un nouveau mouvement correct. Tous les changements de compteurs, réservations et mouvements sont écrits ensemble dans la même transaction. Après chaque mouvement, le physique, le réservé et la quarantaine doivent rester positifs ou nuls. Les types couvrent notamment l’ouverture, l’entrée manuelle, la réservation, la libération, l’expédition, la quarantaine, la perte, le manquant de retour et la contrepassation. Lorsqu’un colis revient, les unités reçues entrent d’abord en quarantaine. Après inspection, une unité peut soit redevenir vendable, soit être déclarée perdue. Si une unité attendue n’est jamais revenue, on enregistre `return_missing_delta` mais on ne l’ajoute pas au stock, puisqu’elle n’a pas été reçue. La perte financière est enregistrée ici une seule fois avec le coût snapshot ; décider ensuite qui est responsable, s’il y a indemnisation, avoir ou remboursement est un autre sujet. Une contrepassation inverse tous les deltas et le montant de perte du mouvement original, garde les mêmes références et verrouille l’original. On refuse l’inverse si cela rendrait les soldes impossibles ou si le cycle métier a déjà avancé d’une manière incompatible. Une correction finale reçoit le même `correlation_id` pour montrer qu’elle appartient au même dossier.
 
@@ -2854,13 +2860,13 @@ erDiagram
     shipping_providers {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
+        bigint_unsigned user_id FK "nullable ; users.id"
+        bigint_unsigned carrier_account_id FK "nullable ; carrier_accounts.id"
         tinyint_unsigned type "ShippingProviderTypeEnum"
         varchar name
-        bigint_unsigned user_id FK "nullable ; users.id"
         varchar phone "nullable"
         varchar email "nullable"
         varchar carrier_code "nullable"
-        bigint_unsigned carrier_account_id FK "nullable ; carrier_accounts.id"
         datetime last_synced_at "nullable"
         boolean is_active
         datetime created_at
@@ -2898,9 +2904,9 @@ erDiagram
     free_shipping_rules {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        varchar name
         bigint_unsigned product_id FK "nullable ; products.id"
         uuid province_uuid "nullable ; REF central.geographic_areas.uuid"
+        varchar name
         tinyint_unsigned delivery_mode "nullable ; DeliveryModeEnum"
         decimal minimum_cart_amount "nullable"
         datetime started_at "nullable"
@@ -3009,9 +3015,9 @@ erDiagram
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned provider_id FK "shipping_providers.id"
-        tinyint_unsigned zone_type "GeoZoneTypeEnum"
         uuid province_uuid "REF central.geographic_areas.uuid"
         uuid municipality_uuid "nullable ; REF central.geographic_areas.uuid"
+        tinyint_unsigned zone_type "GeoZoneTypeEnum"
         varchar external_code
         varchar external_name
         varchar external_province_code
@@ -3027,10 +3033,10 @@ erDiagram
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned provider_id FK "shipping_providers.id"
-        varchar external_code
-        varchar name
         uuid province_uuid "REF central.geographic_areas.uuid"
         uuid municipality_uuid "nullable ; REF central.geographic_areas.uuid"
+        varchar external_code
+        varchar name
         text address
         varchar phone "nullable"
         varchar map_url "nullable"
@@ -3048,6 +3054,8 @@ erDiagram
         bigint_unsigned shipped_revision_id FK "order_revisions.id"
         bigint_unsigned provider_id FK "shipping_providers.id"
         bigint_unsigned pickup_point_id FK "nullable ; pickup_points.id"
+        bigint_unsigned label_media_id FK "nullable ; media.id"
+        bigint_unsigned assigned_by_id FK "users.id"
         tinyint_unsigned delivery_mode "DeliveryModeEnum"
         tinyint_unsigned status "ShipmentStatusEnum"
         varchar raw_external_status "nullable"
@@ -3058,15 +3066,8 @@ erDiagram
         decimal estimated_cost
         decimal weight_kg "nullable"
         boolean is_fragile
-        bigint_unsigned label_media_id FK "nullable ; media.id"
-        bigint_unsigned assigned_by_id FK "users.id"
         datetime shipped_at "nullable"
         datetime carrier_validated_at "nullable"
-        datetime acknowledged_at "nullable"
-        varchar acknowledgement_source "nullable"
-        bigint_unsigned delivery_proof_media_id FK "nullable ; media.id"
-        varchar external_delivery_proof_reference "nullable"
-        char(64) proof_hash "nullable"
         datetime delivered_at "nullable"
         datetime last_synced_at "nullable"
         datetime created_at
@@ -3076,6 +3077,7 @@ erDiagram
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned shipment_id FK "shipments.id"
+        bigint_unsigned actor_id FK "nullable ; users.id"
         tinyint_unsigned logistics_status "nullable ; ShipmentStatusEnum"
         tinyint_unsigned financial_status "nullable ; CollectionStatusEnum"
         varchar external_code "nullable"
@@ -3095,7 +3097,6 @@ erDiagram
         datetime occurred_at "nullable"
         datetime observed_at
         tinyint_unsigned source "ShipmentEventSourceEnum"
-        bigint_unsigned actor_id FK "nullable ; users.id"
         varchar deduplication_key
         datetime created_at
     }
@@ -3165,11 +3166,6 @@ erDiagram
 - **`assigned_by_id`** : l’identifiant de la personne qui a affecté. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
 - **`shipped_at`** : la date et l’heure liées à **expediee**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`carrier_validated_at`** : la date et l’heure liées à **validee transporteur**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`acknowledged_at`** : la date et l’heure liées à **accuse reception**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`acknowledgement_source`** : indique d’où vient la preuve que le colis ou document a été reçu. Exemple : transporteur, saisie manuelle ou autre source prévue. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`delivery_proof_media_id`** : l’identifiant lié à **preuve reception media**. Il sert à retrouver l’élément correspondant. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`external_delivery_proof_reference`** : la référence donnée par le système extérieur pour la preuve de réception. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`proof_hash`** : une petite signature calculée à partir de preuve. Elle permet de vérifier que le contenu n’a pas changé sans stocker une deuxième copie complète. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`delivered_at`** : la date et l’heure liées à **livree**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`last_synced_at`** : la dernière fois où le SaaS a synchronisé ce compte avec le service externe. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`created_at`** : la date où cette ligne a été créée dans la base.
@@ -3211,9 +3207,9 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 - **`pickup_points` :** Pour un même prestataire, chaque `external_code` de point relais est unique. Si le commerçant a volontairement masqué un bureau, une synchronisation suivante ne doit pas le réactiver automatiquement. Un point est disponible seulement s’il est actif côté transporteur ET autorisé côté boutique. Les anciens points relais sont désactivés mais conservés, afin que les anciennes commandes continuent de pointer vers quelque chose qui existe.
 
-- **`shipments` :** Une commande ne peut avoir qu’une seule livraison dans ce MVP, et un tracking donné ne peut apparaître qu’une seule fois pour le même prestataire. La livraison doit pointer vers la bonne commande et exactement vers la révision expédiée. Tous les articles de cette révision partent ensemble dans le même colis. Le mode et le point relais doivent être identiques à ceux enregistrés dans la révision : `domicile` sans point relais, ou `stop_desk` avec exactement le point relais choisi. Avant la remise physique, une modification reste possible seulement après avoir vérifié qu’aucune opération distante n’est en cours ou incertaine. Dès que le transporteur a validé le colis ou que le colis est réellement expédié, la révision, son contenu et le montant COD ne changent plus. Une validation API signifie seulement que le transporteur a accepté l’ordre : elle ne prouve pas encore que le colis lui a été remis et elle ne sort donc pas le stock. Le COD utilisé est exactement `order_revisions.amount_to_collect` de la révision expédiée, même s’il vaut 0 ; on ne le recalcule jamais depuis une facture ou un tarif plus récent. Pour une société de livraison, merchant_reference est persistée dans ce colis local avant l’appel ; UNIQUE(provider_id,merchant_reference) et UNIQUE(provider_id,tracking) hors NULL assurent le rattachement local décrit en T25. Aucun registre central n’est nécessaire. Les vrais frais restent dans `carrier_fees`. `delivered_at`, l’accusé de réception et la preuve de réception sont trois informations différentes : une étiquette ou un statut distant ne devient jamais automatiquement une signature du client. Si une vraie preuve existe sous forme de fichier, elle reste privée et son empreinte peut être conservée. La remise d’un document au client est suivie dans `document_deliveries`. Si une preuve est inconnue, on laisse le champ vide et on signale l’anomalie au lieu d’inventer une valeur. Lorsqu’un retour existe, la révision expédiée ne peut plus être remplacée par une autre. Après une création réussie chez le transporteur, le prestataire et son compte ne peuvent plus être changés au MVP. Une opération en cours ou au résultat incertain bloque aussi ce changement.
+- **`shipments` :** Une commande ne peut avoir qu’une seule livraison dans ce MVP, et un tracking donné ne peut apparaître qu’une seule fois pour le même prestataire. La livraison doit pointer vers la bonne commande et exactement vers la révision expédiée. Tous les articles de cette révision partent ensemble dans le même colis. Le mode et le point relais doivent être identiques à ceux enregistrés dans la révision : `domicile` sans point relais, ou `stop_desk` avec exactement le point relais choisi. Avant la remise physique, une modification reste possible seulement après avoir vérifié qu’aucune opération distante n’est en cours ou incertaine. Dès que le transporteur a validé le colis ou que le colis est réellement expédié, la révision, son contenu et le montant COD ne changent plus. Une validation API signifie seulement que le transporteur a accepté l’ordre : elle ne prouve pas encore que le colis lui a été remis et elle ne sort donc pas le stock. Le COD utilisé est exactement `order_revisions.amount_to_collect` de la révision expédiée, même s’il vaut 0 ; on ne le recalcule jamais depuis une facture ou un tarif plus récent. Pour une société de livraison, merchant_reference est persistée dans ce colis local avant l’appel ; UNIQUE(provider_id,merchant_reference) et UNIQUE(provider_id,tracking) hors NULL assurent le rattachement local décrit en T25. Aucun registre central n’est nécessaire. Les vrais frais restent dans `carrier_fees`. Le fait logistique livré est accepté depuis la déclaration du livreur ou le statut interprété du transporteur. delivered_at garde la date déclarée, avec sa source et son historique dans shipment_events. Aucun accusé, signature, photo ou PDF de réception du client n’est exigé ni conservé. Une étiquette reste un fichier de transport ; cette confiance logistique ne prouve aucun encaissement ni reversement d’argent. Lorsqu’un retour existe, la révision expédiée ne peut plus être remplacée par une autre. Après une création réussie chez le transporteur, le prestataire et son compte ne peuvent plus être changés au MVP. Une opération en cours ou au résultat incertain bloque aussi ce changement.
 
-- **`shipment_events` :** `deduplication_key` empêche d’enregistrer deux fois le même événement pour le même compte/prestataire et le même tracking. Ce journal est `append-only` : on ajoute les faits reçus sans réécrire les anciens. Seule une partie de diagnostic devenue inutile peut être purgée selon C8. On garde l’empreinte et la version de l’adaptateur qui a interprété l’événement. `source` utilise `ShipmentEventSourceEnum` : `MANUAL`, `POLLING` ou `WEBHOOK`. Si le transporteur envoie un événement inconnu, on le conserve pour diagnostic au lieu de lui inventer un sens. Un vieil événement reçu en retard ne doit pas écraser automatiquement un état plus récent.
+- **`shipment_events` :** `deduplication_key` empêche d’enregistrer deux fois le même événement pour le même compte/prestataire et le même tracking. Ce journal est `append-only` : on ajoute les faits reçus sans réécrire les anciens. Seule une partie de diagnostic devenue inutile peut être purgée selon ses dates techniques locales décrites au §12. On garde l’empreinte et la version de l’adaptateur qui a interprété l’événement. `source` utilise `ShipmentEventSourceEnum` : `MANUAL`, `POLLING` ou `WEBHOOK`. Si le transporteur envoie un événement inconnu, on le conserve pour diagnostic au lieu de lui inventer un sens. Un vieil événement reçu en retard ne doit pas écraser automatiquement un état plus récent.
 
 ### T12 — Intégration Ecotrack
 
@@ -3231,8 +3227,10 @@ erDiagram
         bigint_unsigned shipment_id FK "nullable ; shipments.id"
         bigint_unsigned order_id FK "nullable ; orders.id"
         bigint_unsigned return_id FK "nullable ; order_returns.id"
-        tinyint_unsigned type "CarrierOperationTypeEnum"
         bigint_unsigned revision_id FK "nullable ; order_revisions.id"
+        bigint_unsigned superseded_by_operation_id FK "nullable ; carrier_operations.id"
+        bigint_unsigned triggered_by_id FK "nullable ; users.id"
+        tinyint_unsigned type "CarrierOperationTypeEnum"
         varchar operation_key
         json sanitized_request "metadonnees techniques uniquement"
         text encrypted_personal_request "nullable after purge ou sans donnees personnelles"
@@ -3248,8 +3246,6 @@ erDiagram
         datetime ended_at "nullable"
         datetime sending_started_at "nullable"
         datetime superseded_at "nullable"
-        bigint_unsigned superseded_by_operation_id FK "nullable ; carrier_operations.id"
-        bigint_unsigned triggered_by_id FK "nullable ; users.id"
         datetime created_at
         datetime updated_at
     }
@@ -3323,7 +3319,7 @@ erDiagram
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
-- **`carrier_operations` :** `operation_key` est unique pour qu’un retry ne crée pas deux opérations. Les types couvrent la création, validation, modification, suivi, frais, géographie, étiquette, demande/validation de retour et note. Les statuts utilisent exactement `CarrierOperationStatusEnum` : `1 PENDING`, `2 RUNNING`, `3 SUCCEEDED`, `4 RETRYABLE_FAILURE`, `5 PERMANENT_FAILURE`, `6 UNCERTAIN`, `7 SUPERSEDED`, `8 CANCELLED`. Une opération qui touche un colis doit pointer vers la bonne livraison, la bonne commande et la bonne révision ; seules les opérations générales comme `fees` ou `geographie` peuvent exister sans commande. Avant de modifier un colis non encore expédié, on vérifie que la révision visée est toujours la révision courante ; sinon l’opération devient `7 SUPERSEDED` et n’est pas envoyée. Après remise, le suivi, les retours et les étiquettes utilisent toujours la révision réellement expédiée. Juste avant l’appel HTTP, on enregistre `sending_started_at`. À partir de ce moment, on bloque les modifications de commande jusqu’à avoir un résultat certain ou avoir fait un rapprochement. Si on ne sait pas si l’appel a été exécuté chez le transporteur — timeout, coupure réseau, 502/503/504 après effet possible, réponse incompréhensible ou crash au mauvais moment — on met `6 UNCERTAIN`. On ne renvoie surtout pas aveuglément la création, sinon on pourrait créer deux colis. Les retries automatiques des opérations qui modifient l’extérieur restent désactivés tant qu’on n’a pas prouvé qu’ils sont sûrs. Si une nouvelle opération remplace l’ancienne, `superseded_by_operation_id` peut pointer vers elle. On garde durablement l’intention et le résultat, mais l’appel HTTP lui-même ne doit pas garder une longue transaction SQL ouverte. L’empreinte SHA-256 de la requête initiale permet de vérifier qu’une même `operation_key` n’est pas réutilisée avec un autre contenu. `merchant_reference` reste stable et correspond à shipments.merchant_reference du colis local. Les coordonnées personnelles éventuellement nécessaires à une reprise sont stockées chiffrées dans `encrypted_personal_request`, jamais en JSON clair. Après `request_expires_at`, ce payload est effacé par le traitement d’expiration propre à cette intégration et `request_purged_at` garde la date de purge, tandis que les identifiants techniques minimaux restent. Une opération restée incertaine ne devient pas certaine simplement parce que le payload a été supprimé ; on ne reconstruit pas les données depuis une commande actuelle pour renvoyer l’appel.
+- **`carrier_operations` :** `operation_key` est unique pour qu’un retry ne crée pas deux opérations. Les types couvrent la création, validation, modification, suivi, frais, géographie, étiquette, demande/validation de retour et note. Les statuts utilisent exactement `CarrierOperationStatusEnum` : `1 PENDING`, `2 RUNNING`, `3 SUCCEEDED`, `4 RETRYABLE_FAILURE`, `5 PERMANENT_FAILURE`, `6 UNCERTAIN`, `7 SUPERSEDED`, `8 CANCELLED`. Une opération qui touche un colis doit pointer vers la bonne livraison, la bonne commande et la bonne révision ; seules les opérations générales comme `fees` ou `geographie` peuvent exister sans commande. Avant tout envoi mutateur de création, validation ou modification, vérifier sous le protocole commun que la révision visée est la `confirmed_revision_id` validée par clic et possède les réservations actives nécessaires ; une simple proposition `current_revision_id` ne l’autorise jamais. Une modification avant figement distant exige aussi que cette révision soit encore la proposition courante. Une intention qui vise une version remplacée par une nouvelle version validée devient `7 SUPERSEDED` et n’est pas envoyée ; une proposition non validée ne remplace pas silencieusement l’ancienne version acceptée. Recontrôler le contrôle opérationnel et l’absence d’indisponibilité avant HTTP. Après remise, le suivi, les retours et les étiquettes utilisent toujours la révision réellement expédiée. Juste avant l’appel HTTP, on enregistre `sending_started_at`. À partir de ce moment, on bloque les modifications de commande jusqu’à avoir un résultat certain ou avoir fait un rapprochement. Si on ne sait pas si l’appel a été exécuté chez le transporteur — timeout, coupure réseau, 502/503/504 après effet possible, réponse incompréhensible ou crash au mauvais moment — on met `6 UNCERTAIN`. On ne renvoie surtout pas aveuglément la création, sinon on pourrait créer deux colis. Les retries automatiques des opérations qui modifient l’extérieur restent désactivés tant qu’on n’a pas prouvé qu’ils sont sûrs. Si une nouvelle opération remplace l’ancienne, `superseded_by_operation_id` peut pointer vers elle. On garde durablement l’intention et le résultat, mais l’appel HTTP lui-même ne doit pas garder une longue transaction SQL ouverte. L’empreinte SHA-256 de la requête initiale permet de vérifier qu’une même `operation_key` n’est pas réutilisée avec un autre contenu. `merchant_reference` reste stable et correspond à shipments.merchant_reference du colis local. Les coordonnées personnelles éventuellement nécessaires à une reprise sont stockées chiffrées dans `encrypted_personal_request`, jamais en JSON clair. Après `request_expires_at`, ce payload est effacé par le traitement d’expiration propre à cette intégration et `request_purged_at` garde la date de purge, tandis que les identifiants techniques minimaux restent. Une opération restée incertaine ne devient pas certaine simplement parce que le payload a été supprimé ; on ne reconstruit pas les données depuis une commande actuelle pour renvoyer l’appel.
 
 - **`carrier_operation_attempts` :** Pour une même opération, chaque `attempt_number` est unique. On garde seulement les réponses et erreurs utiles, après avoir retiré secrets et données personnelles inutiles. Les gros payloads de diagnostic ont une durée de vie courte définie par C8. Les corps HTTP bruts ne sont pas conservés par défaut. Quand l’opération est terminée, les faits et le résultat restent `append-only`; seule la partie de diagnostic autorisée peut être purgée, et `payload_purged_at` indique quand cette purge a eu lieu.
 
@@ -3358,6 +3354,9 @@ erDiagram
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned provider_id FK "shipping_providers.id"
         bigint_unsigned carrier_remittance_batch_id FK "nullable ; carrier_remittance_batches.id"
+        bigint_unsigned validated_by_id FK "nullable ; users.id"
+        bigint_unsigned proof_media_id FK "nullable ; media.id"
+        bigint_unsigned reversal_of_id FK "nullable ; remittance_statements.id"
         varchar number
         varchar external_reference "nullable"
         tinyint_unsigned type "StatementTypeEnum"
@@ -3368,11 +3367,8 @@ erDiagram
         decimal received_net_amount "nullable"
         datetime declared_at "nullable"
         datetime received_at "nullable"
-        bigint_unsigned validated_by_id FK "nullable ; users.id"
-        bigint_unsigned proof_media_id FK "nullable ; media.id"
         text note "nullable"
         varchar operation_key
-        bigint_unsigned reversal_of_id FK "nullable ; remittance_statements.id"
         datetime reconciled_at "nullable"
         datetime created_at
         datetime updated_at
@@ -3382,9 +3378,9 @@ erDiagram
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned remittance_statement_id FK "remittance_statements.id"
         bigint_unsigned collection_id FK "collections.id"
-        decimal remitted_amount "signe"
         bigint_unsigned reversal_of_id FK "nullable ; remittance_lines.id"
         bigint_unsigned correction_of_id FK "nullable ; remittance_lines.id"
+        decimal remitted_amount "signe"
         varchar operation_key
         datetime created_at
     }
@@ -3440,7 +3436,7 @@ erDiagram
 - **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
 - **`remittance_statement_id`** : l’identifiant du bordereau de reversement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
 - **`collection_id`** : l’identifiant du recouvrement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`remitted_amount`** : le montant rendu au client ou compensé selon le flux prévu.
+- **`remitted_amount`** : la part du versement transporteur attribuée à ce colis et reçue par le commerçant ; une écriture inverse garde le montant opposé.
 - **`reversal_of_id`** : l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`correction_of_id`** : l’identifiant de l’ancienne écriture que cette ligne corrige. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`operation_key`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
@@ -3475,17 +3471,17 @@ erDiagram
         bigint_unsigned order_id FK "nullable ; orders.id"
         bigint_unsigned shipment_id FK "nullable ; shipments.id"
         bigint_unsigned return_id FK "nullable ; order_returns.id"
+        bigint_unsigned proof_media_id FK "nullable ; media.id"
+        bigint_unsigned author_id FK "users.id"
+        bigint_unsigned reversal_of_id FK "nullable ; expenses.id"
+        bigint_unsigned correction_of_id FK "nullable ; expenses.id"
         varchar category
         varchar label
         decimal amount
         datetime expense_date
         tinyint_unsigned status "ExpenseStatusEnum"
-        bigint_unsigned proof_media_id FK "nullable ; media.id"
-        bigint_unsigned author_id FK "users.id"
         varchar source
         varchar operation_key
-        bigint_unsigned reversal_of_id FK "nullable ; expenses.id"
-        bigint_unsigned correction_of_id FK "nullable ; expenses.id"
         datetime cancelled_at "nullable"
         text note "nullable"
         datetime created_at
@@ -3499,19 +3495,19 @@ erDiagram
         bigint_unsigned incident_id FK "order_incidents.id"
         bigint_unsigned credit_note_id FK "nullable ; invoices.id type avoir"
         bigint_unsigned exchange_order_id FK "nullable ; orders.id"
+        bigint_unsigned validated_by_id FK "nullable ; users.id"
+        bigint_unsigned proof_media_id FK "nullable ; media.id"
+        bigint_unsigned reversal_of_id FK "nullable ; customer_adjustments.id"
+        bigint_unsigned correction_of_id FK "nullable ; customer_adjustments.id"
         int compensated_quantity
         tinyint_unsigned amount_kind "AmountKindEnum"
         tinyint_unsigned type "AdjustmentTypeEnum"
         decimal amount "signe"
         tinyint_unsigned status "AdjustmentStatusEnum"
         datetime performed_at "nullable"
-        bigint_unsigned validated_by_id FK "nullable ; users.id"
         varchar reference "nullable"
-        bigint_unsigned proof_media_id FK "nullable ; media.id"
         text reason
         varchar operation_key
-        bigint_unsigned reversal_of_id FK "nullable ; customer_adjustments.id"
-        bigint_unsigned correction_of_id FK "nullable ; customer_adjustments.id"
         datetime created_at
         datetime updated_at
     }
@@ -3520,11 +3516,11 @@ erDiagram
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned order_id FK "orders.id"
         bigint_unsigned revision_id FK "order_revisions.id"
+        bigint_unsigned media_id FK "media.id"
+        bigint_unsigned generated_by_id FK "users.id"
         varchar number
         int document_version
         json issuer_snapshot
-        bigint_unsigned media_id FK "media.id"
-        bigint_unsigned generated_by_id FK "users.id"
         datetime generated_at
         datetime created_at
     }
@@ -3605,9 +3601,9 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 - **`order_documents` :** Un même `number` peut avoir plusieurs versions de document, mais le couple `number + document_version` reste unique. Le bon doit pointer vers la bonne commande et la bonne révision. Le PDF est privé et ne change plus après création ; il garde les coordonnées, les lignes et les totaux de cette version. Si la commande reçoit une nouvelle révision, on crée une nouvelle version du bon au lieu d’écraser le fichier précédent. Un bon de commande et une facture sont deux documents différents et ne doivent pas être confondus.
 
-### T15 — Activités de boutique et évolution ciblée
+### T15 — Journal local commun des actions et des opérations sur les données
 
-La table locale activity_log remplace l’ancien audit de boutique. Le sujet et l’acteur sont locaux, issus de cette BDD. Les alias central_user et les modèles centraux sont refusés dans ces relations ; aucune copie automatique de ces activités ne part au central.
+**`activity_log` — Le carnet de la boutique : qui a fait quoi, quand et sur quel élément. Il garde aussi la validation par clic et les opérations sensibles sur les données, sans seconde table de journal.**
 
 ```mermaid
 erDiagram
@@ -3615,41 +3611,51 @@ erDiagram
     activity_log {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        varchar(64) log_name "nullable ; catégorie stable"
+        bigint_unsigned subject_id "nullable ; PK locale"
+        bigint_unsigned causer_id "nullable ; PK locale"
+        varchar(64) log_name "nullable ; métier ou privacy"
         text description
         varchar(64) subject_type "nullable ; alias morph local"
-        bigint_unsigned subject_id "nullable ; PK du sujet local"
-        varchar(100) event "nullable ; code événement extensible"
-        varchar(64) causer_type "nullable ; alias morph local"
-        bigint_unsigned causer_id "nullable ; PK acteur local"
-        json attribute_changes "nullable ; attributes et old en v5"
-        json properties "nullable ; contexte filtré"
-        varchar(191) operation_key UK "nullable ; deduplication explicite par action et phase"
-        uuid correlation_id "index ; identifiant technique partagé"
+        varchar(100) event "nullable ; code extensible contrôlé"
+        varchar(64) causer_type "nullable ; alias de l'acteur local"
+        json attribute_changes "nullable ; changements autorisés"
+        json properties "nullable ; contrat versionné et filtré"
+        varchar(191) operation_key UK "nullable ; clé idempotente par fait et phase"
+        uuid correlation_id "index applicatif ; nullable pour activités simples"
         tinyint_unsigned origin "ActivityOriginEnum"
+        datetime performed_at "nullable hors privacy ; instant réel de la phase privacy"
         datetime created_at
         datetime updated_at
     }
-    theme_customizations {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        varchar theme_code
-        int version
-        json configuration
-        text sanitized_css "nullable"
-        tinyint_unsigned status "PublicationStatusEnum"
-        datetime published_at "nullable"
-        bigint_unsigned author_id FK "users.id"
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
-    }
-
 ```
 
-Les champs activity_log et leur fonctionnement sont expliqués en C6 et au §7.7. correlation_id permet de regrouper une opération locale ; le contexte tenant est la connexion et ne nécessite pas de tenant_id dans chaque ligne. Les auteurs système restent anonymes, avec origin explicite.
+#### Explication très simple des champs
 
-theme_customizations conserve le thème, sa version, configuration, CSS filtré, état de publication, date et auteur local. Cette table reste réservée à une évolution. CSS contrôlé, aucun script arbitraire et aucune publication sans Policy.
+- **`id`** : le numéro interne de cette action.
+- **`uuid`** : son identifiant public unique.
+- **`log_name`** : la famille de l'action ; privacy désigne une opération sur les données personnelles.
+- **`description`** : une phrase courte expliquant l'action.
+- **`subject_type`** : le type d'élément concerné, par exemple une commande ou un produit.
+- **`subject_id`** : le numéro local de cet élément ; ce lien polymorphe n'est pas une FK SQL universelle.
+- **`event`** : le code précis de l'action, par exemple order.validated.
+- **`causer_type`** : le type de compte local qui a agi ; vide pour une action système selon origin.
+- **`causer_id`** : le numéro du compte local qui a agi ; il permet de retrouver qui a cliqué Valider.
+- **`attribute_changes`** : les anciennes et nouvelles valeurs des champs autorisés à être journalisés.
+- **`properties`** : les informations utiles et contrôlées de l'action ; jamais mots de passe, clés API ou copies des coordonnées.
+- **`operation_key`** : une clé unique qui empêche d'enregistrer deux fois le même fait lors d'une reprise.
+- **`correlation_id`** : le lien entre plusieurs actions de la même opération.
+- **`origin`** : indique si l'action vient d'un compte, du système ou d'une autre origine autorisée.
+- **`performed_at`** : la date réelle de la phase tracée sur les données : intention, réussite, refus, échec ou résultat incertain. Une date d’intention ne prouve pas qu’une transmission a réussi ; created_at reste la date d’enregistrement.
+- **`created_at`** : la date à laquelle l'activité a été enregistrée.
+- **`updated_at`** : champ technique du modèle Spatie ; ne permet pas de réécrire un fait historique.
+
+**Validation de commande :** event=order.validated, subject_type=order et subject_id=orders.id. L'acteur est le compte local shop_user ; created_at est l'instant du clic. properties garde schema_version, revision_uuid, revision_number, request_hash et les références minimales utiles ; pas de contrat, de PDF d'accord, d'enregistrement d'appel ni de copie de l'adresse. La ligne est écrite explicitement dans la même transaction que confirmed_revision_id, validated_at, réservations et mouvements. La clé canonique order.validate:<order_uuid>:<revision_uuid> est dérivée par le serveur pour cette révision et réservée à l’activité de succès order.validated ; un nouveau nonce client ne crée jamais une autre validation. request_hash décrit le contenu immuable de cette révision, sans heure, acteur du retry ou version de concurrence mutable. Retrouver cette activité après contrôle d’accès avant de rejouer le stock ; refus/échecs utilisent des clés distinctes de phase/tentative. Une reprise après perte technique crée une nouvelle révision et de nouvelles lignes, sans réactivation de l’ancienne réservation. Le journal des appels reste order_history ; il ne copie pas cet événement officiel de validation.
+
+**Opérations sur les données :** log_name=privacy ; event=privacy.<operation>.<phase>. performed_at est requis pour chaque activité privacy et désigne l’instant réel de sa phase ; created_at garde l’instant de saisie. Pour une intention, il date la demande sans prétendre que la transmission est effectuée. Une réussite date le fait constaté ; une incertitude ne reçoit aucun faux résultat de réussite. properties versionnées : schema_version=1, operation_type contrôlé, data_categories non vide sans valeurs personnelles, reason, recipient facultatif sous forme d'alias, scope=single/batch, resource_kind, quantity si lot, reference_media_uuid si export et context minimisé. Sujet/acteur utilisent les morphs locaux ou NULL documenté pour lot/système. Clé unique par fait/phase/tentative et corrélation commune. Consultation sensible, modification, export et transmission au transporteur sont tracés selon leur résultat ; aucun succès fictif ni journalisation de chaque SELECT. La trace indispensable précède la remise des données ; les mutations et activités correspondantes sont atomiques. Les fichiers exportés restent privés. Les viewers et filtres privacy ont leurs propres permissions locales.
+
+**Conservation et intégration :** schéma Spatie v5, attribute_changes distinct de properties, morph map explicite, filtres de secrets et journal append-only. La colonne performed_at est une extension locale à migrer/caster explicitement ; la table centrale ne change pas. Le registre processing_activity_register décrit les traitements prévus et reste séparé des événements effectués. Le thème standard, logo et couleurs restent dans shop ; la personnalisation avancée du thème est une évolution sans table au lancement.
+
+**Compatibilité Activitylog locale :** les 17 colonnes de T15 conservent les attributs natifs Spatie v5. `performed_at` est une extension de cette BDD tenant ; le modèle Activity local la caste en date UTC à précision microseconde en conservant les casts hérités de `properties` et `attribute_changes`. Le service renseigne cette date par `tap` ou le hook applicatif contrôlé avant insertion, puis la vérifie avec le contrat privacy. Il ne remplace ni `created_at` ni la configuration du journal central. `CHECK(log_name <> 'privacy' OR performed_at IS NOT NULL)` et les contrôles de propriétés sont requis. Les couples `subject_type/subject_id` et `causer_type/causer_id` sont soit complets, soit tous deux NULL ; le sujet et l’acteur sont vérifiés dans cette connexion. Un lot utilise une référence de sélection sécurisée et des catégories/quantités, pas une copie des données de chaque personne. Une transition sensible et sa trace restent dans la même transaction, avec buffering désactivé.
 
 ### T16 — Frais transporteur, créances et preuve d’encaissement
 
@@ -3674,6 +3680,9 @@ erDiagram
         bigint_unsigned return_id FK "nullable ; order_returns.id"
         bigint_unsigned carrier_account_id FK "nullable ; carrier_accounts.id"
         bigint_unsigned source_rate_id FK "nullable ; carrier_rate_versions.id"
+        bigint_unsigned proof_media_id FK "nullable ; media.id"
+        bigint_unsigned reversal_of_id FK "nullable ; carrier_fees.id"
+        bigint_unsigned correction_of_id FK "nullable ; carrier_fees.id"
         json rate_snapshot "nullable"
         tinyint_unsigned fee_type "CarrierFeeTypeEnum"
         tinyint_unsigned payer "FeePayerEnum"
@@ -3684,9 +3693,6 @@ erDiagram
         varchar date_source
         datetime recognized_at "nullable"
         varchar external_reference "nullable"
-        bigint_unsigned proof_media_id FK "nullable ; media.id"
-        bigint_unsigned reversal_of_id FK "nullable ; carrier_fees.id"
-        bigint_unsigned correction_of_id FK "nullable ; carrier_fees.id"
         varchar operation_key
         datetime created_at
         datetime updated_at
@@ -3696,10 +3702,10 @@ erDiagram
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned remittance_statement_id FK "remittance_statements.id"
         bigint_unsigned carrier_fee_id FK "carrier_fees.id"
-        decimal amount "signe"
-        tinyint_unsigned mode "FeeSettlementModeEnum"
         bigint_unsigned reversal_of_id FK "nullable ; carrier_fee_payments.id"
         bigint_unsigned correction_of_id FK "nullable ; carrier_fee_payments.id"
+        decimal amount "signe"
+        tinyint_unsigned mode "FeeSettlementModeEnum"
         varchar operation_key
         datetime created_at
     }
@@ -3709,12 +3715,12 @@ erDiagram
         bigint_unsigned provider_id FK "shipping_providers.id"
         bigint_unsigned carrier_fee_id FK "carrier_fees.id"
         bigint_unsigned original_fee_payment_id FK "nullable ; carrier_fee_payments.id"
+        bigint_unsigned reversal_of_id FK "nullable ; carrier_receivables.id"
         decimal initial_amount
         decimal remaining_amount "projection materialisee"
         varchar reason
         tinyint_unsigned status "ReceivableStatusEnum"
         varchar operation_key
-        bigint_unsigned reversal_of_id FK "nullable ; carrier_receivables.id"
         datetime recognized_at
         datetime settled_at "nullable"
         datetime created_at
@@ -3724,13 +3730,13 @@ erDiagram
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned receivable_id FK "carrier_receivables.id"
-        tinyint_unsigned settlement_type "ReceivableSettlementTypeEnum"
         bigint_unsigned remittance_statement_id FK "nullable ; remittance_statements.id"
         bigint_unsigned carrier_fee_id FK "nullable ; carrier_fees.id"
+        bigint_unsigned reversal_of_id FK "nullable ; carrier_receivable_allocations.id"
+        tinyint_unsigned settlement_type "ReceivableSettlementTypeEnum"
         decimal amount "signe"
         varchar external_reference "nullable"
         varchar operation_key
-        bigint_unsigned reversal_of_id FK "nullable ; carrier_receivable_allocations.id"
         datetime performed_at
         datetime created_at
     }
@@ -3738,15 +3744,15 @@ erDiagram
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned collection_id FK "collections.id"
+        bigint_unsigned verified_by_id FK "users.id"
+        bigint_unsigned proof_media_id FK "nullable ; media.id"
+        bigint_unsigned reversal_of_id FK "nullable ; collection_entries.id"
+        bigint_unsigned correction_of_id FK "nullable ; collection_entries.id"
         decimal amount "signe"
         datetime collected_at
         datetime verified_at
-        bigint_unsigned verified_by_id FK "users.id"
-        bigint_unsigned proof_media_id FK "nullable ; media.id"
         varchar reference
         text reason
-        bigint_unsigned reversal_of_id FK "nullable ; collection_entries.id"
-        bigint_unsigned correction_of_id FK "nullable ; collection_entries.id"
         varchar operation_key
         datetime created_at
     }
@@ -3848,7 +3854,7 @@ erDiagram
 
 
 
-- **`carrier_fees` :** UNIQUE(operation_key), UNIQUE(reversal_of_id) hors NULL. fee_type=1 OUTBOUND | 2 RETURN | 3 STORAGE | 4 OTHER | 5 SECOND_ATTEMPT | 6 REPLACEMENT. payer=1 CUSTOMER | 2 MERCHANT | 3 COURIER | 4 CARRIER ; settlement_mode=1 DEDUCTION | 3 OFFSET | 2 SEPARATE_PAYMENT | 4 COVERED. status=`1 ESTIMATED | 2 RECOGNIZED | 3 SETTLED | 4 CANCELLED | 5 REVERSED`. Les frais payés par le client et retenus sur le COD sont enregistrés pour expliquer le net, sans être une charge du commerçant. Seuls payer=2 (MERCHANT) et status=2 (RECOGNIZED) alimentent les charges ; ils sont réglables par carrier_fee_payments. Un même service partagé entre payeurs produit plusieurs lignes correspondant à leurs quotes-parts, jamais le total répété pour chacun. FK(shipment_id,provider_id) → shipments(id,provider_id), FK(return_id,shipment_id) → order_returns(id,shipment_id). carrier_account_id doit correspondre au compte du prestataire, validé par le serveur ; NULL pour interne. Snapshot du tarif appliqué immuable même si la grille locale évolue. Frais retour automatiques dédupliqués avec une clé dérivée du retour et du type de frais ; ne pas utiliser un UUID aléatoire à chaque polling. Toute écriture constatée est immuable ; correction par inverse exact puis nouvelle écriture. Une constatation client retenue ne peut excéder l’encaissement vérifié ni le montant de livraison client éligible sans traiter un écart explicite.
+- **`carrier_fees` :** UNIQUE(operation_key), UNIQUE(reversal_of_id) hors NULL. fee_type=1 OUTBOUND | 2 RETURN | 3 STORAGE | 4 OTHER | 5 SECOND_ATTEMPT | 6 REPLACEMENT. payer=1 CUSTOMER | 2 MERCHANT | 3 COURIER | 4 CARRIER ; settlement_mode=1 DEDUCTION | 3 OFFSET | 2 SEPARATE_PAYMENT | 4 COVERED. status=`1 ESTIMATED | 2 RECOGNIZED | 3 SETTLED | 4 CANCELLED | 5 REVERSED`. Les frais payés par le client et retenus sur le COD sont enregistrés pour expliquer le net, sans être une charge du commerçant. Les charges transporteur sont la somme signée des frais à payer=2 MERCHANT qui ont été constatés : status=2 RECOGNIZED ou 3 SETTLED. Un original status=5 REVERSED reste également dans cette somme lorsqu’il possède son inverse effectif RECOGNIZED/SETTLED : original positif + inverse exact négatif s’annulent une fois. Les montants simplement estimés et les brouillons annulés avant constatation sont exclus. Les frais pris en charge par client, livreur ou transporteur ne sont pas une charge du commerçant. Le règlement change la dette restant à payer et la trésorerie, jamais le montant de la charge déjà reconnue. Les allocations carrier_fee_payments règlent ces frais sans créer une deuxième charge. Un même service partagé entre payeurs produit plusieurs lignes correspondant à leurs quotes-parts, jamais le total répété pour chacun. FK(shipment_id,provider_id) → shipments(id,provider_id), FK(return_id,shipment_id) → order_returns(id,shipment_id). carrier_account_id doit correspondre au compte du prestataire, validé par le serveur ; NULL pour interne. Snapshot du tarif appliqué immuable même si la grille locale évolue. Frais retour automatiques dédupliqués avec une clé dérivée du retour et du type de frais ; ne pas utiliser un UUID aléatoire à chaque polling. Toute écriture constatée est immuable ; correction par inverse exact puis nouvelle écriture. Une constatation client retenue ne peut excéder l’encaissement vérifié ni le montant de livraison client éligible sans traiter un écart explicite.
 - **`carrier_fee_payments` :** UNIQUE(operation_key), UNIQUE(reversal_of_id) hors NULL. mode=3 OFFSET | 2 SEPARATE_PAYMENT. Frais du même prestataire que le bordereau, payer=2 (MERCHANT), déjà constatés. Sous verrou du frais, 0<=somme nette des allocations sur bordereaux rapprochés<=montant effectif du frais (original + contrepassation). Pour corriger un frais déjà payé, contrepasser/réaffecter son allocation sans créer de mouvement bancaire fictif ; le trop-payé reconnu devient une `carrier_receivables`. Une écriture d’allocation n’est jamais une seconde charge.
 - **`carrier_receivables` — AUD-02 :** représente un montant reconnu dû par le transporteur après correction d’un frais déjà payé, sans présumer qu’il a été encaissé. UNIQUE(operation_key), UNIQUE(reversal_of_id) hors NULL. `initial_amount>0`, `0<=remaining_amount<=initial_amount`; `remaining_amount` est une projection vérifiable depuis les allocations nettes. status=`1 OPEN | 2 PARTIALLY_SETTLED | 3 SETTLED | 4 CANCELLED | 5 REVERSED`. La manière de règlement (remboursement bancaire, compensation de frais, compensation de bordereau, autre) est portée uniquement par `carrier_receivable_allocations.settlement_type`, pas dupliquée dans le statut. Exemple : paiement réel 650, frais corrigé 600 → charge nette 600, trésorerie -650, créance 50. La création de la créance ne produit aucun `+50` bancaire. Une erreur sur une créance finalisée se corrige par contrepassation puis nouvelle écriture, pas par réécriture silencieuse.
 - **`carrier_receivable_allocations` :** UNIQUE(operation_key), UNIQUE(reversal_of_id) hors NULL. `settlement_type=1 BANK_REFUND | 2 FEE_OFFSET | 3 STATEMENT_OFFSET | 4 OTHER_VALID_SETTLEMENT`. Sous `FOR UPDATE` sur la créance, exiger que la somme nette des allocations ne dépasse jamais `initial_amount`. Un remboursement bancaire exige un bordereau/preuve réellement rapproché ; une compensation de frais référence le frais futur effectivement réduit. Une réaffectation interne sans cash n’entre jamais dans le net bancaire. Quand le net des allocations atteint `initial_amount`, `remaining_amount=0` et la créance est soldée.
@@ -3871,12 +3877,12 @@ erDiagram
         bigint_unsigned remittance_statement_id FK "remittance_statements.id"
         bigint_unsigned shipment_id FK "shipments.id"
         bigint_unsigned replacement_order_id FK "nullable ; orders.id"
-        decimal amount "signe"
-        varchar reason
-        varchar external_reference
         bigint_unsigned proof_media_id FK "nullable ; media.id"
         bigint_unsigned reversal_of_id FK "nullable ; carrier_compensations.id"
         bigint_unsigned correction_of_id FK "nullable ; carrier_compensations.id"
+        decimal amount "signe"
+        varchar reason
+        varchar external_reference
         varchar operation_key
         datetime created_at
     }
@@ -3885,9 +3891,14 @@ erDiagram
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned order_id FK "orders.id"
         bigint_unsigned revision_id FK "order_revisions.id"
-        tinyint_unsigned document_type "DocumentTypeEnum"
         bigint_unsigned original_invoice_id FK "nullable ; invoices.id"
-        bigint_unsigned sequence_id FK "nullable ; document_sequences.id"
+        bigint_unsigned sequence_id FK "nullable avant réservation ; billing_rules.id ; compteur type 1"
+        bigint_unsigned media_id FK "nullable ; media.id"
+        bigint_unsigned issued_by_id FK "nullable ; users.id"
+        bigint_unsigned incident_id FK "nullable ; order_incidents.id"
+        tinyint_unsigned document_type "DocumentTypeEnum"
+        tinyint_unsigned sequence_record_type "generated STORED ; 1 si sequence_id non NULL"
+        int fiscal_year "nullable avant réservation ; exercice du compteur"
         bigint sequence_number "nullable before emission"
         int snapshot_format_version
         char(3) currency
@@ -3897,18 +3908,11 @@ erDiagram
         json client_snapshot
         json items_snapshot
         json totals_snapshot
-        bigint_unsigned media_id FK "nullable ; media.id"
-        varchar external_provider "nullable"
-        varchar external_reference "nullable"
-        varchar external_document_url "nullable"
-        char(64) document_hash "nullable ; SHA-256"
         datetime issued_at "nullable"
         datetime cancelled_at "nullable"
         text cancellation_reason "nullable"
-        bigint_unsigned issued_by_id FK "nullable ; users.id"
         varchar operation_key
         varchar document_reason "nullable sauf avoir"
-        bigint_unsigned incident_id FK "nullable ; order_incidents.id"
         datetime created_at
         datetime updated_at
     }
@@ -3938,9 +3942,11 @@ erDiagram
 - **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
 - **`order_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
 - **`revision_id`** : l’identifiant de la version de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`document_type`** : indique quel document c’est. Exemple : facture, avoir ou autre type prévu.
+- **`document_type`** : 1 INVOICE pour une facture de cette boutique ; 2 CREDIT_NOTE pour un avoir qui corrige une facture.
 - **`original_invoice_id`** : l’identifiant de la facture d’origine. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`sequence_id`** : l’identifiant du compteur de numérotation. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`sequence_id`** : Le compteur local utilisé pour attribuer le numéro, dans billing_rules avec record_type=1 SEQUENCE. Vide tant que le numéro n’a pas été réservé.
+- **`sequence_record_type`** : Colonne SQL calculée qui impose que sequence_id vise un compteur, jamais une règle de facturation.
+- **`fiscal_year`** : L’exercice du numéro réservé ; il doit être identique à celui du compteur choisi.
 - **`sequence_number`** : le nombre utilisé à l’intérieur de la série du document. Exemple : `123` dans `FAC-2026-000123`. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`snapshot_format_version`** : une **copie figée** de version format au moment important de l’opération. Si l’information d’origine change plus tard, cette ancienne ligne garde la valeur utilisée à ce moment-là.
 - **`currency`** : la monnaie utilisée. Exemple : `DZD` pour le dinar algérien.
@@ -3950,14 +3956,10 @@ erDiagram
 - **`client_snapshot`** : une copie figée des informations client utilisées par cette version de commande.
 - **`items_snapshot`** : une **copie figée** de articles au moment important de l’opération. Si l’information d’origine change plus tard, cette ancienne ligne garde la valeur utilisée à ce moment-là.
 - **`totals_snapshot`** : une copie figée des totaux de la commande à ce moment précis.
-- **`media_id`** : l’identifiant du fichier/image/vidéo. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`external_provider`** : le nom du fournisseur ou service extérieur auquel la dépense est liée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`external_reference`** : le numéro donné par un système extérieur. Exemple : référence d’un reversement chez le transporteur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`external_document_url`** : un lien vers un document fourni par le service extérieur lorsqu’il existe.
-- **`document_hash`** : une signature du contenu du document qui permet de vérifier qu’il est resté identique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`media_id`** : Le PDF privé produit par la boutique. Son emplacement et son empreinte canonique sont dans media.storage_key et media.file_hash ; le fichier et ces métadonnées sont protégés après préparation/émission.
 - **`issued_at`** : la date et l’heure liées à **emise**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`cancelled_at`** : la date et l’heure liées à **annulee**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`cancellation_reason`** : explique la raison de **annulation**. Cela permet de comprendre plus tard pourquoi la décision a été prise. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
+- **`cancellation_reason`** : Le motif d’abandon d’un brouillon de document fiscal. Ce champ n’annule pas et ne clôture pas une commande.
 - **`issued_by_id`** : l’identifiant de la personne qui a émis. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`operation_key`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
 - **`document_reason`** : explique la raison de **document**. Cela permet de comprendre plus tard pourquoi la décision a été prise. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
@@ -3968,7 +3970,17 @@ erDiagram
 
 
 - **`carrier_compensations` :** UNIQUE(operation_key), UNIQUE(reversal_of_id) hors NULL. Un dédommagement pour perte/casse ou autre sinistre payé par le prestataire au commerçant est séparé du COD et du remboursement client. La livraison et le bordereau ont le même prestataire ; un remplacement éventuel se rattache à la commande de cette livraison, contrôlé sous verrou. Montant>0 sauf inverse exact. L’indemnisation devient effective uniquement avec un bordereau rapproché ; les promesses peuvent rester sur un brouillon. Les pièces et références sont contrôlées pour ne pas importer deux fois la même indemnisation. **Le remboursement d’un trop-payé issu d’une correction de frais n’est pas une indemnisation : il apure `carrier_receivables` via T16.** Ne pas enregistrer simultanément une baisse de frais et une indemnisation pour une seule réduction de dette.
-- **`invoices` :** UNIQUE(number) hors NULL, UNIQUE(sequence_id,sequence_number) hors NULL, UNIQUE(operation_key), UNIQUE(external_provider,external_reference) lorsque renseignés ensemble. Clés parents UNIQUE(id,order_id), UNIQUE(id,order_id,revision_id,document_type) et UNIQUE(id,order_id,revision_id,document_type,original_invoice_id) pour T22. FK(revision_id,order_id) → order_revisions(id,order_id). document_type=1 INVOICE ou 2 CREDIT_NOTE ; une facture a original_invoice_id=NULL, un avoir a une origine non NULL, différente de soi, qui est une facture émise de cette commande via FK(original_invoice_id,order_id) → invoices(id,order_id). Un avoir exige document_reason, même devise et plafonds cumulés par ligne sous verrou ; il ne prouve ni remboursement ni crédit libre. status=1 DRAFT, 2 ISSUED, 3 CANCELLED ou 4 PREPARING. Une révision confirmée et la règle validée de billing_obligations sont requises ; l’émission ne dépend pas du reversement transporteur. Réserver numéro/séquence, snapshots et operation_key dans une transaction locale, puis générer/importer le PDF privé sur une clé stable liée à invoices.uuid. Vérifier fichier et document_hash ; dans une seconde transaction locale courte, renseigner media_id/document_hash une fois, passer à ISSUED et créer document_deliveries avec la même identité documentaire. Stockage objet et SQL ne sont pas atomiques : un crash reprend le même document, vérifie l’objet existant et ne consomme aucun second numéro. Aucune inscription documentaire centrale n’est requise. Un fournisseur externe conserve son numéro/référence sous idempotence, sans numéro local concurrent ; le fichier reste conservé localement dans l’espace privé. La pièce reste PREPARING tant que son fichier ou sa vérification manque. Numéro réservé, snapshots, média et empreinte sont immuables à l’émission, et le numéro n’est jamais recyclé. Une annulation de brouillon garde le numéro déjà réservé ; après émission, une annulation de vente corrige via avoir, tandis que la facture originale reste ISSUED. cancelled_at/cancellation_reason décrivent seulement un brouillon annulé. FK(incident_id,order_id) → order_incidents(id,order_id) lorsque renseigné. Les garanties de correspondance de T22 et les snapshots du §10.4 restent obligatoires.
+- **`invoices` :** UNIQUE(number) hors NULL, UNIQUE(sequence_id,sequence_number) hors NULL et UNIQUE(operation_key). Cette table contient seulement les factures produites par la boutique et les avoirs internes qui les corrigent. Chaque pièce vise la bonne commande et la bonne révision par FK(revision_id,order_id) vers order_revisions(id,order_id). Clés parents UNIQUE(id,order_id), UNIQUE(id,order_id,revision_id,document_type) et UNIQUE(id,order_id,revision_id,document_type,original_invoice_id), nécessaires à T22.
+
+**Facture ou avoir :** document_type=1 INVOICE ou 2 CREDIT_NOTE. Une facture a original_invoice_id=NULL ; un avoir exige une facture originale émise de la même commande, une origine différente de soi, document_reason, même devise et quantités/montants crédités identifiables dans items_snapshot. FK(original_invoice_id,order_id) vers invoices(id,order_id) ; contrôler sous verrou le type et l’état ISSUED de l’original. Les cumulés de quantités, HT, taxes et TTC des avoirs émis ainsi que les réserves de brouillons/préparations ne dépassent pas les lignes originales. Avoir, remboursement réel, compensation d’échange et correction du résultat conservent leurs rôles distincts.
+
+**Règle et validation métier :** la version de commande utilisée vient de la validation simple effectuée par l’employé habilité dans orders, avec confirmed_revision_id, validated_at et activité locale. Aucun contrat téléphonique ni envoi de document n’est requis par ce parcours. L’obligation T22 conserve sa règle locale validée et son snapshot historique. À la première réservation de la pièce, revalider la révision ciblée et ses faits métier ; une reprise retrouve ensuite la même préparation figée. L’émission ne dépend pas du reversement du transporteur. Les factures émises restent liées à leur révision historique même si la commande évolue ensuite.
+
+**Réservation et préparation :** status utilise DocumentStatusEnum : 1 DRAFT, 2 ISSUED, 3 CANCELLED, 4 PREPARING. Dans une transaction locale courte, retrouver operation_key, verrouiller obligation et compteur, puis réserver ensemble sequence_id, fiscal_year, sequence_number et number. sequence_record_type est GENERATED ALWAYS AS (CASE WHEN sequence_id IS NOT NULL THEN 1 ELSE NULL END) STORED. FK(sequence_id,document_type,fiscal_year,sequence_record_type) vers billing_rules(id,document_type,fiscal_year,record_type) impose un compteur du bon type et du bon exercice. Toutes les valeurs de réservation sont NULL avant réservation, puis renseignées ensemble. Pas de MAX+1 ni réutilisation d’un numéro déjà réservé.
+
+**PDF interne et reprise :** générer uniquement le PDF privé à partir des snapshots figés, hors transaction longue, sur une clé stable liée à invoices.uuid. media.storage_key et media.file_hash sont la source canonique de l’emplacement et du SHA-256 des octets ; aucune copie d’empreinte du PDF n’est maintenue dans invoices. Vérifier l’existence, les octets, la visibilité PRIVATE, le parent morph et la collection du média avant de renseigner media_id et issued_at et de passer à ISSUED dans une seconde transaction locale courte. PREPARING fige déjà les données utilisées pour le PDF. Stockage et SQL ne sont pas atomiques : un crash reprend le même UUID, le même numéro et l’objet déjà préparé ; il ne consomme pas un deuxième numéro. Aucune facture extérieure n’est importée et aucune transmission automatique au client n’est créée.
+
+**Immutabilité et corrections :** numéro, exercice, identité vendeur/client, lignes et totaux figés, média et ses octets/empreinte restent immuables à l’émission ; le compteur reste consommé si un brouillon préparé est abandonné. cancelled_at/cancellation_reason concernent uniquement cet abandon de brouillon fiscal, jamais une annulation/clôture manuelle de commande. Une correction de vente déjà facturée utilise un avoir ; la facture originale reste ISSUED. FK(incident_id,order_id) vers order_incidents(id,order_id) si incident renseigné. Les règles de T22 et les snapshots du §10.4 restent obligatoires. Pas de mise à jour rétroactive du PDF pour signaler un encaissement.
 
 ### T18 — Incidents par ligne et plafonds des remèdes
 
@@ -3987,14 +3999,14 @@ erDiagram
         bigint_unsigned shipped_revision_id FK "order_revisions.id"
         bigint_unsigned order_item_id FK,UK "order_items.id"
         bigint_unsigned return_id FK "nullable ; order_returns.id"
+        bigint_unsigned opened_by_id FK "nullable ; users.id"
+        bigint_unsigned validated_by_id FK "nullable ; users.id"
         int affected_quantity "projection de la somme des details"
         decimal eligible_product_amount
         decimal eligible_shipping_amount
         tinyint_unsigned status "IncidentStatusEnum"
         varchar operation_key UK
         text reason
-        bigint_unsigned opened_by_id FK "nullable ; users.id"
-        bigint_unsigned validated_by_id FK "nullable ; users.id"
         datetime validated_at "nullable"
         datetime closed_at "nullable"
         datetime created_at
@@ -4004,10 +4016,10 @@ erDiagram
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned incident_id FK "order_incidents.id"
+        bigint_unsigned author_id FK "nullable ; users.id"
         tinyint_unsigned type "IncidentTypeEnum"
         int quantity
         text reason
-        bigint_unsigned author_id FK "nullable ; users.id"
         datetime created_at
         datetime updated_at
     }
@@ -4052,159 +4064,98 @@ erDiagram
 
 
 
-Dossier lié à la **ligne expédiée précise**, donc deux bouquets de même variante avec deux personnalisations restent distincts. UNIQUE(order_item_id) au MVP : un seul dossier par ligne, réouvrable et enrichi par order_history. Cette décision évite de dupliquer des incidents pour contourner le plafond ; plusieurs causes sont ventilées dans order_incident_details. Chaque détail : type=`1 DAMAGED | 2 DEFECTIVE | 3 INCORRECT | 4 MISSING | 5 LOST | 6 OTHER` (`IncidentTypeEnum`), quantite>0 et motif requis. Sous verrou commande puis incident, SUM(details.quantite)<=article_commande.quantite et affected_quantity=SUM(details.quantite). Une unité n’est comptée qu’une fois dans cette ventilation : choisir sa cause principale et décrire les causes secondaires dans le motif. Exemple 3 unités : 1 cassée + 1 manquante, la troisième correcte ne consomme aucun budget. Création/modification des détails et projection sont atomiques, auditées ; aucune diminution sous les remèdes déjà engagés. Le dossier porte exactement `IncidentStatusEnum` : `1 OPEN`, `2 VALIDATED`, `3 REJECTED`, `4 RESOLVED`, `5 CLOSED`, `6 CANCELLED`. Quantité affectée >0 et <= quantité expédiée ; ne jamais la diminuer sous la quantité déjà engagée. Montants éligibles>=0, alloués par décision documentée, pas automatiquement égaux au total commande. La clôture ne libère aucun budget consommé.
+Dossier lié à la **ligne expédiée précise**, donc deux bouquets de même variante avec deux personnalisations restent distincts. UNIQUE(order_item_id) au MVP : un seul dossier par ligne, réouvrable et enrichi par order_history. Cette décision évite de dupliquer des incidents pour contourner le plafond ; plusieurs causes sont ventilées dans order_incident_details. Chaque détail : type=`1 DAMAGED | 2 DEFECTIVE | 3 INCORRECT | 4 MISSING | 5 LOST | 6 OTHER` (`IncidentTypeEnum`), quantite>0 et motif requis. Sous verrou commande puis incident, SUM(details.quantite)<=article_commande.quantite et affected_quantity=SUM(details.quantite). Une unité n’est comptée qu’une fois dans cette ventilation : choisir sa cause principale et décrire les causes secondaires dans le motif. Exemple 3 unités : 1 cassée + 1 manquante, la troisième correcte ne consomme aucun budget. Création/modification des détails et projection sont atomiques, auditées ; aucune diminution sous les remèdes déjà engagés. Le dossier porte exactement `IncidentStatusEnum` : `1 OPEN`, `2 VALIDATED`, `3 REJECTED`, `4 RESOLVED`, `5 CLOSED`, `6 CANCELLED`. Quantité affectée >0 et <= quantité expédiée ; ne jamais la diminuer sous la quantité déjà engagée. Montants éligibles>=0, alloués par décision documentée, pas automatiquement égaux au total commande. La clôture du dossier incident ne libère aucun budget consommé.
 
 Clés parents : UNIQUE(id,order_id) ; FK(shipment_id,order_id,shipped_revision_id) → shipments(id,order_id,shipped_revision_id), FK(order_item_id,shipped_revision_id) → order_items(id,revision_id), FK(return_id,shipment_id) → order_returns(id,shipment_id). Définir les parents avant d’ajouter les FK cycliques. L’incident peut exister sans retour : une photo et une décision de SAV peuvent justifier un remplacement sans collecte physique. **En revanche, si une prise en charge nécessite un retour physique dans le MVP, il n’existe pas de réception SAV isolée par article : le retour T9 porte sur tout le colis.**
 
-**Protocole commun remplacement/remboursement :** verrous des commandes concernées par UUID, puis incident, puis recouvrement et autres parents financiers nécessaires ; relecture courante des remèdes. Soit Qr la somme des original_incident_quantity des commandes de remplacement ET d’échange non annulées, Qf les quantités de remboursements produits réservées/effectuées nettes des seules contrepassations effectuées. Exiger Qr+Qf<=affected_quantity avant insertion/validation. Le budget SAV est réservé dès création du remplacement ; son stock est réservé à son acceptation selon le même protocole que les autres commandes. Un brouillon sans acceptation ne réserve donc pas encore de stock. Réessayer une action avec la même clé ne consomme pas une seconde quantité. Un remboursement brouillon annulé libère sa réserve ; une correction effectuée passe par inverse exact. Aucun inverse en attente ne crée de disponibilité. Une commande déjà expédiée n’est pas annulable pour libérer artificiellement son budget SAV.
+**Protocole commun remplacement/remboursement :** verrous des commandes concernées par UUID, puis incident, puis recouvrement et autres parents financiers nécessaires ; relecture courante des remèdes. Soit Qr la somme des original_incident_quantity des toutes les commandes de remplacement ET d’échange créées, Qf les quantités de remboursements produits réservées/effectuées nettes des seules contrepassations effectuées. Exiger Qr+Qf<=affected_quantity avant insertion/validation. Le budget SAV est réservé dès création du remplacement ; son stock est réservé à son acceptation selon le même protocole que les autres commandes. Un brouillon sans acceptation ne réserve donc pas encore de stock. Réessayer une action avec la même clé ne consomme pas une seconde quantité. Un remboursement brouillon annulé libère sa réserve ; une correction effectuée passe par inverse exact. Aucun inverse en attente ne crée de disponibilité. Aucun bouton d’annulation/clôture de commande n’existe ; un budget SAV déjà engagé ne se libère pas par changement de statut logistique.
 
 Mêmes contrôles sur les montants : somme des remboursements produits engagés <= eligible_product_amount ET valeur TTC réellement payée des quantités concernées ; une unité remboursée partiellement compte comme unité compensée et ne peut recevoir un remplacement au MVP. Paiements fractionnés d’un même remède non gérés sans entité d’allocation supplémentaire. Frais de livraison : compensated_quantity=0, plafond séparé par incident ET cumul de la commande <= livraison nette éligible réellement payée. Contrôle global des remboursements <= encaissement vérifié. Les remboursements de produit, de livraison et de différence d’échange utilisent des lignes distinctes si nécessaire. La différence d’échange ne consomme aucune nouvelle unité mais reste plafonnée monétairement selon T22. Les montants sont réservés dès brouillon, pour empêcher deux décisions simultanées.
 
 Après incident sur un remplacement ou un échange, le MVP ne crée pas automatiquement une chaîne de remplacements : traitement SAV manuel documenté et évolution à concevoir avant automatisation. Ne pas contourner cela en ouvrant un second dossier pour la ligne initiale. Les décisions, plafonds et preuves sont audités sans exposer inutilement les données de l’acheteur.
 
-### T19 — Contrats acceptés et transmission des documents
-
-**`order_contracts` — Le contenu exact de la commande accepté par téléphone, avec la date de l’accord déclaré et la personne qui l’a enregistré. Exemple : le commerçant confirme les articles, les prix et la livraison annoncés au client.**
-
-**`document_deliveries` — Le suivi de l’envoi des documents au client. Exemple : savoir si un contrat, une facture ou une copie de preuve de réception a été envoyé, livré ou reste en échec.**
-
-```mermaid
-erDiagram
-    direction TB
-    order_contracts {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        bigint_unsigned order_id FK "orders.id"
-        bigint_unsigned revision_id FK "order_revisions.id"
-        int format_version
-        datetime customer_confirmed_at
-        tinyint_unsigned confirmation_mode "CustomerConfirmationModeEnum"
-        bigint_unsigned confirmed_by_id FK "users.id"
-        varchar operation_key UK
-        json sanitized_confirmation_proof "nullable"
-        json document_snapshot
-        char(64) hash
-        bigint_unsigned media_id FK "nullable ; media.id"
-        char(64) media_hash "nullable"
-        datetime delivered_at "nullable projection premier succes"
-        tinyint_unsigned delivery_channel "nullable ; DocumentDeliveryChannelEnum ; projection"
-        varchar delivery_reference "nullable projection"
-        datetime created_at
-    }
-    document_deliveries {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        bigint_unsigned contract_id FK "nullable ; order_contracts.id"
-        bigint_unsigned invoice_id FK "nullable ; invoices.id"
-        bigint_unsigned shipment_id FK "nullable ; shipments.id pour copie accuse"
-        tinyint_unsigned channel "DocumentDeliveryChannelEnum"
-        text encrypted_recipient "nullable selon channel"
-        tinyint_unsigned status "DocumentDeliveryStatusEnum"
-        varchar operation_key UK
-        int attempts_count
-        datetime next_attempt_at "nullable"
-        varchar provider_reference "nullable"
-        datetime sent_at "nullable"
-        datetime delivered_at "nullable"
-        varchar error_code "nullable"
-        bigint_unsigned proof_media_id FK "nullable ; media.id"
-        datetime created_at
-        datetime updated_at
-    }
-    order_contracts ||--o{ document_deliveries : contract_id
-```
-
-#### Explication très simple des champs
-
-**`order_contracts` :**
-
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`order_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`revision_id`** : l’identifiant de la version de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`format_version`** : le numéro de version de format. Exemple : version 1, puis version 2 après une évolution ; l’ancienne version peut rester conservée pour comprendre l’historique.
-- **`customer_confirmed_at`** : la date et l’heure liées à **confirme client**. Elle permet de savoir exactement quand cette étape a eu lieu.
-- **`confirmation_mode`** : la manière dont le client a donné son accord au contrat. Dans le MVP, l’exemple principal est l’accord téléphonique.
-- **`confirmed_by_id`** : l’identifiant de la personne qui a saisi la confirmation. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`operation_key`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
-- **`sanitized_confirmation_proof`** : plusieurs petits réglages liés à **preuve confirmation filtree**, regroupés ensemble de manière structurée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`document_snapshot`** : une copie figée du document ou de ses informations importantes au moment de l’envoi.
-- **`hash`** : une petite signature calculée à partir des données. Elle sert à vérifier que le contenu n’a pas changé sans recopier tout le contenu.
-- **`media_id`** : l’identifiant du fichier/image/vidéo. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`media_hash`** : une signature du fichier qui permet de vérifier son contenu et parfois de repérer un doublon. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`delivered_at`** : la date et l’heure liées à **transmis**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`delivery_channel`** : projection facultative du premier canal de transmission réussi, castée vers `DocumentDeliveryChannelEnum` (`EMAIL`, `SMS_LINK`, `WHATSAPP_LINK`, `DOCUMENTED_HANDOFF`).
-- **`delivery_reference`** : la référence utilisée pour reconnaître **transmission** sans se baser seulement sur son nom. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
-
-**`document_deliveries` :**
-
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`contract_id`** : l’identifiant du contrat de commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`invoice_id`** : l’identifiant de la facture. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`shipment_id`** : l’identifiant de la livraison. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`channel`** : code de `DocumentDeliveryChannelEnum` : `EMAIL`, `SMS_LINK`, `WHATSAPP_LINK` ou `DOCUMENTED_HANDOFF`.
-- **`encrypted_recipient`** : les coordonnées du destinataire enregistrées de manière protégée lorsqu’elles doivent être conservées. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`status`** : code entier de l’enum propre à cet objet, défini au §3.3 ; les libellés sont traduits à l’affichage et les transitions contrôlées par le service.
-- **`operation_key`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
-- **`attempts_count`** : le nombre de **tentatives**. Exemple : `3` signifie qu’il y en a trois.
-- **`next_attempt_at`** : la date prévue pour retenter l’opération après un échec récupérable. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`provider_reference`** : le numéro de facture, reçu ou référence donné par le fournisseur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`sent_at`** : la date où l’envoi a été effectué. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`delivered_at`** : la date où la réception ou livraison du message a été confirmée quand cette information existe. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`error_code`** : un petit code qui permet de reconnaître le type d’erreur sans stocker un long message sensible. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`proof_media_id`** : l’identifiant lié à **preuve media**. Il sert à retrouver l’élément correspondant. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
-- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
 
 
+### T20 — Réglages de facturation : règles et compteurs dans une même table
 
-- `order_contracts` : UNIQUE(order_id,revision_id), FK(revision_id,order_id) → order_revisions(id,order_id). La confirmation est attachée à une révision exacte ; le snapshot complet contient vendeur identifié/version, client, lignes, TTC, livraison, conditions, version de format et confirmation. `hash`=SHA-256 du JSON canonique, `media_hash`=SHA-256 des octets du document : ne pas confondre les deux. Création immuable dans la transaction d’acceptation/réservation, y compris avenant avant expédition. Le média peut être produit après commit à partir du snapshot exact. `confirmation_mode=1 PHONE` (`CustomerConfirmationModeEnum`, CHECK pour le MVP), confirmed_by_id obligatoire, customer_confirmed_at=date de l’accord déclaré et created_at=date de saisie. Le commerçant appelle puis clique « Confirmer la commande » ; aucun retour du client sur le site n’est exigé. Note/référence facultative minimisée : la déclaration du commerçant ne constitue pas à elle seule une preuve indépendante de l’appel. UNIQUE(operation_key) et UNIQUE(order_id,revision_id) dédupliquent le double clic. L’acceptation des conditions reste un événement distinct (T21). La preuve minimale de l’information relative aux données de commande est portée directement par `orders` (T8), sans table `accords_collecte_donnees`. Les trois projections de première transmission sont remplies depuis une transmission réussie et jamais depuis la seule création du contrat.
-- `document_deliveries` : exactement UNE des trois FK est non NULL (CHECK explicite avec IS NOT NULL). Pour livraison, l’objet est la copie de l’accusé, jamais son étiquette. `channel=1 EMAIL | 2 SMS_LINK | 3 WHATSAPP_LINK | 4 DOCUMENTED_HANDOFF` ; `status=1 PENDING | 2 RUNNING | 3 SENT | 4 DELIVERED | 5 RETRYABLE_FAILURE | 6 PERMANENT_FAILURE | 7 UNCERTAIN | 8 CANCELLED` (`DocumentDeliveryStatusEnum`). Référence fournisseur et preuve adaptées au canal. Une acceptation par le fournisseur établit au mieux « envoyé », pas « lu par le client ». Aucun numéro/e-mail inventé pour remplir la preuve. Si un canal nécessite une adresse absente, obtenir un canal utilisable ou maintenir l’anomalie à résoudre, sans prétendre la transmission faite.
-- C’est une outbox locale durable : ligne créée dans la transaction qui produit le document, envoi après commit, retries et déduplication par operation_key. Un timeout ambigu est incertain et rapproché selon les capacités du fournisseur. Les tentatives techniques détaillées utilisent le mécanisme de jobs retenu sans effacer la trace d’échec de cette action. Accès aux documents via liens signés limités, jamais téléphone/UUID seuls. Le destinataire est chiffré et soumis à la politique de rétention.
+**`billing_rules` — Une seule table locale contient les compteurs de numéros et les règles de facturation. Une ligne type 1 réserve les numéros de facture/avoir ; une ligne type 2 décrit quand et comment la boutique produit ses documents.**
 
-### T20 — Séquences de documents
-
-**`document_sequences` — Les compteurs locaux des numéros de factures et d’avoirs. Exemple : deux émissions simultanées reçoivent des numéros distincts ; un retry garde le numéro déjà réservé.**
+La table conserve son nom billing_rules pour préserver le contrat documentaire existant avec le schéma central. Le registre processing_activity_register reste séparé dans T26. Les modèles logiques DocumentSequence et BillingRule utilisent respectivement record_type=1 et record_type=2 ; ils ne résolvent jamais l’autre type.
 
 ```mermaid
 erDiagram
     direction TB
-    document_sequences {
+    billing_rules {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        varchar(32) shop_prefix "copie central.tenants.document_prefix"
-        tinyint_unsigned document_type "DocumentTypeEnum"
-        int fiscal_year
-        bigint next_number
+        bigint_unsigned validated_by_id FK "nullable hors RULE ou avant validation ; users.id ; acteur local"
+        tinyint_unsigned record_type "TenantBillingRecordTypeEnum ; 1 SEQUENCE / 2 RULE ; immuable"
+        tinyint_unsigned document_type "nullable hors SEQUENCE ; DocumentTypeEnum 1/2"
+        int fiscal_year "nullable hors SEQUENCE"
+        varchar(32) shop_prefix "nullable hors SEQUENCE ; copie du préfixe central au provisionnement"
+        bigint next_number "nullable hors SEQUENCE ; strictement positif"
+        tinyint_unsigned sequence_slot "generated STORED ; 1 si record_type=1, sinon NULL"
+        varchar(100) code "nullable hors RULE"
+        int version "nullable hors RULE ; version positive"
+        bigint_unsigned seller_profile_version "nullable hors RULE ou avant validation"
+        varchar trigger_event "nullable hors RULE"
+        varchar exchange_rule "nullable hors RULE"
+        varchar numbering_scope "nullable hors RULE ; shop"
+        json parameters "nullable hors RULE"
+        tinyint_unsigned policy_status "nullable hors RULE ; PolicyStatusEnum"
+        text validation_reference "nullable hors RULE ou avant validation"
+        datetime validated_at "nullable hors RULE ou avant validation"
+        datetime effective_at "nullable hors RULE ou avant activation"
+        datetime ends_at "nullable hors RULE ; fin de validité"
         datetime created_at
         datetime updated_at
     }
+    users |o--o{ billing_rules : validated_by_id
 ```
 
 #### Explication très simple des champs
 
-**`document_sequences` :**
+- **`id`** : Le numéro interne de ce réglage.
+- **`uuid`** : Son identifiant public, utilisé dans les écrans et les liens autorisés.
+- **`validated_by_id`** : Le compte local habilité qui a validé une règle ; vide sur un compteur ou avant validation.
+- **`record_type`** : 1 SEQUENCE : un compteur de numéros ; 2 RULE : une version de règle de facturation.
+- **`document_type`** : Le type du compteur : facture ou avoir ; une règle n’utilise pas ce champ.
+- **`fiscal_year`** : L’exercice du compteur, par exemple 2026.
+- **`shop_prefix`** : Le préfixe documentaire stable attribué à la boutique, qui compose ses numéros.
+- **`next_number`** : Le prochain numéro disponible ; il progresse sous verrou à chaque réservation.
+- **`sequence_slot`** : Une colonne calculée qui permet de réserver un seul compteur par type et exercice.
+- **`code`** : Le code stable de la règle, par exemple sales.invoice.
+- **`version`** : Le numéro de version de cette règle ; changer son contenu crée une nouvelle version.
+- **`seller_profile_version`** : La version du dossier professionnel du propriétaire prise en compte pour valider la règle.
+- **`trigger_event`** : L’événement métier autorisé qui doit provoquer une facture ou un avoir.
+- **`exchange_rule`** : La règle validée à appliquer aux échanges, sans inventer un portefeuille client.
+- **`numbering_scope`** : La portée de numérotation de la règle ; elle reste propre à cette boutique.
+- **`parameters`** : Les paramètres structurés de la règle, interprétés seulement par du code serveur autorisé.
+- **`policy_status`** : L’état de la règle : brouillon, validée, active ou retirée ; pas l’état d’une facture.
+- **`validation_reference`** : La référence expliquant sur quoi repose la validation de la règle.
+- **`validated_at`** : La date de validation de la règle.
+- **`effective_at`** : La date à laquelle la règle devient applicable.
+- **`ends_at`** : La fin éventuelle de la période d’application de la règle.
+- **`created_at`** : La date de création de cette ligne.
+- **`updated_at`** : La date du dernier changement autorisé de cette ligne.
 
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`shop_prefix`** : la copie du préfixe documentaire de la boutique utilisée pour construire ses numéros. Exemple : `KRM`.
-- **`document_type`** : indique quel document c’est. Exemple : facture, avoir ou autre type prévu.
-- **`fiscal_year`** : l’année ou période de numérotation concernée. Exemple : `2026`.
-- **`next_number`** : le prochain nombre disponible dans cette série. Exemple : si le dernier document était 102, le prochain peut être 103.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
-- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
+**Types et formes :** TenantBillingRecordTypeEnum est un enum local adossé à int : 1 SEQUENCE, 2 RULE. record_type est immuable ; seuls ces deux codes sont admis. Aucun champ de compteur ne se remplit dans une règle et aucun paramètre/état/auteur de validation de règle ne se remplit dans un compteur. Les identifiants et les horodatages communs suivent les conventions du projet. La table possède 23 champs ; elle ne reçoit ni en-têtes, ni lignes de facture, ni paiements, ni transmissions.
 
+**Compteur type 1 :** document_type=1 INVOICE ou 2 CREDIT_NOTE, fiscal_year, shop_prefix et next_number>0 requis ; les champs de RULE, dont validated_by_id, sont NULL. sequence_slot=CASE WHEN record_type=1 THEN 1 ELSE NULL END, GENERATED ALWAYS AS (...) STORED. UNIQUE(document_type,fiscal_year,sequence_slot) garantit un compteur par type/exercice dans cette BDD. Initialiser les compteurs avant usage ; en création concurrente, gérer l’unicité puis relire le même compteur sous verrou. shop_prefix provient du préfixe documentaire déjà attribué au central, copié au provisionnement et jamais réattribué à une autre boutique.
 
+**Allocation :** sous l’ordre de verrous commun, verrouiller l’obligation puis le compteur, retrouver l’opération puis incrémenter next_number une seule fois et réserver le numéro fiscal de la facture/avoir. Type/exercice/préfixe deviennent immuables après première réservation ; next_number ne diminue jamais. Un retry utilise le même document, UUID et numéro, et aucun brouillon abandonné ne libère son numéro. Pas de MAX+1, reset ni allocation documentaire centrale. Format proposé : préfixe-type-exercice-numéro, à valider pour cette boutique. Les bons de commande facultatifs peuvent conserver numéro de commande + version.
 
-UNIQUE(document_type,fiscal_year) dans la BDD tenant ; shop_prefix copie tenants.document_prefix fixé au provisionnement, stable et jamais réattribué à une autre boutique. document_type=1 INVOICE ou 2 CREDIT_NOTE, next_number>0. Initialiser les séquences avant usage ; création concurrente : gérer la collision UNIQUE puis relire sous verrou. Pour émettre, verrouiller la séquence et l’obligation, retrouver operation_key, allouer/incrémenter une seule fois next_number et réserver le numéro sur la facture/avoir local en PREPARING. La préparation du PDF et le passage à ISSUED suivent T17 ; le même UUID, la même clé et le même numéro sont conservés au retry. Aucune suppression/reset du compteur ni réutilisation d’un numéro réservé. Format proposé : préfixe-type-exercice-numéro, avec série propre à chaque boutique à faire valider avant activation ; aucune allocation centrale pour les documents boutique. Le bon de commande peut utiliser le numéro de commande + document_version.
+**Règle type 2 :** code, version>0, trigger_event, exchange_rule, numbering_scope=shop, parameters et policy_status requis ; document_type/fiscal_year/shop_prefix/next_number sont NULL. UNIQUE(code,version) hors NULL. PolicyStatusEnum : 1 DRAFT, 2 VALIDATED, 3 ACTIVE, 4 RETIRED. seller_profile_version, validated_by_id, validated_at et validation_reference sont requis à la validation ; effective_at est requis à l’activation et ends_at NULL ou >effective_at. La version vendeur correspond au profil professionnel vérifié du propriétaire ; ce numéro est un repère documentaire, pas une FK SQL entre BDD.
 
-### T21 — Conditions de vente et opérations sur les données personnelles
+**Versions et application :** sous verrou de shop.singleton, revalider le profil vendeur, les permissions locales et les versions courantes ; refuser le chevauchement des périodes actives du même code. Une règle validée/utilisée garde ses paramètres, sa référence et son auteur ; nouveau contenu = nouvelle version. Une fermeture/retraite future est auditée sans modifier les snapshots des anciennes obligations. Une règle non validée bloque l’émission concernée ; les valeurs a_valider restent limitées au brouillon. Aucun nom, téléphone, e-mail ou identifiant fiscal courant n’est recopié ici. Les événements/paramètres désignent uniquement des implémentations serveur autorisées, sans exécution de script administrable.
 
-**`sales_terms_acceptances` — Les acceptations des conditions de vente réellement recueillies pour une version précise de commande. Exemple : conserver la date et la version des conditions acceptées au checkout, séparément de la confirmation téléphonique.**
+**Relations typées :** créer UNIQUE(id,record_type) et UNIQUE(id,document_type,fiscal_year,record_type) une seule fois. invoices.sequence_record_type=1 quand sequence_id est renseigné ; sa FK composite impose un compteur du bon type/exercice. billing_obligations.billing_rule_record_type=2 quand billing_rule_id est renseigné ; sa FK composite impose une RULE, jamais un compteur. Garder aussi les FK simples locales. Les générées sont STORED, non saisissables ; les triggers lisent les colonnes de base et respectent les restrictions MySQL déjà documentées.
 
-**`personal_data_operations` — Le carnet des opérations sur les données personnelles dans cette boutique. Exemple : noter l’envoi des coordonnées nécessaires au transporteur ou un export, sans recopier toutes les données dans le journal.**
+**Modèles et index :** DocumentSequence/document_sequence et BillingRule/billing_rule partagent billing_rules avec scopes et créations strictement typés, UUID publics et Policies locales. Comptage des règles, sélection des versions et activation filtrent record_type=2 ; réservation de numéro filtre record_type=1. Index supplémentaire utile : (record_type,code,policy_status,effective_at). Les UNIQUE apportent déjà les index d’identité et de séries ; ne pas les dupliquer.
+
+### T21 — Acceptations réelles des conditions de vente
+
+**`sales_terms_acceptances` — Garder quelles conditions ont réellement été acceptées, à quelle date et pour quelle version de commande. Ce n'est ni un PDF d'accord téléphonique ni un envoi au client.**
 
 ```mermaid
 erDiagram
@@ -4219,22 +4170,6 @@ erDiagram
         datetime accepted_at
         tinyint_unsigned acceptance_mode "TermsAcceptanceModeEnum"
         json sanitized_proof "nullable"
-        varchar operation_key UK
-        datetime created_at
-    }
-    personal_data_operations {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        bigint_unsigned actor_id FK "nullable ; users.id"
-        varchar operation_type
-        varchar resource_type
-        bigint_unsigned resource_id "nullable pour lot"
-        json data_categories
-        text reason
-        varchar recipient "nullable"
-        datetime performed_at
-        json context "nullable ; minimise"
-        uuid correlation_id
         varchar operation_key UK
         datetime created_at
     }
@@ -4256,32 +4191,7 @@ erDiagram
 - **`operation_key`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
 - **`created_at`** : la date où cette ligne a été créée dans la base.
 
-**`personal_data_operations` :**
-
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`actor_id`** : l’identifiant de la personne qui a fait l’action. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`operation_type`** : indique quelle action a été faite sur les données ou le système. Exemple : export, suppression ou anonymisation.
-- **`resource_type`** : le type d’élément concerné. Exemple : client, commande ou fichier.
-- **`resource_id`** : l’identifiant de l’élément précis concerné. Il peut rester vide si l’opération porte sur un lot entier.
-- **`data_categories`** : les types d’informations concernés. Exemple : nom, téléphone ou adresse, sans recopier toutes les valeurs ici.
-- **`reason`** : explique pourquoi l’action ou la décision a été faite.
-- **`recipient`** : indique à qui l’information ou le document a été envoyé lorsque cela doit être tracé. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`performed_at`** : la date où l’opération a réellement été faite.
-- **`context`** : quelques informations utiles pour comprendre l’opération, sans recopier inutilement des données sensibles. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`correlation_id`** : un numéro commun utilisé pour relier plusieurs traces qui appartiennent à la même grande opération. Exemple : une création de boutique qui produit plusieurs actions techniques.
-- **`operation_key`** : une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
-
-
-
-- **Conditions de vente :** événement immuable distinct du contrat téléphonique et de l’information relative aux données de commande. FK(revision_id,order_id) → order_revisions(id,order_id). `acceptance_mode=1 CHECKOUT` (`TermsAcceptanceModeEnum`) au MVP ; version et empreinte doivent correspondre aux conditions de la révision ; serveur vérifie le hash du snapshot canonique. Une nouvelle révision n’hérite pas automatiquement d’une nouvelle acceptation de conditions. Si une nouvelle acceptation est requise, la recueillir explicitement et la tracer ; ne pas transformer l’appel en acceptation implicite. Dédupliquer avec operation_key. Cette table peut être vide si aucun événement n’a été réellement recueilli ; ne pas fabriquer des dates pour satisfaire un champ.
-
-- **Information données au checkout — AUD-10 :** la table `accords_collecte_donnees` est supprimée ainsi que `orders.accord_collecte_id`. Le client ne reçoit pas une option facultative « accepter/refuser » tout en pouvant quand même commander. Avant la validation, le checkout affiche clairement l’information versionnée expliquant l’utilisation des nom, téléphone, adresse et autres données nécessaires au traitement de la commande. L’action « Passer commande » valide le parcours ; la commande conserve directement `data_policy_version`, `data_notice_acknowledged_at` et, lorsque utilisé, `notice_text_hash`. Une saisie assistée/manuelle doit conserver la même preuve d’information réellement fournie au client, sans fabriquer une acceptation. Les consentements réellement facultatifs, comme la prospection ou une newsletter future, doivent être modélisés séparément s’ils sont activés et ne sont jamais déduits du passage de commande.
-
-- **Journal tenant :** format minimisé décrit en §7.7 et registre local T26 ; tenant implicite par connexion, ajouté dans l’enveloppe si export vers stockage d’audit externe. Catégories et motifs contrôlés par allowlist ; acteur NULL seulement pour système/visiteur non authentifié, identifié par origine dans contexte. Accès à une fiche de destinataire de commande, export, transmission API et rétention produisent les événements métier exigés, avec ressources/dates/acteurs et destinataire si pertinent. Le modèle n’ajoute pas un compte acheteur obligatoire ni une table clients uniquement pour journaliser ces actions.
-
-- **Implémentation :** les modifications et leur audit local sont atomiques ; pour consultation/export, tracer avant remise des données selon la politique de disponibilité définie. Pour appel distant, tracer intention puis résultat corrélés ; ne pas prétendre que la transmission a réussi si son résultat est incertain. Les politiques fixent explicitement durée, accès, protection anti-altération et éventuel stockage externe immuable. L’empreinte n’est pas une anonymisation. Les traces d’analytics ne constituent pas la preuve de l’information fournie au checkout.
+UNIQUE(operation_key) ; FK(revision_id,order_id) vers order_revisions(id,order_id). acceptance_mode utilise TermsAcceptanceModeEnum : 1 CHECKOUT ou 2 PHONE. sales_terms_version et terms_hash identifient le texte effectivement présenté ; accepted_at est l'instant de l'acceptation réelle. sanitized_proof ne contient que des métadonnées minimisées et vérifiables ; aucun appel enregistré ou PDF n'est exigé. Ne pas fabriquer une acceptation des conditions à partir du seul clic du commerçant. L'information relative aux coordonnées du checkout reste directement dans orders ; les opérations sensibles sur les données utilisent activity_log de catégorie privacy (T15). Aucune table personnelle parallèle ni transmission documentaire au client.
 
 ### T22 — Émission obligatoire et compensation d’échange
 
@@ -4297,16 +4207,17 @@ erDiagram
     billing_obligations {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
+        bigint_unsigned event_id "PK locale ; type validé"
         bigint_unsigned order_id FK "orders.id"
         bigint_unsigned revision_id FK "order_revisions.id"
-        bigint_unsigned billing_rule_id FK "billing_rules.id"
-        json rule_snapshot
-        varchar event_type
-        bigint_unsigned event_id "PK locale ; type validé"
-        datetime triggered_at
-        tinyint_unsigned document_type "DocumentTypeEnum"
+        bigint_unsigned billing_rule_id FK "billing_rules.id ; regle type 2"
         bigint_unsigned original_invoice_id FK "nullable ; invoices.id"
         bigint_unsigned invoice_id FK "nullable ; invoices.id"
+        tinyint_unsigned billing_rule_record_type "generated STORED ; 2 si billing_rule_id non NULL"
+        json rule_snapshot
+        varchar event_type
+        datetime triggered_at
+        tinyint_unsigned document_type "DocumentTypeEnum"
         tinyint_unsigned status "BillingObligationStatusEnum"
         varchar operation_key UK
         int attempts_count
@@ -4323,10 +4234,10 @@ erDiagram
         bigint_unsigned original_credit_note_id FK "invoices.id ; type avoir"
         bigint_unsigned destination_order_id FK "orders.id"
         bigint_unsigned destination_revision_id FK "order_revisions.id"
+        bigint_unsigned reversal_of_id FK "nullable ; exchange_offsets.id"
         decimal amount
         tinyint_unsigned status "ExchangeOffsetStatusEnum"
         varchar operation_key UK
-        bigint_unsigned reversal_of_id FK "nullable ; exchange_offsets.id"
         datetime performed_at "nullable"
         datetime created_at
     }
@@ -4340,7 +4251,8 @@ erDiagram
 - **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
 - **`order_id`** : l’identifiant de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
 - **`revision_id`** : l’identifiant de la version de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`billing_rule_id`** : la version de règle résolue dans la BDD de ce document ; saas_billing_settings de type 2 RULE pour le SaaS, billing_rules pour une obligation de boutique.
+- **`billing_rule_id`** : La version de règle locale dans billing_rules, obligatoirement de type 2 RULE ; elle est figée pour cette occurrence.
+- **`billing_rule_record_type`** : Colonne SQL calculée qui interdit de prendre un compteur pour une règle.
 - **`rule_snapshot`** : une **copie figée** de regle au moment important de l’opération. Si l’information d’origine change plus tard, cette ancienne ligne garde la valeur utilisée à ce moment-là.
 - **`event_type`** : le type d’événement qui a créé l’obligation de facturer. Exemple : vente finalisée, avoir à produire ou autre événement prévu.
 - **`event_id`** : l’identifiant de l’événement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
@@ -4374,10 +4286,12 @@ erDiagram
 
 
 
-- **Obligation — AUD-03 :** FK(revision_id,order_id) → order_revisions(id,order_id). `document_type=1 INVOICE | 2 CREDIT_NOTE`; origine NULL pour facture, obligatoire pour avoir. Le document satisfaisant l’obligation doit correspondre **simultanément** à la bonne commande, la bonne révision et le bon type : FK composite `(invoice_id,order_id,revision_id,document_type)` → `invoices(id,order_id,revision_id,document_type)`. Pour un avoir, renforcer aussi l’égalité de l’origine par FK composite `(invoice_id,order_id,revision_id,document_type,original_invoice_id)` → `invoices(id,order_id,revision_id,document_type,original_invoice_id)` ; la FK simple sur `original_invoice_id` garde la validation de l’origine elle-même. UNIQUE(invoice_id) hors NULL. `status=1 PENDING | 2 READY | 3 ISSUED | 4 FAILED | 5 CANCELLED` (`BillingObligationStatusEnum`). **`billing_obligations.status=3 (ISSUED)` est interdit si `invoice_id` est NULL ou si le document lié n’a pas lui-même `invoices.status=2`.** Le service et un trigger de transition vérifient ce statut, l’origine et l’impossibilité de remplacer le document après satisfaction. Clé métier stable issue de l’occurrence du fait générateur et du type de pièce ; la règle ne se change pas au retry pour créer une deuxième facture. L’événement métier et cette intention sont commités ensemble ; si fait constaté externe, son import crée l’intention dans la même transaction. Un rapprochement périodique cherche les faits générateurs sans obligation et les obligations sans document. Émission idempotente de factures avec `operation_key` dérivée, puis transmission T19. Révision confirmée exigée ; un avoir reste lié à la facture originale même après fermeture de commande. Une clé d’idempotence évite les doublons mais ne remplace jamais ces contraintes de correspondance documentaire.
+- **Obligation — AUD-03 :** FK(revision_id,order_id) → order_revisions(id,order_id). `document_type=1 INVOICE | 2 CREDIT_NOTE`; origine NULL pour facture, obligatoire pour avoir. Le document satisfaisant l’obligation doit correspondre **simultanément** à la bonne commande, la bonne révision et le bon type : FK composite `(invoice_id,order_id,revision_id,document_type)` → `invoices(id,order_id,revision_id,document_type)`. Pour un avoir, renforcer aussi l’égalité de l’origine par FK composite `(invoice_id,order_id,revision_id,document_type,original_invoice_id)` → `invoices(id,order_id,revision_id,document_type,original_invoice_id)` ; la FK simple sur `original_invoice_id` garde la validation de l’origine elle-même. UNIQUE(invoice_id) hors NULL. `status=1 PENDING | 2 READY | 3 ISSUED | 4 FAILED | 5 CANCELLED` (`BillingObligationStatusEnum`). **`billing_obligations.status=3 (ISSUED)` est interdit si `invoice_id` est NULL ou si le document lié n’a pas lui-même `invoices.status=2`.** Le service et un trigger de transition vérifient ce statut, l’origine et l’impossibilité de remplacer le document après satisfaction. Clé métier stable issue de l’occurrence du fait générateur et du type de pièce ; la règle ne se change pas au retry pour créer une deuxième facture. L’événement métier et cette intention sont commités ensemble ; si fait constaté externe, son import crée l’intention dans la même transaction. Un rapprochement périodique cherche les faits générateurs sans obligation et les obligations sans document. Émission idempotente de factures avec `operation_key` dérivée, puis mise à disposition du PDF privé interne, sans envoi au client. Révision validée par un clic audité exigée ; un avoir reste lié à la facture originale même après un retour ou une correction économique. Une clé d’idempotence évite les doublons mais ne remplace jamais ces contraintes de correspondance documentaire.
+
+**Règle locale typée et intention séparée :** billing_rule_record_type=CASE WHEN billing_rule_id IS NOT NULL THEN 2 ELSE NULL END, GENERATED ALWAYS AS (...) STORED ; billing_rule_id est requis et FK(billing_rule_id,billing_rule_record_type) vers billing_rules(id,record_type). Une obligation ne prend jamais un compteur comme règle. invoices reste le document fiscal ; billing_obligations reste l’intention/reprise d’émission, sans répéter identité, PDF ou montants de facture. UNIQUE(invoice_id) hors NULL garantit au plus une obligation par document et ses FK de commande/révision/type/origine imposent la correspondance exacte. Avant ISSUED, une intention peut encore être sans document ; une facture issue d’un fait générateur prévu possède son obligation cohérente. Les clés métier rendent la création/reprise idempotente, puis la satisfaction lie le document une fois. PENDING/READY/FAILED concernent l’intention, pas un statut de vente ; CANCELLED n’abandonne qu’une intention/brouillon fiscal sans effet et ne crée aucun bouton d’annulation/clôture de commande.
 - **Compensation dédiée :** sert uniquement à affecter un avoir émis d’une ancienne vente à UNE commande d’échange identifiée ; aucun solde client librement dépensable. FK(incident_id,original_order_id) → order_incidents(id,order_id) ; FK(original_credit_note_id,original_order_id) → invoices(id,order_id) ; FK(destination_revision_id,destination_order_id) → order_revisions(id,order_id). Le service vérifie document_type=2 (CREDIT_NOTE), invoices.status=2 (ISSUED), origine de l’incident et order_type=3 (EXCHANGE). Origine et destination distinctes. Montant>0, sauf inverse exact ; UNIQUE(reversal_of_id). `status=1 DRAFT | 2 RESERVED | 3 APPLIED | 4 CANCELLED | 5 REVERSED` (`ExchangeOffsetStatusEnum`). `CANCELLED` s’emploie avant effet ; après application, toute annulation passe par `REVERSED`. Une affectation réservée consomme déjà le disponible de l’avoir ; une inverse ne libère ce disponible qu’une fois effectuée. Après effet, pas de modification/suppression, uniquement contrepassation traçable. Annulation avant effet uniquement avant figement distant de la destination.
 - **Plafonds coordonnés :** verrouiller les commandes par UUID, incident puis facture/avoir et parents financiers dans l’ordre commun. Pour chaque avoir, somme des compensations réservées/effectuées nettes + remboursements liés engagés/effectifs <= TTC de l’avoir. Un avoir sur une vente impayée ne crée aucun crédit de compensation : au niveau de la commande d’origine, somme de toutes les compensations engagées/effectives et remboursements engagés/effectifs <= encaissement initial vérifié, net des seules contrepassations effectives. Plafonner la compensation produits à la valeur de produits effectivement payée et créditée, en excluant les frais non éligibles. Réserver ce budget avant tout envoi externe de la destination et interdire une correction d’encaissement qui rendrait les affectations excessives sans correction coordonnée. Les régularisations lient credit_note_id lorsque le remboursement corrige une facture émise ; elles gardent aussi leurs plafonds d’encaissement réel. Les compensations ne créent ni cash ni revenu : l’avoir corrige la vente initiale, la nouvelle facture représente la nouvelle vente, la compensation en acquitte une part. Si plusieurs avoirs couvrent les mêmes unités, plafonner aussi contre la facture originale et les remèdes de l’incident.
-- **Révision destination :** exchange_offset_amount est un snapshot non négatif, égal à la somme affectée à cette révision lors de sa confirmation ; CHECK <= applied_subtotal : la compensation couvre les produits, les nouveaux frais de livraison restent payables séparément dans le COD. amount_to_collect=order_total-exchange_offset_amount. Valeur nulle pour standard/remplacement gratuit. Une évolution avant envoi crée une nouvelle révision et réaffecte atomiquement les réserves ; une livraison déjà figée ne change pas son COD. Le solde effectif de compensation est validé avec le fait de nouvelle vente défini par la règle comptable, et ne dépend pas du reversement transporteur. Une compensation annulée après un effet externe ne doit pas rendre le COD distant contradictoire : geler puis rapprocher et corriger via nouvelles pièces.
+- **Révision destination :** exchange_offset_amount est un snapshot non négatif, égal à la somme affectée à cette révision lors de sa validation métier ; CHECK <= applied_subtotal : la compensation couvre les produits, les nouveaux frais de livraison restent payables séparément dans le COD. amount_to_collect=order_total-exchange_offset_amount. Valeur nulle pour standard/remplacement gratuit. Une évolution avant envoi crée une nouvelle révision et réaffecte atomiquement les réserves ; une livraison déjà figée ne change pas son COD. Le solde effectif de compensation est validé avec le fait de nouvelle vente défini par la règle comptable, et ne dépend pas du reversement transporteur. Une compensation annulée après un effet externe ne doit pas rendre le COD distant contradictoire : geler puis rapprocher et corriger via nouvelles pièces.
 - **Budget de quantité :** échange et remplacement consomment le même Qr du dossier incident. La restitution de la seule différence de prix d’un échange consomme un budget monétaire distinct, avec amount_kind=4 (EXCHANGE_DIFFERENCE), compensated_quantity=0 et exchange_order_id obligatoire. Elle ne rembourse pas une deuxième fois les unités déjà remplacées ; montant plafonné par avoir non affecté, différence positive réelle et encaissement initial. Un remboursement ordinaire de produits conserve sa quantité compensée et reste exclusif d’un remplacement sur ces mêmes unités. Coordonner ces plafonds dans UNE transaction locale.
 
 **Cas documentaires à prendre en charge**
@@ -4396,8 +4310,7 @@ erDiagram
 | Colis perdu/cassé chez transporteur | Incident/perte et indemnisation transporteur séparés de remboursement client, remplacement et documents de vente |
 | COD encaissé, reversement en attente | Facture émise selon sa règle ; paiement client chez transporteur et créance commerçant séparés ; aucune attente du reversement pour effacer l’obligation de facturation |
 
-**Arbitrage explicite avec les notes — AUD-07/AUD-08 :** leur exemple d’échange mentionne une nouvelle révision et une nouvelle livraison. Après expédition, la révision originale reste immuable et UNIQUE(shipments.order_id) est conservé : la nouvelle révision appartient à la nouvelle commande liée à l’originale. Une modification de taille AVANT expédition peut rester une nouvelle révision de la même commande, avec nouvel accord téléphonique. **Le retour physique partiel demeure interdit : si un retour physique est ouvert, toutes les lignes de la révision expédiée sont attendues.** Pour un remplacement gratuit, la valeur produits de la nouvelle révision reste 0 et aucune facture complète valorisée ne peut lui être rattachée. Si la règle fiscale validée exige une nouvelle facture valorisée, utiliser le mécanisme d’échange valorisé avec compensation ; ne jamais créer une facture de 8 000 sur une révision à 0.
-
+**Arbitrage explicite avec les notes — AUD-07/AUD-08 :** leur exemple d’échange mentionne une nouvelle révision et une nouvelle livraison. Après expédition, la révision originale reste immuable et UNIQUE(shipments.order_id) est conservé : la nouvelle révision appartient à la nouvelle commande liée à l’originale. Une modification de taille AVANT expédition peut rester une nouvelle révision de la même commande, avec nouvelle validation explicite de cette révision par clic audité. **Le retour physique partiel demeure interdit : si un retour physique est ouvert, toutes les lignes de la révision expédiée sont attendues.** Pour un remplacement gratuit, la valeur produits de la nouvelle révision reste 0 et aucune facture complète valorisée ne peut lui être rattachée. Si la règle fiscale validée exige une nouvelle facture valorisée, utiliser le mécanisme d’échange valorisé avec compensation ; ne jamais créer une facture de 8 000 sur une révision à 0.
 
 ### T23 — Reconnaissance économique et corrections commerciales
 
@@ -4416,6 +4329,8 @@ erDiagram
         bigint_unsigned order_id FK "orders.id"
         bigint_unsigned source_revision_id FK "order_revisions.id"
         bigint_unsigned incident_id FK "nullable ; order_incidents.id"
+        bigint_unsigned correction_of_id FK "nullable ; commercial_corrections.id"
+        bigint_unsigned actor_id FK "nullable ; users.id"
         tinyint_unsigned correction_type "CommercialCorrectionTypeEnum"
         tinyint_unsigned status "CommercialCorrectionStatusEnum"
         decimal non_product_revenue_delta "signe DEFAULT 0"
@@ -4424,8 +4339,6 @@ erDiagram
         datetime recorded_at
         text reason
         varchar operation_key UK
-        bigint_unsigned correction_of_id FK "nullable ; commercial_corrections.id"
-        bigint_unsigned actor_id FK "nullable ; users.id"
         datetime created_at
     }
     commercial_correction_lines {
@@ -4481,15 +4394,17 @@ erDiagram
 
 
 
-- **`commercial_corrections` — AUD-06/AUD-12 :** UNIQUE(operation_key), UNIQUE(correction_of_id) hors NULL, UNIQUE(id,source_revision_id), UNIQUE(id,order_id,source_revision_id). FK(source_revision_id,order_id) → order_revisions(id,order_id) ; si incident renseigné, FK(incident_id,order_id) → order_incidents(id,order_id). FK composite `(correction_of_id,order_id,source_revision_id)` → `commercial_corrections(id,order_id,source_revision_id)` et trigger/validation interdisant correction_of_id=id : une correction de correction reste sur la même commande et la même révision source. `correction_type=1 RETURN | 2 PRICE_REDUCTION | 3 CANCELLATION | 4 EXCHANGE | 5 GOODWILL | 6 REVERSAL | 7 OTHER` (`CommercialCorrectionTypeEnum`). `status=1 DRAFT | 2 FINALIZED | 3 CANCELLED | 4 REVERSED` (`CommercialCorrectionStatusEnum`). `non_product_kind=1 NONE | 2 SHIPPING | 3 GLOBAL_GOODWILL | 4 OTHER` (`NonProductKindEnum`) et `non_product_revenue_delta` est signé. CHECK : nature=`aucune` ⇒ delta=0 ; nature différente de `aucune` ⇒ delta<>0. Une correction peut comporter uniquement des lignes produit, uniquement un impact hors produit, ou les deux ; à la finalisation, au moins un impact non nul doit exister. Exemple : remboursement commercial des seuls 650 DZD de livraison → `non_product_kind=livraison`, `non_product_revenue_delta=-650`, aucune ligne produit. `effective_at` est la période économique utilisée par les indicateurs ; `recorded_at` est l’instant où la décision est réellement enregistrée. Au MVP, une décision finalisée prend effet à sa date commerciale explicite ; elle ne réécrit pas silencieusement une période déjà publiée. Une ligne finalisée est immuable ; une erreur se corrige par un nouvel événement lié via `correction_of_id`, jamais par UPDATE destructif. L’ouverture d’un incident ou la réception d’un retour ne crée pas automatiquement cette correction.
-- **`commercial_correction_lines` :** UNIQUE(correction_id,order_item_id). FK(correction_id,source_revision_id) → commercial_corrections(id,source_revision_id) et FK(order_item_id,source_revision_id) → order_items(id,revision_id), avec clés parents UNIQUE ; la ligne concernée appartient donc obligatoirement à la révision source. `affected_quantity>0`. Sous verrou de la commande/révision puis des lignes concernées, la **quantité corrigée nette cumulée** de chaque `order_item_id` (corrections finalisées moins leurs contrepassations exactes) + la nouvelle quantité ne peut jamais dépasser la quantité admissible de la ligne. Une seconde correction quantité=1 sur une ligne vendue quantité=1 est donc refusée, sauf si elle constitue l’inverse documenté d’une correction précédente. Une contrepassation doit reprendre les mêmes lignes/quantités et inverser exactement les deltas correspondants ; elle ne crée pas un nouveau budget de correction tant qu’elle n’est pas finalisée. `reference_sale_amount>=0`. `revenue_delta` et `sold_cost_delta` sont signés et expliquent exactement l’impact de gestion ; exemple d’annulation de 8 000 : `revenue_delta=-8000`. L’impact revenu total de l’événement = Σ `commercial_correction_lines.revenue_delta` + `commercial_corrections.non_product_revenue_delta`. Les quantités/statistiques produit utilisent uniquement les lignes produit ; une correction de livraison ne doit jamais être attribuée artificiellement à un article. Les montants fiscaux restent dans factures/avoirs et le mouvement de trésorerie dans `customer_adjustments`/journaux financiers : cette table ne simule ni document fiscal ni paiement.
+- **`commercial_corrections` — AUD-06/AUD-12 :** UNIQUE(operation_key), UNIQUE(correction_of_id) hors NULL, UNIQUE(id,source_revision_id), UNIQUE(id,order_id,source_revision_id). FK(source_revision_id,order_id) → order_revisions(id,order_id) ; si incident renseigné, FK(incident_id,order_id) → order_incidents(id,order_id). FK composite `(correction_of_id,order_id,source_revision_id)` → `commercial_corrections(id,order_id,source_revision_id)` et trigger/validation interdisant correction_of_id=id : une correction de correction reste sur la même commande et la même révision source. `correction_type=1 RETURN | 2 PRICE_REDUCTION | 4 EXCHANGE | 5 GOODWILL | 6 REVERSAL | 7 OTHER` (`CommercialCorrectionTypeEnum`). L’ancien code 3 CANCELLATION est retiré et jamais réattribué ; aucune correction économique ne crée une fonction d’annulation/clôture manuelle de commande. `status=1 DRAFT | 2 FINALIZED | 3 CANCELLED | 4 REVERSED` (`CommercialCorrectionStatusEnum`). `non_product_kind=1 NONE | 2 SHIPPING | 3 GLOBAL_GOODWILL | 4 OTHER` (`NonProductKindEnum`) et `non_product_revenue_delta` est signé. CHECK : nature=`aucune` ⇒ delta=0 ; nature différente de `aucune` ⇒ delta<>0. Une correction peut comporter uniquement des lignes produit, uniquement un impact hors produit, ou les deux ; à la finalisation, au moins un impact non nul doit exister. Exemple : remboursement commercial des seuls 650 DZD de livraison → `non_product_kind=livraison`, `non_product_revenue_delta=-650`, aucune ligne produit. `effective_at` est la période économique utilisée par les indicateurs ; `recorded_at` est l’instant où la décision est réellement enregistrée. Au MVP, une décision finalisée prend effet à sa date commerciale explicite ; elle ne réécrit pas silencieusement une période déjà publiée. Une ligne finalisée est immuable ; une erreur se corrige par un nouvel événement lié via `correction_of_id`, jamais par UPDATE destructif. L’ouverture d’un incident ou la réception d’un retour ne crée pas automatiquement cette correction.
+- **`commercial_correction_lines` :** UNIQUE(correction_id,order_item_id). FK(correction_id,source_revision_id) → commercial_corrections(id,source_revision_id) et FK(order_item_id,source_revision_id) → order_items(id,revision_id), avec clés parents UNIQUE ; la ligne concernée appartient donc obligatoirement à la révision source. `affected_quantity>0`. Sous verrou de la commande/révision puis des lignes concernées, la **quantité corrigée nette cumulée** de chaque `order_item_id` (corrections finalisées moins leurs contrepassations exactes) + la nouvelle quantité ne peut jamais dépasser la quantité admissible de la ligne. Une seconde correction quantité=1 sur une ligne vendue quantité=1 est donc refusée, sauf si elle constitue l’inverse documenté d’une correction précédente. Une contrepassation doit reprendre les mêmes lignes/quantités et inverser exactement les deltas correspondants ; elle ne crée pas un nouveau budget de correction tant qu’elle n’est pas finalisée. `reference_sale_amount>=0`. `revenue_delta` et `sold_cost_delta` sont signés et expliquent exactement l’impact de gestion ; exemple de correction économique de 8 000 après retour accepté : `revenue_delta=-8000`. La commande est conservée sans annulation commerciale. L’impact revenu total de l’événement = Σ `commercial_correction_lines.revenue_delta` + `commercial_corrections.non_product_revenue_delta`. Les quantités/statistiques produit utilisent uniquement les lignes produit ; une correction de livraison ne doit jamais être attribuée artificiellement à un article. Les montants fiscaux restent dans factures/avoirs et le mouvement de trésorerie dans `customer_adjustments`/journaux financiers : cette table ne simule ni document fiscal ni paiement.
 
 **Convention temporelle :** vente en janvier, colis reçu en février, décision commerciale finalisée en mars, remboursement en avril → vente initiale en janvier, correction commerciale en mars (`effective_at`), cash en avril. Les exports exposent séparément `date_retour_physique`, `date_effet_correction`, `date_emission_document` et `date_remboursement` lorsqu’elles existent.
 
 
-### T24 — Comptes, membres, rôles et invitations indépendants de boutique
+### T24 — Comptes, accès d’équipe, rôles et invitations indépendants de boutique
 
-Chaque boutique possède ses propres users, mots de passe, membres et tables Spatie. Le même e-mail dans deux boutiques crée deux comptes indépendants. Aucun compte central n’est accepté par le provider tenant. L’accès du propriétaire au SaaS et son accès à une boutique utilisent deux identités et deux sessions distinctes.
+Chaque boutique possède ses propres `users`, mots de passe et tables Spatie. Le même e-mail dans deux boutiques crée deux comptes indépendants. Aucun compte central n’est accepté par le provider tenant. L’accès du propriétaire au SaaS et son accès à une boutique utilisent deux identités et deux sessions distinctes.
+
+L’ancienne appartenance locale 1:1 est intégrée dans `users` : cette BDD représente déjà une seule boutique. `status` décrit l’état du compte ; `membership_status` décrit son droit d’entrer dans l’équipe ; `joined_at` indique la première activation de cet accès. Ces deux états restent distincts. Aucun second identifiant de membre ou `tenant_id` n’est ajouté.
 
 ```mermaid
 erDiagram
@@ -4497,6 +4412,7 @@ erDiagram
     users {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
+        uuid central_user_uuid UK "nullable ; propriétaire seulement ; REF central.users.uuid"
         varchar name
         varchar first_name "nullable"
         varchar email UK
@@ -4505,19 +4421,10 @@ erDiagram
         datetime email_verified_at "nullable"
         varchar(10) locale
         tinyint_unsigned status "UserStatusEnum ; DEFAULT 1"
-        uuid central_user_uuid UK "nullable ; propriétaire seulement ; REF central.users.uuid"
+        tinyint_unsigned membership_status "MemberStatusEnum ; NOT NULL"
+        datetime joined_at "nullable avant premiere activation"
         datetime last_login_at "nullable"
         varchar(100) remember_token "nullable"
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
-    }
-    shop_members {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        bigint_unsigned user_id FK,UK "users.id"
-        tinyint_unsigned status "MemberStatusEnum"
-        datetime joined_at "nullable"
         datetime created_at
         datetime updated_at
         datetime deleted_at "nullable"
@@ -4565,13 +4472,13 @@ erDiagram
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned user_id FK "users.id"
         bigint_unsigned permission_id FK "permissions.id"
+        bigint_unsigned assigned_by_id FK "users.id"
         tinyint_unsigned effect "PermissionEffectEnum"
         tinyint_unsigned status "OverrideStatusEnum"
         datetime started_at
         datetime ended_at "nullable"
         tinyint_unsigned active_slot "generated nullable"
         datetime expires_at "nullable"
-        bigint_unsigned assigned_by_id FK "users.id"
         text reason "nullable"
         datetime created_at
         datetime updated_at
@@ -4604,7 +4511,6 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
-    users ||--o| shop_members : user_id
     roles ||--o{ role_has_permissions : role_id
     permissions ||--o{ role_has_permissions : permission_id
     roles ||--o{ model_has_roles : role_id
@@ -4615,19 +4521,25 @@ erDiagram
     users ||--o{ contact_verifications : user_id
 ```
 
-**users :** id/uuid, profil, email unique local, mot de passe haché, contact, vérification, langue, UserStatusEnum, dernières dates et remember_token. `central_user_uuid` est rempli exclusivement sur le compte local du propriétaire ; il sert à vérifier la concordance avec tenants.user_id via la lecture centrale. Les collaborateurs ont NULL. Le central ne reçoit aucun miroir de ces utilisateurs. Ce champ est immuable et ne peut être fourni/modifié par un formulaire d’équipe.
+**`users`, expliqué simplement :** chaque ligne est le compte d’une personne dans cette boutique. Elle garde son nom, son e-mail unique local, son mot de passe haché, ses contacts, sa langue et ses dates de connexion. `status` utilise `UserStatusEnum` : `1 ACTIVE`, `2 INACTIVE`, `3 SUSPENDED`, `4 DELETED`. `membership_status` utilise `MemberStatusEnum` : `1 ACTIVE`, `2 INVITED`, `3 SUSPENDED`, `4 REVOKED`. Un compte peut donc rester enregistré alors que son accès à l’équipe est retiré. `joined_at` est la date de première activation de cet accès et ne se réécrit pas à une réactivation. Une appartenance active exige `joined_at` non NULL ; elle n’est jamais obtenue par une valeur libre envoyée dans un formulaire.
 
-**shop_members :** appartenance locale univoque (UNIQUE(user_id)) et cycle `MemberStatusEnum` : `1 ACTIVE`, `2 INVITED`, `3 SUSPENDED`, `4 REVOKED`. Aucun tenant_id : toute la BDD correspond déjà à une boutique. Les pivots Spatie visent users via `model_type=shop_user` et model_id numérique ; shop_members sert de contrôle d’accès, pas de second chemin d’attribution. Un compte suspendu ou sans appartenance active est bloqué avant toute permission, même s’il conserve un rôle.
+**Accès d’équipe :** avant toute permission ou exception locale, exiger `users.status=1`, `users.membership_status=1`, `users.deleted_at IS NULL` et un tenant accessible. Un compte suspendu ou révoqué ne retrouve pas l’accès parce qu’il conserve un rôle. La révocation de l’accès et la suspension du compte sont motivées, auditées et appliquées aux sessions/tokens concernés. Une réactivation réévalue le rôle, les exceptions et le quota ; elle ne réattribue pas des privilèges devenus interdits. Les parcours limités d’acceptation d’invitation, de vérification et de récupération restent protégés par leur jeton/identité propre ; ils n’autorisent aucune consultation métier avant l’activation de l’accès.
 
-**roles/permissions et pivots :** structure et méthodes identiques à C2, avec guard_name=tenant, modèle local et cache de cette boutique. Le rôle système shop-owner porte is_super_admin=true et is_protected=true, uniquement pour le propriétaire provisionné. Un rôle de gestionnaire personnalisé ne confère aucune propriété. Les permissions du catalogue local (`product.create`, `order.confirm`, `team.invite`, `role.create`...) ne comprennent jamais les capacités saas.*. Les services/migrations refusent un guard incompatible ; aucun rôle central n’est réutilisé dans une boutique.
+**Propriétaire local :** `central_user_uuid` est rempli exclusivement sur son compte ; il sert à vérifier la concordance avec `tenants.user_id` par lecture centrale. Les collaborateurs ont NULL. Ce lien est immuable, non modifiable par les formulaires d’équipe, et ne constitue pas une connexion centrale. Le central ne reçoit aucun miroir des employés. Le rôle `shop-owner` reste réservé à ce propriétaire et protégé contre attribution, retrait ou remplacement par la gestion ordinaire d’équipe. Cette gestion ne peut supprimer/révoquer l’accès du propriétaire pour contourner cette protection. Aucune rotation de rôle ne change la propriété centrale immuable.
 
-**permission_overrides :** même structure temporelle que C3, toutes les FK étant locales ; aucune portée tenant_id à normaliser. UNIQUE(user_id,permission_id,active_slot). Les DENY actifs priment pour tous les comptes locaux. Les contrôles supplémentaires passent par Laravel Gates/Policies ; `hasPermissionTo` seul n’applique ni interdictions ni quotas.
+**`roles`, `permissions` et pivots :** structure et méthodes identiques à C2, avec `guard_name=tenant`, modèle local et cache de cette boutique. Le rôle système `shop-owner` porte `is_super_admin=true` et `is_protected=true`, uniquement pour le propriétaire provisionné. Un rôle de gestionnaire personnalisé ne confère aucune propriété. Les permissions locales (`product.create`, `order.confirm`, `team.invite`, `role.create`...) ne comprennent jamais les capacités `saas.*`. Les services/migrations refusent un guard incompatible ; aucun rôle central n’est réutilisé. Les pivots ciblent `users` via `model_type=shop_user` et `model_id` numérique : l’accès d’équipe est contrôlé sur cette même ligne, sans deuxième chemin d’attribution. Les pivots Spatie gardent leurs clés composites natives, sans `id`/`uuid` autonome. Les changements de rôles et de droits sont journalisés explicitement dans la transaction tenant.
 
-**team_invitations :** initial_role_id cible un rôle local attribuable ; invited_by_id est l’invitant local habilité, email est normalisé, token_hash est haché et à usage unique. role_permission_version capture la version du rôle. L’acceptation verrouille l’invitation, revalide expiration/révocation, droit actuel de l’invitant, rôle et quota, crée un compte local vérifié ou rattache un compte existant seulement après authentification locale et concordance de son e-mail vérifié, active son appartenance et attribue le rôle dans une seule transaction tenant. Si les permissions du rôle ont changé, exiger une validation explicite de l’invitation au lieu d’accepter silencieusement de nouveaux droits. Une invitation ne peut jamais attribuer shop-owner. Les invitations ouvertes consomment une place d’équipe réservée, afin d’éviter un dépassement lors d’acceptations simultanées.
+**`permission_overrides` :** même structure temporelle que C3, toutes les FK étant locales ; aucune portée `tenant_id` à normaliser. `UNIQUE(user_id,permission_id,active_slot)`. Les DENY actifs priment pour tous les comptes locaux. Les contrôles supplémentaires passent par Laravel Gates/Policies ; `hasPermissionTo` seul n’applique ni interdictions, ni accès d’équipe, ni quotas. Les droits effectifs restent l’union des droits Spatie et ALLOW temporaires valides après application des DENY prioritaires.
 
-**contact_verifications :** fonctionnement de C1, sur le compte local uniquement. Les sessions, réinitialisations et éventuelles passkeys suivent les migrations du mécanisme installé, sur cette même connexion.
+**`team_invitations`, expliqué simplement :** elles permettent d’inviter un employé avec un rôle initial et un lien secret qui expire. `initial_role_id` cible un rôle local attribuable ; `invited_by_id` est l’invitant local habilité ; l’e-mail est normalisé ; le jeton n’est enregistré que sous forme hachée et sert une seule fois. `role_permission_version` capture la version du rôle. L’acceptation verrouille d’abord la ligne `shop` de quota, puis l’invitation et le compte existant s’il existe, dans un ordre stable partagé avec les autres opérations d’équipe ; elle revalide expiration/révocation, droit actuel de l’invitant, rôle et quota. Elle crée un compte local vérifié ou réutilise un compte existant seulement après authentification locale et concordance de son e-mail vérifié, puis active `membership_status`, renseigne `joined_at` si c’est sa première activation et attribue le rôle dans une seule transaction. Un compte suspendu/supprimé n’est jamais réactivé implicitement par l’acceptation d’un lien. Si le rôle a changé, exiger une validation explicite de l’invitation au lieu d’accepter silencieusement de nouveaux droits. Une invitation ne peut jamais attribuer `shop-owner`.
 
-**Création du propriétaire local :** après réservation centrale du tenant, une étape de provisioning idempotente crée users, shop_members et shop-owner dans la BDD tenant. Le propriétaire définit un mot de passe local via un jeton d’activation court, transmis pour sa propre boutique ; aucun partage ou copie du mot de passe central. Le tenant devient actif seulement après validation des migrations, du seeding et de cette liaison de propriétaire. Une nouvelle connexion authentifie ce compte local. Root central et personnel du SaaS ne peuvent ni se connecter à sa place ni gérer ses employés. La réparation technique du provisioning ne constitue pas un écran de gestion d’équipe centrale.
+**Places d’équipe et invitations :** compter les accès locaux qui consomment une place selon la règle de quota existante, puis ajouter les invitations ouvertes réservant une nouvelle place. Une invitation concernant un compte déjà compté ne consomme pas une deuxième place ; une réactivation qui ne consommait plus de place la réserve avant de réussir. Une suspension temporaire du compte ou de son accès ne libère pas artificiellement une place ; une libération définitive suit la règle de quota versionnée et le même verrou. Les invitations ouvertes pour un même e-mail normalisé réservent au plus une place, sans permettre une double attribution concurrente. Réservation, acceptation, révocation et changement d’accès utilisent le verrou `shop.singleton=1`, afin que deux actions simultanées ne dépassent pas la limite. Une rétrogradation du plan conserve les comptes/rôles historiques et bloque les nouvelles créations au-delà du quota ; elle ne supprime pas l’équipe.
+
+**`contact_verifications` et authentification :** vérification du contact du compte local par code haché, durée limitée, nombre d’essais contrôlé et consommation unique. Sessions, récupération/réinitialisation de mot de passe et fermeture de sessions utilisent les mécanismes techniques installés sur cette même connexion, avec protection contre énumération et abus. Les messages de sécurité destinés au propriétaire et aux employés — activation, invitations, vérification et récupération — restent explicitement autorisés. Ce sont des parcours de compte local ; ils ne réintroduisent ni messages aux acheteurs, ni campagnes, ni envoi automatique de documents commerciaux. Les passkeys restent une option distincte de l’authentification ; si activées, utiliser la migration réelle du paquet avec provider/connexion/RP cohérents, sans leur donner de rôle supplémentaire.
+
+**Création du propriétaire local :** après réservation centrale du tenant, le provisioning idempotent crée `users` avec compte et accès d’équipe actifs, `joined_at` réel et attribution `shop-owner` dans la BDD tenant. Le propriétaire définit son mot de passe local via un jeton d’activation court, transmis pour cette boutique ; aucun partage ou copie du mot de passe central. Le tenant devient actif seulement après validation des migrations, du seeding et du rattachement au propriétaire. Une nouvelle connexion authentifie ce compte local. Root central et personnel du SaaS ne peuvent ni se connecter à sa place ni gérer ses employés. La réparation technique du provisioning ne constitue pas un écran de gestion d’équipe centrale.
+
+**Fusion et conservation :** les auteurs des commandes, mouvements de stock, paiements, remboursements, preuves, médias et activités continuent de viser le même `users.id`. Retirer une appartenance d’équipe signifie modifier son état sur ce compte et écrire une activité locale ; aucune suppression en cascade n’efface ses actes passés. Pour une migration future d’un schéma déjà installé, vérifier `UNIQUE(user_id)` dans l’ancienne appartenance, conserver `users.id`/`uuid`, reporter son état et sa première date d’activation, et traiter un accès ancien supprimé comme révoqué. L’ancienne clé de membre n’était aucune identité d’authentification ; les éventuels alias ou liens d’archive doivent être résolus explicitement avant retrait. Aucun déplacement de données ni migration SQL n’est exécuté par ce document.
 
 ### T25 — Comptes transporteur, tarifs et lots de reversement locaux
 
@@ -4643,6 +4555,7 @@ erDiagram
     carrier_accounts {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
+        bigint_unsigned created_by_id FK "users.id ; compte local"
         varchar carrier
         varchar label
         varchar adapter
@@ -4652,7 +4565,6 @@ erDiagram
         varchar encryption_key_version "nullable"
         boolean is_active
         datetime last_synced_at "nullable"
-        bigint_unsigned created_by_id FK "users.id ; compte local"
         datetime created_at
         datetime updated_at
     }
@@ -4660,26 +4572,26 @@ erDiagram
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned carrier_account_id FK "carrier_accounts.id"
+        bigint_unsigned created_by_id FK "users.id ; compte local"
         decimal return_rate
         datetime starts_at
         datetime ends_at "nullable"
         boolean is_active
         tinyint_unsigned source "ProviderRateSourceEnum"
-        bigint_unsigned created_by_id FK "users.id ; compte local"
         datetime created_at
     }
     carrier_remittance_batches {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned carrier_account_id FK "carrier_accounts.id"
+        bigint_unsigned proof_media_id FK "nullable ; media.id"
+        bigint_unsigned reversal_of_id FK "nullable ; carrier_remittance_batches.id"
+        bigint_unsigned validated_by_id FK "nullable ; users.id ; compte local"
         varchar external_reference "nullable pour contrepassation interne"
         decimal reported_account_net_amount "nullable ; total externe indicatif, plusieurs boutiques possibles"
         decimal computed_shop_net_amount "signe ; calcul depuis les lignes locales"
         decimal verified_net_amount "nullable ; signe ; part effectivement verifiee de cette boutique"
         tinyint_unsigned status "RemittanceBatchStatusEnum"
-        bigint_unsigned proof_media_id FK "nullable ; media.id"
-        bigint_unsigned reversal_of_id FK "nullable ; carrier_remittance_batches.id"
-        bigint_unsigned validated_by_id FK "nullable ; users.id ; compte local"
         datetime received_at "nullable"
         varchar operation_key UK
         datetime created_at
@@ -4704,34 +4616,19 @@ erDiagram
 
 **Coordination technique des appels :** deux copies d’une clé restent soumises au quota du même compte fournisseur et de la sortie IP. Utiliser un limiteur/verrou technique partagé dans Redis/cache, indexé par une empreinte HMAC serveur du fournisseur et de l’identité externe (ou du secret en attente d’identification), sans stocker la clé API dans l’index. Ce cache ne contient ni registre central de colis ni données commerciales. La rotation des credentials conserve la clé de coordination du compte canonique. Les résultats et tentatives restent dans carrier_operations/carrier_operation_attempts de la boutique ; l’adaptateur, les incertitudes et l’absence de retry mutateur aveugle de §11 restent applicables.
 
-### T26 — Règles de facturation et registre des traitements de la boutique
+### T26 — Application des règles de facturation et registre des traitements
 
-**billing_rules** décide quand et comment cette boutique doit émettre une facture ou un avoir. **processing_activity_register** documente les traitements de données de cette boutique : finalité, catégories, destinataires, responsabilités, conservation et protections. Ce registre décrit les traitements prévus ; les événements réellement exécutés sont journalisés dans activity_log local et, pour la preuve spécialisée des données personnelles, personal_data_operations (T21), avec la même corrélation. Il ne contient aucune liste nominative des acheteurs.
+**Les règles de facturation sont les lignes type 2 RULE de billing_rules définies en T20.** Les compteurs type 1 partagent cette table ; chaque sélection de règle filtre le bon type. processing_activity_register reste une table locale séparée qui décrit les traitements de données de cette boutique : finalité, catégories, destinataires, responsabilités, conservation et protections.
+
+Le registre décrit les traitements prévus ; les événements réellement exécutés et leurs preuves privacy utilisent uniquement activity_log local (T15), avec performed_at, propriétés contrôlées et correlation_id commun. Il ne contient aucune liste nominative des acheteurs et n’est pas un second journal d’événements.
 
 ```mermaid
 erDiagram
     direction TB
-    billing_rules {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        varchar code
-        int version
-        bigint_unsigned seller_profile_version "nullable avant validation ; version du profil professionnel utilise"
-        varchar trigger_event
-        varchar exchange_rule
-        varchar numbering_scope "shop"
-        json parameters
-        tinyint_unsigned status "PolicyStatusEnum"
-        text validation_reference "nullable avant validation"
-        bigint_unsigned validated_by_id FK "nullable ; users.id ; compte local habilite"
-        datetime validated_at "nullable"
-        datetime effective_at "nullable"
-        datetime ends_at "nullable"
-        datetime created_at
-    }
     processing_activity_register {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
+        bigint_unsigned validated_by_id FK "nullable ; users.id ; compte local habilite"
         varchar code
         int version
         text purpose
@@ -4745,19 +4642,14 @@ erDiagram
         json security_measures
         tinyint_unsigned status "PolicyStatusEnum"
         text validation_reference "nullable avant validation"
-        bigint_unsigned validated_by_id FK "nullable ; users.id ; compte local habilite"
         datetime validated_at "nullable"
         datetime effective_at "nullable"
         datetime created_at
     }
-    billing_rules ||--o{ billing_obligations : billing_rule_id
-    users |o--o{ billing_rules : validated_by_id
     users |o--o{ processing_activity_register : validated_by_id
 ```
 
-**Règles locales :** UNIQUE(code,version), status=1 DRAFT, 2 VALIDATED, 3 ACTIVE ou 4 RETIRED. La boutique et le propriétaire sont ceux du contexte shop/users local déjà établi ; aucune colonne tenant_id, scope central/tenant ni référence du propriétaire dupliquée n’est ajoutée. seller_profile_version est un numéro de version documentaire, pas une FK centrale ; la validation exige une valeur non NULL correspondant au profil professionnel vérifié du propriétaire en C1. L’activation recontrôle cette version et exige validated_by_id, validated_at et validation_reference ; un profil matériellement modifié impose la validation d’une nouvelle version avant les nouvelles émissions. Pas de répétition de nom, téléphone, e-mail ou NIF dans une fiche courante de règle. trigger_event, exchange_rule et parameters désignent des événements/cas/implémentations serveur autorisés ; aucune exécution de texte administrable. numbering_scope=shop décrit les séquences locales T20. Version validée/utilisée immuable, nouvelles valeurs par nouvelle version ; fermeture d’une période et retrait futur audités sans modifier les anciennes obligations. effective_at obligatoire pour activation, ends_at NULL ou >effective_at, pas de chevauchement des périodes pour un code. Verrouiller la ligne shop singleton et relire les versions courantes avant activation. Une valeur a_valider reste limitée au brouillon ; une règle non validée bloque l’émission concernée.
-
-**Application à la facturation :** billing_obligations.billing_rule_id est une FK numérique locale ; chaque obligation fige rule_snapshot avec UUID/code/version, paramètres et version du profil vendeur utilisés. Le fait générateur et son obligation sont écrits dans la même transaction tenant, avec operation_key stable. Un retry conserve la règle initiale ; il ne prend pas une nouvelle version pour créer une seconde facture. L’émission/transmission de T17/T19/T20/T22 utilise uniquement ces données locales. La validation exacte des événements, échanges et séries reste celle des notes avant activation commerciale ; aucune règle universelle arbitraire n’est imposée.
+**Application à la facturation :** billing_obligations.billing_rule_id vise uniquement billing_rules de type 2 RULE, par FK locale typée. Chaque obligation fige rule_snapshot avec UUID/code/version, paramètres et version du profil vendeur utilisés. Le fait générateur et son obligation sont écrits dans la même transaction tenant, avec operation_key stable. Un retry conserve la règle initiale ; il ne sélectionne pas une nouvelle version pour créer une deuxième pièce. La validation métier de commande est un clic habilité et audité sur une révision précise ; aucun contrat téléphonique ou envoi de document n’est ajouté. La préparation et l’émission T17/T20/T22 utilisent uniquement les données et médias de cette BDD. La version émise reste historique ; les états d’une intention d’émission, d’une facture, d’une livraison physique de colis et d’un remboursement sont distincts ; aucune livraison documentaire aux acheteurs n’est prévue. Événements fiscaux, échanges et séries restent à valider avant activation ; aucun taux ou régime universel n’est inventé.
 
 **Registre local :** UNIQUE(code,version) dans la BDD boutique ; aucune normalisation d’un tenant_id nullable n’est nécessaire. purpose précise pourquoi le traitement existe ; data_subject_categories/data_categories ses catégories, recipients les destinataires, processing_basis son fondement, controller/processors les responsabilités, retention_rules les durées/conditions versionnées et security_measures les protections. Une version validée/utilisée est immuable ; un changement produit une nouvelle version avec date d’effet et activité locale. L’auteur habilité local et la référence de validation sont enregistrés, sans usurper l’identité d’un réviseur externe. Les catégories et informations de traitement sont validées avant utilisation effective ; validated_by_id, validated_at et validation_reference sont alors obligatoires, et effective_at est requis pour ACTIVE. Le validateur appartient à users local et possède la permission concernée ; aucune validation centrale d’équipe n’est substituée à cet acteur. Verrouiller shop singleton pour les changements de version/activation et ne pas activer deux versions du même code simultanément. Toutes les boutiques reçoivent ces mêmes tables ; le contenu et les validations appartiennent à chacune, et aucun miroir central de leur registre n’est créé.
 
@@ -4769,7 +4661,10 @@ Les FK simples dessinées dans Mermaid restent utiles, mais les FK composites ci
 
 | Table enfant et colonnes | Clé UNIQUE parent référencée | Garantie |
 |---|---|---|
-| orders(current_revision_id,id) | order_revisions(id,order_id) | Révision de cette commande |
+| orders(current_revision_id,id) | order_revisions(id,order_id) | Proposition courante de cette commande |
+| orders(confirmed_revision_id,id) | order_revisions(id,order_id) | Révision exacte validée par clic |
+| invoices(sequence_id,document_type,fiscal_year,sequence_record_type) | billing_rules(id,document_type,fiscal_year,record_type) | Compteur type 1 du bon type et exercice |
+| billing_obligations(billing_rule_id,billing_rule_record_type) | billing_rules(id,record_type) | Version de règle type 2, jamais un compteur |
 | shipments(shipped_revision_id,order_id) | order_revisions(id,order_id) | Colis de cette commande |
 | shipments(shipped_revision_id,order_id,delivery_mode) | order_revisions(id,order_id,delivery_mode) | Mode exact, sans contournement par NULL |
 | shipments(shipped_revision_id,order_id,pickup_point_id) | order_revisions(id,order_id,pickup_point_id) | Stop desk exact de la révision |
@@ -4777,7 +4672,6 @@ Les FK simples dessinées dans Mermaid restent utiles, mais les FK composites ci
 | order_documents(revision_id,order_id) | order_revisions(id,order_id) | Bon de cette commande |
 | invoices(revision_id,order_id) | order_revisions(id,order_id) | Facture de cette commande |
 | invoices(original_invoice_id,order_id) | invoices(id,order_id) | Avoir de la même commande |
-| order_contracts(revision_id,order_id) | order_revisions(id,order_id) | Acceptation de cette version |
 | order_incidents(shipment_id,order_id,shipped_revision_id) | shipments(id,order_id,shipped_revision_id) | Incident du colis expédié |
 | order_incidents(order_item_id,shipped_revision_id) | order_items(id,revision_id) | Ligne source précise |
 | order_incidents(return_id,shipment_id) | order_returns(id,shipment_id) | Retour du même colis |
@@ -4799,6 +4693,8 @@ Les FK simples dessinées dans Mermaid restent utiles, mais les FK composites ci
 Lorsque stock_movements.return_item_id est renseigné, le service impose aussi que order_item_id soit celui de la ligne de retour. Pour les opérations avec retour, retour.shipment_id doit être shipment_id ; le prestataire est toujours celui du colis.
 
 **Cycle commande/révision.** Créer les tables puis ajouter les FK cycliques par ALTER TABLE. En transaction : insérer la commande avec current_revision_id=NULL, insérer sa révision complète et ses lignes, affecter le pointeur puis commit. Aucun checkout/worker ne publie une commande incomplète ; un contrôleur d’intégrité détecte toute commande persistée sans révision. InnoDB vérifie les FK immédiatement et ne fournit pas de contraintes différées au commit ; le caractère non NULL final relève ici du service transactionnel. [S1]
+
+**Validation de la bonne révision :** la FK composite `orders(confirmed_revision_id,id)` garantit l’appartenance à cette commande. Imposer par CHECK que `confirmed_revision_id` et `validated_at` soient NULL ensemble ou renseignés ensemble, et que `commercial_status=2` exige les deux non NULL. La mutation et l’activité officielle de validation de clé canonique sont commitées ensemble. Le lien polymorphe de cette activité utilise la morph map et une validation serveur, sans FK SQL fictive. Une expédition utilise exactement cette révision validée avec ses réservations actives ; aucune proposition non validée ne reçoit ces droits.
 
 Exemple de traduction SQL des garanties principales (à intégrer aux migrations complètes) :
 
@@ -4842,7 +4738,9 @@ L’exhaustivité des axes actifs d’une variante et l’absence de cycles de c
 | tenants(id,user_id) | subscriptions(tenant_id,user_id), feature_overrides(tenant_id,user_id), feature_usage(tenant_id,user_id) |
 | carrier_rate_versions(id,carrier_account_id) en boutique | carrier_fees(source_rate_id,carrier_account_id), avec FK simple sur source_rate_id et compte du prestataire contrôlé |
 | users(id), roles(id), permissions(id) | FK locales des tables de leur BDD ; rôle/permission du même guard |
-| users(id) en boutique | shop_members(user_id) UNIQUE ; invitations et acteurs métier locaux |
+| users(id) en boutique | invitations et acteurs métier locaux ; appartenance portée par users.membership_status/joined_at |
+
+**Contrôle d’accès local fusionné :** `users.membership_status` est NOT NULL et appartient à `MemberStatusEnum`. Ajouter `CHECK(membership_status IN (1,2,3,4))` et `CHECK(membership_status<>1 OR joined_at IS NOT NULL)`. L’accès métier exige en plus `status=1`, `membership_status=1`, `deleted_at IS NULL` et un tenant accessible. Ces colonnes ne sont pas mass assignables. Conserver `users.id`/`uuid` et toutes les FK des auteurs ; il n’existe aucune FK vers une seconde appartenance.
 
 Les FK d’appartenance/rôle/tenant de l’ancienne organisation centrale sont supprimées. Les boutiques étant physiquement séparées, aucun pivot local ne contient tenant_id. Les relations morph des trois pivots Spatie sont vérifiées par le service et une liste de modèles autorisés ; model_id utilise la PK BIGINT locale. Un trigger ou une validation d’intégrité dédiée contrôle le guard des rôles/permissions et refuse les capacités saas.* au tenant. Les guards et is_super_admin ne sont pas éditables par les formulaires ordinaires.
 
@@ -4983,7 +4881,7 @@ Chaque index parent UNIQUE est créé une seule fois même s’il reçoit plusie
 
 ## 7. Autorisations, propriété et intégration Laravel
 
-**Membre de boutique :** users local actif, shop_members actif, tenant accessible, permission effective locale, aucune interdiction, fonctionnalité du plan et quota disponibles. La permission effective est l’union des rôles/permissions directes Spatie et des ALLOW temporaires valides, à laquelle les DENY s’imposent. Les coûts et marges sont également filtrés dans les réponses. Les jobs réévaluent ces conditions à l’exécution.
+**Membre de boutique :** users local actif, membership_status=1 ACTIVE, deleted_at NULL, tenant accessible, permission effective locale, aucune interdiction, fonctionnalité du plan et quota disponibles. La permission effective est l’union des rôles/permissions directes Spatie et des ALLOW temporaires valides, à laquelle les DENY s’imposent. Les coûts et marges sont également filtrés dans les réponses. Les jobs réévaluent ces conditions à l’exécution.
 
 **Propriétaire :** propriété centrale définie uniquement par tenants.user_id et protégée contre toute modification. L’accès au back-office de chaque boutique exige son compte local distinct, lié par central_user_uuid au propriétaire central, et son appartenance active. Son rôle système local shop-owner donne les capacités de cette boutique sous réserve des interdictions explicites, du plan, des quotas et de l’état métier. Aucun transfert n’est offert.
 
@@ -5047,7 +4945,7 @@ Les références externes sont validées dans le contexte attendu avant usage. L
 
 ### 7.4 Middleware, Gates, Policies et quotas d’équipe
 
-**Ordre central :** route centrale → provider/guard central → compte actif → permission saas.* → Policy de cible et restrictions → validation → transaction centrale → activité. **Ordre boutique :** domaine validé → contexte tenant (BDD, cache, session, droits, fichiers et activité) → auth:tenant → compte/appartenance actifs et tenant accessible → binding UUID dans cette BDD → can/Policy → fonctionnalité/quota → validation → transaction tenant → activité. L’initialisation tenant précède l’authentification locale et le binding ; reproduire ce pipeline pour chaque action Livewire, API ou job.
+**Ordre central :** route centrale → provider/guard central → compte actif → permission saas.* → Policy de cible et restrictions → validation → transaction centrale → activité. **Ordre boutique :** domaine validé → contexte tenant (BDD, cache, session, droits, fichiers et activité) → auth:tenant → users.status=1, users.membership_status=1, users.deleted_at NULL et tenant accessible → binding UUID dans cette BDD → can/Policy → fonctionnalité/quota → validation → transaction tenant → activité. L’initialisation tenant précède l’authentification locale et le binding ; reproduire ce pipeline pour chaque action Livewire, API ou job.
 
 Le middleware auth reconnaît une identité ; can contrôle une capacité Laravel ; les middleware Spatie role/permission/role_or_permission sont utilisables avec le guard approprié, mais leurs vérifications directes ne représentent pas tout le contrat d’interdictions et de quotas du projet. Préférer can/Gate::authorize et une Policy pour les opérations métier. Cacher un bouton avec @can ou Inertia ne protège pas le serveur. Chaque mutation et lecture sensible est réautorisée.
 
@@ -5098,7 +4996,7 @@ Les attributions Spatie via attach/sync et les pivots natifs ne doivent pas êtr
 
 ### 7.6 Relations polymorphes Laravel et bibliothèque media
 
-Source complémentaire : [Laravel — relations polymorphes](https://laravel.com/framework/docs/13.x/eloquent-relationships#polymorphic-relationships). Une morph map définit des alias anglais stables : central_user, shop_user, tenant, product, product_variant, category, shop, invoice, saas_invoice, saas_credit_note, saas_invoice_line, saas_credit_note_line, saas_sequence, subscription, subscription_installment, saas_billing_rule, saas_document_delivery, saas_payment, saas_refund, order_contract, shipment, carrier_account, carrier_rate_version, carrier_remittance_batch, billing_rule, processing_activity_register, etc. Tous les modèles effectivement attachables/auditables ont un alias et un périmètre autorisé explicites avant migrations. Les modèles logiques partagés imposent leur discriminant : document_type pour les factures/avoirs et leurs lignes, record_type pour réglages/virements/abonnements. Les alias saas_sequence/saas_billing_rule résolvent saas_billing_settings, saas_invoice/saas_credit_note résolvent saas_invoices, saas_invoice_line/saas_credit_note_line résolvent saas_invoice_lines, saas_document_delivery résout saas_document_deliveries et saas_payment/saas_refund résolvent saas_transfers. Un alias et une route ne résolvent jamais une autre table/nature ; subscription refuse une échéance. Un PDF fiscal est attaché au modèle d’en-tête correspondant, une preuve de virement à saas_payment/saas_refund. Relation::enforceMorphMap est utilisé ; les relations existantes d’un package sont testées pour qu’elles enregistrent les mêmes alias, au lieu de supposer un nom PHP brut. Les noms model_type/subject_type/causer_type sont conservés pour compatibilité des packages. Les colonnes morph *_id sont définies en BIGINT UNSIGNED ; ne pas activer un type morph UUID global alors que les PK restent numériques.
+Source complémentaire : [Laravel — relations polymorphes](https://laravel.com/framework/docs/13.x/eloquent-relationships#polymorphic-relationships). Une morph map définit des alias anglais stables : central_user, shop_user, tenant, product, product_variant, category, shop, invoice, saas_invoice, saas_credit_note, saas_invoice_line, saas_credit_note_line, saas_sequence, subscription, subscription_installment, saas_billing_rule, saas_document_delivery, saas_payment, saas_refund, order, shipment, carrier_account, carrier_rate_version, carrier_remittance_batch, document_sequence, billing_rule, processing_activity_register, etc. Tous les modèles effectivement attachables/auditables ont un alias et un périmètre autorisé explicites avant migrations. Les modèles logiques partagés imposent leur discriminant : document_type pour les factures/avoirs et leurs lignes, record_type pour réglages/virements/abonnements. Les alias saas_sequence/saas_billing_rule résolvent saas_billing_settings, saas_invoice/saas_credit_note résolvent saas_invoices, saas_invoice_line/saas_credit_note_line résolvent saas_invoice_lines, saas_document_delivery résout saas_document_deliveries et saas_payment/saas_refund résolvent saas_transfers. Les alias locaux `document_sequence` et `billing_rule` résolvent désormais la même table `billing_rules`, respectivement avec `record_type=1 SEQUENCE` et `record_type=2 RULE` imposés par leurs modèles/scopes/Policies. Le premier ne résout jamais une règle et le second ne résout jamais un compteur ; les liens numériques et morphs restent locaux. Un alias et une route ne résolvent jamais une autre table/nature ; subscription refuse une échéance. Un PDF fiscal est attaché au modèle d’en-tête correspondant, une preuve de virement à saas_payment/saas_refund. Relation::enforceMorphMap est utilisé ; les relations existantes d’un package sont testées pour qu’elles enregistrent les mêmes alias, au lieu de supposer un nom PHP brut. Les noms model_type/subject_type/causer_type sont conservés pour compatibilité des packages. Les colonnes morph *_id sont définies en BIGINT UNSIGNED ; ne pas activer un type morph UUID global alors que les PK restent numériques.
 
 ```php
 // Extraits des modèles tenant, connexion tenant explicite sur leurs bases communes.
@@ -5134,17 +5032,17 @@ La recherche fournie reste la source de préparation. [Le guide officiel de migr
 |---|---|
 | Auteur central ou local | causer_type/causer_id du modèle de cette BDD, ou acteur système anonyme avec origin |
 | Action | log_name=privacy/subscriptions/... et event stable en anglais |
-| Objet | subject_type/subject_id local ; pour un lot, properties.resource_type/resource_uuids minimisés ou référence sécurisée du lot |
+| Objet | subject_type/subject_id de cette BDD ; pour un lot central, propriétés minimisées déjà définies en C6 ; pour un lot tenant, properties.resource_kind/scope/quantity et référence sécurisée de sélection selon T15, sans copier une liste nominative |
 | Boutique concernée au central | tenant_id vers tenants pour une action sur un objet central ; tenant_uuid dans la Resource publique |
-| Catégories, motif, destinataire | properties.data_categories, reason et recipient_code minimisés, sans coordonnées acheteur |
-| Date réelle et date de saisie | properties.performed_at en UTC, validée par le serveur ; created_at est la date d’enregistrement |
+| Catégories, motif, destinataire | properties.data_categories et reason minimisés ; recipient_code au central inchangé, properties.recipient sous forme d’alias contrôlé dans le contrat privacy local T15 ; aucune copie des coordonnées acheteur |
+| Date réelle et date de saisie | Au central : properties.performed_at UTC validée, sans changement de C6. En boutique : colonne activity_log.performed_at UTC de T15 pour la phase réelle ; created_at reste partout la date d’enregistrement |
 | Contexte, résultat et lien entre étapes | properties.outcome/context filtrés et correlation_id |
 | Déduplication | operation_key nullable UNIQUE ; clé stable de l’action avec suffixe de phase explicite |
 | Changement d’un modèle | attribute_changes filtré par une liste de champs autorisés |
 
 operation_key est une extension applicative des deux tables activity_log ; les activités automatiques sans clé gardent NULL. Format ASCII stable, au plus 191 caractères ; si la clé métier est longue, dériver une empreinte déterministe avec le type et la phase, sans donnée personnelle. Une action explicite rejouée garde la même clé pour la même phase ; intention, succès, refus et échec ont des clés distinctes pour rester des événements append-only. Un échec n’écrase jamais un succès et une activité de succès annulée par rollback n’est pas recréée comme si la mutation avait été commise. Le service retrouve le résultat d’une action déjà commise avant de tenter un nouveau succès.
 
-**Exemples demandés :** l’export des données internes de boutique A, autorisé à un compte local de A, écrit privacy.data_export_requested puis data_export_succeeded/data_export_failed dans activity_log de A, avec catégories, quantité et référence de fichier privé, sans recopier le fichier exporté. personal_data_operations, lorsqu’il est requis comme preuve spécialisée T21, est écrit dans la même transaction avec la même correlation_id ; il n’est pas une seconde action à compter. Le viewer central ne lit ni ne copie ce journal. Un export de données SaaS centrales écrit ces événements dans le journal central. L’administration centrale garde ses permissions sur les objets SaaS et n’acquiert aucun accès aux données internes d’une boutique par cet audit.
+**Exemples demandés :** l’export des données internes de boutique A, autorisé à un compte local de A, écrit privacy.data_export_requested puis data_export_succeeded/data_export_failed dans activity_log de A, avec catégories, quantité et référence de fichier privé, sans recopier le fichier exporté. La preuve spécialisée utilise cette même activity_log locale de catégorie privacy, performed_at et propriétés contrôlées de T15 ; aucun journal parallèle ni seconde action à compter. Le viewer central ne lit ni ne copie ce journal. Un export de données SaaS centrales écrit ces événements dans le journal central. L’administration centrale garde ses permissions sur les objets SaaS et n’acquiert aucun accès aux données internes d’une boutique par cet audit.
 
 Une attribution ou correction d’abonnement utilise un sujet central Subscription et un acteur central habilité. Journaliser subscription_assign_requested puis subscription_assigned/subscription_assignment_corrected avec les UUID du propriétaire, du tenant éventuel, du plan et de l’abonnement, les dates/paramètres autorisés et la raison de la correction. Mauvais propriétaire/plan, période invalide, refus ou erreur produisent subscription_assignment_denied/failed avec motif minimal ; rollback n’enregistre aucun faux abonnement attribué. Corriger un abonnement historiquement utilisé garde l’ancien et crée la nouvelle attribution selon C4, avec correlation_id commun ; le log ne modifie pas la règle métier à lui seul.
 
@@ -5165,27 +5063,33 @@ public function getActivitylogOptions(): LogOptions
 }
 ```
 
-**Explicite :** actions métier, lecture sensible/export, connexion/déconnexion/échec, attribution/révocation de rôle, invitation, changement de plan, confirmation, annulation, prix manuel, correction de stock, envoi transporteur, émission/transmission documentaire et virements SaaS vérifiés. performedOn cible le modèle local ; causedBy désigne l’acteur réel local ; causedByAnonymous représente un système ; event désigne le code de l’action ; withProperties ajoute seulement un contexte autorisé. beforeLogging ou l’action personnalisée enrichit correlation_id/origin et masque les champs sensibles, pour les chemins automatiques et manuels. Un causer défini pour un job est limité à son exécution et nettoyé ensuite.
+**Explicite :** actions métier, lecture sensible/export, connexion/déconnexion/échec, attribution/révocation de rôle, invitation, changement de plan, validation de commande, abandon de brouillon financier, prix manuel, correction de stock, envoi transporteur, émission de pièces internes pour les boutiques, émission/transmission documentaire centrale et virements SaaS vérifiés. performedOn cible le modèle local ; causedBy désigne l’acteur réel local ; causedByAnonymous représente un système ; event désigne le code de l’action ; withProperties ajoute seulement un contexte autorisé. beforeLogging ou l’action personnalisée enrichit correlation_id/origin et masque les champs sensibles, pour les chemins automatiques et manuels. Un causer défini pour un job est limité à son exécution et nettoyé ensuite.
 
 ```php
-// Exemple après confirmation métier, dans la transaction tenant.
+// Dans le service Valider, après les contrôles et dans la transaction tenant.
+// La révision est immuable ; $validationRequestHash est calculé par le serveur.
+// Retrouver le succès existant sous verrou AVANT tout nouvel effet de stock.
+$validationKey = 'order.validate:'.$order->uuid.':'.$revision->uuid;
 activity('orders')
     ->performedOn($order)
     ->causedBy($localUser)
-    ->event('order_confirmed')
+    ->event('order.validated')
     ->withProperties([
+        'schema_version' => 1,
         'order_uuid' => $order->uuid,
         'revision_uuid' => $revision->uuid,
+        'revision_number' => $revision->revision_number,
+        'request_hash' => $validationRequestHash,
     ])
-    ->tap(function ($activity) use ($correlationUuid, $operationKey): void {
+    ->tap(function ($activity) use ($correlationUuid, $validationKey): void {
         $activity->correlation_id = $correlationUuid;
         $activity->origin = 1; // ActivityOriginEnum::USER
-        $activity->operation_key = 'order_confirmed:'.$operationKey; // clé bornée par le service
+        $activity->operation_key = $validationKey; // canonique, bornée par le serveur
     })
-    ->log('Order confirmed by phone');
+    ->log('Order validated after phone call');
 ```
 
-La confirmation/réservation du stock reste effectuée par le service existant ; cet appel constate l’action. Un retry reconnu par sa clé métier retourne le résultat existant sans créer une seconde activité de succès. Un log automatique updated et un événement order_confirmed peuvent coexister si leurs rôles sont explicites ; le tableau de bord ne les compte pas comme deux confirmations.
+Le service Valider réalise réservation/transfert et projections dans cette même transaction ; l’activité officielle `order.validated` en porte l’idempotence canonique par commande/révision. Un retry autorisé retrouve le succès avant tout nouvel effet et ne change ni stock ni `validated_at`. Un log automatique `updated` peut conserver les seules modifications autorisées du modèle ; il ne remplace pas l’activité officielle et le tableau de bord compte uniquement celle-ci comme validation. Une tentative échouée utilise sa phase propre sans réserver la clé du succès. Aucun contrat ou document d’accord n’est créé.
 
 | Catalogue log_name | Actions à couvrir | Base |
 |---|---|---|
@@ -5193,8 +5097,8 @@ La confirmation/réservation du stock reste effectuée par le service existant ;
 | users / permissions / teams | comptes, invitations, suspensions, rôles, composition de permissions, exceptions, refus de délégation | Central pour administration ; tenant pour équipe |
 | shops / plans / subscriptions | provisioning, slug/domaines, activation, plan et quotas, exceptions, reçus/validation | Central |
 | catalog / content / media / settings | catalogue, publication, prix/promotion, variantes, configuration, pièces | BDD du modèle |
-| orders / stock / shipping | checkout soumis, confirmation, annulation, révision, réservations, corrections, retours, événements et intentions transporteur | Tenant |
-| finance / documents | encaissement vérifié, reversement, frais, créances, remboursement, avoir, correction, émission/transmission | BDD de la preuve concernée |
+| orders / stock / shipping | checkout soumis, validation par clic, révision, réservations, corrections, retours, événements et intentions transporteur | Tenant |
+| finance / documents | encaissement vérifié, reversement, frais, créances, remboursement, avoir, correction, émission interne boutique ; transmission des seuls documents SaaS centraux | BDD de la preuve concernée |
 | privacy / operations | exports, lectures confidentielles explicitement identifiées, purge/anonymisation, migration et rapprochement | BDD de l’opération |
 
 « Toutes les actions » signifie une couverture définie de chaque commande applicative pertinente, des mutations et des accès sensibles, y compris jobs/APIs/imports ; aucun SELECT brut n’est converti automatiquement en audit. navigation_events conserve son rôle de mesure de la vitrine. À la réalisation, chaque service/action est inscrit dans cette matrice avec son event, ses champs autorisés et ses issues success/denied/failed. Les refus et échecs sont journalisés séparément du succès, après rollback sur la bonne connexion, avec contexte minimal ; une activité de succès ne subsiste jamais pour une mutation annulée.
@@ -5203,7 +5107,7 @@ La confirmation/réservation du stock reste effectuée par le service existant ;
 
 **Confidentialité et stabilité :** exclure password, remember_token, codes/jetons de vérification/reset/invitation, clés API, credentials chiffrés, cookies, Authorization, données de passkey, adresses/téléphones complets et payloads personnels. Ne jamais copier avant/après l’intégralité d’une commande ou document. UUID et libellés minimaux autorisés facilitent la lecture même après disparition du sujet ; ils restent des données corrélables soumises à rétention. IP/user_agent sont facultatifs seulement si une finalité et une durée sont définies. Les IDs numériques et contenus bruts de subject/causer/properties/attribute_changes sont filtrés par Resource à la consultation ; ne pas sérialiser directement un modèle Activity.
 
-**Lecture :** viewer central réservé aux permissions saas.audit.view/export ; viewer boutique réservé à audit.view/export local. Filtrer log_name, event, période, acteur/sujet public UUID, correlation_id ; index (log_name,created_at,id), (subject_type,subject_id,created_at), (causer_type,causer_id,created_at), (event,created_at) et correlation_id. Pagination, eager loading des morphs et données minimales, aucune résolution dans une autre base. La consultation/export sensible du journal est elle-même une action explicite ; elle n’est pas relancée automatiquement lors du rendu de cette activité.
+**Lecture :** viewer central réservé aux permissions saas.audit.view/export ; viewer boutique réservé à audit.view/export local. Le filtre privacy tenant utilise performed_at et son index local (log_name,performed_at,id), en gardant created_at pour la date d’enregistrement ; la lecture/export de cette catégorie exige aussi l’autorisation locale correspondante. Filtrer log_name, event, période, acteur/sujet public UUID, correlation_id ; index (log_name,created_at,id), (subject_type,subject_id,created_at), (causer_type,causer_id,created_at), (event,created_at) et correlation_id. Pagination, eager loading des morphs et données minimales, aucune résolution dans une autre base. La consultation/export sensible du journal est elle-même une action explicite ; elle n’est pas relancée automatiquement lors du rendu de cette activité.
 
 **Conservation des activités :** logs sans SoftDeletes, écriture append-only pour le rôle applicatif ordinaire ; pas d’édition/suppression depuis le viewer, pas de LogsActivity sur Activity lui-même. updated_at reste présent pour compatibilité technique. Les privilèges/triggers protègent les traces et pièces requises. Le module central de politiques/exécutions de rétention est retiré ; aucun ordonnanceur de ce module ni lancement global automatique de activitylog:clean n’est prévu. Les expirations techniques explicitement décrites sur jetons et diagnostics restent appliquées dans leur contexte et auditées lorsqu’elles affectent des données sensibles ; aucune purge en cascade des documents/flux n’est introduite.
 
@@ -5211,46 +5115,49 @@ La confirmation/réservation du stock reste effectuée par le service existant ;
 
 Les guards central/tenant utilisent leurs providers Central\User et Tenant\User, ainsi que leurs stores de session/récupération isolés. Cookies tenant limités à l’hôte de la boutique, noms/préfixes distincts de la session centrale ; pas de cookie central permettant une connexion boutique. Sur un domaine personnalisé, la connexion et le reset restent liés au tenant résolu. Une suspension locale invalide l’accès et les sessions/tokens concernés via une procédure explicite ; elle ne suspend pas le compte central ou une autre boutique portant le même e-mail.
 
+**Messages d’accès aux comptes :** invitations, activation du propriétaire local, codes de vérification et récupération du mot de passe du propriétaire/employés restent autorisés, avec destinataire contrôlé, secret limité et expiration. Ils n’autorisent aucun message aux acheteurs ni envoi de document commercial. Les parcours de récupération/vérification ne donnent aucun accès aux données métier tant que les contrôles de compte et membership ne sont pas satisfaits. Une réinitialisation de mot de passe ne lève ni suspension ni révocation d’accès.
+
 Les passkeys restent une option d’authentification décrite dans [la recherche fournie](Documentation-Laravel-Spatie-Permissions-Passkeys.md#s17), §§17–19. Elles ne donnent aucun rôle. Si ce module est activé, publier/analyser la migration du paquet réellement verrouillé et la déployer dans la BDD de l’identité ; modèle/provider/connexion de la passkey doivent rester cohérents. Aucun schéma de colonnes non fourni n’est inventé ici. Ces tables techniques d’authentification sont hors inventaire métier, comme les sessions. WebAuthn dépend de l’origine/RP ID : changements de slug/domaine et domaines personnalisés exigent un parcours validé (réenregistrement ou domaine d’authentification stable avec transition maîtrisée). Une clé centrale ne devient pas automatiquement une clé locale. Les activités ne conservent aucune donnée de credential ou assertion.
 
 La génération décrite par Activity Log v5 et la documentation Passkeys citée requiert PHP 8.4+ et Laravel 12+ ; Permission v8 a sa propre matrice compatible. Choisir et verrouiller l’ensemble avec Composer, relever les versions réelles puis tester tenancy/guards/cache/morph map/passkeys avant migrations. Ce document reste une conception, aucune application n’est installée par cette révision.
 
 ## 8. Parcours commande et concurrence
 
-1. **Information avant validation du checkout — AUD-10** : afficher clairement l’information versionnée expliquant l’utilisation des coordonnées nécessaires à la commande. Il n’y a pas de consentement facultatif « accepter/refuser » permettant malgré tout de commander. Au clic « Passer commande », conserver directement dans `orders` la version présentée, l’horodatage serveur et éventuellement le hash du texte. Ne pas confondre cette preuve d’information avec analytics, prospection/newsletter, conditions de vente ou confirmation téléphonique.
-2. **Panier et checkout** : panier sans réservation. Recalculer prix TTC, disponibilité indicative, fiscalité et livraison ; afficher récapitulatif et total. Soumission idempotente : verrou panier si présent, création commande `a_confirmer`, révision/lignes immuables, éventuelle acceptation des conditions séparée, conversion du panier. Aucun contrat téléphonique, aucune réservation et aucune commande prétendue confirmée à cette étape. Refuser une indisponibilité déjà connue, mais recontrôler impérativement à l’appel. Le client est informé de l’attente de confirmation. Cette décision de réservation tardive est une adaptation du parcours demandé ; la portée contractuelle exacte de la soumission et l’information de disponibilité doivent être validées avant mise en production.
-3. **Idempotence** : submission_hash SHA-256 du format canonique versionné initial, montants en chaînes décimales, ordre stable. Même clé/même contenu → même commande après autorisation ; autre contenu → 409. UNIQUE(cart_id) déduplique la conversion. Empreinte inchangée malgré un changement ultérieur de catalogue. Une confirmation utilise sa propre clé dans order_contracts.
-4. **Appel et proposition** : le commerçant annonce articles, quantités, variantes, adresse, mode/desk, livraison et total. Toute modification crée une nouvelle révision B ; A reste inchangée. L’accord porte explicitement sur B. Les champs version/revision attendus sont envoyés avec le clic de confirmation : une création concurrente de C ne transforme jamais l’accord B en accord C. Vérifier lock_version ; conflit → relecture et nouvelle décision, pas acceptation automatique de la version la plus récente.
-5. **Confirmation téléphonique atomique** : verrou commande puis variantes par UUID ; vérifier droits, statut tenant, révision ciblée, P-R>=q et conditions requises. Créer contrat (telephone, auteur, date accord/date saisie), réservations et mouvements, basculer current_revision_id sur la version confirmée, statut `confirmee`, projections de première confirmation et outbox documentaire ; commit ensemble. Si stock insuffisant, rollback : aucune confirmation enregistrée, contacter le client pour une nouvelle proposition. Le hash de B reste identique avant/après confirmation. Aucun deuxième clic du client sur le site requis.
-6. **Contrôle opérationnel** : préparation/anti-fraude après confirmation, champs operationally_confirmed_at/par_id ; aucun nouveau mouvement de réservation. Peut être effectué dans la même action autorisée que l’appel, mais les faits restent distincts. Une absence de réponse avant accord maintient a_confirmer ; un accord précédent ne s’efface pas par simple changement de statut.
-7. **Révision après première confirmation, avant figement distant** : créer une proposition immuable ; l’ancienne version engagée garde ses réservations. Au nouvel accord ciblé, verrou commande et variantes, libérer les anciennes puis réserver les nouvelles dans UNE transaction, créer le contrat de cette révision et réinitialiser le contrôle opérationnel si nécessaire. Manque de stock → rollback complet conservant l’ancien engagement. Sans accord, la proposition n’est pas expédiable ; ni customer_confirmed_at ni l’ancien contrat ne l’autorisent.
-8. **Envoi transporteur** : vérifier contrat de la révision exacte, contrôle opérationnel et contexte valide. Persister intention et référence marchand dans la BDD locale, marquer sending_started_at avant HTTP ; aucun verrou SQL long pendant l’appel. Worker perdu après ce marqueur, coupure, timeout, 502/503/504 potentiellement après traitement ou réponse invalide → resultat_incertain. Bloquer opérations incompatibles et réaffectation. Même operation_key/merchant_reference, rapprochement ; jamais retry mutateur aveugle. Une ancienne révision non envoyée est supersedee.
-9. **Validation puis remise** : une validation distante prouvée fige révision/COD/adresse mais ne sort aucun stock. À la remise physique documentée, vérifier contrat exact, réservations et stock ; sortir P et R une seule fois et renseigner shipped_at. Une intention incertaine bloque une remise contradictoire. Après remise, aucun changement de contenu et aucune annulation qui remettrait artificiellement du stock.
-10. **SAV et facturation** : incident unique par ligne avec détails multi-causes, retour complet éventuel, budgets communs et documents correctifs. Remplacement/échange = nouvelle commande liée (T22), une livraison propre. À chaque fait générateur fiscal validé, écrire l’obligation de facture/avoir dans la transaction du fait ; la transmission et le paiement restent distincts.
+1. **Information au checkout :** présenter la version de l’information relative aux coordonnées nécessaires. Conserver directement dans orders sa version, son horodatage et éventuellement l’empreinte du texte. Ne pas en déduire un consentement analytics ou marketing, ni une acceptation des conditions.
+2. **Panier et checkout :** panier sans réservation. Recalculer prix, taxes applicables, disponibilité indicative et livraison ; montrer le total. Sous verrou du panier si présent, créer la commande AWAITING_CONFIRMATION, une révision complète et ses lignes immuables, convertir le panier et enregistrer une éventuelle acceptation effective des conditions. Aucun stock réservé à cette étape. Refuser une indisponibilité connue puis revérifier lors de la validation. Le client sait que le commerçant doit encore confirmer par téléphone ; aucun lien ni écran de suivi de commande accessible à l’acheteur n’est prévu.
+3. **Soumission sans doublon :** submission_key stable et submission_hash canonique versionné. Même clé et même contenu après autorisation : même commande ; contenu différent : conflit. UNIQUE(cart_id) empêche deux conversions. La clé ne constitue pas un droit d’accès. La validation utilise dans activity_log sa clé canonique distincte `order.validate:<order_uuid>:<revision_uuid>`, calculée par le serveur et indépendante d’un nonce client.
+4. **Appel et proposition :** le commerçant annonce articles, quantités, texte de personnalisation, adresse, mode de livraison et total. Les rappels et résultats restent dans order_history, avec confirmation_owner_id pour l’employé affecté. Un refus reste un résultat d’appel, sans annulation commerciale. Toute modification crée une nouvelle révision complète. Le clic cible l’UUID et la version exacte annoncés : aucune validation automatique d’une autre proposition créée entre-temps.
+5. **Clic Valider :** après l’accord reçu par téléphone, le commerçant clique. Dans UNE transaction locale : verrouiller la commande et les variantes selon l’ordre commun ; retrouver d’abord le succès de la clé canonique après contrôle d’accès, puis, pour une nouvelle validation seulement, vérifier statut de boutique, proposition ciblée et version attendue ; exiger P-R>=q à la première validation, ou P-(R-R_ancienne)>=q_nouvelle par variante lors d’un transfert, R_ancienne ne comprenant que les anciennes réservations encore actives ; transférer/créer les réservations et mouvements, mettre confirmed_revision_id et validated_at à jour, passer commercial_status à 2 CONFIRMED et écrire activity_log.event=order.validated avec operation_key unique, auteur Spatie et UUID de révision. L’audit est écrit explicitement dans cette transaction, pas après commit. Même clé canonique/contenu autorisé : résultat acquis sans nouvel effet, ni nouvelle date ; contenu différent : conflit. Un nonce différent fourni par le navigateur n’autorise pas une autre clé pour la même commande/révision. Le succès déjà acquis est recherché avant les tests de version de concurrence et de stock. Échec de stock ou de concurrence : rollback entier et nouvelle proposition après appel ; aucune validation partielle. Aucun contrat, PDF d’accord, deuxième clic client ou envoi de document.
+6. **Contrôle opérationnel :** le contrôle interne avant expédition reste séparé, avec operationally_confirmed_at et operationally_confirmed_by_id. Il ne crée pas une deuxième réservation et ne remplace pas le clic Valider.
+7. **Nouvelle proposition avant figement distant :** créer une révision immuable et la désigner comme current_revision_id. L’ancienne confirmed_revision_id et ses réservations restent engagées tant qu’aucun nouvel accord n’est validé. Au clic sur la nouvelle version, transférer les réservations atomiquement, actualiser confirmed_revision_id/validated_at, écrire le nouvel audit idempotent et réinitialiser le contrôle opérationnel si nécessaire. Un manque de stock conserve l’ancien engagement entier. Une proposition seule n’est pas expédiable.
+8. **Envoi au transporteur :** exiger la validation de la révision exacte, le contrôle interne et les réservations. Persister l’intention et la référence marchand avant HTTP ; marquer sending_started_at avant l’appel, sans long verrou SQL pendant celui-ci. Après timeout ou résultat susceptible d’avoir produit un effet distant, marquer résultat incertain, bloquer les mutations incompatibles et rapprocher avec la même référence. Aucun retry mutateur aveugle.
+9. **Validation distante et remise physique :** la validation prouvée du transporteur fige révision, COD et adresse ; elle ne sort pas le stock. À la remise réelle au transporteur, contrôler la version validée et ses réservations puis sortir P et R une seule fois et renseigner shipped_at. Une intention incertaine bloque les opérations contradictoires. Après remise, conserver le contenu expédié ; les incidents et retours suivent leur propre circuit.
+10. **SAV et documents internes :** conserver incident par ligne, causes, éventuel retour complet, budgets coordonnés et documents correctifs. Un remplacement ou échange crée une nouvelle commande liée avec une livraison propre. L’intention de facture/avoir est créée atomiquement avec son fait générateur ; son émission interne et le paiement réel restent distincts. Aucune transmission de message ou document aux acheteurs.
 
-Saisie manuelle : brouillon avant proposition, puis a_confirmer ; même accord téléphonique et même réservation atomique. L’employé doit fournir au client l’information données prévue par le parcours assisté et enregistrer sa version/horodatage sur la commande ; il ne faut pas fabriquer cette preuve sans information réellement fournie. Aucun consentement marketing n’est déduit de cette saisie. Un remplacement gratuit suit aussi le contrôle d’accord et de stock.
+La saisie manuelle peut commencer en DRAFT puis passer AWAITING_CONFIRMATION ; elle suit le même appel, clic Valider, contrôle interne et stock. Fournir réellement l’information relative aux coordonnées dans ce parcours assisté. Un remplacement gratuit suit lui aussi ces vérifications.
 
 **Ordre de verrous :** central : propriétaire puis tenants triés et enfants ; tenant : panier si concerné, commandes par UUID, incidents par UUID, livraison/opération ou parents financiers dans un ordre commun documenté, variantes par UUID, puis lignes dépendantes. Toute opération SAV portant sur origine et destination verrouille les deux commandes dans cet ordre. Une perte sur stock réservé identifie d’abord les commandes, les verrouille puis les variantes et revalide la liste ; réessayer si elle a changé. Retry SQL borné de la transaction entière, jamais d’un seul INSERT ni d’un HTTP mutateur. Les transactions locales ne sont pas présentées comme une transaction distribuée avec le central.
 
-### États séparés
+**États séparés :**
+- Commercial : 5 DRAFT → 1 AWAITING_CONFIRMATION → 2 CONFIRMED. Pas de fonction d’annulation ou clôture commerciale de commande. Les propositions et appels ne changent pas silencieusement la révision déjà validée.
+- Logistique : conserver les états du prestataire et les circuits de remise, livraison, incident et retour prévus par l’adaptateur vérifié. Aucun état commercial ne remplace ces faits.
+- Financier : facture/avoir émis, paiement client, affectation d’avoir et reversement transporteur restent distincts.
 
-- Commercial : brouillon → a_confirmer → confirmee → cloturee ; annulee par procédure avant remise seulement si résultat distant certain. Les projections de première confirmation ne servent pas de permission d’envoi pour une révision nouvelle.
-- Logistique : preparee, a_expedier, en_ramassage, preparation_transporteur, prise_en_charge, en_transit, en_preparation_livraison, en_livraison, suspendue, livree, retour_en_cours, retour_en_transit, retour_en_traitement, retour_recu, retour_termine, incident, annulee. Validation API et remise physique restent des faits distincts. Les transitions relèvent de l’adaptateur vérifié.
-- Financier : facture/avoir émis, encaissement vérifié, compensation d’échange et reversement sont des objets distincts. livred, encaissed et payed ne sont pas interchangeables. Une livraison peut être terminée alors que le transporteur doit encore de l’argent.
+Une libération technique de réservation lors d’une perte réelle ou du transfert validé de révision n’annule pas la commande et ne libère pas son budget SAV. Aucun ancien engagement n’est réactivé silencieusement.
 
-Annuler ou clôturer ne supprime ni contrat, ni facture, ni dette. Chaque compensation de stock/argent utilise ses écritures dédiées.
+**Reprises de validation :** dériver côté serveur la clé canonique `order.validate:<order_uuid>:<revision_uuid>` et vérifier après contrôle d’accès sujet/révision/`request_hash` de l’activité officielle. L’empreinte porte le contenu immuable, sans heure, acteur du retry ou version de concurrence mutable. Retrouver un succès commis avant d’appliquer à nouveau les préconditions de version ou de stock : un double clic conserve son résultat sans modifier les réservations, `validated_at` ou l’auteur initial. Une clé client différente ne crée aucun second succès. Sans succès antérieur, viser la proposition courante, refuser une ancienne version ou une projection validée dépourvue de preuve attendue. Après perte technique, le rejeu de l’ancienne validation signale l’engagement devenu indisponible sans réactiver de stock ; la reprise crée une nouvelle révision complète et ses lignes, puis un nouveau clic après les contrôles requis. Le transfert compte seulement les anciennes réservations encore actives dans `P-(R-R_ancienne)>=q_nouvelle` et fait rollback entier en cas d’échec. Une opération distante incertaine ou figée bloque toute réallocation incompatible jusqu’à son rapprochement. `confirmed_revision_id` et `validated_at` sont NULL ensemble avant première validation ; CONFIRMED les exige non NULL. REFUSED reste un résultat d’appel dans order_history, sans réservation si aucun clic n’a réussi.
 
 ## 9. Stock et retours
 
-Pour une variante : P=physique vendable, R=réservé, Q=quarantaine, A=P-R. Toujours P>=0, R>=0, Q>=0 et R<=P. Toute réservation, standard ou remplacement, exige A>=q ; pas de précommande au MVP. Une perte physique réelle n’est pas masquée : si du stock réservé est touché, libérer/réaffecter les engagements insuffisants, signaler l’indisponibilité et engager un traitement client dans la même transaction de constatation. Une réallocation ultérieure utilise une nouvelle révision et des réservations traçables ; ne pas réactiver silencieusement une réservation consommée/libérée.
+Pour une variante : P=physique vendable, R=réservé, Q=quarantaine, A=P-R. Toujours P>=0, R>=0, Q>=0 et R<=P. Toute réservation, standard ou remplacement, exige A>=q ; pas de précommande au MVP. Une perte physique réelle n’est pas masquée : si du stock réservé est touché, libérer/réaffecter les engagements insuffisants, signaler l’indisponibilité et engager un traitement client dans la même transaction de constatation. Une réallocation ultérieure crée une nouvelle révision complète et de nouvelles lignes avant le nouveau clic, avec réservations et audit canonique propres. Rejouer la clé de l’ancienne validation ne réactive jamais une réservation consommée/libérée. Si la révision est figée ou un résultat distant incertain, appliquer d’abord le rapprochement prévu sans mutation contradictoire.
 
 | Événement pour q unités | physical_delta | reserved_delta | quarantine_delta |
 |---|---:|---:|---:|
 | Ouverture ou réception manuelle vendable | +q | 0 | 0 |
 | Ajout au panier / soumission au checkout | 0 | 0 | 0 |
-| Confirmation téléphonique enregistrée | 0 | +q | 0 |
+| Clic Valider après l’appel | 0 | +q | 0 |
 | Contrôle opérationnel manuel | 0 | 0 | 0 |
-| Annulation avant remise | 0 | -q | 0 |
+| Libération technique pour perte réelle ou transfert validé de révision | 0 | -q | 0 |
 | Expédition | -q | -q | 0 |
 | Retour annoncé | 0 | 0 | 0 |
 | Retour physiquement reçu | 0 | 0 | +q |
@@ -5284,7 +5191,7 @@ Les différences prix catalogue/prix appliqué sont explicables par price_origin
 
 E = somme nette des collection_entries vérifiées du colis. Fclient = somme nette des frais constatés avec `payer=1 CUSTOMER` et le mode de règlement applicable, notamment `settlement_mode=1 DEDUCTION` lorsqu’ils sont retenus sur l’encaissement. **Reversable = E − Fclient**, avec 0<=Fclient<=E. La somme des remittance_lines sur bordereaux rapprochés reste entre zéro et Reversable. Un frais retenu doit être constaté avant de rapprocher le reversement ; pas de frais « oublié » ajouté après paiement sans procédure de correction.
 
-Fcommercant = somme nette des frais constatés avec `payer=2 MERCHANT`. Ces frais sont des charges, réglées une fois via carrier_fee_payments. Ils peuvent être compensés sur le versement de produits ou payés séparément. Les frais pris en charge par livreur/société ne sont pas une dette du commerçant. Un écart de facturation est enregistré et vérifié, pas absorbé en modifiant le COD historique.
+Fcommercant = somme signée des frais à `payer=2 MERCHANT` effectivement constatés, qu’ils soient encore `2 RECOGNIZED` ou déjà `3 SETTLED`. Un original devenu `5 REVERSED` reste compté avec son inverse exact effectif RECOGNIZED/SETTLED ; chaque ligne entre une seule fois, de sorte que l’original et son inverse s’annulent sans double retrait. Les estimations et les brouillons annulés avant constatation sont exclus. Ces frais constituent les charges transporteur ; carrier_fee_payments indique comment leur dette est réglée, par compensation sur un versement ou paiement séparé, sans créer une seconde charge. Leur règlement peut diminuer la trésorerie ou le montant reçu, mais ne supprime pas la charge du résultat. Les frais supportés par client, livreur ou société ne sont pas une dette du commerçant. Un écart de facturation est enregistré et vérifié, pas absorbé en modifiant le COD historique.
 
 | Cas | Encaissement client | Frais client retenus | Reversable produits | Frais commerçant | Net reçu |
 |---|---:|---:|---:|---:|---:|
@@ -5300,7 +5207,9 @@ Dans la dernière ligne, deux colis différents peuvent être ventilés dans le 
 
 ### 10.3 Résultat et trésorerie
 
-Résultat de gestion estimé = ventes produits livrées hors taxes collectées, nettes des retours reconnus + part de livraison effectivement conservée par la boutique + indemnisations effectives − coût des marchandises sorties pour ventes/remplacements − pertes reconnues non déjà comptées en coût vendu − carrier_fees à charge commerçant − autres depenses constatées.
+Résultat de gestion estimé = ventes produits livrées hors taxes collectées, nettes des corrections économiques finalisées + part de livraison effectivement conservée par la boutique + indemnisations effectives − coût des marchandises sorties pour ventes/remplacements − pertes reconnues non déjà comptées en coût vendu − Fcommercant, somme signée des frais commerçant constatés encore dus ou déjà réglés selon §10.2 − autres dépenses constatées.
+
+Le résultat reconnaît une charge transporteur à sa constatation ; la trésorerie enregistre seulement son règlement effectif. Passer un frais de RECOGNIZED à SETTLED ne modifie donc ni son montant historique ni la charge du résultat. Une contrepassation effective conserve l’original et son inverse exact dans la somme signée, puis l’écriture correcte éventuelle est comptée une fois. La même convention vaut pour les autres journaux financiers : ne pas exclure l’original puis ajouter aussi son inverse, ni retirer deux fois la même correction. Les tableaux de dettes utilisent les frais moins leurs allocations réglées ; les tableaux de marge utilisent les charges nettes constatées, sans déduire aussi les allocations de paiement. Exemple : frais constaté 300 DA puis payé 300 DA → charge totale 300 DA, dette 0, sortie de trésorerie 300 DA ; aucune disparition de charge ni deuxième charge.
 
 Un refus ne crée pas une vente. **AUD-06 : une réception physique de retour ne corrige pas automatiquement le revenu.** La correction commerciale est portée par `commercial_corrections`/`commercial_correction_lines` finalisées : `effective_at` fixe la période économique, `recorded_at` conserve l’instant de saisie, les `revenue_delta`/`sold_cost_delta` signés expliquent les lignes produit et `non_product_revenue_delta` explique notamment une correction de livraison ou un geste global. L’impact revenu total est la somme des deltas produit et hors produit, sans attribuer artificiellement un remboursement de livraison à un article. Exemple : vente janvier, retour physique février, décision économique mars, remboursement avril → revenu corrigé en mars et trésorerie en avril. Un remplacement gratuit conserve le coût des produits expédiés ; ne pas ajouter encore comme perte le même coût déjà reconnu sur la vente originale pour un article cassé chez le client. Un remboursement est une sortie de trésorerie : si la vente a déjà été corrigée économiquement, ne pas diminuer le résultat une seconde fois. Une indemnisation est distincte d’un reversement COD. Si des taxes collectées existent, calculer les ventes nettes hors taxes collectées ; utiliser des coûts cohérents avec leur traitement déductible/non déductible. Les exemples TTC sans ventilation ne constituent pas un calcul de résultat fiscal.
 
@@ -5320,7 +5229,7 @@ Les éléments fiscaux sont prévus dès le calcul de la révision et conservés
 
 Champs inapplicables explicitement NULL selon le schéma JSON ; montants en chaînes décimales, jamais nombre binaire flottant. `tax_snapshot` de la ligne contient cette ventilation monétaire ; `shipping_tax_snapshot` contient celle de la livraison après remise, plus la règle d’allocation de remise. La remise livraison n’est soustraite qu’une fois. Pour un taux simple connu et validé : base HT déduite du TTC avec arithmétique décimale, taxe=différence arrondie ; régimes multiples nécessitent leur règle explicite. Quantités/prix affichés, bases, taxes et arrondis doivent se réconcilier ; conserver l’ajustement d’arrondi lorsqu’un prix unitaire HT arrondi ne reproduit pas exactement le total de ligne.
 
-À l’émission d’une facture couvrant toute la révision, vérifier total_ht+total_taxes=total_ttc, total_ttc=order_total et currency=révision.devise. Pour un avoir partiel, vérifier HT+taxes=TTC crédité, même devise et plafond des seules lignes créditées ; son total ne doit pas être forcé au total de la commande. Un avoir référence les lignes de la facture d’origine et les quantités/montants crédités, avec sa propre numérotation ; la somme créditée par ligne ne dépasse pas son montant net facturé. Aucun changement rétroactif de facture pour signaler son paiement : le règlement ultérieur vient du journal financier et, si requis, d’un reçu complémentaire. Le PDF et sa transmission sont distincts de l’existence du snapshot.
+À l’émission d’une facture couvrant toute la révision, vérifier total_ht+total_taxes=total_ttc, total_ttc=order_total et currency=révision.devise. Pour un avoir partiel, vérifier HT+taxes=TTC crédité, même devise et plafond des seules lignes créditées ; son total ne doit pas être forcé au total de la commande. Un avoir référence les lignes de la facture d’origine et les quantités/montants crédités, avec sa propre numérotation ; la somme créditée par ligne ne dépasse pas son montant net facturé. Aucun changement rétroactif de facture pour signaler son paiement : le règlement ultérieur vient du journal financier et, si requis, d’un reçu complémentaire. Le PDF interne et le snapshot sont distincts ; aucun envoi de message ou document aux acheteurs n’est prévu.
 
 Le décret 05-468 encadre les informations de facture et distingue les frais de transport [S9]. Les champs ci-dessus sont une proposition technique permettant de figer ces informations ; régime applicable, taux, mentions, numérotation et forme finale doivent être validés pour le vendeur. Aucun taux fiscal universel ni durée légale inventés.
 
@@ -5386,30 +5295,30 @@ Alias explicitement signalés par les notes : `payé_et_archivé` et libellés h
 |---|---|
 | POST /api/v1/create/order | Référence SaaS stable, intention durable ; timeout après envoi = résultat incertain, pas de retry aveugle |
 | POST /api/v1/valid/order | Fige la révision distante ; renseigner carrier_validated_at, pas shipped_at par simple déduction |
-| Modification avant validation | Seulement tant que non validée, révision courante et absence d’opération incertaine ; confirmer les endpoints exacts dans la collection |
+| Modification avant validation transporteur | Seulement avant figement distant, sur la révision courante déjà validée localement par clic, avec réservations actives et absence d’opération incertaine ; une proposition non validée n’est jamais envoyée ; confirmer les endpoints exacts dans la collection |
 | GET /api/v1/get/tracking/info | Suivi d’un tracking avec historique |
 | GET /api/v1/get/trackings/info | Suivi groupé ; taille de lot selon l’endpoint, taille maximale à confirmer (100 cité par la V2, non garanti) |
 | POST /api/v1/ask/for/order/return | success signifie demande_retour_envoyee ; ne prouve ni prise en charge ni retour réel |
 | POST /api/v1/valid/returns | Envoyer après réception locale réelle, même si inspection encore en cours ; clé stable par retour |
-| Étiquette PDF | Média privé ; ne constitue pas une preuve de réception client |
+| Étiquette PDF | Média privé utilisé pour le colis ; livraison déclarée par le livreur sans collecte de preuve de remise signée |
 | Wilayas/communes/desks | Codes externes obtenus et vérifiés par compte ; jamais UUID interne transmis |
 
 Polling prévu, sans prétendre qu’un webhook inexistant dans les notes est disponible. Appels batch, priorisation des colis actifs et poursuite du suivi financier après livraison. La V2 citait 50/minute, 1 500/heure, 15 000/jour par utilisateur ou IP : ces nombres sont des hypothèses historiques non confirmées, pas des capacités garanties ni des valeurs de production validées. Configurer les limites à partir d’une documentation officielle exploitable ou de tests contrôlés du compte. Limiteur partagé par compte ET sortie IP entre tous les tenants concernés, backoff avec jitter, respect Retry-After et 429. Ne pas donner chaque quota complet à chaque boutique d’un compte mutualisé.
 
 Aucune clé d’idempotence distante garantie dans les notes pour create/order. Après timeout : rechercher la référence stable avec les capacités effectivement disponibles ; résultat ambigu → rapprochement humain et blocage des opérations incompatibles. Une recherche vide éventuellement retardée ne prouve pas immédiatement l’absence de création. Le résultat est rattaché au colis et à l’intention locaux par compte, tracking et référence marchand ; contrôler le contexte de connexion et retrouver la même clé au retry.
 
-Token Bearer chiffré dans carrier_accounts de la boutique, jamais journalisé ni envoyé au navigateur. Filtrer requêtes/réponses/erreurs et limiter les URLs appelables. Fait générateur des frais retour, preuves POD, prise en charge du COD zéro, codes géographiques actuels et structure des bordereaux restent à valider en essais réels. Le mapping indépendant gère le décalage éventuel entre les 69 wilayas internes et les anciens codes 1–58 cités dans la documentation ; aucune adresse n’est remappée automatiquement vers une zone supposée équivalente.
+Token Bearer chiffré dans carrier_accounts de la boutique, jamais journalisé ni envoyé au navigateur. Filtrer requêtes/réponses/erreurs et limiter les URLs appelables. Fait générateur des frais retour, prise en charge du COD zéro, codes géographiques actuels et structure des bordereaux restent à valider en essais réels. Le mapping indépendant gère le décalage éventuel entre les 69 wilayas internes et les anciens codes 1–58 cités dans la documentation ; aucune adresse n’est remappée automatiquement vers une zone supposée équivalente.
 
 ## 12. Vitrine, statistiques, sécurité et preuves
 
-Le commerçant modifie textes/blocs via content_pages.content et sales_pages.content, couleurs/logo via shop et fichiers via media. Un seul template pour le MVP ; theme_customizations reste une évolution. Le JSON suit une structure serveur versionnée ; aucun code arbitraire ni montant commercial indépendant dans une page. SEO : slugs, titres, descriptions, alt et données structurées générées depuis le catalogue. Les menus, FAQ et sections visuelles ne nécessitent pas chacun une table.
+Le commerçant modifie textes/blocs via content_pages.content et sales_pages.content, couleurs/logo via shop et fichiers via media. Un seul template pour le MVP ; la personnalisation avancée du thème reste une évolution, sans table réservée au lancement. Le JSON suit une structure serveur versionnée ; aucun code arbitraire ni montant commercial indépendant dans une page. SEO : slugs, titres, descriptions, alt et données structurées générées depuis le catalogue. Les menus, FAQ et sections visuelles ne nécessitent pas chacun une table.
 
-Les acheteurs restent invités. visitors identifie un navigateur dans une boutique, pas une personne certaine entre appareils ; visit_sessions et navigation_events alimentent les vues/parcours. Le choix de mesure d’audience est conservé dans visitor_preferences ; refuser la mesure ne bloque pas le panier. Un lien de suivi signé donne accès à une seule commande ; ni UUID ni téléphone seuls ne donnent l’accès à un historique.
+Les acheteurs restent invités. visitors identifie un navigateur dans une boutique, pas une personne certaine entre appareils ; visit_sessions et navigation_events alimentent les vues/parcours. Le choix de mesure d’audience est conservé dans visitor_preferences ; refuser la mesure ne bloque pas le panier. Aucun lien, écran ou API de suivi de commande n’est accessible aux acheteurs. Les informations de livraison et les historiques sont réservés aux comptes locaux autorisés. Les statistiques globales gardent leurs sources minimales ; aucun écran de parcours individuel de navigateur n’est prévu au lancement.
 
 | Indicateur | Source et définition |
 |---|---|
 | Visiteurs uniques | COUNT DISTINCT visitor_id sur la période ; pas somme des uniques quotidiens |
-| Vues et parcours | Événements dédupliqués, exclusion trafic interne/test connu |
+| Vues et étapes globales du parcours | Événements dédupliqués agrégés, exclusion trafic interne/test connu ; aucun écran ou export de parcours individuel |
 | Paniers abandonnés | Dernière activité et absence de commande ; retour possible au panier |
 | Commandes reçues | commandes, pas nombre de révisions |
 | Produits livrés | Lignes de la révision expédiée et livraison effective |
@@ -5442,9 +5351,9 @@ Créer les index des FK et des contraintes UNIQUE, puis les index de lecture sui
 - expenses(expense_date,product_id), expenses(shipment_id), expenses(return_id).
 - tenant_schema_deployments(tenant_id,created_at), carrier_remittance_batches(carrier_account_id,status,received_at), remittance_statements(carrier_remittance_batch_id,status).
 
-Index complémentaires : tenants(user_id,deleted_at,status), permission_overrides(user_id,status,expires_at), feature_overrides(user_id,feature_id,tenant_id,started_at), order_incidents(order_id,status), orders(original_incident_id,commercial_status), customer_adjustments(incident_id,status), order_contracts(order_id,created_at), document_deliveries(status,next_attempt_at), shipment_events(shipment_id,occurred_at), et payload_expires_at sur les diagnostics purgés. Valider la longueur des clés composées de plusieurs VARCHAR avant migration ; les empreintes et UUID ont des types fixes.
+Index complémentaires : tenants(user_id,deleted_at,status), permission_overrides(user_id,status,expires_at), feature_overrides(user_id,feature_id,tenant_id,started_at), order_incidents(order_id,status), orders(original_incident_id,commercial_status), customer_adjustments(incident_id,status), orders(confirmed_revision_id), shipment_events(shipment_id,occurred_at), et payload_expires_at sur les diagnostics purgés. Valider la longueur des clés composées de plusieurs VARCHAR avant migration ; les empreintes et UUID ont des types fixes.
 
-Index complémentaires métier : order_incident_details(incident_id), billing_obligations(status,next_attempt_at), exchange_offsets(original_credit_note_id,status), carrier_receivables(provider_id,status,remaining_amount), carrier_receivable_allocations(receivable_id,performed_at), commercial_corrections(status,effective_at), commercial_correction_lines(order_item_id), carrier_operations(request_expires_at), personal_data_operations(performed_at,operation_type), saas_invoices(user_id,document_type,issued_at,id), saas_invoice_lines(document_id,line_number), subscriptions(record_type,user_id,status), subscriptions(parent_subscription_id,installment_status,due_at), geographic_areas(country_id,type,parent_id,is_active), saas_transfers(user_id,record_type,transfer_status,created_at,id), saas_transfers(document_id,record_type,transfer_status,id), saas_document_deliveries(delivery_status,next_attempt_at,id), billing_rules(code,status,effective_at), saas_billing_settings(code,policy_status,effective_at), processing_activity_register(code,status,effective_at), carrier_rate_versions(carrier_account_id,is_active,starts_at).
+Index complémentaires métier : order_incident_details(incident_id), billing_obligations(status,next_attempt_at), exchange_offsets(original_credit_note_id,status), carrier_receivables(provider_id,status,remaining_amount), carrier_receivable_allocations(receivable_id,performed_at), commercial_corrections(status,effective_at), commercial_correction_lines(order_item_id), carrier_operations(request_expires_at), activity_log(log_name,performed_at,id), saas_invoices(user_id,document_type,issued_at,id), saas_invoice_lines(document_id,line_number), subscriptions(record_type,user_id,status), subscriptions(parent_subscription_id,installment_status,due_at), geographic_areas(country_id,type,parent_id,is_active), saas_transfers(user_id,record_type,transfer_status,created_at,id), saas_transfers(document_id,record_type,transfer_status,id), saas_document_deliveries(delivery_status,next_attempt_at,id), billing_rules(record_type,code,policy_status,effective_at), saas_billing_settings(code,policy_status,effective_at), processing_activity_register(code,status,effective_at), carrier_rate_versions(carrier_account_id,is_active,starts_at).
 
 **Index centraux de facturation V4.5 :** ajouter saas_invoices(installment_id,document_type,status), saas_invoices(original_invoice_id,status,id), saas_invoice_lines(original_invoice_line_id,document_id), saas_document_deliveries(document_id,created_at,id), saas_transfers(original_payment_id,record_type,transfer_status,id), saas_transfers(credit_note_id,record_type,transfer_status,id), et correlation_id dans réglages/envois/virements pour la reprise. Les UNIQUE de C8/§6.7 et ceux des PK/UUID/opérations fournissent déjà plusieurs index : ne pas les dupliquer. Préfixes selon les requêtes réelles ; pagination par date/id, liste avec colonnes utiles plutôt que SELECT *, eager loading des parents et agrégats distincts fiscal/cash. Les JSON de snapshots/paramètres/essais restent des charges utiles, sans index systématique ni référence métier cachée ; mesurer EXPLAIN et les temps sous charge avant ajout d’autres index.
 
@@ -5496,14 +5405,14 @@ Confirmer les index avec EXPLAIN sur données représentatives. Pour reconstitue
 | Remplacement et remboursement simultanés d’une unité | Un seul budget disponible, brouillons inclus |
 | Deux dossiers incident pour la même ligne | Un seul dossier, enrichissement audité du premier |
 | Deux lignes identiques sauf personnalisation | Chaque incident vise sa vraie ligne |
-| Annulation remplacement avant remise | Budget et stock libérés une seule fois |
+| Refus d’appel d’un remplacement ou échange | Budget SAV déjà engagé conservé ; aucune annulation de commande ni libération de budget par un statut logistique |
 | Contrepassation remboursement encore brouillon | Aucun budget libéré avant effet réel |
 | Frais livraison remboursés sur deux incidents | Plafond global commande respecté |
-| Checkout puis confirmation téléphonique | Checkout sans contrat/réservation ; confirmation crée exactement un contrat et une réservation |
+| Checkout puis clic Valider après appel | Checkout sans réservation ; clic validé crée un seul audit officiel et les réservations de la révision ciblée |
 | Nouvelle révision proposée sans accord client | Ancienne révision engagée/réservée ; aucun envoi de la proposition |
-| Modification acceptée sans stock suffisant | Rollback complet, ancien contrat/réservations préservés |
-| Révision acceptée puis changement identité/taux | Contrat et facture conservent les valeurs historiques |
-| Transmission contrat en échec | Intention durable, retry, jamais faux delivered_at |
+| Modification acceptée sans stock suffisant | Rollback complet, ancienne révision validée et ses réservations préservées |
+| Révision validée puis changement identité/taux | Révision et facture conservent les valeurs historiques |
+| Préparation du PDF interne interrompue | Reprise du même document et numéro ; aucune intention d’envoi au client |
 | Deux émissions de facture concurrentes | Numéros distincts, snapshots immuables |
 | Avoir puis remboursement | Document et cash suivis séparément, pas de crédit portefeuille |
 | Même référence marchand sur deux colis du même prestataire local | Refus UNIQUE ; aucune association devinée à un colis étranger |
@@ -5517,14 +5426,14 @@ Confirmer les index avec EXPLAIN sur données représentatives. Pour reconstitue
 | Timeout create/order | Incertain ; aucun double colis créé par retry aveugle |
 | 429 / Retry-After / batch de 100 si supporté | Quotas mutualisés et reprise temporisée |
 | Wilaya interne nouvelle sans mapping vérifié | Route bloquée, aucun code fournisseur inventé |
-| Étiquette disponible sans POD | Preuve de réception encore manquante |
+| Livraison déclarée sans POD ni signature | État livré accepté ; aucun encaissement ou reversement vérifié n’est inventé |
 | Audit d’une modification d’adresse | Références de révision, aucun secret ou copie inutile |
 | Suppression d’un compte/média avec pièce requise ou litige | Références et preuve préservées ; aucune cascade documentaire/financière |
 | Tentative de lecture tenant B depuis A | Refus BDD/cache/jobs/médias/export, y compris compte transporteur partagé |
-| Accord sur B puis proposition C concurrente | Contrat cible B ou conflit de version ; C jamais confirmée implicitement |
-| Hash de B avant/après confirmation | Identique ; date et auteur uniquement dans le contrat |
-| Double clic Confirmer | Un contrat et un effet de stock |
-| Conditions acceptées sans appel | Commande a_confirmer, aucun contrat téléphone |
+| Accord sur B puis proposition C concurrente | Clic vise exactement B ou conflit de version ; C jamais validée implicitement |
+| Révision B avant/après validation | Révision immuable ; date/révision dans orders, auteur et clé dans activity_log |
+| Double clic Valider | Un événement officiel et un seul effet de stock |
+| Conditions acceptées sans clic de validation | Commande en attente ; aucun stock réservé ni faux clic |
 | Stop desk X accepté puis Y demandé dans livraison | Refus SQL |
 | Stop desk accepté puis mode domicile/point NULL dans livraison | Refus SQL sur mode, même si FK nullable serait ignorée |
 | Domicile avec point non NULL | Refus CHECK |
@@ -5543,8 +5452,8 @@ Confirmer les index avec EXPLAIN sur données représentatives. Pour reconstitue
 | Expiration Pro de trois boutiques, cron arrêté | Droits gratuits immédiats, une éligible, deux hors_quota, aucune suppression |
 | Changement boutique active puis upgrade | Quota jamais dépassé, suspensions administratives préservées, données intactes |
 | Information données de commande absente | Nouvelle commande refusée tant que `data_policy_version` et `data_notice_acknowledged_at` ne sont pas enregistrés ; aucun consentement marketing n’est déduit |
-| Consultation/export/transmission/purge | Journal métier minimisé, acteur/date/motif/ressource et destinataire traçables |
-| Fait générateur puis crash worker facture | Obligation persistée, une seule facture à la reprise et transmission durable |
+| Consultation/export/API/expiration technique | Journal métier minimisé, acteur/date/motif/ressource et destinataire pertinent traçables |
+| Fait générateur puis crash worker facture | Obligation persistée, une seule facture interne à la reprise, même PDF et numéro ; aucun envoi client |
 | Obligation R2 reliée à facture R1 / mauvais type / mauvaise origine | Refus des FK composites ou de la transition ; jamais `emise` |
 | Retour/refus après facture | Original inchangé, avoir lié si décision financière validée |
 | Vente janvier, retour février, décision mars, remboursement avril | Correction économique en mars, cash en avril ; reconstruction reproductible |
@@ -5567,12 +5476,12 @@ Ces scénarios sont des critères à implémenter sur MySQL réel, avec connexio
 
 ### 13.1 Enveloppe de capacité multi-BDD — AUD-17
 
-Le choix « une BDD par boutique » est conservé. Avec **83 tables par boutique dans cette version V4.2**, dont une table réservée à une évolution et hors tables techniques Laravel/passkeys, le décompte documentaire est le suivant :
+Le choix « une BDD par boutique » est conservé. Avec **77 tables par boutique dans cette version V4.6**, sans table réservée au thème futur et hors tables techniques Laravel/passkeys, le décompte documentaire est le suivant :
 
-- 100 boutiques ≈ 8 300 tables tenant ;
-- 500 boutiques ≈ 41 500 tables tenant ;
-- 2 000 boutiques ≈ 166 000 tables tenant ;
-- 5 000 boutiques ≈ 415 000 tables tenant.
+- 100 boutiques ≈ 7 700 tables tenant ;
+- 500 boutiques ≈ 38 500 tables tenant ;
+- 2 000 boutiques ≈ 154 000 tables tenant ;
+- 5 000 boutiques ≈ 385 000 tables tenant.
 
 Ces nombres ne constituent pas une limite MySQL. Ce sont des paliers de benchmark avant d’annoncer une capacité commerciale. Mesurer temps de provisioning, migration de tous les tenants, fenêtre de déploiement, CPU/RAM, connexions, workers/jobs, métadonnées InnoDB et reprise d’une étape technique en échec.
 
@@ -5582,7 +5491,7 @@ La capacité officiellement supportée est celle démontrée par les mesures ré
 
 L’architecture actuelle `carrier_operations`/`carrier_operation_attempts` est conservée : intention persistée avant HTTP, référence marchand stable, `resultat_incertain` pour résultat ambigu et absence de retry mutateur aveugle.
 
-**Le connecteur réel reste désactivé tant que la documentation et le compte effectivement utilisés n’ont pas validé par tests contrôlés** : création, recherche par référence marchand, modification, validation, annulation, stop desk, retour, échange, POD/preuve de livraison, frais, recouvrements/reversements, limites, appels dupliqués, événements dupliqués ou hors ordre et timeout après création distante réelle. Les endpoints, statuts et garanties d’idempotence ne sont jamais figés à partir d’une hypothèse.
+**Le connecteur réel reste désactivé tant que la documentation et le compte effectivement utilisés n’ont pas validé par tests contrôlés** : création, recherche par référence marchand, modification, validation, annulation, stop desk, retour, échange, déclarations de livraison, frais, recouvrements/reversements, limites, appels dupliqués, événements dupliqués ou hors ordre et timeout après création distante réelle. Les endpoints, statuts et garanties d’idempotence ne sont jamais figés à partir d’une hypothèse.
 
 ## 14. Traçabilité des notes professionnelles et corrections intégrées en V3.2
 
@@ -5590,7 +5499,7 @@ La ressource présente dans le dépôt est « les derniere modiff toujour les no
 
 | Note ou correction | Intégration dans le schéma |
 |---|---|
-| DB-1 / F1 — confirmation | Champs d’acceptation retirés de order_revisions ; order_contracts=confirmation telephone avec auteur/date/idempotence ; conditions séparées T21 ; parcours de réservation explicite section 8 |
+| DB-1 / F1 — confirmation | Champs d’acceptation retirés de order_revisions ; validation par clic via orders.confirmed_revision_id/validated_at et audit auteur/date/idempotence ; conditions séparées T21 ; parcours de réservation explicite section 8 |
 | DB-2 / F2 — desk accepté | Modes domicile/stop_desk fermés, CHECK point et FK composites exactes ; FK supplémentaire sur mode pour éviter contournement par NULL |
 | DB-3 / F3 — manquants | return_missing_delta, type manquant_retour_constate, perte valorisée, contrepassation et reconstruction des cinq compteurs |
 | DB-4 / F4 — même produit | product_id et FK composites panier/ligne/page/variante/avis ; analytics contrôlés par service |
@@ -5598,11 +5507,11 @@ La ressource présente dans le dépôt est « les derniere modiff toujour les no
 | DB-5 / F6 — création | UNIQUE(user_id,creation_key), creation_hash et reprise avant comptage quota |
 | PRIV-01 cité / F7 — payload | Empreinte, chiffrement des coordonnées de requête, expiration/purge ; conservation des références et résultats techniques minimisés |
 | API-01 / F8 — résultat incertain | Coupures/timeouts/crash/502–504 ambigus, clé et référence stables, blocage et rapprochement ; aucune idempotence Ecotrack présumée |
-| OPS-01 / F9 — sauvegardes, AUD-04 et AUD-09 liés à la reprise historique | Fonctionnalité et dépendances retirées par la décision du jour 4 ; les séquences, identités documentaires courantes, preuves et retries locaux restent définis en T17/T19/T20 |
+| OPS-01 / F9 — sauvegardes, AUD-04 et AUD-09 liés à la reprise historique | Fonctionnalité et dépendances retirées par la décision du jour 4 ; les séquences, identités documentaires courantes, preuves et retries locaux restent définis en T14/T17/T20 |
 | SEC-02 / F10 — isolation | Namespace fichiers physique, clés construites serveur, cache/jobs initialisés et nettoyés par tenant |
 | BUS-01 / F11 — causes d’incident | order_incident_details ; dossier unique par ligne, somme protégée sous verrou et budget commun |
 | BUS-02 / F12 — expiration | Gratuit automatique, choix principal/plus ancien, hors_quota sans suppression, lecture/export et checkout bloqué ; upgrade et permutation transactionnels |
-| DZ-01 / F13 — traitements | processing_activity_register local T26 ; opérations centrales dans activity_log C6, actions de boutique dans activity_log local et preuve spécialisée T21 ; catégories minimisées et corrélation |
+| DZ-01 / F13 — traitements | processing_activity_register local T26 ; opérations centrales dans activity_log C6 inchangé, toutes les actions et preuves privacy de boutique dans activity_log local T15 avec performed_at/propriétés contrôlées ; catégories minimisées et corrélation, aucun journal parallèle |
 | DZ-02 / F13 — collecte | Remplacé en V3.2 par AUD-10 : information versionnée liée directement à la commande ; plus de table d’accord de collecte séparée ; conditions et téléphone restent distincts |
 | DZ-04 / F14 — boutiques | Règle fiscale à valider, obligation durable d’émission, factures/avoirs typés immuables, retours/SAV/paiement séparés, échanges et différences affectées |
 | DZ-04 / F15 — SaaS | saas_invoices conserve les factures/avoirs ; saas_invoice_lines, saas_billing_settings, saas_document_deliveries et saas_transfers conservent détails, numérotation/règles, transmissions et virements entrants-sortants manuels vérifiés |
@@ -5633,7 +5542,7 @@ Incidents multi-causes autorisés ; retour physique partiel hors MVP mais struct
 | Fiscalité des échanges | Pièces requises pour même prix, supplément, restitution de différence et remplacement défectueux ; activer uniquement les cas couverts par règle validée |
 | Numérotation | Séries locales par boutique, type et exercice à faire valider ; préfixe stable et aucun numéro réservé réutilisé |
 | Domaine .com.dz | Suffisance ou non d’un sous-domaine SaaS et formalités propres à chaque vendeur ; aucune conformité présumée |
-| Ecotrack/DHD | Endpoints, recherche merchant_reference, idempotence distante, POD, reversements, limites et sémantique des statuts à vérifier officiellement et par tests contrôlés ; connecteur désactivé jusqu’à validation complète AUD-18 |
+| Ecotrack/DHD | Endpoints, recherche merchant_reference, idempotence distante, déclarations de livraison, reversements, limites et sémantique des statuts à vérifier officiellement et par tests contrôlés ; connecteur désactivé jusqu’à validation complète AUD-18 |
 | Données personnelles | Responsables/sous-traitants, base de traitement, durées, registre et journal, information checkout, éventuels consentements facultatifs séparés et protection des preuves à valider |
 | Scalabilité multi-BDD | Capacité officielle à fixer après benchmarks 100/500/2 000/5 000 tenants ; aucune promesse de très grande échelle sans mesures réelles |
 | Profil vendeur | Source courante unique dans users ; un profil professionnel par propriétaire. Un futur fonctionnement multi-sociétés nécessitera une conception distincte |
@@ -5693,8 +5602,8 @@ La liste du jour 4 n’est pas numérotée ; les identifiants J4 ci-dessous couv
 | J4-03 — suivi/registre des colis local | Tracking et merchant_reference dans shipments T11 ; rôle du registre absorbé par cette table existante, sans copie ni registre central ; filtrage des colis étrangers §11/T25 |
 | J4-04 — lots locaux, calcul de la part par suivi plutôt qu’allocation centrale | carrier_remittance_batches local relié à remittance_statements ; calcul depuis les seuls colis/lignes locaux T13/T16/T17. Exemple 20 000 = 12 000 A + 8 000 B ; détail/preuve exigés, total global hors revenu |
 | J4-05 — retirer la table d’identité légale et analyser les répétitions | Source professionnelle unique users C1 ; contacts/pays existants réutilisés, seulement les champs professionnels manquants ajoutés ; anciennes FK supprimées, snapshots historiques justifiés |
-| J4-06 — retirer entièrement la sauvegarde/restauration et les registres liés | Toutes les tables, champs, états, index, jobs et scénarios de cette fonctionnalité retirés. Émission/séquences/preuves restent dans la BDD émettrice T17/T19/T20 et C8 ; aucune inscription documentaire centrale des boutiques |
-| J4-07 — règles des factures de boutique dans chaque BDD | billing_rules local T26 et billing_obligations.billing_rule_id numérique local T22 ; snapshots/versions/validations locaux. saas_billing_settings record_type=2 RULE central C8 sert uniquement aux abonnements/options du SaaS |
+| J4-06 — retirer entièrement la sauvegarde/restauration et les registres liés | Toutes les tables, champs, états, index, jobs et scénarios de cette fonctionnalité retirés. Émission/séquences/preuves restent dans la BDD émettrice T14/T17/T20 et C8 ; aucune inscription documentaire centrale des boutiques |
+| J4-07 — règles des factures de boutique dans chaque BDD | billing_rules record_type=2 RULE local T20/T26 et billing_obligations.billing_rule_id numérique local T22 ; snapshots/versions/validations locaux. saas_billing_settings record_type=2 RULE central C8 sert uniquement aux abonnements/options du SaaS |
 | J4-08 — registre des traitements dans chaque BDD | processing_activity_register local T26, sans tenant_id ni miroir central ; responsabilités, catégories, destinataires, protections, conservation et validations versionnés |
 | J4-09 — remplacer le journal personnel central par activity_log | C6/T15/§7.7 : mapping complet auteur/action/ressource/date/motif/destinataire/contexte ; logs d’export et d’abonnement attribué/corrigé/refusé/échoué, connexions isolées, déduplication et confidentialité |
 | Notes de suivi — corrections d’abonnement/facture et conventions | subscriptions.tenant_id et FK(tenant_id,user_id) conservés ; les cinq tables C8 séparent documents/lignes/réglages/envois/virements, avec preuve propre à chaque opération. PK numériques, UUID publics, anglais, enums, cinq pays, Spatie, comptes locaux, media et morphs préservés |
@@ -5713,8 +5622,8 @@ La liste du jour 4 n’est pas numérotée ; les identifiants J4 ci-dessous couv
 | Lot/bordereau déjà commis puis retry | Même operation_key, aucun deuxième revenu, règlement de frais ou encaissement ; mauvaise association de compte refusée |
 | Rotation de la clé / changement de compte externe | Rotation conserve compte et liens historiques ; changement d’identité externe crée un nouveau compte, ancien suivi préservé |
 | Retour tarifé 300 puis version à 350 | Ancien frais reste 300 avec sa source locale ; nouveau cas utilise sa version applicable, pas de recalcul de l’historique |
-| Modification e-mail/téléphone/NIF du propriétaire | Une seule source courante users, version et validation mises à jour ; contrats/factures émis inchangés |
-| Émission du PDF interrompue après réservation du numéro | Même UUID, numéro et clé privée au retry ; émission puis transmission locale une seule fois, aucun registre documentaire de boutique au central |
+| Modification e-mail/téléphone/NIF du propriétaire | Une seule source courante users, version et validation mises à jour ; pièces fiscales émises inchangées |
+| Émission du PDF interrompue après réservation du numéro | Même UUID, numéro et clé privée au retry ; émission interne une seule fois, sans transmission aux acheteurs ni registre documentaire boutique central |
 | Relecture du modèle et des parcours actifs | Aucune table, FK, enum ni opération fonctionnelle de sauvegarde/restauration ; catalogue SoftDeletes et reprise d’un job restent des opérations distinctes |
 | Règle facture de A remplacée, UUID de règle de B fourni | Ancienne obligation garde son snapshot/version ; UUID étranger refusé dans la BDD courante, aucune lecture de règle boutique centrale |
 | Registre des traitements modifié dans B | Nouvelle version locale dans B ; aucun changement dans A ni copie du registre au central |
@@ -5770,15 +5679,65 @@ Les fusions financières V4.3/V4.4 répondaient aux précédentes demandes de re
 
 Contrôles de cette livraison : couverture des champs/fonctionnalités, conservation des tables de boutique et des ressources, cohérence des références et parseur Mermaid. Les critères ci-dessus seront exécutés sur MySQL réel lors de l’implémentation ; aucun test bancaire ou de migration exécutée n’est revendiqué.
 
+### Traçabilité V4.6 — choix et optimisation de la BDD boutique
+
+Cette révision remplace seulement les prescriptions boutique incompatibles des tableaux historiques ; la BDD centrale et Diagramme-BDD-Centrale-Complet.md restent strictement inchangés. La boutique passe de 83 à 77 tables. Aucun code applicatif ni migration de données n'est exécuté ici.
+
+| Décision | Résultat dans le modèle actif |
+|---|---|
+| Comptes et appartenance réunis | users conserve status et reçoit membership_status/joined_at ; plus de table shop_members |
+| Journal des données intégré à l'audit | activity_log local reçoit performed_at et contrat privacy ; plus de personal_data_operations |
+| Compteurs et règles regroupés | billing_rules à 23 champs, record_type 1 SEQUENCE / 2 RULE ; plus de document_sequences ; FK typées |
+| Factures courtes et complètes | invoices à 28 champs ; billing_obligations séparée pour éviter une nouvelle table excessive ; aucun import externe |
+| Aucun envoi aux acheteurs | plus de document_deliveries, de projections d'envoi, de jobs ou de canaux client ; messages d'accès aux comptes conservés |
+| Validation simple après l'appel | clic Valider, confirmed_revision_id/validated_at, audit atomique qui/date/révision ; plus de order_contracts ni PDF d'accord |
+| Pas d'annulation/clôture de commande | états commerciaux 5 DRAFT / 1 AWAITING_CONFIRMATION / 2 CONFIRMED ; aucun bouton ni permission correspondante ; corrections/retours/états financiers séparés conservés |
+| Pas de suivi client | aucun lien signé, écran, historique ou API acheteur de suivi ; suivi interne et avis vérifiés par secret navigateur conservés |
+| Confiance dans la déclaration du livreur | état livré/date depuis livreur/transporteur ; aucun POD/signature/photo/accusé client ; paiement et reversement vérifiés séparément |
+| Personnalisation simple | texte libre par ligne, empreinte technique au panier ; aucune création de champs configurables/supplément automatique |
+| Statistiques globales | visiteurs/sessions/événements nécessaires aux chiffres et panier ; pas de consultation individuelle au lancement |
+| Thème avancé plus tard | couleurs/logo/template dans shop ; plus de theme_customizations au lancement |
+| Fichiers fiscaux canoniques | invoices.media_id et media.file_hash ; pas de copie document_hash ; fichiers/pointeurs probants protégés |
+
+**Fonctions conservées :** catalogue/variantes/options, catégories/étiquettes/caractéristiques, pages/promotions/avis, panier invité, appels/rappels internes et responsable, révisions/contrôle opérationnel, stock et inspection, retours entiers MVP, incidents et budgets SAV, remplacements/échanges/compensations, remboursements/preuves, APIs transporteur et reprises, tarifs/stop desks, encaissements/reversements/frais/créances/indemnités, dépenses et marge estimée, bons internes, factures/avoirs/taxes/compteurs, comptes locaux/Spatie/invitations/vérifications, audit/conditions/registre de traitements et exports autorisés. Clôture d'un retour/incident, annulation de brouillon financier, inverse comptable ou état transporteur ne recréent pas une fonction d'annulation/clôture commerciale de commande.
+
+**Fichiers et preuves :** fichier fiscal privé obligatoire avec media.file_hash vérifié avant émission ; clé, octets, empreinte, parent/collection et pointeur deviennent immuables dès leur figement. Pas de suppression/réaffectation d'une pièce historique. Une nouvelle pièce est un nouveau média ; les contrepassations peuvent référencer la pièce de leur original sans réaffecter son parent, sous contrôle explicite. L'empreinte de texte panier et les empreintes de JSON/payload restent distinctes de l'empreinte des octets d'un PDF.
+
+**Migration future, si une BDD existe :** aucune donnée n'est déplacée par ce document. Conserver les IDs/UUID users et reporter l'ancien état d'appartenance. Pour la fusion des compteurs/règles, établir une correspondance (ancienne table,id) vers nouvelle billing_rules.id avec record_type, réécrire FK/morphs et vérifier collisions. Reprendre les anciens faits réellement démontrables de validation dans l'audit sans fabriquer un clic à partir d'une date de checkout. Archiver les données d'anciens modèles retirés avant leur suppression selon les dépendances, sans les maintenir comme fonctionnalités actives. Vérifier les empreintes de PDF avant retrait de leur copie ; préserver les snapshots fiscaux, écritures signées et références d'origine.
+
+
+**Contrôle des changements de champs depuis V4.5 :** les tableaux ci-dessous comparent toutes les définitions locales avant/après ; les tables absentes de cette liste conservent les mêmes champs et types. Les contraintes/procédures adaptées restent décrites dans leurs modules.
+
+| Table | Champs retirés ou transférés | Champs ajoutés ou types adaptés |
+|---|---|---|
+| cart_items | customization | customization_text, customization_signature : varchar → char(64) |
+| orders | customer_confirmed_at, customer_confirmation_mode, cancelled_at | confirmed_revision_id, validated_at |
+| order_items | customization_snapshot | customization_text |
+| shipments | acknowledged_at, acknowledgement_source, delivery_proof_media_id, external_delivery_proof_reference, proof_hash | — |
+| activity_log | — | performed_at |
+| theme_customizations | Table retirée (12 champs), destination et conservation décrites ci-dessus | — |
+| invoices | external_provider, external_reference, external_document_url, document_hash | sequence_record_type, fiscal_year |
+| order_contracts | Table retirée (18 champs), destination et conservation décrites ci-dessus | — |
+| document_deliveries | Table retirée (18 champs), destination et conservation décrites ci-dessus | — |
+| document_sequences | Table retirée (8 champs), destination et conservation décrites ci-dessus | — |
+| personal_data_operations | Table retirée (14 champs), destination et conservation décrites ci-dessus | — |
+| billing_obligations | — | billing_rule_record_type |
+| users | — | membership_status, joined_at |
+| shop_members | Table retirée (8 champs), destination et conservation décrites ci-dessus | — |
+| billing_rules | status | record_type, document_type, fiscal_year, shop_prefix, next_number, sequence_slot, policy_status, updated_at, code : varchar → varchar(100) |
+
+
+**Vérifications d'acceptation boutique V4.6 :** dernier article confirmé une fois en concurrence ; double clic même révision sans double stock/audit ; nouvelle clé sur révision déjà validée sans nouvelle réservation ; révision attendue périmée refusée ; transfert de réservation en échec conserve l'ancien engagement ; indisponibilité technique bloque remise ; aucun budget SAV libéré par refus d'appel ; livraison déclarée acceptée sans POD mais sans faux paiement ; aucun suivi/envoi acheteur ni import facture externe ; invitations/vérifications/reset des comptes restent disponibles ; compte suspendu/révoqué refuse les droits ; compteur/règle ne se substituent pas par FK ; PDF/reprise garde UUID et numéro ; charge transporteur conservée après paiement et inverse compté une seule fois ; 77 tables et tous champs/relations décrits dans le diagramme séparé ; hashes des fichiers protégés identiques.
+
 ## 15. Ordre de mise en œuvre
 
 | Lot | Modules |
 |---|---|
 | Fondations | Versions, pays, central/tenants, slugs/domaines uniques, PK numériques/UUID publics, quotas concurrentiels, propriété fixe, comptes locaux, Spatie, activité et déploiements |
 | Catalogue et vitrine | Profil, médias, variantes/options, pages, prix/promotion |
-| Vente | Panier, information données versionnée portée par `orders`, checkout en attente idempotent, conditions distinctes, révisions, confirmation téléphonique/réservation atomique, contrats et transmission |
+| Vente | Panier, information données versionnée portée par `orders`, checkout en attente idempotent, conditions distinctes, révisions, appel puis clic Valider/réservation atomique, audit officiel et documents internes sans envoi acheteur |
 | Stock et logistique | Réservations, mouvements, livraison entière, retours/quarantaine, remplacements |
-| Finance et documents | Incidents multi-causes et budgets, encaissements, frais, remboursements, règles/obligations locales T26/T22 ; table SaaS unique C8, virements manuels prouvés, avoirs, preuves et transmissions |
+| Finance et documents | Incidents multi-causes et budgets, encaissements, frais, remboursements, règles/obligations locales T26/T22 ; table SaaS unique C8, virements manuels prouvés, avoirs, preuves et PDF internes |
 | Comptes et API | Comptes/clés et tarifs locaux T25, référence marchand dans shipments, lots/bordereaux/lignes locaux, outbox, suivi et rapprochement par tracking |
 | Mesure et exploitation | Analytics, registre des traitements local T26, expirations techniques explicites et migrations par tenant, mesures de capacité et contrôles de concurrence/isolation |
 | Évolution | Personnalisation avancée, agrégats après mesure ; pas de sharding/microservices requis |
@@ -5852,7 +5811,7 @@ Les noms/adaptations et décisions de connexion/quota/délégation, ainsi que le
 26. `saas_transfers`
 27. `media`
 
-### BDD boutique — 83 tables
+### BDD boutique — 77 tables
 
 1. `shop`
 2. `shop_addresses`
@@ -5903,37 +5862,31 @@ Les noms/adaptations et décisions de connexion/quota/délégation, ainsi que le
 47. `customer_adjustments`
 48. `order_documents`
 49. `activity_log`
-50. `theme_customizations` — évolution
-51. `carrier_fees`
-52. `carrier_fee_payments`
-53. `carrier_receivables`
-54. `carrier_receivable_allocations`
-55. `collection_entries`
-56. `carrier_compensations`
-57. `invoices`
-58. `order_incidents`
-59. `order_incident_details`
-60. `order_contracts`
-61. `document_deliveries`
-62. `document_sequences`
-63. `sales_terms_acceptances`
-64. `personal_data_operations`
-65. `billing_obligations`
-66. `exchange_offsets`
-67. `commercial_corrections`
-68. `commercial_correction_lines`
-69. `users`
-70. `shop_members`
-71. `permissions`
-72. `roles`
-73. `role_has_permissions`
-74. `model_has_roles`
-75. `model_has_permissions`
-76. `permission_overrides`
-77. `team_invitations`
-78. `contact_verifications`
-79. `carrier_accounts`
-80. `carrier_rate_versions`
-81. `carrier_remittance_batches`
-82. `billing_rules`
-83. `processing_activity_register`
+50. `carrier_fees`
+51. `carrier_fee_payments`
+52. `carrier_receivables`
+53. `carrier_receivable_allocations`
+54. `collection_entries`
+55. `carrier_compensations`
+56. `invoices`
+57. `order_incidents`
+58. `order_incident_details`
+59. `billing_rules`
+60. `sales_terms_acceptances`
+61. `billing_obligations`
+62. `exchange_offsets`
+63. `commercial_corrections`
+64. `commercial_correction_lines`
+65. `users`
+66. `permissions`
+67. `roles`
+68. `role_has_permissions`
+69. `model_has_roles`
+70. `model_has_permissions`
+71. `permission_overrides`
+72. `team_invitations`
+73. `contact_verifications`
+74. `carrier_accounts`
+75. `carrier_rate_versions`
+76. `carrier_remittance_batches`
+77. `processing_activity_register`
