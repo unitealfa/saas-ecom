@@ -1,27 +1,24 @@
 # Diagramme complet de la BDD boutique
 
-Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.6 du 4 octobre 2026. Chaque boutique possède cette même structure dans sa propre BDD. Ce document réunit **les 77 tables locales et leurs 1169 champs dans un seul diagramme Mermaid**, puis explique chaque table et chacun de ses champs. Il décrit une conception ; aucune migration n’est exécutée. La BDD centrale et son diagramme restent inchangés.
+Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.7 du 4 octobre 2026. Chaque boutique possède cette même structure dans sa propre BDD. Ce document réunit **les 68 tables locales et leurs 1107 champs dans un seul diagramme Mermaid**, puis explique chaque table et chacun de ses champs. Il décrit une conception ; aucune migration n’est exécutée. La BDD centrale et son diagramme restent inchangés.
 
-## 1. Les 77 tables expliquées très simplement
+## 1. Les 68 tables expliquées très simplement
 
 | Table | Explication très simple |
 |---|---|
 | **`shop`** | La fiche publique de la boutique : son nom affiché, son logo, ses contacts et sa présentation. Exemple : les informations que les visiteurs voient sur le site de Karim. |
-| **`shop_addresses`** | Les adresses publiques de la boutique et leur emplacement sur une carte. Exemple : une adresse pour le magasin et une autre pour un point de retrait. Cela n’ajoute pas une caisse de magasin. |
-| **`social_links`** | Les liens vers les pages de la boutique sur les réseaux sociaux. Exemple : son compte Instagram et deux pages Facebook différentes. |
-| **`content_pages`** | Le contenu des pages d’information du site. Exemple : Karim écrit le texte de « À propos », de « Contact » ou de sa politique de retour. |
+| **`shop_addresses`** | Les adresses publiques et les liens sociaux : type 1 pour un lieu ; type 2 pour un lien général ou associé à un lieu de cette boutique. Leurs détails publics suivent deux formats contrôlés. |
+| **`content_pages`** | Les pages éditées de la vitrine : type 1 pour les informations comme À propos ; type 2 pour présenter et vendre un produit précis. Les deux familles gardent leurs routes, blocs, publication et SEO. |
 | **`media`** | Les informations permettant de retrouver les fichiers de la boutique : images, vidéos, logos ou documents. Exemple : l’emplacement et le type de la photo d’un produit ; le fichier lui-même est stocké séparément. |
 | **`categories`** | Les familles de produits et leurs sous-familles. Exemple : « Vêtements » contient « T-shirts ». Une seule table permet d’organiser les deux niveaux. |
 | **`products`** | La présentation commune d’un produit : son nom, sa description et les informations partagées par ses versions. Exemple : le modèle « T-shirt coton », proposé ensuite en plusieurs tailles et couleurs. |
 | **`product_variants`** | Les versions précises que l’on peut acheter, avec leur prix et leur stock. Exemple : « T-shirt rouge, taille M ». Un produit sans choix possède aussi une variante standard. |
-| **`product_options`** | Les types de choix proposés pour un produit. Exemple : pour un t-shirt, le client peut choisir une taille et une couleur. |
-| **`option_values`** | Les choix disponibles pour chaque option. Exemple : M et L pour la taille ; rouge et bleu pour la couleur. |
-| **`variant_option_values`** | Indique les choix qui composent chaque variante. Exemple : cette variante correspond à la taille M et à la couleur rouge. |
+| **`product_options`** | Les axes de choix et leurs valeurs : type 1 pour Taille ou Couleur ; type 2 pour M, L ou Rouge sous un axe précis. Les variantes vendables restent séparées. |
+| **`variant_option_values`** | Les choix qui composent une variante vendable. Exemple : le t-shirt précis a la taille M et la couleur rouge. La variante garde son prix, son SKU et son stock dans product_variants. |
 | **`tags`** | Les petits mots utilisés pour classer ou mettre en avant les produits. Exemple : « Été » ou « Idée cadeau ». |
 | **`product_tags`** | Indique quelles étiquettes sont attachées à chaque produit. Exemple : le même t-shirt peut porter les étiquettes « Été » et « Idée cadeau ». |
 | **`attributes`** | La liste des informations servant à décrire les produits. Exemple : le poids ou le pays de fabrication ; ce ne sont pas forcément des choix proposés à l’achat. |
 | **`product_attributes`** | La valeur d’une caractéristique pour un produit précis. Exemple : le poids de ce pot de miel est de 500 grammes. |
-| **`sales_pages`** | Les pages qui présentent un seul produit pour donner envie de le commander. Exemple : une page partageable avec les avantages d’un produit, ses images et son formulaire de commande. |
 | **`product_promotions`** | Les réductions appliquées automatiquement aux produits, sans code à saisir. Exemple : une réduction sur un produit pendant une période choisie. |
 | **`product_reviews`** | Les notes et commentaires laissés sur les produits, même sans compte acheteur. Exemple : un client écrit « Très bon produit » ; la boutique décide ensuite de publier ou de masquer cet avis. |
 | **`visitors`** | Un identifiant pour reconnaître un navigateur dans cette boutique, sans créer de compte acheteur. Exemple : reconnaître le même navigateur lors d’un retour sur le site, sans garantir qu’il s’agit de la même personne. |
@@ -34,13 +31,11 @@ Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md),
 | **`order_revisions`** | Les copies successives du contenu d’une commande à chaque modification. Exemple : la première version contient une taille M ; une nouvelle version contient une taille L, sans effacer l’ancienne. |
 | **`order_items`** | Les produits et quantités d’une version précise de commande, avec les prix et coûts conservés à ce moment-là. Exemple : deux t-shirts à 2 000 DA chacun, même si le prix du catalogue change ensuite. |
 | **`order_history`** | Le carnet des appels, rappels, propositions et changements concernant une commande. Exemple : noter un appel sans réponse ou un changement de taille ; le clic « Valider » est audité séparément dans `activity_log`. |
-| **`stock_reservations`** | Les quantités mises de côté au clic « Valider » du commerçant après son appel. Exemple : réserver deux t-shirts ; leur sortie physique est enregistrée lors de la remise du colis au transporteur. |
 | **`stock_movements`** | Le carnet de tous les changements de stock. Exemple : recevoir dix articles, en réserver deux, les expédier ou constater une perte, en gardant l’explication de chaque changement. |
 | **`order_returns`** | Les dossiers des colis qui reviennent à la boutique. Exemple : un client refuse son colis. Au lancement, le retour porte sur tout le colis ; la structure permet une évolution future. |
 | **`return_items`** | Le détail de ce qui est attendu et constaté dans un retour. Exemple : sur trois articles attendus, deux sont reçus et un manque ; les articles reçus peuvent être revendables ou abîmés. |
 | **`shipping_providers`** | Les personnes ou sociétés qui livrent pour la boutique. Exemple : un livreur interne ou EcoTrack, avec le suivi de l’argent qu’ils doivent reverser. |
-| **`customer_shipping_rates`** | Le prix de livraison demandé à l’acheteur. Exemple : le client paie 600 DA pour une livraison dans une zone donnée ; ce prix peut différer du coût payé au transporteur. |
-| **`provider_rates`** | Le coût estimé de la livraison pour la boutique selon la zone et le mode choisi. Exemple : estimer le coût d’une livraison à domicile. Les tarifs de retour des comptes société sont versionnés dans carrier_rate_versions de cette boutique (T25). |
+| **`shipping_rates`** | Les tarifs conservés par cette boutique : prix client, devis du transporteur ou version de tarif de retour. Chaque type garde son usage, son prestataire et sa période. |
 | **`free_shipping_rules`** | Les conditions qui rendent automatiquement la livraison gratuite pour le client. Exemple : offrir la livraison lorsque la commande remplit la règle définie par la boutique. |
 | **`carrier_geo_mappings`** | Relie les wilayas et communes du SaaS aux noms ou codes utilisés par chaque transporteur. Exemple : traduire une commune choisie sur le site en code reconnu par EcoTrack. |
 | **`pickup_points`** | Les bureaux du transporteur où le client peut retirer son colis. Exemple : choisir un stop desk au lieu d’une livraison à domicile. |
@@ -50,17 +45,14 @@ Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md),
 | **`carrier_operation_attempts`** | Le résultat de chaque essai de communication avec le transporteur. Exemple : le premier essai échoue ; une nouvelle tentative est enregistrée séparément sans effacer la précédente. |
 | **`collections`** | Le suivi de l’argent lié à un colis : ce qui doit être encaissé et reversé. Exemple : le client a payé le livreur, mais le commerçant attend encore son argent. |
 | **`remittance_statements`** | Les documents de suivi d’un règlement avec le livreur ou le transporteur pour cette boutique. Exemple : expliquer le montant reçu en distinguant ventes, frais et indemnisations. |
-| **`remittance_lines`** | Le détail d’un reversement pour chaque colis. Exemple : préciser que 4 000 DA du versement concernent le colis A et 6 000 DA le colis B, sans les compter deux fois. |
+| **`carrier_settlement_lines`** | Les détails des règlements transporteur : produits reversés, frais payés, créances apurées ou indemnités. Le type de chaque ligne empêche de mélanger ces montants. |
 | **`expenses`** | Les autres dépenses réelles de la boutique, hors frais transporteur et pertes de stock déjà suivis ailleurs. Exemple : publicité, emballages ou frais généraux. |
 | **`customer_adjustments`** | Le suivi des remboursements aux acheteurs, avec leurs montants, motifs et états. Exemple : enregistrer un remboursement réellement effectué, sans créer de portefeuille client. |
 | **`order_documents`** | Les bons de commande facultatifs correspondant à une version précise de la commande. Exemple : conserver un document indiquant exactement les articles et les prix de cette version. |
 | **`activity_log`** | Le carnet de la boutique : qui a fait quoi, quand et sur quel élément. Il garde aussi la validation par clic et les opérations sensibles sur les données, sans seconde table de journal. |
 | **`carrier_fees`** | Les frais liés au transport et la personne qui doit les payer. Exemple : des frais de retour à la charge du commerçant, distincts de la livraison payée par l’acheteur. |
-| **`carrier_fee_payments`** | Indique comment les frais dus par le commerçant au transporteur sont réglés. Exemple : un frais de retour est déduit d’un reversement ou payé séparément, sans compter une deuxième dépense. |
 | **`carrier_receivables`** | Les sommes que le transporteur doit rendre après correction de frais déjà payés. Exemple : 650 DA ont été payés au lieu de 600 DA ; le transporteur doit encore 50 DA au commerçant. |
-| **`carrier_receivable_allocations`** | Indique comment le transporteur règle les sommes qu’il doit après une correction de frais. Exemple : les 50 DA dus sont remboursés ou déduits d’un prochain frais. |
 | **`collection_entries`** | Les montants réellement encaissés auprès du client et vérifiés, avec leurs éventuelles corrections. Exemple : confirmer que le livreur a reçu 5 000 DA ; cela ne prouve pas encore leur reversement au commerçant. |
-| **`carrier_compensations`** | Les dédommagements du transporteur pour un problème comme une perte ou une casse. Exemple : un montant versé au commerçant pour un colis perdu, séparé de l’argent payé par le client. |
 | **`invoices`** | Les factures de vente de la boutique et les avoirs qui les corrigent, avec leur contenu historique conservé. Exemple : garder la facture d’origine puis créer un avoir si son montant doit être réduit. |
 | **`order_incidents`** | Le dossier d’un problème concernant une ligne de produits expédiée et les limites de sa prise en charge. Exemple : un article cassé pour lequel on examine un remplacement ou un remboursement. |
 | **`order_incident_details`** | Les différents problèmes et quantités dans un dossier d’incident. Exemple : sur trois articles, un est cassé, un manque et le troisième est correct ; on ne compte pas deux fois le même article. |
@@ -80,7 +72,6 @@ Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md),
 | **`team_invitations`** | Les invitations permettant à un employé de rejoindre cette boutique avec un rôle précis et un lien secret qui expire. |
 | **`contact_verifications`** | Les codes protégés utilisés pour vérifier les contacts des comptes du propriétaire et des employés ; les acheteurs ne reçoivent aucun message. |
 | **`carrier_accounts`** | Les connexions de cette boutique aux services de livraison : compte transporteur, adresse API et secrets protégés. |
-| **`carrier_rate_versions`** | Les tarifs de retour annoncés par un compte transporteur, avec leur période d’application. Un changement crée une autre version. |
 | **`carrier_remittance_batches`** | Les lots de versements annoncés par un compte transporteur, leur justificatif et la part vérifiée pour cette boutique. |
 | **`processing_activity_register`** | Le registre qui explique pourquoi la boutique utilise des données, lesquelles, avec qui et comment elle les protège. Les actions réellement faites sont dans activity_log. |
 
@@ -88,11 +79,11 @@ Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md),
 
 **Types du dessin :** u64 = BIGINT UNSIGNED ; u8 = TINYINT UNSIGNED ; « ? » = nullable. Les types complets, enums et phases restent définis dans le schéma principal.
 
-**Lecture :** PK = clé primaire ; FK = lien SQL vers une table de cette boutique ; UK = unicité ; REF = référence logique vers la BDD centrale. Dans chaque table : identifiants d’abord, clés et liens ensuite, autres champs après. Les trois pivots Spatie conservent leurs clés composites sans inventer id ou uuid. Les 220 liens FK du dessin reprennent toutes les colonnes marquées FK. Les 90 liens POLY sont conditionnels et n’inventent aucune FK SQL. Un trait plein concerne une colonne de clé primaire ; les autres traits sont pointillés. Un parent peut être obligatoire ou facultatif, et plusieurs enfants sont possibles sauf les liens uniques indiqués.
+**Lecture :** PK = clé primaire ; FK = lien SQL vers une table de cette boutique ; UK = unicité ; REF = référence logique vers la BDD centrale. Dans chaque table : identifiants d’abord, clés et liens ensuite, autres champs après. Les trois pivots Spatie conservent leurs clés composites sans inventer id ou uuid. Les 210 liens FK du dessin reprennent toutes les colonnes marquées FK. Les 81 liens POLY sont conditionnels et n’inventent aucune FK SQL. Un trait plein concerne une colonne de clé primaire ; les autres traits sont pointillés. Un parent peut être obligatoire ou facultatif, et plusieurs enfants sont possibles sauf les liens uniques indiqués.
 
-Le dessin contient uniquement les 77 tables locales. Les UUID centraux sont visibles dans les champs REF ; ils ne recopient aucune table centrale et n’autorisent aucune jointure d’identités. Les contraintes composites et les règles de phase restent obligatoires même lorsque le dessin montre chaque colonne séparément : voir §6 et les modules T8–T26 du schéma principal.
+Le dessin contient uniquement les 68 tables locales. Les UUID centraux sont visibles dans les champs REF ; ils ne recopient aucune table centrale et n’autorisent aucune jointure d’identités. Les contraintes composites et les règles de phase restent obligatoires même lorsque le dessin montre chaque colonne séparément : voir §6 et les modules T1–T26 du schéma principal.
 
-Les pivots et causer_id ne ciblent que les comptes shop_user autorisés de cette boutique. subject_id cible un modèle local explicitement autorisé ; les traits « si modèle autorisé » décrivent ce choix sans autoriser automatiquement toutes les tables. Les événements d’attribution de pivots prennent pour sujet un compte ou rôle et décrivent le lien dans des propriétés filtrées. model_id des médias utilise un seul parent local autorisé, y compris produit/variante pour les galeries ; les FK de pièce précise restent distinctes de ce lien. Un inverse peut référencer la pièce de son original sous les contrôles du schéma, sans en déplacer le parent.
+Les pivots et causer_id ne ciblent que les comptes shop_user autorisés de cette boutique. subject_id cible un modèle local explicitement autorisé ; les traits POLY sont conditionnels et n’autorisent pas automatiquement toutes les tables. Les événements d’attribution de pivots prennent pour sujet un compte ou rôle et décrivent le lien dans des propriétés filtrées. model_id des médias utilise un seul parent local autorisé, y compris produit/variante pour les galeries ; les FK de pièce précise restent distinctes de ce lien. Un inverse peut référencer la pièce de son original sous les contrôles du schéma, sans en déplacer le parent. Les alias des tables typées imposent leur famille : ADDRESS/SOCIAL, CONTENT/SALES, AXIS/VALUE et chaque nature de tarif ou règlement.
 
 ```mermaid
 erDiagram
@@ -128,33 +119,17 @@ shop_addresses {
   u64 id PK
   uuid uuid UK
   u64 shop_id FK
-  uuid province_uuid "REF central.geographic_areas.uuid"
-  uuid municipality_uuid "REF central.geographic_areas.uuid"
-  varchar label
-  text address
-  varchar postal_code "?"
-  decimal_geo latitude "?"
-  decimal_geo longitude "?"
-  varchar map_url "?"
-  varchar phone "?"
-  json opening_hours "?"
+  u64 shop_address_id FK "?"
+  uuid province_uuid "? ; REF central.geographic_areas.uuid"
+  uuid municipality_uuid "? ; REF central.geographic_areas.uuid"
+  u8 record_type
+  u8 shop_address_type "?"
+  varchar label "?"
+  int position
   boolean is_primary
   boolean visible
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
-}
-
-social_links {
-  u64 id PK
-  uuid uuid UK
-  u64 shop_id FK
-  u64 shop_address_id FK "?"
-  varchar network
-  varchar label "?"
-  varchar url
-  int position
-  boolean is_active
+  json payload
+  u8 primary_slot "?"
   datetime created_at
   datetime updated_at
   datetime deleted_at "?"
@@ -163,12 +138,15 @@ social_links {
 content_pages {
   u64 id PK
   uuid uuid UK
+  u64 product_id FK "?"
+  u8 page_kind
   varchar slug
-  varchar type
+  varchar type "?"
   varchar title
   json content
   varchar meta_title "?"
   text meta_description "?"
+  varchar canonical_url "?"
   boolean indexable
   boolean is_published
   datetime published_at "?"
@@ -256,7 +234,7 @@ product_variants {
   varchar label
   varchar sku
   varchar barcode "?"
-  varchar combination_signature
+  char(64) combination_signature
   datetime used_at "?"
   decimal sale_price
   decimal unit_cost
@@ -281,20 +259,12 @@ product_options {
   u64 id PK
   uuid uuid UK
   u64 product_id FK
+  u64 parent_id FK "?"
+  u8 record_type
+  u8 parent_record_type "?"
   varchar name
-  u8 display_type
-  int position
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
-}
-
-option_values {
-  u64 id PK
-  uuid uuid UK
-  u64 option_id FK
-  varchar identity_code
-  varchar value
+  varchar identity_code "?"
+  u8 display_type "?"
   char(7) color_hex "?"
   int position
   datetime created_at
@@ -309,6 +279,8 @@ variant_option_values {
   u64 variant_id FK
   u64 option_id FK
   u64 value_id FK
+  u8 option_record_type
+  u8 value_record_type
   datetime created_at
   datetime updated_at
 }
@@ -355,24 +327,6 @@ product_attributes {
   decimal numeric_value "?"
   datetime created_at
   datetime updated_at
-}
-
-sales_pages {
-  u64 id PK
-  uuid uuid UK
-  u64 product_id FK
-  varchar slug
-  varchar title
-  json content
-  varchar meta_title "?"
-  text meta_description "?"
-  varchar canonical_url "?"
-  boolean indexable
-  boolean is_published
-  datetime published_at "?"
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
 }
 
 product_promotions {
@@ -449,6 +403,8 @@ navigation_events {
   u64 sales_page_id FK "?"
   u64 content_page_id FK "?"
   u64 cart_id FK "?"
+  u8 sales_page_kind "?"
+  u8 content_page_kind "?"
   varchar type
   varchar path
   int quantity "?"
@@ -507,6 +463,7 @@ orders {
   u64 confirmed_revision_id FK "?"
   u64 confirmation_owner_id FK "?"
   u64 operationally_confirmed_by_id FK "?"
+  u8 original_sales_page_kind "?"
   varchar number
   varchar data_policy_version
   datetime data_notice_acknowledged_at
@@ -592,6 +549,11 @@ order_items {
   decimal unit_cost_snapshot
   decimal line_total
   json tax_snapshot
+  u8 reservation_status "?"
+  datetime reserved_at "?"
+  datetime reservation_released_at "?"
+  datetime reservation_created_at "?"
+  datetime reservation_updated_at "?"
   datetime created_at
 }
 
@@ -612,18 +574,6 @@ order_history {
   uuid correlation_id
   u8 origin
   datetime created_at
-}
-
-stock_reservations {
-  u64 id PK
-  uuid uuid UK
-  u64 order_item_id FK
-  int quantity
-  u8 status
-  datetime reserved_at
-  datetime released_at "?"
-  datetime created_at
-  datetime updated_at
 }
 
 stock_movements {
@@ -713,33 +663,28 @@ shipping_providers {
   datetime deleted_at "?"
 }
 
-customer_shipping_rates {
+shipping_rates {
   u64 id PK
   uuid uuid UK
-  uuid province_uuid "REF central.geographic_areas.uuid"
+  u64 provider_id FK "?"
+  u64 carrier_account_id FK "?"
+  u64 created_by_id FK "?"
+  uuid province_uuid "? ; REF central.geographic_areas.uuid"
   uuid municipality_uuid "? ; REF central.geographic_areas.uuid"
-  u8 delivery_mode
+  u8 record_type
+  u8 delivery_mode "?"
+  u8 service_type "?"
   decimal amount
+  u8 source "?"
+  datetime retrieved_at "?"
+  datetime starts_at "?"
+  datetime ends_at "?"
   boolean is_active
+  u64 provider_scope_id
+  uuid municipality_scope_uuid "?"
+  u8 current_slot "?"
   datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
-}
-
-provider_rates {
-  u64 id PK
-  uuid uuid UK
-  u64 provider_id FK
-  uuid province_uuid "REF central.geographic_areas.uuid"
-  uuid municipality_uuid "? ; REF central.geographic_areas.uuid"
-  u8 delivery_mode
-  u8 service_type
-  decimal amount
-  u8 source
-  datetime retrieved_at
-  boolean is_active
-  datetime created_at
-  datetime updated_at
+  datetime updated_at "?"
   datetime deleted_at "?"
 }
 
@@ -940,15 +885,27 @@ remittance_statements {
   datetime updated_at
 }
 
-remittance_lines {
+carrier_settlement_lines {
   u64 id PK
   uuid uuid UK
-  u64 remittance_statement_id FK
-  u64 collection_id FK
+  u64 provider_id FK
+  u64 remittance_statement_id FK "?"
+  u64 collection_id FK "?"
+  u64 carrier_fee_id FK "?"
+  u64 receivable_id FK "?"
+  u64 shipment_id FK "?"
+  u64 replacement_order_id FK "?"
+  u64 proof_media_id FK "?"
   u64 reversal_of_id FK "?"
   u64 correction_of_id FK "?"
-  decimal remitted_amount
-  varchar operation_key
+  u8 record_type
+  decimal amount
+  u8 fee_payment_mode "?"
+  u8 receivable_settlement_type "?"
+  varchar reason "?"
+  varchar external_reference "?"
+  varchar operation_key UK
+  datetime performed_at "?"
   datetime created_at
 }
 
@@ -1047,6 +1004,7 @@ carrier_fees {
   u64 reversal_of_id FK "?"
   u64 correction_of_id FK "?"
   json rate_snapshot "?"
+  u8 source_rate_record_type "?"
   u8 fee_type
   u8 payer
   u8 settlement_mode
@@ -1061,19 +1019,6 @@ carrier_fees {
   datetime updated_at
 }
 
-carrier_fee_payments {
-  u64 id PK
-  uuid uuid UK
-  u64 remittance_statement_id FK
-  u64 carrier_fee_id FK
-  u64 reversal_of_id FK "?"
-  u64 correction_of_id FK "?"
-  decimal amount
-  u8 mode
-  varchar operation_key
-  datetime created_at
-}
-
 carrier_receivables {
   u64 id PK
   uuid uuid UK
@@ -1084,27 +1029,13 @@ carrier_receivables {
   decimal initial_amount
   decimal remaining_amount
   varchar reason
+  u8 original_fee_payment_record_type "?"
   u8 status
   varchar operation_key
   datetime recognized_at
   datetime settled_at "?"
   datetime created_at
   datetime updated_at
-}
-
-carrier_receivable_allocations {
-  u64 id PK
-  uuid uuid UK
-  u64 receivable_id FK
-  u64 remittance_statement_id FK "?"
-  u64 carrier_fee_id FK "?"
-  u64 reversal_of_id FK "?"
-  u8 settlement_type
-  decimal amount
-  varchar external_reference "?"
-  varchar operation_key
-  datetime performed_at
-  datetime created_at
 }
 
 collection_entries {
@@ -1120,22 +1051,6 @@ collection_entries {
   datetime verified_at
   varchar reference
   text reason
-  varchar operation_key
-  datetime created_at
-}
-
-carrier_compensations {
-  u64 id PK
-  uuid uuid UK
-  u64 remittance_statement_id FK
-  u64 shipment_id FK
-  u64 replacement_order_id FK "?"
-  u64 proof_media_id FK "?"
-  u64 reversal_of_id FK "?"
-  u64 correction_of_id FK "?"
-  decimal amount
-  varchar reason
-  varchar external_reference
   varchar operation_key
   datetime created_at
 }
@@ -1214,7 +1129,7 @@ billing_rules {
   int fiscal_year "?"
   varchar(32) shop_prefix "?"
   bigint next_number "?"
-  u8 sequence_slot
+  u8 sequence_slot "?"
   varchar(100) code "?"
   int version "?"
   u64 seller_profile_version "?"
@@ -1445,19 +1360,6 @@ carrier_accounts {
   datetime updated_at
 }
 
-carrier_rate_versions {
-  u64 id PK
-  uuid uuid UK
-  u64 carrier_account_id FK
-  u64 created_by_id FK
-  decimal return_rate
-  datetime starts_at
-  datetime ends_at "?"
-  boolean is_active
-  u8 source
-  datetime created_at
-}
-
 carrier_remittance_batches {
   u64 id PK
   uuid uuid UK
@@ -1501,27 +1403,26 @@ processing_activity_register {
 media |o..o{ shop : "FK logo_media_id"
 media |o..o{ shop : "FK favicon_media_id"
 shop ||..o{ shop_addresses : "FK shop_id"
-shop ||..o{ social_links : "FK shop_id"
-shop_addresses |o..o{ social_links : "FK shop_address_id"
+shop_addresses |o..o{ shop_addresses : "FK shop_address_id"
+products |o..o{ content_pages : "FK product_id"
 users |o..o{ media : "FK created_by_id"
 categories |o..o{ categories : "FK parent_id"
 media |o..o{ categories : "FK media_id"
 categories |o..o{ products : "FK category_id"
 products ||..o{ product_variants : "FK product_id"
 products ||..o{ product_options : "FK product_id"
-product_options ||..o{ option_values : "FK option_id"
+product_options |o..o{ product_options : "FK parent_id"
 products ||..o{ variant_option_values : "FK product_id"
 product_variants ||..o{ variant_option_values : "FK variant_id"
 product_options ||..o{ variant_option_values : "FK option_id"
-option_values ||..o{ variant_option_values : "FK value_id"
+product_options ||..o{ variant_option_values : "FK value_id"
 products ||..o{ product_tags : "FK product_id"
 tags ||..o{ product_tags : "FK tag_id"
 products ||..o{ product_attributes : "FK product_id"
 attributes ||..o{ product_attributes : "FK attribute_id"
-products ||..o{ sales_pages : "FK product_id"
 products ||..o{ product_promotions : "FK product_id"
 product_variants |o..o{ product_promotions : "FK variant_id"
-sales_pages |o..o{ product_promotions : "FK sales_page_id"
+content_pages |o..o{ product_promotions : "FK sales_page_id"
 products ||..o{ product_reviews : "FK product_id"
 visitors |o..o{ product_reviews : "FK visitor_id"
 order_items |o..o{ product_reviews : "FK order_item_id"
@@ -1530,7 +1431,7 @@ visitors ||..o{ visit_sessions : "FK visitor_id"
 visit_sessions ||..o{ navigation_events : "FK session_id"
 products |o..o{ navigation_events : "FK product_id"
 product_variants |o..o{ navigation_events : "FK variant_id"
-sales_pages |o..o{ navigation_events : "FK sales_page_id"
+content_pages |o..o{ navigation_events : "FK sales_page_id"
 content_pages |o..o{ navigation_events : "FK content_page_id"
 carts |o..o{ navigation_events : "FK cart_id"
 visitors ||..o{ visitor_preferences : "FK visitor_id"
@@ -1538,11 +1439,11 @@ visitors ||..o{ carts : "FK visitor_id"
 carts ||..o{ cart_items : "FK cart_id"
 product_variants ||..o{ cart_items : "FK variant_id"
 products ||..o{ cart_items : "FK product_id"
-sales_pages |o..o{ cart_items : "FK sales_page_id"
+content_pages |o..o{ cart_items : "FK sales_page_id"
 visitors |o..o{ orders : "FK visitor_id"
 carts |o..o{ orders : "FK cart_id"
 visit_sessions |o..o{ orders : "FK original_session_id"
-sales_pages |o..o{ orders : "FK original_sales_page_id"
+content_pages |o..o{ orders : "FK original_sales_page_id"
 order_returns |o..o{ orders : "FK original_return_id"
 orders |o..o{ orders : "FK original_order_id"
 order_incidents |o..o{ orders : "FK original_incident_id"
@@ -1558,12 +1459,11 @@ order_revisions ||..o{ order_items : "FK revision_id"
 product_variants ||..o{ order_items : "FK variant_id"
 products ||..o{ order_items : "FK product_id"
 product_promotions |o..o{ order_items : "FK promotion_id"
-sales_pages |o..o{ order_items : "FK sales_page_id"
+content_pages |o..o{ order_items : "FK sales_page_id"
 orders ||..o{ order_history : "FK order_id"
 order_revisions |o..o{ order_history : "FK previous_revision_id"
 order_revisions |o..o{ order_history : "FK next_revision_id"
 users |o..o{ order_history : "FK actor_id"
-order_items ||..o| stock_reservations : "FK order_item_id"
 product_variants ||..o{ stock_movements : "FK variant_id"
 order_items |o..o{ stock_movements : "FK order_item_id"
 return_items |o..o{ stock_movements : "FK return_item_id"
@@ -1580,7 +1480,9 @@ product_variants ||..o{ return_items : "FK variant_id"
 users |o..o{ return_items : "FK inspected_by_id"
 users |o..o{ shipping_providers : "FK user_id"
 carrier_accounts |o..o{ shipping_providers : "FK carrier_account_id"
-shipping_providers ||..o{ provider_rates : "FK provider_id"
+shipping_providers |o..o{ shipping_rates : "FK provider_id"
+carrier_accounts |o..o{ shipping_rates : "FK carrier_account_id"
+users |o..o{ shipping_rates : "FK created_by_id"
 products |o..o{ free_shipping_rules : "FK product_id"
 shipping_providers ||..o{ carrier_geo_mappings : "FK provider_id"
 shipping_providers ||..o{ pickup_points : "FK provider_id"
@@ -1606,10 +1508,16 @@ carrier_remittance_batches |o..o{ remittance_statements : "FK carrier_remittance
 users |o..o{ remittance_statements : "FK validated_by_id"
 media |o..o{ remittance_statements : "FK proof_media_id"
 remittance_statements |o..o{ remittance_statements : "FK reversal_of_id"
-remittance_statements ||..o{ remittance_lines : "FK remittance_statement_id"
-collections ||..o{ remittance_lines : "FK collection_id"
-remittance_lines |o..o{ remittance_lines : "FK reversal_of_id"
-remittance_lines |o..o{ remittance_lines : "FK correction_of_id"
+shipping_providers ||..o{ carrier_settlement_lines : "FK provider_id"
+remittance_statements |o..o{ carrier_settlement_lines : "FK remittance_statement_id"
+collections |o..o{ carrier_settlement_lines : "FK collection_id"
+carrier_fees |o..o{ carrier_settlement_lines : "FK carrier_fee_id"
+carrier_receivables |o..o{ carrier_settlement_lines : "FK receivable_id"
+shipments |o..o{ carrier_settlement_lines : "FK shipment_id"
+orders |o..o{ carrier_settlement_lines : "FK replacement_order_id"
+media |o..o{ carrier_settlement_lines : "FK proof_media_id"
+carrier_settlement_lines |o..o{ carrier_settlement_lines : "FK reversal_of_id"
+carrier_settlement_lines |o..o{ carrier_settlement_lines : "FK correction_of_id"
 products |o..o{ expenses : "FK product_id"
 orders |o..o{ expenses : "FK order_id"
 shipments |o..o{ expenses : "FK shipment_id"
@@ -1635,33 +1543,19 @@ shipments ||..o{ carrier_fees : "FK shipment_id"
 shipping_providers ||..o{ carrier_fees : "FK provider_id"
 order_returns |o..o{ carrier_fees : "FK return_id"
 carrier_accounts |o..o{ carrier_fees : "FK carrier_account_id"
-carrier_rate_versions |o..o{ carrier_fees : "FK source_rate_id"
+shipping_rates |o..o{ carrier_fees : "FK source_rate_id"
 media |o..o{ carrier_fees : "FK proof_media_id"
 carrier_fees |o..o{ carrier_fees : "FK reversal_of_id"
 carrier_fees |o..o{ carrier_fees : "FK correction_of_id"
-remittance_statements ||..o{ carrier_fee_payments : "FK remittance_statement_id"
-carrier_fees ||..o{ carrier_fee_payments : "FK carrier_fee_id"
-carrier_fee_payments |o..o{ carrier_fee_payments : "FK reversal_of_id"
-carrier_fee_payments |o..o{ carrier_fee_payments : "FK correction_of_id"
 shipping_providers ||..o{ carrier_receivables : "FK provider_id"
 carrier_fees ||..o{ carrier_receivables : "FK carrier_fee_id"
-carrier_fee_payments |o..o{ carrier_receivables : "FK original_fee_payment_id"
+carrier_settlement_lines |o..o{ carrier_receivables : "FK original_fee_payment_id"
 carrier_receivables |o..o{ carrier_receivables : "FK reversal_of_id"
-carrier_receivables ||..o{ carrier_receivable_allocations : "FK receivable_id"
-remittance_statements |o..o{ carrier_receivable_allocations : "FK remittance_statement_id"
-carrier_fees |o..o{ carrier_receivable_allocations : "FK carrier_fee_id"
-carrier_receivable_allocations |o..o{ carrier_receivable_allocations : "FK reversal_of_id"
 collections ||..o{ collection_entries : "FK collection_id"
 users ||..o{ collection_entries : "FK verified_by_id"
 media |o..o{ collection_entries : "FK proof_media_id"
 collection_entries |o..o{ collection_entries : "FK reversal_of_id"
 collection_entries |o..o{ collection_entries : "FK correction_of_id"
-remittance_statements ||..o{ carrier_compensations : "FK remittance_statement_id"
-shipments ||..o{ carrier_compensations : "FK shipment_id"
-orders |o..o{ carrier_compensations : "FK replacement_order_id"
-media |o..o{ carrier_compensations : "FK proof_media_id"
-carrier_compensations |o..o{ carrier_compensations : "FK reversal_of_id"
-carrier_compensations |o..o{ carrier_compensations : "FK correction_of_id"
 orders ||..o{ invoices : "FK order_id"
 order_revisions ||..o{ invoices : "FK revision_id"
 invoices |o..o{ invoices : "FK original_invoice_id"
@@ -1711,8 +1605,6 @@ roles ||..o{ team_invitations : "FK initial_role_id"
 users ||..o{ team_invitations : "FK invited_by_id"
 users ||..o{ contact_verifications : "FK user_id"
 users ||..o{ carrier_accounts : "FK created_by_id"
-carrier_accounts ||..o{ carrier_rate_versions : "FK carrier_account_id"
-users ||..o{ carrier_rate_versions : "FK created_by_id"
 carrier_accounts ||..o{ carrier_remittance_batches : "FK carrier_account_id"
 media |o..o{ carrier_remittance_batches : "FK proof_media_id"
 carrier_remittance_batches |o..o{ carrier_remittance_batches : "FK reversal_of_id"
@@ -1723,20 +1615,17 @@ users ||..o{ model_has_permissions : "POLY model_id"
 users |o..o{ activity_log : "POLY causer_id"
 shop |o..o{ activity_log : "POLY subject_id"
 shop_addresses |o..o{ activity_log : "POLY subject_id"
-social_links |o..o{ activity_log : "POLY subject_id"
 content_pages |o..o{ activity_log : "POLY subject_id"
 media |o..o{ activity_log : "POLY subject_id"
 categories |o..o{ activity_log : "POLY subject_id"
 products |o..o{ activity_log : "POLY subject_id"
 product_variants |o..o{ activity_log : "POLY subject_id"
 product_options |o..o{ activity_log : "POLY subject_id"
-option_values |o..o{ activity_log : "POLY subject_id"
 variant_option_values |o..o{ activity_log : "POLY subject_id"
 tags |o..o{ activity_log : "POLY subject_id"
 product_tags |o..o{ activity_log : "POLY subject_id"
 attributes |o..o{ activity_log : "POLY subject_id"
 product_attributes |o..o{ activity_log : "POLY subject_id"
-sales_pages |o..o{ activity_log : "POLY subject_id"
 product_promotions |o..o{ activity_log : "POLY subject_id"
 product_reviews |o..o{ activity_log : "POLY subject_id"
 visitors |o..o{ activity_log : "POLY subject_id"
@@ -1749,13 +1638,11 @@ orders |o..o{ activity_log : "POLY subject_id"
 order_revisions |o..o{ activity_log : "POLY subject_id"
 order_items |o..o{ activity_log : "POLY subject_id"
 order_history |o..o{ activity_log : "POLY subject_id"
-stock_reservations |o..o{ activity_log : "POLY subject_id"
 stock_movements |o..o{ activity_log : "POLY subject_id"
 order_returns |o..o{ activity_log : "POLY subject_id"
 return_items |o..o{ activity_log : "POLY subject_id"
 shipping_providers |o..o{ activity_log : "POLY subject_id"
-customer_shipping_rates |o..o{ activity_log : "POLY subject_id"
-provider_rates |o..o{ activity_log : "POLY subject_id"
+shipping_rates |o..o{ activity_log : "POLY subject_id"
 free_shipping_rules |o..o{ activity_log : "POLY subject_id"
 carrier_geo_mappings |o..o{ activity_log : "POLY subject_id"
 pickup_points |o..o{ activity_log : "POLY subject_id"
@@ -1765,16 +1652,13 @@ carrier_operations |o..o{ activity_log : "POLY subject_id"
 carrier_operation_attempts |o..o{ activity_log : "POLY subject_id"
 collections |o..o{ activity_log : "POLY subject_id"
 remittance_statements |o..o{ activity_log : "POLY subject_id"
-remittance_lines |o..o{ activity_log : "POLY subject_id"
+carrier_settlement_lines |o..o{ activity_log : "POLY subject_id"
 expenses |o..o{ activity_log : "POLY subject_id"
 customer_adjustments |o..o{ activity_log : "POLY subject_id"
 order_documents |o..o{ activity_log : "POLY subject_id"
 carrier_fees |o..o{ activity_log : "POLY subject_id"
-carrier_fee_payments |o..o{ activity_log : "POLY subject_id"
 carrier_receivables |o..o{ activity_log : "POLY subject_id"
-carrier_receivable_allocations |o..o{ activity_log : "POLY subject_id"
 collection_entries |o..o{ activity_log : "POLY subject_id"
-carrier_compensations |o..o{ activity_log : "POLY subject_id"
 invoices |o..o{ activity_log : "POLY subject_id"
 order_incidents |o..o{ activity_log : "POLY subject_id"
 order_incident_details |o..o{ activity_log : "POLY subject_id"
@@ -1791,7 +1675,6 @@ permission_overrides |o..o{ activity_log : "POLY subject_id"
 team_invitations |o..o{ activity_log : "POLY subject_id"
 contact_verifications |o..o{ activity_log : "POLY subject_id"
 carrier_accounts |o..o{ activity_log : "POLY subject_id"
-carrier_rate_versions |o..o{ activity_log : "POLY subject_id"
 carrier_remittance_batches |o..o{ activity_log : "POLY subject_id"
 processing_activity_register |o..o{ activity_log : "POLY subject_id"
 products ||..o{ media : "POLY model_id"
@@ -1800,12 +1683,12 @@ shop ||..o{ media : "POLY model_id"
 categories ||..o{ media : "POLY model_id"
 shipments ||..o{ media : "POLY model_id"
 remittance_statements ||..o{ media : "POLY model_id"
+carrier_settlement_lines ||..o{ media : "POLY model_id"
 expenses ||..o{ media : "POLY model_id"
 customer_adjustments ||..o{ media : "POLY model_id"
 order_documents ||..o{ media : "POLY model_id"
 carrier_fees ||..o{ media : "POLY model_id"
 collection_entries ||..o{ media : "POLY model_id"
-carrier_compensations ||..o{ media : "POLY model_id"
 invoices ||..o{ media : "POLY model_id"
 carrier_remittance_batches ||..o{ media : "POLY model_id"
 ```
@@ -1819,10 +1702,8 @@ carrier_remittance_batches ||..o{ media : "POLY model_id"
 | `shop_addresses.municipality_uuid` | `central.geographic_areas.uuid` | UUID externe, vérifié dans le bon contexte ; aucune FK SQL entre BDD. |
 | `order_revisions.province_uuid` | `central.geographic_areas.uuid` | UUID externe, vérifié dans le bon contexte ; aucune FK SQL entre BDD. |
 | `order_revisions.municipality_uuid` | `central.geographic_areas.uuid` | UUID externe, vérifié dans le bon contexte ; aucune FK SQL entre BDD. |
-| `customer_shipping_rates.province_uuid` | `central.geographic_areas.uuid` | UUID externe, vérifié dans le bon contexte ; aucune FK SQL entre BDD. |
-| `customer_shipping_rates.municipality_uuid` | `central.geographic_areas.uuid` | UUID externe, vérifié dans le bon contexte ; aucune FK SQL entre BDD. |
-| `provider_rates.province_uuid` | `central.geographic_areas.uuid` | UUID externe, vérifié dans le bon contexte ; aucune FK SQL entre BDD. |
-| `provider_rates.municipality_uuid` | `central.geographic_areas.uuid` | UUID externe, vérifié dans le bon contexte ; aucune FK SQL entre BDD. |
+| `shipping_rates.province_uuid` | `central.geographic_areas.uuid` | UUID externe, vérifié dans le bon contexte ; aucune FK SQL entre BDD. |
+| `shipping_rates.municipality_uuid` | `central.geographic_areas.uuid` | UUID externe, vérifié dans le bon contexte ; aucune FK SQL entre BDD. |
 | `free_shipping_rules.province_uuid` | `central.geographic_areas.uuid` | UUID externe, vérifié dans le bon contexte ; aucune FK SQL entre BDD. |
 | `carrier_geo_mappings.province_uuid` | `central.geographic_areas.uuid` | UUID externe, vérifié dans le bon contexte ; aucune FK SQL entre BDD. |
 | `carrier_geo_mappings.municipality_uuid` | `central.geographic_areas.uuid` | UUID externe, vérifié dans le bon contexte ; aucune FK SQL entre BDD. |
@@ -1866,73 +1747,87 @@ La fiche publique de la boutique : son nom affiché, son logo, ses contacts et s
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 2. `shop_addresses` — 18 champs
+### 2. `shop_addresses` — 17 champs
 
-Les adresses publiques de la boutique et leur emplacement sur une carte. Exemple : une adresse pour le magasin et une autre pour un point de retrait. Cela n’ajoute pas une caisse de magasin.
-
-| Champ | Explication très simple |
-|---|---|
-| `id` | le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`. |
-| `uuid` | identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique. |
-| `shop_id` | l’identifiant de la fiche de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `province_uuid` | l’identifiant de la wilaya. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `municipality_uuid` | l’identifiant de la commune. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `label` | un nom court utilisé pour reconnaître facilement l’élément à l’écran. |
-| `address` | l’adresse écrite. Exemple : rue, cité ou quartier. |
-| `postal_code` | le code postal lorsqu’il est connu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `latitude` | la position nord/sud utilisée pour placer l’adresse sur une carte. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `longitude` | la position est/ouest utilisée pour placer l’adresse sur une carte. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `map_url` | un lien vers la position sur une carte. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `phone` | le numéro de téléphone. Il est gardé comme texte pour ne pas perdre le `0`, le `+213` ou d’autres signes utiles. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `opening_hours` | les heures d’ouverture regroupées par jour. Exemple : samedi 09:00–18:00. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `is_primary` | indique si cette ligne est la principale parmi plusieurs choix. |
-| `visible` | indique si les visiteurs peuvent voir l’élément sur le site. |
-| `created_at` | la date où cette ligne a été créée dans la base. |
-| `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
-| `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
-
-### 3. `social_links` — 12 champs
-
-Les liens vers les pages de la boutique sur les réseaux sociaux. Exemple : son compte Instagram et deux pages Facebook différentes.
+Les adresses publiques et les liens sociaux : type 1 pour un lieu ; type 2 pour un lien général ou associé à un lieu de cette boutique. Leurs détails publics suivent deux formats contrôlés.
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`. |
-| `uuid` | identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique. |
-| `shop_id` | l’identifiant de la fiche de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `shop_address_id` | l’identifiant de l’adresse de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `network` | le réseau social concerné. Exemple : Instagram, Facebook ou TikTok. |
-| `label` | un nom court utilisé pour reconnaître facilement l’élément à l’écran. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `url` | le lien web à ouvrir. |
-| `position` | l’ordre d’affichage. Exemple : 1 apparaît avant 2. |
-| `is_active` | indique si l’élément peut encore être utilisé. `true` = oui, `false` = non. |
-| `created_at` | la date où cette ligne a été créée dans la base. |
-| `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
-| `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
+| `id` | le numéro interne de cette adresse ou de ce lien social. |
+| `uuid` | son identifiant public unique, utilisé dans les routes et formulaires. |
+| `shop_id` | le profil local auquel appartient cette ligne. |
+| `shop_address_id` | l’adresse à laquelle un lien social est associé ; vide pour un lien général et toujours vide sur une adresse. |
+| `province_uuid` | la wilaya officielle de l’adresse ; vide sur un lien social. La référence centrale reste un UUID externe. |
+| `municipality_uuid` | la commune officielle de cette adresse, appartenant à cette wilaya ; vide sur un lien social. |
+| `record_type` | 1 ADDRESS pour une adresse publique ; 2 SOCIAL pour un lien vers un réseau. Ce rôle ne change jamais après création. |
+| `shop_address_type` | la valeur 1 calculée quand un lien vise une adresse ; elle empêche de le rattacher à un autre lien social. |
+| `label` | le nom du lieu, ou un petit titre facultatif pour reconnaître un lien. |
+| `position` | l’ordre d’affichage parmi les adresses ou parmi les liens de la sélection concernée. |
+| `is_primary` | indique l’adresse principale ; un lien social ne peut pas être une adresse principale. |
+| `visible` | indique si cette adresse ou ce lien peut être montré au public ; masquer ne supprime pas la ligne. |
+| `payload` | les détails publics propres au rôle : rue/carte/horaires pour une adresse, réseau/URL pour un lien. Toutes les clés sont expliquées ci-dessous. |
+| `primary_slot` | la valeur technique 1 pour l’adresse principale non archivée ; elle permet de n’en avoir qu’une, même si elle est masquée. |
+| `created_at` | la date d’origine de création de cette adresse ou de ce lien. |
+| `updated_at` | la date de sa dernière modification autorisée. |
+| `deleted_at` | la date de son archivage ; archiver conserve ses données et ses associations historiques. |
 
-### 4. `content_pages` — 15 champs
+#### Détails du JSON public, sans perte de champs
 
-Le contenu des pages d’information du site. Exemple : Karim écrit le texte de « À propos », de « Contact » ou de sa politique de retour.
+Le payload est un objet obligatoire. Son schéma dépend exclusivement du record_type fixé par le modèle, avec schema_version=1 et clés autorisées ; des valeurs facultatives utilisent NULL plutôt qu’une information inventée. Les schémas ADDRESS et SOCIAL sont distincts, pas un objet mélangeant leurs attributs. Les contrôles SQL gardent identités, parents et géographie ; le validateur serveur contrôle les détails JSON avant chaque create/update/import, y compris le DTO public. Les futures versions demandent une transformation explicite, jamais l’effacement silencieux d’une ancienne clé.
+
+**Schéma ADDRESS :**
+
+| Clé du payload | Type et obligation | Explication très simple |
+|---|---|---|
+| schema_version | entier 1 requis | La version du format des détails. |
+| address | texte requis, non vide | La rue, le quartier et les indications publiques de cette adresse. |
+| postal_code | chaîne facultative | Le code postal, différent du code de commune. |
+| latitude | décimal canonique facultatif, précision DECIMAL(10,7) | La position nord/sud sur une carte, de -90 à 90. |
+| longitude | décimal canonique facultatif, précision DECIMAL(10,7) | La position est/ouest sur une carte, de -180 à 180. |
+| map_url | URL publique facultative | Le lien de la carte ; il peut exister même sans coordonnées. |
+| phone | chaîne facultative | Le téléphone public de ce lieu ; garder le 0 et l’indicatif. |
+| opening_hours | objet facultatif organisé par jour | Les horaires publics ; aucune réservation, caisse ou gestion de stock n’est ajoutée. |
+| opening_hours.<jour> | liste d’intervalles ; jours mon/tue/wed/thu/fri/sat/sun | Les plages d’ouverture de ce jour ; une liste vide signifie fermé. |
+| opening_hours.<jour>[].opens_at | chaîne HH:mm requise par intervalle | L’heure à laquelle ce lieu ouvre. |
+| opening_hours.<jour>[].closes_at | chaîne HH:mm requise par intervalle | L’heure à laquelle il ferme. |
+| opening_hours.<jour>[].closes_next_day | booléen requis par intervalle | Indique si cette fermeture arrive le lendemain ; permet les horaires traversant minuit. |
+
+**Schéma SOCIAL :**
+
+| Clé du payload | Type et obligation | Explication très simple |
+|---|---|---|
+| schema_version | entier 1 requis | La version du format de ce lien. |
+| network | chaîne requise, extensible | Le réseau concerné, par exemple Facebook, Instagram ou TikTok. |
+| url | URL publique requise | La page exacte de cette boutique ou de ce lieu sur ce réseau. |
+
+**Validation des détails :** latitude et longitude sont toutes deux NULL ou toutes deux fournies ; normaliser leurs valeurs décimales sans arrondi au-delà de la précision précédente. map_url reste indépendant de cette paire. Les URL map_url/url acceptent seulement http/https, au maximum les 255 caractères du VARCHAR d’origine, sans identifiants de connexion ni clé API/token secret ; les paramètres publics de carte nécessaires restent possibles. Le serveur ne consulte pas ces URL pour enregistrer le profil. network, postal_code et phone conservent la limite VARCHAR(255) ; address conserve la capacité TEXT initiale, avec limite d’octets contrôlée. Les jours/intervalles d’horaires et leurs traversées de minuit sont validés selon le fuseau shop.timezone, sans code exécutable, HTML arbitraire ni secret. Les limites du formulaire/payload sont bornées et ne suppriment aucune entrée historique pendant une migration. Aucun service Maps, compte social, publication automatisée ou calendrier marketing n’est créé.
+
+### 3. `content_pages` — 18 champs
+
+Les pages éditées de la vitrine : type 1 pour les informations comme À propos ; type 2 pour présenter et vendre un produit précis. Les deux familles gardent leurs routes, blocs, publication et SEO.
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`. |
-| `uuid` | identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique. |
-| `slug` | la partie simple de l’adresse web. Exemple : `a-propos` dans `/a-propos`. |
-| `type` | type fonctionnel de page, conservé en texte car il est extensible. Exemples : `about`, `contact`, `faq`, `returns` ou un nouveau type ajouté par le template sans migration de BDD. |
-| `title` | le titre affiché à l’utilisateur. |
-| `content` | le texte ou contenu principal de la page. |
-| `meta_title` | le titre prévu pour les moteurs de recherche et le partage web. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `meta_description` | la petite description prévue pour les moteurs de recherche. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `indexable` | indique si les moteurs de recherche sont autorisés à indexer cette page. |
-| `is_published` | indique si l’élément est publié et donc prêt à être montré. |
-| `published_at` | la date et l’heure liées à **publiee**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `version` | le numéro de version de cet élément. Exemple : version 1, puis version 2 après une évolution ; l’ancienne version peut rester conservée pour comprendre l’historique. |
-| `created_at` | la date où cette ligne a été créée dans la base. |
-| `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
-| `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
+| `id` | le numéro interne de cette page. |
+| `uuid` | son identifiant public unique ; il est conservé lors de la fusion. |
+| `product_id` | le produit présenté par une page de vente. Une page d’information n’a pas de produit. |
+| `page_kind` | 1 CONTENT pour une page d’information ; 2 SALES pour une page de vente. Ce rôle ne change pas après création. |
+| `slug` | la partie lisible de son adresse web. Elle est unique parmi les pages du même rôle. |
+| `type` | le sous-type d’une page d’information, par exemple about, contact, faq ou returns. Il reste extensible et est vide pour une page de vente. |
+| `title` | le titre affiché sur la page. |
+| `content` | ses textes et blocs autorisés par le template, dans un JSON structuré ; aucun code arbitraire ni prix indépendant. |
+| `meta_title` | son titre pour les moteurs de recherche et le partage, s’il est renseigné. |
+| `meta_description` | sa courte description pour les moteurs de recherche, si nécessaire. |
+| `canonical_url` | l’adresse principale d’une page de vente pour les moteurs de recherche, lorsqu’elle est renseignée. |
+| `indexable` | indique si les moteurs de recherche peuvent indexer la page. |
+| `is_published` | indique si la page peut être montrée au public. |
+| `published_at` | la date de sa publication ; vide avant publication. |
+| `version` | le numéro de version de ses blocs et paramètres éditoriaux ; une modification autorisée l’incrémente. |
+| `created_at` | la date de création de cette page. |
+| `updated_at` | la date de sa dernière modification autorisée. |
+| `deleted_at` | sa date d’archivage ; archiver conserve la page et ses liens historiques. |
 
-### 5. `media` — 23 champs
+### 4. `media` — 23 champs
 
 Les informations permettant de retrouver les fichiers de la boutique : images, vidéos, logos ou documents. Exemple : l’emplacement et le type de la photo d’un produit ; le fichier lui-même est stocké séparément.
 
@@ -1962,7 +1857,7 @@ Les informations permettant de retrouver les fichiers de la boutique : images, v
 | `updated_at` | cycle du média ; un retrait logique n’efface pas une preuve requise. |
 | `deleted_at` | cycle du média ; un retrait logique n’efface pas une preuve requise. |
 
-### 6. `categories` — 14 champs
+### 5. `categories` — 14 champs
 
 Les familles de produits et leurs sous-familles. Exemple : « Vêtements » contient « T-shirts ». Une seule table permet d’organiser les deux niveaux.
 
@@ -1983,7 +1878,7 @@ Les familles de produits et leurs sous-familles. Exemple : « Vêtements » cont
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 | `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
 
-### 7. `products` — 25 champs
+### 6. `products` — 25 champs
 
 La présentation commune d’un produit : son nom, sa description et les informations partagées par ses versions. Exemple : le modèle « T-shirt coton », proposé ensuite en plusieurs tailles et couleurs.
 
@@ -2015,7 +1910,7 @@ La présentation commune d’un produit : son nom, sa description et les informa
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 | `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
 
-### 8. `product_variants` — 25 champs
+### 7. `product_variants` — 25 champs
 
 Les versions précises que l’on peut acheter, avec leur prix et leur stock. Exemple : « T-shirt rouge, taille M ». Un produit sans choix possède aussi une variante standard.
 
@@ -2027,7 +1922,7 @@ Les versions précises que l’on peut acheter, avec leur prix et leur stock. Ex
 | `label` | un nom court utilisé pour reconnaître facilement l’élément à l’écran. |
 | `sku` | la référence utilisée pour reconnaître **SKU** sans se baser seulement sur son nom. |
 | `barcode` | le code-barres de la variante lorsqu’il existe. |
-| `combination_signature` | une signature calculée à partir des options choisies pour empêcher deux variantes représentant exactement la même combinaison. |
+| `combination_signature` | une empreinte SHA-256 de 64 caractères calculée à partir des identifiants stables des axes et valeurs, pour empêcher deux variantes du même produit représentant exactement la même combinaison. Une correction de libellé ne change pas cette empreinte. |
 | `used_at` | la date et l’heure liées à **utilisee**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
 | `sale_price` | le prix de vente actuel de cette variante. |
 | `unit_cost` | le coût d’achat ou de revient d’une unité pour le commerçant. |
@@ -2047,55 +1942,45 @@ Les versions précises que l’on peut acheter, avec leur prix et leur stock. Ex
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 | `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
 
-### 9. `product_options` — 9 champs
+### 8. `product_options` — 14 champs
 
-Les types de choix proposés pour un produit. Exemple : pour un t-shirt, le client peut choisir une taille et une couleur.
-
-| Champ | Explication très simple |
-|---|---|
-| `id` | le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`. |
-| `uuid` | identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique. |
-| `product_id` | l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `name` | le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ». |
-| `display_type` | la façon d’afficher l’option. Exemple : boutons, liste ou pastilles de couleur. |
-| `position` | l’ordre d’affichage. Exemple : 1 apparaît avant 2. |
-| `created_at` | la date où cette ligne a été créée dans la base. |
-| `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
-| `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
-
-### 10. `option_values` — 10 champs
-
-Les choix disponibles pour chaque option. Exemple : M et L pour la taille ; rouge et bleu pour la couleur.
+Les axes de choix et leurs valeurs : type 1 pour Taille ou Couleur ; type 2 pour M, L ou Rouge sous un axe précis. Les variantes vendables restent séparées.
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`. |
-| `uuid` | identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique. |
-| `option_id` | l’option concernée. Exemple : « Taille ». |
-| `identity_code` | le code utilisé pour reconnaître **identite** de manière stable dans le programme ou chez un service externe. |
-| `value` | la valeur enregistrée. Exemple : `Rouge`, `XL` ou une autre valeur selon la table. |
-| `color_hex` | la couleur écrite sous forme de code web. Exemple : `#FF0000` pour rouge. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `position` | l’ordre d’affichage. Exemple : 1 apparaît avant 2. |
-| `created_at` | la date où cette ligne a été créée dans la base. |
-| `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
-| `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
+| `id` | le numéro interne de cet axe ou de ce choix. |
+| `uuid` | son identifiant public unique, utilisé dans les routes et formulaires. |
+| `product_id` | le produit qui propose ce choix ; l’axe et toutes ses valeurs ont le même produit. |
+| `parent_id` | pour une valeur comme M, l’axe auquel elle appartient, par exemple Taille. Un axe n’a pas de parent. |
+| `record_type` | 1 AXIS pour la question « quelle taille ? » ; 2 VALUE pour un choix comme M. Ce rôle ne change pas après création. |
+| `parent_record_type` | une valeur technique calculée, égale à 1 lorsqu’un parent est indiqué ; elle empêche de placer une valeur sous une autre valeur. |
+| `name` | le nom affiché de l’axe, comme Taille, ou le libellé affiché de la valeur, comme M. |
+| `identity_code` | pour une valeur, son code stable dans l’axe ; vide pour un axe. Le code distingue son identité de son libellé. |
+| `display_type` | pour un axe, la façon d’afficher ses choix : liste, boutons ou couleurs. Vide pour une valeur. |
+| `color_hex` | pour un choix de couleur, son code web éventuel, par exemple #FF0000 ; vide pour les axes et les autres valeurs. |
+| `position` | l’ordre des axes d’un produit ou des valeurs d’un axe. |
+| `created_at` | la date de création de cette ligne. |
+| `updated_at` | la date de sa dernière correction autorisée. |
+| `deleted_at` | sa date d’archivage ; archiver conserve ses liens historiques. |
 
-### 11. `variant_option_values` — 8 champs
+### 9. `variant_option_values` — 10 champs
 
-Indique les choix qui composent chaque variante. Exemple : cette variante correspond à la taille M et à la couleur rouge.
+Les choix qui composent une variante vendable. Exemple : le t-shirt précis a la taille M et la couleur rouge. La variante garde son prix, son SKU et son stock dans product_variants.
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`. |
-| `uuid` | identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique. |
-| `product_id` | l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `variant_id` | l’identifiant de la variante du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `option_id` | l’option concernée. Exemple : « Taille ». |
-| `value_id` | la valeur choisie pour l’option. Exemple : « 42 » pour l’option Taille. |
-| `created_at` | la date où cette ligne a été créée dans la base. |
-| `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
+| `id` | le numéro interne de ce choix pour une variante. |
+| `uuid` | son identifiant public unique. |
+| `product_id` | le produit commun à la variante, à l’axe et à la valeur. |
+| `variant_id` | la variante vendable composée de ces choix. |
+| `option_id` | l’axe concerné, par exemple Taille ; il pointe exclusivement une ligne AXIS. |
+| `value_id` | le choix retenu, par exemple M ; il pointe exclusivement une ligne VALUE de cet axe. |
+| `option_record_type` | la constante technique 1 calculée par la BDD pour imposer un axe. |
+| `value_record_type` | la constante technique 2 calculée par la BDD pour imposer une valeur. |
+| `created_at` | la date de création de cette composition. |
+| `updated_at` | la date d’une correction autorisée avant le premier usage ; ensuite la composition est figée. |
 
-### 12. `tags` — 7 champs
+### 10. `tags` — 7 champs
 
 Les petits mots utilisés pour classer ou mettre en avant les produits. Exemple : « Été » ou « Idée cadeau ».
 
@@ -2109,7 +1994,7 @@ Les petits mots utilisés pour classer ou mettre en avant les produits. Exemple 
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 | `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
 
-### 13. `product_tags` — 6 champs
+### 11. `product_tags` — 6 champs
 
 Indique quelles étiquettes sont attachées à chaque produit. Exemple : le même t-shirt peut porter les étiquettes « Été » et « Idée cadeau ».
 
@@ -2122,7 +2007,7 @@ Indique quelles étiquettes sont attachées à chaque produit. Exemple : le mêm
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 14. `attributes` — 11 champs
+### 12. `attributes` — 11 champs
 
 La liste des informations servant à décrire les produits. Exemple : le poids ou le pays de fabrication ; ce ne sont pas forcément des choix proposés à l’achat.
 
@@ -2140,7 +2025,7 @@ La liste des informations servant à décrire les produits. Exemple : le poids o
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 | `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
 
-### 15. `product_attributes` — 8 champs
+### 13. `product_attributes` — 8 champs
 
 La valeur d’une caractéristique pour un produit précis. Exemple : le poids de ce pot de miel est de 500 grammes.
 
@@ -2155,29 +2040,7 @@ La valeur d’une caractéristique pour un produit précis. Exemple : le poids d
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 16. `sales_pages` — 15 champs
-
-Les pages qui présentent un seul produit pour donner envie de le commander. Exemple : une page partageable avec les avantages d’un produit, ses images et son formulaire de commande.
-
-| Champ | Explication très simple |
-|---|---|
-| `id` | le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`. |
-| `uuid` | identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique. |
-| `product_id` | l’identifiant du produit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `slug` | la partie simple de l’adresse web. Exemple : `a-propos` dans `/a-propos`. |
-| `title` | le titre affiché à l’utilisateur. |
-| `content` | le texte ou contenu principal de la page. |
-| `meta_title` | le titre prévu pour les moteurs de recherche et le partage web. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `meta_description` | la petite description prévue pour les moteurs de recherche. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `canonical_url` | l’adresse web principale que les moteurs de recherche doivent considérer comme la vraie version de cette page. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `indexable` | indique si les moteurs de recherche sont autorisés à indexer cette page. |
-| `is_published` | indique si l’élément est publié et donc prêt à être montré. |
-| `published_at` | la date et l’heure liées à **publiee**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `created_at` | la date où cette ligne a été créée dans la base. |
-| `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
-| `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
-
-### 17. `product_promotions` — 16 champs
+### 14. `product_promotions` — 16 champs
 
 Les réductions appliquées automatiquement aux produits, sans code à saisir. Exemple : une réduction sur un produit pendant une période choisie.
 
@@ -2200,7 +2063,7 @@ Les réductions appliquées automatiquement aux produits, sans code à saisir. E
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 | `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
 
-### 18. `product_reviews` — 15 champs
+### 15. `product_reviews` — 15 champs
 
 Les notes et commentaires laissés sur les produits, même sans compte acheteur. Exemple : un client écrit « Très bon produit » ; la boutique décide ensuite de publier ou de masquer cet avis.
 
@@ -2222,7 +2085,7 @@ Les notes et commentaires laissés sur les produits, même sans compte acheteur.
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 | `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
 
-### 19. `visitors` — 8 champs
+### 16. `visitors` — 8 champs
 
 Un identifiant pour reconnaître un navigateur dans cette boutique, sans créer de compte acheteur. Exemple : reconnaître le même navigateur lors d’un retour sur le site, sans garantir qu’il s’agit de la même personne.
 
@@ -2237,7 +2100,7 @@ Un identifiant pour reconnaître un navigateur dans cette boutique, sans créer 
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 20. `visit_sessions` — 14 champs
+### 17. `visit_sessions` — 14 champs
 
 Les différentes visites d’un navigateur sur la boutique. Exemple : une visite le matin puis une autre le soir peuvent former deux sessions pour le même visiteur.
 
@@ -2258,7 +2121,7 @@ Les différentes visites d’un navigateur sur la boutique. Exemple : une visite
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 21. `navigation_events` — 14 champs
+### 18. `navigation_events` — 16 champs
 
 Les actions minimales servant aux statistiques globales : page ouverte, produit vu ou ajout au panier. Aucun écran de parcours individuel n’est prévu.
 
@@ -2272,6 +2135,8 @@ Les actions minimales servant aux statistiques globales : page ouverte, produit 
 | `sales_page_id` | l’identifiant de la page de vente. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
 | `content_page_id` | l’identifiant de la page de contenu. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
 | `cart_id` | l’identifiant du panier. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
+| `sales_page_kind` | la valeur technique 2 calculée quand une page de vente est indiquée ; elle empêche de pointer une page d’information. |
+| `content_page_kind` | la valeur technique 1 calculée quand une page d’information est indiquée ; elle empêche de pointer une page de vente. |
 | `type` | code d’événement de navigation extensible, par exemple `product_view`, `add_to_cart` ou `checkout_started`. Il reste textuel car de nouveaux événements analytiques peuvent être ajoutés sans migration. |
 | `path` | Le chemin de la page visitée, sans paramètres contenant des données sensibles. |
 | `quantity` | le nombre d’éléments concernés. Exemple : `2` signifie deux unités du produit. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
@@ -2279,7 +2144,7 @@ Les actions minimales servant aux statistiques globales : page ouverte, produit 
 | `received_at` | la date à laquelle le serveur a reçu cet événement ; elle peut être différente de la date où le navigateur l’a produit. |
 | `created_at` | la date où cette ligne a été créée dans la base. |
 
-### 22. `visitor_preferences` — 7 champs
+### 19. `visitor_preferences` — 7 champs
 
 Les choix du visiteur concernant la mesure de sa navigation. Exemple : refuser cette mesure tout en continuant à utiliser le panier et à commander.
 
@@ -2293,7 +2158,7 @@ Les choix du visiteur concernant la mesure de sa navigation. Exemple : refuser c
 | `chosen_at` | la date à laquelle le navigateur a enregistré ce choix de mesure d’audience ; une modification crée un nouveau choix daté. |
 | `created_at` | la date où cette ligne a été créée dans la base. |
 
-### 23. `carts` — 9 champs
+### 20. `carts` — 9 champs
 
 Les paniers conservés par le site pour les acheteurs invités. Exemple : un visiteur ajoute deux produits avant de renseigner ses coordonnées ; cela ne réserve pas encore le stock.
 
@@ -2309,7 +2174,7 @@ Les paniers conservés par le site pour les acheteurs invités. Exemple : un vis
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 24. `cart_items` — 11 champs
+### 21. `cart_items` — 11 champs
 
 Le contenu détaillé de chaque panier. Exemple : deux t-shirts rouges taille M, avec une éventuelle personnalisation, forment une ligne du panier.
 
@@ -2327,7 +2192,7 @@ Le contenu détaillé de chaque panier. Exemple : deux t-shirts rouges taille M,
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 25. `orders` — 32 champs
+### 22. `orders` — 33 champs
 
 La fiche principale de chaque commande, avec son identité et son état commercial. Exemple : la commande de Karim reste la même commande même si son contenu est modifié avant expédition.
 
@@ -2346,6 +2211,7 @@ La fiche principale de chaque commande, avec son identité et son état commerci
 | `confirmed_revision_id` | la version précise que le commerçant a validée après son appel. Si une nouvelle proposition est préparée, cette ancienne version validée reste connue jusqu’au prochain clic « Valider ». |
 | `confirmation_owner_id` | l’identifiant de la personne responsable de la confirmation. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
 | `operationally_confirmed_by_id` | l’identifiant de la personne qui a validé le contrôle opérationnel. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
+| `original_sales_page_kind` | la valeur 2 calculée quand une page de vente d’origine est indiquée ; une page d’information ne peut pas devenir une origine commerciale. |
 | `number` | le numéro lisible de l’élément. Exemple : numéro d’échéance ou de facture selon la table. |
 | `data_policy_version` | la version de la politique d’information sur les données personnelles montrée au client pendant ce checkout. |
 | `data_notice_acknowledged_at` | la date où le client a continué le checkout après que l’information sur l’utilisation de ses données lui a été présentée. |
@@ -2366,7 +2232,7 @@ La fiche principale de chaque commande, avec son identité et son état commerci
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 26. `order_revisions` — 38 champs
+### 23. `order_revisions` — 38 champs
 
 Les copies successives du contenu d’une commande à chaque modification. Exemple : la première version contient une taille M ; une nouvelle version contient une taille L, sans effacer l’ancienne.
 
@@ -2411,7 +2277,7 @@ Les copies successives du contenu d’une commande à chaque modification. Exemp
 | `sales_terms_snapshot` | une copie figée du texte ou des informations importantes des conditions acceptées. |
 | `created_at` | la date où cette ligne a été créée dans la base. |
 
-### 27. `order_items` — 23 champs
+### 24. `order_items` — 28 champs
 
 Les produits et quantités d’une version précise de commande, avec les prix et coûts conservés à ce moment-là. Exemple : deux t-shirts à 2 000 DA chacun, même si le prix du catalogue change ensuite.
 
@@ -2439,9 +2305,14 @@ Les produits et quantités d’une version précise de commande, avec les prix e
 | `unit_cost_snapshot` | une copie du coût unitaire au moment de la vente, afin que la marge historique ne change pas si le coût catalogue change plus tard. |
 | `line_total` | le total de cette ligne après quantité et règles de prix prévues. |
 | `tax_snapshot` | une copie figée des règles ou informations fiscales utilisées pour calculer ce document. |
+| `reservation_status` | l’état de la quantité mise de côté : vide avant validation, 1 réservée, 2 libérée ou 3 expédiée/consommée. |
+| `reserved_at` | la date du premier clic Valider qui a réservé la quantité de cette ligne ; vide avant réservation. |
+| `reservation_released_at` | la date de libération technique de cette quantité, seulement si l’état vaut 2 RELEASED. |
+| `reservation_created_at` | la date où la projection de réservation a été créée ; elle conserve aussi la date exacte d’une ancienne réservation lors d’une migration. |
+| `reservation_updated_at` | la date de la dernière transition de réservation, distincte de la création immuable de la ligne commerciale. |
 | `created_at` | la date où cette ligne a été créée dans la base. |
 
-### 28. `order_history` — 16 champs
+### 25. `order_history` — 16 champs
 
 Le carnet des appels, rappels, propositions et changements concernant une commande. Exemple : noter un appel sans réponse ou un changement de taille ; le clic « Valider » est audité séparément dans `activity_log`.
 
@@ -2464,23 +2335,7 @@ Le carnet des appels, rappels, propositions et changements concernant une comman
 | `origin` | indique d’où vient l’action. Exemple : utilisateur, serveur, tâche automatique ou transporteur. |
 | `created_at` | la date où cette ligne a été créée dans la base. |
 
-### 29. `stock_reservations` — 9 champs
-
-Les quantités mises de côté au clic « Valider » du commerçant après son appel. Exemple : réserver deux t-shirts ; leur sortie physique est enregistrée lors de la remise du colis au transporteur.
-
-| Champ | Explication très simple |
-|---|---|
-| `id` | le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`. |
-| `uuid` | identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique. |
-| `order_item_id` | l’identifiant de la ligne de produit de la commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `quantity` | le nombre d’éléments concernés. Exemple : `2` signifie deux unités du produit. |
-| `status` | code entier de l’enum propre à cet objet, défini au §3.3 ; les libellés sont traduits à l’affichage et les transitions contrôlées par le service. |
-| `reserved_at` | la date et l’heure liées à **reserve**. Elle permet de savoir exactement quand cette étape a eu lieu. |
-| `released_at` | la date et l’heure liées à **libere**. Elle permet de savoir exactement quand cette étape a eu lieu. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `created_at` | la date où cette ligne a été créée dans la base. |
-| `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
-
-### 30. `stock_movements` — 28 champs
+### 26. `stock_movements` — 28 champs
 
 Le carnet de tous les changements de stock. Exemple : recevoir dix articles, en réserver deux, les expédier ou constater une perte, en gardant l’explication de chaque changement.
 
@@ -2515,7 +2370,7 @@ Le carnet de tous les changements de stock. Exemple : recevoir dix articles, en 
 | `note` | une information libre ajoutée pour aider à comprendre la ligne. Selon la table, cela peut être une note interne ou une note chiffrée. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
 | `created_at` | la date où cette ligne a été créée dans la base. |
 
-### 31. `order_returns` — 14 champs
+### 27. `order_returns` — 14 champs
 
 Les dossiers des colis qui reviennent à la boutique. Exemple : un client refuse son colis. Au lancement, le retour porte sur tout le colis ; la structure permet une évolution future.
 
@@ -2536,7 +2391,7 @@ Les dossiers des colis qui reviennent à la boutique. Exemple : un client refuse
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 32. `return_items` — 19 champs
+### 28. `return_items` — 19 champs
 
 Le détail de ce qui est attendu et constaté dans un retour. Exemple : sur trois articles attendus, deux sont reçus et un manque ; les articles reçus peuvent être revendables ou abîmés.
 
@@ -2562,7 +2417,7 @@ Le détail de ce qui est attendu et constaté dans un retour. Exemple : sur troi
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 33. `shipping_providers` — 14 champs
+### 29. `shipping_providers` — 14 champs
 
 Les personnes ou sociétés qui livrent pour la boutique. Exemple : un livreur interne ou EcoTrack, avec le suivi de l’argent qu’ils doivent reverser.
 
@@ -2583,45 +2438,36 @@ Les personnes ou sociétés qui livrent pour la boutique. Exemple : un livreur i
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 | `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
 
-### 34. `customer_shipping_rates` — 10 champs
+### 30. `shipping_rates` — 22 champs
 
-Le prix de livraison demandé à l’acheteur. Exemple : le client paie 600 DA pour une livraison dans une zone donnée ; ce prix peut différer du coût payé au transporteur.
-
-| Champ | Explication très simple |
-|---|---|
-| `id` | le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`. |
-| `uuid` | identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique. |
-| `province_uuid` | l’identifiant de la wilaya. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `municipality_uuid` | l’identifiant de la commune. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `delivery_mode` | la façon de livrer choisie. Exemple : domicile ou point relais. |
-| `amount` | la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA. |
-| `is_active` | indique si cette possibilité est autorisée. `true` = oui, `false` = non. |
-| `created_at` | la date où cette ligne a été créée dans la base. |
-| `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
-| `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
-
-### 35. `provider_rates` — 14 champs
-
-Le coût estimé de la livraison pour la boutique selon la zone et le mode choisi. Exemple : estimer le coût d’une livraison à domicile. Les tarifs de retour des comptes société sont versionnés dans carrier_rate_versions de cette boutique (T25).
+Les tarifs conservés par cette boutique : prix client, devis du transporteur ou version de tarif de retour. Chaque type garde son usage, son prestataire et sa période.
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`. |
-| `uuid` | identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique. |
-| `provider_id` | l’identifiant du transporteur ou livreur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `province_uuid` | l’identifiant de la wilaya. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `municipality_uuid` | l’identifiant de la commune. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `delivery_mode` | la façon de livrer choisie. Exemple : domicile ou point relais. |
-| `service_type` | indique la catégorie de **prestation** utilisée pour cette ligne. |
-| `amount` | la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA. |
-| `source` | code de `ProviderRateSourceEnum` : `1 MANUAL` pour une saisie manuelle, `2 API` pour un tarif importé par API. |
-| `retrieved_at` | la date et l’heure liées à **releve**. Elle permet de savoir exactement quand cette étape a eu lieu. |
-| `is_active` | indique si cette possibilité est autorisée. `true` = oui, `false` = non. |
-| `created_at` | la date où cette ligne a été créée dans la base. |
-| `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
-| `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
+| `id` | Le numéro interne du tarif. |
+| `uuid` | Son identifiant public. |
+| `provider_id` | Le prestataire concerné par le devis. |
+| `carrier_account_id` | Le compte transporteur concerné par le tarif de retour. |
+| `created_by_id` | Le compte local qui a créé la version du tarif de retour. |
+| `province_uuid` | La wilaya concernée par le prix client ou le devis. |
+| `municipality_uuid` | La commune précise, si le tarif est plus détaillé que la wilaya. |
+| `record_type` | 1 : prix client ; 2 : coût prévu du prestataire ; 3 : version du prix d’un retour. |
+| `delivery_mode` | Le mode domicile ou stop desk du prix client ou du devis. |
+| `service_type` | Le service du devis ; le prix client concerne l’envoi aller. |
+| `amount` | Le montant de ce tarif ; ce n’est pas encore une charge ou un paiement. |
+| `source` | Indique si le devis ou le tarif de retour a été saisi ou obtenu par API. |
+| `retrieved_at` | La date où le devis a été obtenu. |
+| `starts_at` | Le début de la période du tarif de retour. |
+| `ends_at` | La fin éventuelle de cette période. |
+| `is_active` | Indique si ce tarif est utilisable selon son type. |
+| `provider_scope_id` | Une valeur calculée permettant l’unicité du prix client sans prestataire. |
+| `municipality_scope_uuid` | Une valeur calculée pour l’unicité du tarif général d’une wilaya sans commune. |
+| `current_slot` | Une valeur calculée empêchant deux tarifs courants pour la même combinaison. |
+| `created_at` | La date de création de la ligne. |
+| `updated_at` | La date du dernier changement autorisé, sans réécrire un ancien montant de retour. |
+| `deleted_at` | L’archivage d’un prix client ou devis ; les versions de retour restent conservées. |
 
-### 36. `free_shipping_rules` — 14 champs
+### 31. `free_shipping_rules` — 14 champs
 
 Les conditions qui rendent automatiquement la livraison gratuite pour le client. Exemple : offrir la livraison lorsque la commande remplit la règle définie par la boutique.
 
@@ -2642,7 +2488,7 @@ Les conditions qui rendent automatiquement la livraison gratuite pour le client.
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 | `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
 
-### 37. `carrier_geo_mappings` — 16 champs
+### 32. `carrier_geo_mappings` — 16 champs
 
 Relie les wilayas et communes du SaaS aux noms ou codes utilisés par chaque transporteur. Exemple : traduire une commune choisie sur le site en code reconnu par EcoTrack.
 
@@ -2665,7 +2511,7 @@ Relie les wilayas et communes du SaaS aux noms ou codes utilisés par chaque tra
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 38. `pickup_points` — 16 champs
+### 33. `pickup_points` — 16 champs
 
 Les bureaux du transporteur où le client peut retirer son colis. Exemple : choisir un stop desk au lieu d’une livraison à domicile.
 
@@ -2688,7 +2534,7 @@ Les bureaux du transporteur où le client peut retirer son colis. Exemple : choi
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 | `deleted_at` | la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé. |
 
-### 39. `shipments` — 24 champs
+### 34. `shipments` — 24 champs
 
 Les colis : commande et version expédiée, livreur, frais, suivi interne et dates. On accepte la déclaration de livraison du livreur, sans preuve de réception client.
 
@@ -2719,7 +2565,7 @@ Les colis : commande et version expédiée, livreur, frais, suivi interne et dat
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 40. `shipment_events` — 25 champs
+### 35. `shipment_events` — 25 champs
 
 Les étapes reçues pendant le transport, avec le message original du transporteur. Exemple : « en livraison », puis « livré » ou « refusé ».
 
@@ -2751,7 +2597,7 @@ Les étapes reçues pendant le transport, avec le message original du transporte
 | `deduplication_key` | une clé utilisée pour repérer deux messages ou événements qui représentent en réalité la même action. |
 | `created_at` | la date où cette ligne a été créée dans la base. |
 
-### 41. `carrier_operations` — 27 champs
+### 36. `carrier_operations` — 27 champs
 
 Les demandes à envoyer au transporteur, conservées pour pouvoir les suivre et les reprendre. Exemple : demander la création d’un colis sans créer un deuxième colis si la réponse est incertaine.
 
@@ -2785,7 +2631,7 @@ Les demandes à envoyer au transporteur, conservées pour pouvoir les suivre et 
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 42. `carrier_operation_attempts` — 13 champs
+### 37. `carrier_operation_attempts` — 13 champs
 
 Le résultat de chaque essai de communication avec le transporteur. Exemple : le premier essai échoue ; une nouvelle tentative est enregistrée séparément sans effacer la précédente.
 
@@ -2805,7 +2651,7 @@ Le résultat de chaque essai de communication avec le transporteur. Exemple : le
 | `ended_at` | la date et l’heure où elle s’est terminée. Peut rester vide tant que ce n’est pas terminé. |
 | `created_at` | la date où cette ligne a été créée dans la base. |
 
-### 43. `collections` — 13 champs
+### 38. `collections` — 13 champs
 
 Le suivi de l’argent lié à un colis : ce qui doit être encaissé et reversé. Exemple : le client a payé le livreur, mais le commerçant attend encore son argent.
 
@@ -2825,7 +2671,7 @@ Le suivi de l’argent lié à un colis : ce qui doit être encaissé et revers�
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 44. `remittance_statements` — 22 champs
+### 39. `remittance_statements` — 22 champs
 
 Les documents de suivi d’un règlement avec le livreur ou le transporteur pour cette boutique. Exemple : expliquer le montant reçu en distinguant ventes, frais et indemnisations.
 
@@ -2854,23 +2700,35 @@ Les documents de suivi d’un règlement avec le livreur ou le transporteur pour
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 45. `remittance_lines` — 9 champs
+### 40. `carrier_settlement_lines` — 21 champs
 
-Le détail d’un reversement pour chaque colis. Exemple : préciser que 4 000 DA du versement concernent le colis A et 6 000 DA le colis B, sans les compter deux fois.
+Les détails des règlements transporteur : produits reversés, frais payés, créances apurées ou indemnités. Le type de chaque ligne empêche de mélanger ces montants.
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`. |
-| `uuid` | identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique. |
-| `remittance_statement_id` | l’identifiant du bordereau de reversement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `collection_id` | l’identifiant du recouvrement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `reversal_of_id` | l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `correction_of_id` | l’identifiant de l’ancienne écriture que cette ligne corrige. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `remitted_amount` | La part du versement reçue par le commerçant et attribuée à ce colis ; un inverse garde le montant opposé. |
-| `operation_key` | une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois. |
-| `created_at` | la date où cette ligne a été créée dans la base. |
+| `id` | Le numéro interne de cette ligne de règlement. |
+| `uuid` | Son identifiant public. |
+| `provider_id` | Le prestataire auquel appartiennent cette ligne et ses autres liens. |
+| `remittance_statement_id` | Le bordereau réel qui explique ce règlement, lorsqu’il existe. |
+| `collection_id` | Le recouvrement du colis dont une part est reversée. |
+| `carrier_fee_id` | Le frais payé ou le futur frais sur lequel une créance est compensée. |
+| `receivable_id` | La créance remboursée ou compensée. |
+| `shipment_id` | Le colis concerné ; obligatoire pour produits reversés, frais payés et indemnité. |
+| `replacement_order_id` | La commande de remplacement éventuellement liée à l’indemnité. |
+| `proof_media_id` | Le justificatif privé propre à un apurement ou une indemnité ; les autres types utilisent le bordereau et ses preuves. |
+| `reversal_of_id` | La ligne inversée exactement, sans inventer un transfert d’argent. |
+| `correction_of_id` | L’ancienne ligne à laquelle une nouvelle écriture correcte se rattache. |
+| `record_type` | 1 : reversement produits ; 2 : paiement de frais ; 3 : règlement d’une créance ; 4 : indemnité de sinistre. |
+| `amount` | Le montant de cette opération ; chaque type garde son rôle dans les calculs. |
+| `fee_payment_mode` | Pour les frais : paiement séparé ou compensation sur un reversement. |
+| `receivable_settlement_type` | Pour une créance : remboursement bancaire, compensation de frais/bordereau ou autre règlement validé. |
+| `reason` | La raison de l’indemnité, par exemple un colis perdu. |
+| `external_reference` | La référence de l’apurement ou de l’indemnité, utile contre les doublons. |
+| `operation_key` | Une clé stable empêchant le même fait d’être enregistré deux fois. |
+| `performed_at` | Quand la créance a réellement été réglée ou compensée. |
+| `created_at` | La date de création de cette ligne. |
 
-### 46. `expenses` — 21 champs
+### 41. `expenses` — 21 champs
 
 Les autres dépenses réelles de la boutique, hors frais transporteur et pertes de stock déjà suivis ailleurs. Exemple : publicité, emballages ou frais généraux.
 
@@ -2898,7 +2756,7 @@ Les autres dépenses réelles de la boutique, hors frais transporteur et pertes 
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 47. `customer_adjustments` — 22 champs
+### 42. `customer_adjustments` — 22 champs
 
 Le suivi des remboursements aux acheteurs, avec leurs montants, motifs et états. Exemple : enregistrer un remboursement réellement effectué, sans créer de portefeuille client.
 
@@ -2927,7 +2785,7 @@ Le suivi des remboursements aux acheteurs, avec leurs montants, motifs et états
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 48. `order_documents` — 11 champs
+### 43. `order_documents` — 11 champs
 
 Les bons de commande facultatifs correspondant à une version précise de la commande. Exemple : conserver un document indiquant exactement les articles et les prix de cette version.
 
@@ -2945,7 +2803,7 @@ Les bons de commande facultatifs correspondant à une version précise de la com
 | `generated_at` | la date et l’heure liées à **genere**. Elle permet de savoir exactement quand cette étape a eu lieu. |
 | `created_at` | la date où cette ligne a été créée dans la base. |
 
-### 49. `activity_log` — 17 champs
+### 44. `activity_log` — 17 champs
 
 Le carnet de la boutique : qui a fait quoi, quand et sur quel élément. Il garde aussi la validation par clic et les opérations sensibles sur les données, sans seconde table de journal.
 
@@ -2969,7 +2827,7 @@ Le carnet de la boutique : qui a fait quoi, quand et sur quel élément. Il gard
 | `created_at` | la date à laquelle l'activité a été enregistrée. |
 | `updated_at` | champ technique du modèle Spatie ; ne permet pas de réécrire un fait historique. |
 
-### 50. `carrier_fees` — 23 champs
+### 45. `carrier_fees` — 24 champs
 
 Les frais liés au transport et la personne qui doit les payer. Exemple : des frais de retour à la charge du commerçant, distincts de la livraison payée par l’acheteur.
 
@@ -2986,6 +2844,7 @@ Les frais liés au transport et la personne qui doit les payer. Exemple : des fr
 | `reversal_of_id` | l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
 | `correction_of_id` | l’identifiant de l’ancienne écriture que cette ligne corrige. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
 | `rate_snapshot` | une copie figée du tarif utilisé pour calculer ce frais. Si le tarif change demain, l’ancien frais garde son ancien prix. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
+| `source_rate_record_type` | Le code calculé 3 impose une version historique du tarif de retour, jamais un prix client ou un devis. |
 | `fee_type` | le type de frais du transporteur. Exemple : frais de retour ou autre frais prévu. |
 | `payer` | indique qui doit supporter le frais. Exemple : commerçant ou autre partie prévue. |
 | `settlement_mode` | la façon dont le règlement a été fait. Exemple : déduction, versement ou autre mode autorisé. |
@@ -2999,24 +2858,7 @@ Les frais liés au transport et la personne qui doit les payer. Exemple : des fr
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 51. `carrier_fee_payments` — 10 champs
-
-Indique comment les frais dus par le commerçant au transporteur sont réglés. Exemple : un frais de retour est déduit d’un reversement ou payé séparément, sans compter une deuxième dépense.
-
-| Champ | Explication très simple |
-|---|---|
-| `id` | le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`. |
-| `uuid` | identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique. |
-| `remittance_statement_id` | l’identifiant du bordereau de reversement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `carrier_fee_id` | l’identifiant des frais du transporteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `reversal_of_id` | l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `correction_of_id` | l’identifiant de l’ancienne écriture que cette ligne corrige. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `amount` | la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA. |
-| `mode` | indique la manière utilisée pour cette opération. Exemple : paiement séparé, déduction ou autre mode prévu. |
-| `operation_key` | une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois. |
-| `created_at` | la date où cette ligne a été créée dans la base. |
-
-### 52. `carrier_receivables` — 15 champs
+### 46. `carrier_receivables` — 16 champs
 
 Les sommes que le transporteur doit rendre après correction de frais déjà payés. Exemple : 650 DA ont été payés au lieu de 600 DA ; le transporteur doit encore 50 DA au commerçant.
 
@@ -3031,6 +2873,7 @@ Les sommes que le transporteur doit rendre après correction de frais déjà pay
 | `initial_amount` | le montant du frais au moment où il a été constaté. |
 | `remaining_amount` | la partie du montant qui n’a pas encore été réglée ou affectée. |
 | `reason` | explique pourquoi l’action ou la décision a été faite. |
+| `original_fee_payment_record_type` | Le code calculé 2 impose un règlement de frais comme paiement d’origine du trop-payé. |
 | `status` | code entier de l’enum propre à cet objet, défini au §3.3 ; les libellés sont traduits à l’affichage et les transitions contrôlées par le service. |
 | `operation_key` | une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois. |
 | `recognized_at` | la date et l’heure liées à **reconnue**. Elle permet de savoir exactement quand cette étape a eu lieu. |
@@ -3038,26 +2881,7 @@ Les sommes que le transporteur doit rendre après correction de frais déjà pay
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 53. `carrier_receivable_allocations` — 12 champs
-
-Indique comment le transporteur règle les sommes qu’il doit après une correction de frais. Exemple : les 50 DA dus sont remboursés ou déduits d’un prochain frais.
-
-| Champ | Explication très simple |
-|---|---|
-| `id` | le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`. |
-| `uuid` | identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique. |
-| `receivable_id` | la somme due par le transporteur que ce règlement vient réduire. |
-| `remittance_statement_id` | l’identifiant du bordereau de reversement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `carrier_fee_id` | l’identifiant des frais du transporteur. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `reversal_of_id` | l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `settlement_type` | indique la catégorie de **apurement** utilisée pour cette ligne. |
-| `amount` | la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA. |
-| `external_reference` | le numéro donné par un système extérieur. Exemple : référence d’un reversement chez le transporteur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `operation_key` | une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois. |
-| `performed_at` | la date où l’opération a réellement été faite. |
-| `created_at` | la date où cette ligne a été créée dans la base. |
-
-### 54. `collection_entries` — 14 champs
+### 47. `collection_entries` — 14 champs
 
 Les montants réellement encaissés auprès du client et vérifiés, avec leurs éventuelles corrections. Exemple : confirmer que le livreur a reçu 5 000 DA ; cela ne prouve pas encore leur reversement au commerçant.
 
@@ -3078,27 +2902,7 @@ Les montants réellement encaissés auprès du client et vérifiés, avec leurs 
 | `operation_key` | une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois. |
 | `created_at` | la date où cette ligne a été créée dans la base. |
 
-### 55. `carrier_compensations` — 13 champs
-
-Les dédommagements du transporteur pour un problème comme une perte ou une casse. Exemple : un montant versé au commerçant pour un colis perdu, séparé de l’argent payé par le client.
-
-| Champ | Explication très simple |
-|---|---|
-| `id` | le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`. |
-| `uuid` | identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique. |
-| `remittance_statement_id` | l’identifiant du bordereau de reversement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `shipment_id` | l’identifiant de la livraison. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
-| `replacement_order_id` | l’identifiant de la commande de remplacement. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `proof_media_id` | l’identifiant lié à **preuve media**. Il sert à retrouver l’élément correspondant. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `reversal_of_id` | l’identifiant de l’ancienne écriture annulée par une écriture inverse. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `correction_of_id` | l’identifiant de l’ancienne écriture que cette ligne corrige. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `amount` | la somme d’argent de cette ligne, en DZD au lancement. Exemple : `3000` signifie 3 000 DA. |
-| `reason` | explique pourquoi l’action ou la décision a été faite. |
-| `external_reference` | le numéro donné par un système extérieur. Exemple : référence d’un reversement chez le transporteur. |
-| `operation_key` | une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois. |
-| `created_at` | la date où cette ligne a été créée dans la base. |
-
-### 56. `invoices` — 28 champs
+### 48. `invoices` — 28 champs
 
 Les factures de vente de la boutique et les avoirs qui les corrigent, avec leur contenu historique conservé. Exemple : garder la facture d’origine puis créer un avoir si son montant doit être réduit.
 
@@ -3133,7 +2937,7 @@ Les factures de vente de la boutique et les avoirs qui les corrigent, avec leur 
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 57. `order_incidents` — 19 champs
+### 49. `order_incidents` — 19 champs
 
 Le dossier d’un problème concernant une ligne de produits expédiée et les limites de sa prise en charge. Exemple : un article cassé pour lequel on examine un remplacement ou un remboursement.
 
@@ -3159,7 +2963,7 @@ Le dossier d’un problème concernant une ligne de produits expédiée et les l
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 58. `order_incident_details` — 9 champs
+### 50. `order_incident_details` — 9 champs
 
 Les différents problèmes et quantités dans un dossier d’incident. Exemple : sur trois articles, un est cassé, un manque et le troisième est correct ; on ne compte pas deux fois le même article.
 
@@ -3175,7 +2979,7 @@ Les différents problèmes et quantités dans un dossier d’incident. Exemple :
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 59. `billing_rules` — 23 champs
+### 51. `billing_rules` — 23 champs
 
 Les réglages de facturation dans une seule table : une ligne type 1 compte les numéros ; une ligne type 2 définit une règle validée de production des documents.
 
@@ -3205,7 +3009,7 @@ Les réglages de facturation dans une seule table : une ligne type 1 compte les 
 | `created_at` | La date de création de cette ligne. |
 | `updated_at` | La date du dernier changement autorisé de cette ligne. |
 
-### 60. `sales_terms_acceptances` — 11 champs
+### 52. `sales_terms_acceptances` — 11 champs
 
 Les conditions de vente réellement acceptées pour une version précise de commande. Cela ne crée aucun contrat ni PDF d’accord téléphonique.
 
@@ -3223,7 +3027,7 @@ Les conditions de vente réellement acceptées pour une version précise de comm
 | `operation_key` | une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois. |
 | `created_at` | la date où cette ligne a été créée dans la base. |
 
-### 61. `billing_obligations` — 20 champs
+### 53. `billing_obligations` — 20 champs
 
 Les factures ou avoirs que le système doit produire après un événement prévu par une règle validée. Exemple : garder une facture à émettre dans la liste jusqu’à ce que son émission réussisse.
 
@@ -3250,7 +3054,7 @@ Les factures ou avoirs que le système doit produire après un événement prév
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
-### 62. `exchange_offsets` — 13 champs
+### 54. `exchange_offsets` — 13 champs
 
 La part d’un avoir utilisée pour payer une nouvelle commande d’échange précise. Exemple : affecter 8 000 DA à un échange coûtant 10 000 DA, avec 2 000 DA de produits restant à payer, sans portefeuille client.
 
@@ -3270,7 +3074,7 @@ La part d’un avoir utilisée pour payer une nouvelle commande d’échange pr�
 | `performed_at` | la date où l’opération a réellement été faite. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
 | `created_at` | la date où cette ligne a été créée dans la base. |
 
-### 63. `commercial_corrections` — 16 champs
+### 55. `commercial_corrections` — 16 champs
 
 Les décisions qui corrigent les montants des ventes, avec la date où elles comptent dans les statistiques. Exemple : enregistrer une réduction après un retour, séparément du retour physique et du remboursement réel.
 
@@ -3293,7 +3097,7 @@ Les décisions qui corrigent les montants des ventes, avec la date où elles com
 | `operation_key` | une clé unique utilisée pour reconnaître une opération déjà faite. Exemple : si le serveur reçoit deux fois la même demande après une coupure, cette clé aide à éviter de faire l’opération deux fois. |
 | `created_at` | la date où cette ligne a été créée dans la base. |
 
-### 64. `commercial_correction_lines` — 11 champs
+### 56. `commercial_correction_lines` — 11 champs
 
 Le détail d’une correction commerciale pour chaque ligne de produits concernée. Exemple : retirer 2 000 DA de ventes pour un article et indiquer aussi la correction de son coût dans les résultats.
 
@@ -3311,7 +3115,7 @@ Le détail d’une correction commerciale pour chaque ligne de produits concern�
 | `detailed_reason` | explique la raison de **detaille**. Cela permet de comprendre plus tard pourquoi la décision a été prise. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
 | `created_at` | la date où cette ligne a été créée dans la base. |
 
-### 65. `users` — 18 champs
+### 57. `users` — 18 champs
 
 Les comptes du propriétaire et des employés de cette boutique : nom, e-mail, mot de passe protégé, état du compte et droit d’entrer dans l’équipe. Chaque boutique garde ses propres comptes.
 
@@ -3336,7 +3140,7 @@ Les comptes du propriétaire et des employés de cette boutique : nom, e-mail, m
 | `updated_at` | La date du dernier changement autorisé de cette ligne. |
 | `deleted_at` | La date d’archivage ; vide tant que cette ligne n’est pas archivée. |
 
-### 66. `permissions` — 8 champs
+### 58. `permissions` — 8 champs
 
 La liste des actions qu’une personne peut être autorisée à faire dans cette boutique : créer un produit, valider une commande ou inviter un employé.
 
@@ -3351,7 +3155,7 @@ La liste des actions qu’une personne peut être autorisée à faire dans cette
 | `created_at` | La date de création de cette ligne. |
 | `updated_at` | La date du dernier changement autorisé de cette ligne. |
 
-### 67. `roles` — 12 champs
+### 59. `roles` — 12 champs
 
 Les groupes d’autorisations de la boutique. Exemple : le rôle de préparateur réunit les actions nécessaires pour préparer les colis.
 
@@ -3370,7 +3174,7 @@ Les groupes d’autorisations de la boutique. Exemple : le rôle de préparateur
 | `created_at` | La date de création de cette ligne. |
 | `updated_at` | La date du dernier changement autorisé de cette ligne. |
 
-### 68. `role_has_permissions` — 2 champs
+### 60. `role_has_permissions` — 2 champs
 
 Indique quelles actions sont autorisées pour chaque rôle.
 
@@ -3379,7 +3183,7 @@ Indique quelles actions sont autorisées pour chaque rôle.
 | `permission_id` | Le lien local vers permissions correspondant à permission_id ; les informations ne sont pas recopiées. |
 | `role_id` | Le lien local vers roles correspondant à role_id ; les informations ne sont pas recopiées. |
 
-### 69. `model_has_roles` — 3 champs
+### 61. `model_has_roles` — 3 champs
 
 Indique quel compte possède quel rôle dans cette boutique.
 
@@ -3389,7 +3193,7 @@ Indique quel compte possède quel rôle dans cette boutique.
 | `model_type` | Le type du modèle auquel appartient ce lien, sous forme d’alias autorisé. |
 | `model_id` | Le numéro local de ce modèle ; son type indique dans quelle table le retrouver. |
 
-### 70. `model_has_permissions` — 3 champs
+### 62. `model_has_permissions` — 3 champs
 
 Donne une autorisation directement à un compte de cette boutique.
 
@@ -3399,7 +3203,7 @@ Donne une autorisation directement à un compte de cette boutique.
 | `model_type` | Le type du modèle auquel appartient ce lien, sous forme d’alias autorisé. |
 | `model_id` | Le numéro local de ce modèle ; son type indique dans quelle table le retrouver. |
 
-### 71. `permission_overrides` — 15 champs
+### 63. `permission_overrides` — 15 champs
 
 Les autorisations ou interdictions exceptionnelles accordées à un compte, avec leur motif et leurs dates.
 
@@ -3421,7 +3225,7 @@ Les autorisations ou interdictions exceptionnelles accordées à un compte, avec
 | `updated_at` | La date du dernier changement autorisé de cette ligne. |
 | `deleted_at` | La date d’archivage ; vide tant que cette ligne n’est pas archivée. |
 
-### 72. `team_invitations` — 12 champs
+### 64. `team_invitations` — 12 champs
 
 Les invitations permettant à un employé de rejoindre cette boutique avec un rôle précis et un lien secret qui expire.
 
@@ -3440,7 +3244,7 @@ Les invitations permettant à un employé de rejoindre cette boutique avec un r�
 | `created_at` | La date de création de cette ligne. |
 | `updated_at` | La date du dernier changement autorisé de cette ligne. |
 
-### 73. `contact_verifications` — 11 champs
+### 65. `contact_verifications` — 11 champs
 
 Les codes protégés utilisés pour vérifier les contacts des comptes du propriétaire et des employés ; les acheteurs ne reçoivent aucun message.
 
@@ -3458,7 +3262,7 @@ Les codes protégés utilisés pour vérifier les contacts des comptes du propri
 | `created_at` | La date de création de cette ligne. |
 | `updated_at` | La date du dernier changement autorisé de cette ligne. |
 
-### 74. `carrier_accounts` — 14 champs
+### 66. `carrier_accounts` — 14 champs
 
 Les connexions de cette boutique aux services de livraison : compte transporteur, adresse API et secrets protégés.
 
@@ -3479,24 +3283,7 @@ Les connexions de cette boutique aux services de livraison : compte transporteur
 | `created_at` | La date de création de cette ligne. |
 | `updated_at` | La date du dernier changement autorisé de cette ligne. |
 
-### 75. `carrier_rate_versions` — 10 champs
-
-Les tarifs de retour annoncés par un compte transporteur, avec leur période d’application. Un changement crée une autre version.
-
-| Champ | Explication très simple |
-|---|---|
-| `id` | Le numéro interne de cette ligne, utilisé par la base de données. |
-| `uuid` | Son identifiant public unique, utilisé dans les écrans autorisés. |
-| `carrier_account_id` | Le lien local vers carrier_accounts correspondant à carrier_account_id ; les informations ne sont pas recopiées. |
-| `created_by_id` | Le lien local vers users correspondant à created_by_id ; les informations ne sont pas recopiées. |
-| `return_rate` | Le tarif de retour annoncé pour cette période. |
-| `starts_at` | Le début de la période d’application de ce tarif. |
-| `ends_at` | La fin éventuelle de sa période d’application. |
-| `is_active` | Indique si cet élément peut encore être utilisé. |
-| `source` | L’origine de ce tarif : déclaration locale ou donnée transporteur contrôlée. |
-| `created_at` | La date de création de cette ligne. |
-
-### 76. `carrier_remittance_batches` — 15 champs
+### 67. `carrier_remittance_batches` — 15 champs
 
 Les lots de versements annoncés par un compte transporteur, leur justificatif et la part vérifiée pour cette boutique.
 
@@ -3518,7 +3305,7 @@ Les lots de versements annoncés par un compte transporteur, leur justificatif e
 | `created_at` | La date de création de cette ligne. |
 | `updated_at` | La date du dernier changement autorisé de cette ligne. |
 
-### 77. `processing_activity_register` — 19 champs
+### 68. `processing_activity_register` — 19 champs
 
 Le registre qui explique pourquoi la boutique utilise des données, lesquelles, avec qui et comment elle les protège. Les actions réellement faites sont dans activity_log.
 
@@ -3560,8 +3347,57 @@ Fonctions retirées : annulation/clôture commerciale de commande, lien/écran/A
 | order_contracts | Révision/date dans orders et événement officiel order.validated dans activity_log |
 | document_deliveries | Fonction retirée pour les acheteurs ; aucun remplacement actif |
 | theme_customizations | Fonction avancée reportée ; thème standard, logo et couleurs dans shop |
+| social_links | shop_addresses type 2 SOCIAL ; adresses type 1 ADDRESS et association SQL protégée |
+| sales_pages | content_pages type 2 SALES ; pages d’information type 1 CONTENT |
+| option_values | product_options type 2 VALUE sous un axe type 1 AXIS |
+| stock_reservations | Cinq champs de projection dans order_items ; quantité dérivée, stock/journal atomiques |
+| customer_shipping_rates / provider_rates / carrier_rate_versions | shipping_rates type 1 CUSTOMER / 2 PROVIDER_QUOTE / 3 RETURN_VERSION |
+| remittance_lines / carrier_fee_payments / carrier_receivable_allocations / carrier_compensations | carrier_settlement_lines type 1 produits / 2 frais / 3 créance / 4 indemnité |
 
 Les invoices restent à 28 champs et les billing_rules à 23. Les détails historiques des factures/avoirs sont dans leur snapshot_json versionné et contrôlé ; les règles de calcul, taxes, plafonds et liens d’origine sont décrits en T17. Les obligations d’émission restent séparées pour conserver les reprises fiables sans agrandir à nouveau invoices. Cette organisation ne crée pas un moteur fiscal universel ni un portefeuille client.
+
+### Décisions V4.7
+
+La V4.7 conserve les fonctions déjà choisies et réduit le nombre de tables physiques de neuf. shop reste une fiche unique de 23 champs ; shop_addresses est une table de 17 champs pour les adresses et liens, avec véritables IDs/UUID, parent SQL typé et détails publics contrôlés. content_pages réunit publication, blocs et SEO dans 18 champs, avec modèles ContentPage et SalesPage filtrés ; une page SALES reste liée à son produit immuable et plusieurs pages peuvent présenter le même produit. Les espaces de routes/slugs restent distincts.
+
+product_options regroupe axes et valeurs dans 14 champs, avec parent AXIS du même produit et pivots typés. product_variants reste l’article vendable avec prix, coût, identité et stock. La réservation devient une projection de cinq champs dans order_items ; les quantités, prix et snapshots commerciaux restent immuables et les mouvements de stock sont conservés. Une empreinte de révision commerciale exclut ces champs opérationnels.
+
+shipping_rates regroupe trois usages explicites sans confondre prix client, devis et version de retour. carrier_settlement_lines regroupe quatre formes financières ; chaque agrégat filtre son type. Encaissement vérifié, frais reconnus, créance, remboursement acheteur et document fiscal restent séparés. Les versions, écritures originales/inverses, dates, liens de contexte, plafonds, preuves et reprises restent conservés. Aucun JSON ne remplace un parent financier ou un montant à sommer.
+
+Visiteurs et préférences historisées restent séparés, ainsi que sessions et événements globaux. Aucun écran de parcours individuel n’est prévu. Les cinq tables natives Spatie Permission restent séparées. Les nouvelles migrations de regroupement ne sont pas exécutées : elles devront conserver UUID, timestamps, types, parents, signatures et pièces, avec résolution explicite des collisions. Moins de tables ne garantit pas une meilleure vitesse ; index, verrous et charge réelle restent à mesurer.
+
+**Revue exhaustive des 77 tables de départ :** chaque table apparaît une seule fois ci-dessous. Le nombre de tables diminue quand les données ont le même rôle ou une relation strictement un-à-un ; conserver une séparation quand elle porte une cardinalité, un cycle de vie ou une preuve indépendante.
+
+| Tables examinées en V4.6 | Décision et raison |
+|---|---|
+| `shop`, `shop_addresses`, `social_links` | Deux tables : fiche unique et entrées publiques typées ; conserver plusieurs lieux/liens et leur association. |
+| `content_pages`, `sales_pages` | Une table de pages ; familles et produit contrôlés par FK typées, mêmes blocs/publication/SEO. |
+| `media` | Conserver : bibliothèque commune à plusieurs types de modèles ; chaque fichier garde son parent, ses galeries ou sa pièce privée et son hash immuable. |
+| `categories`, `products`, `product_variants` | Conserver : classement, fiche et article physique vendable ont des cardinalités et stocks différents. |
+| `product_options`, `option_values`, `variant_option_values` | Axes/valeurs regroupés ; pivot distinct car une variante combine plusieurs choix réutilisés. |
+| `tags`, `product_tags`, `attributes`, `product_attributes` | Conserver : relations plusieurs-à-plusieurs et valeurs descriptives ; ne pas les confondre avec les choix vendables. |
+| `product_promotions`, `product_reviews` | Conserver : remises datées et avis modérés sont des fonctions indépendantes. |
+| `visitors`, `visit_sessions`, `navigation_events`, `visitor_preferences` | Conserver : identité technique, visites, événements et historique de préférences ont des volumes et cycles distincts ; pas de parcours individuel exposé. |
+| `carts`, `cart_items` | Conserver : panier invité temporaire et ses articles multiples ; aucun engagement de stock. |
+| `orders`, `order_revisions`, `order_items`, `order_history` | Conserver : dossier, propositions figées, plusieurs articles et rappels/événements internes ; projections de réservation dans les lignes seulement. |
+| `stock_reservations`, `stock_movements`, `order_returns`, `return_items` | Réservation intégrée à la ligne ; journal de deltas et retour/inspection conservés pour reconstruire les faits. |
+| `shipping_providers`, `carrier_accounts`, `carrier_geo_mappings`, `pickup_points` | Conserver : prestataires, connexions privées, traduction géographique et lieux de retrait ont des parents différents. |
+| `customer_shipping_rates`, `provider_rates`, `carrier_rate_versions` | Une table shipping_rates à trois types : prix client, devis transporteur et taux de retour historisé ; aucun mélange de coût/prix. |
+| `free_shipping_rules` | Conserver : conditions de gratuité distinctes des grilles ; calcul du port et de son payeur inchangé. |
+| `shipments`, `shipment_events` | Conserver : colis courant et événements datés multiples, sans preuve client de réception. |
+| `carrier_operations`, `carrier_operation_attempts` | Conserver : intention idempotente et tentatives multiples, résultats incertains et rapprochement. |
+| `collections`, `collection_entries` | Conserver : dossier d’encaissement et faits signés prouvés ; livraison déclarée seule ne prouve pas un paiement. |
+| `remittance_statements`, `carrier_remittance_batches` | Conserver : relevé rapproché et lot externe de versement sont deux parents distincts pouvant regrouper plusieurs lignes. |
+| `remittance_lines`, `carrier_fee_payments`, `carrier_receivable_allocations`, `carrier_compensations` | Une table carrier_settlement_lines à quatre types, parents exacts et contrepassations typées ; sommes filtrées par rôle. |
+| `carrier_fees`, `carrier_receivables` | Conserver : charge reconnue et créance attendue restent distinctes de leurs règlements ; aucun double comptage. |
+| `expenses`, `customer_adjustments` | Conserver : charges de boutique et remboursements/remèdes au client ont des autorisations et plafonds différents. |
+| `order_documents`, `invoices` | Conserver : bon interne et facture/avoir fiscal figé sont deux documents de règles différentes ; ni import ni envoi acheteur. |
+| `order_incidents`, `order_incident_details` | Conserver : dossier SAV et problèmes de plusieurs lignes, avec budgets coordonnés de remèdes. |
+| `billing_rules`, `billing_obligations`, `sales_terms_acceptances` | Conserver : règle/compteur déjà regroupés, intention d’émission et conditions réellement acceptées ne sont pas des factures ni un accord téléphonique. |
+| `exchange_offsets`, `commercial_corrections`, `commercial_correction_lines` | Conserver : affectation d’avoir, correction commerciale et quantités de plusieurs articles ont des invariants propres. |
+| `users`, `team_invitations`, `contact_verifications` | Conserver : compte durable, invitation et secret temporaire de vérification ; messages d’accès autorisés. |
+| `permissions`, `roles`, `role_has_permissions`, `model_has_roles`, `model_has_permissions`, `permission_overrides` | Conserver : cinq tables natives Spatie et exception locale ; compatibilité des guards, droits et quotas indépendants. |
+| `activity_log`, `processing_activity_register` | Conserver : faits d’audit multiples et registre descriptif des traitements ; ni journal de stock ni historique de préférences remplacés. |
 
 ## 6. Contraintes qui complètent le dessin
 
@@ -3575,6 +3411,12 @@ Une FK simple ne suffit pas à garantir que deux éléments appartiennent à la 
 | billing_obligations(billing_rule_id,billing_rule_record_type) → billing_rules(id,record_type) | Utiliser un compteur comme règle |
 | UNIQUE(document_type,fiscal_year,sequence_slot) sur les compteurs | Créer deux séries du même type/exercice dans cette boutique |
 | UNIQUE(code,version) et contrôle des périodes des règles | Réécrire une version validée ou activer deux versions du même code à la même date |
+| shop_addresses : parent typé ADDRESS du même shop, principale non archivée et détails JSON validés | Associer un lien à un autre lien/une autre boutique, doubler la principale ou perdre carte/horaires |
+| content_pages : familles CONTENT/SALES, produit obligatoire seulement SALES, UNIQUE(page_kind,slug), FK typées | Transformer une page d’information en origine de vente ou utiliser la page d’un autre produit |
+| product_options : AXIS/VALUE, parent de même produit et pivots typés | Placer un choix sous un autre choix ou mélanger deux produits/axes |
+| order_items : projections de réservation séparées du contenu commercial et des empreintes | Réserver deux fois ou modifier une quantité/prix historique par un changement de stock |
+| shipping_rates : CUSTOMER / PROVIDER_QUOTE / RETURN_VERSION et source de frais type 3 | Appliquer un devis au client ou remplacer une ancienne version de tarif de retour |
+| carrier_settlement_lines : quatre formes, mêmes parents et sommes par type | Compter un apurement comme vente, une indemnité comme COD ou régler un frais deux fois |
 | Comptes actifs, appartenance active, tenant accessible, DENY prioritaire et quota | Redonner l’accès à un compte suspendu/révoqué par un simple rôle |
 | Clé de validation stable par commande/révision et verrous de stock | Réserver deux fois au double clic ou lors d’une reprise |
 | Écritures signées, références d’origine, plafonds et preuve financière | Compter deux fois un montant ou confondre livraison et paiement |
@@ -3586,7 +3428,7 @@ Ce diagramme doit évoluer avec la partie boutique du schéma principal. Il n’
 
 La même méthode que pour la centrale est appliquée : clarifier les fonctions, réunir les données d’un même rôle quand cela reste lisible, séparer les cycles métier, garder les contraintes SQL locales et les instantanés historiques, puis vérifier champs, relations, parcours et inventaire ensemble. Le nombre de tables est un compromis pour ces fonctions ; il ne prouve pas à lui seul une meilleure vitesse. Les performances seront mesurées sur la future BDD MySQL.
 
-L’analyse couvre les 35 commits disponibles, du premier 7b14ffb au dernier 2660108, et les documents du dépôt à ce dernier état. Les étapes centrales retenues comme méthode sont les UUID publics avec PK/FK locales, les comptes et droits isolés, les regroupements par type, les états et preuves séparés, puis la réduction des gros documents de facturation sans perdre leurs reprises ou leur histoire. Les choix boutique V4.6 remplacent les anciennes notes incompatibles ; ils ne réécrivent pas la centrale.
+L’analyse couvre les 36 commits disponibles, du premier 7b14ffb au dernier 8e0ec6d, et les documents du dépôt à ce dernier état. Les étapes centrales retenues comme méthode sont les UUID publics avec PK/FK locales, les comptes et droits isolés, les regroupements par type, les états et preuves séparés, puis la réduction des gros documents de facturation sans perdre leurs reprises ou leur histoire. Les choix boutique V4.7 conservent ceux de V4.6 et remplacent les anciennes notes incompatibles ; ils ne réécrivent pas la centrale.
 
 Références du dépôt :
 
