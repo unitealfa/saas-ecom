@@ -63,12 +63,12 @@ countries {
 
 users {
   u64 id PK
-  uuid uuid UK
   u64 country_id FK
   u64 legal_verified_by_id FK "?"
+  uuid uuid UK
+  varchar email UK
   varchar name
   varchar first_name "?"
-  varchar email UK
   varchar password
   varchar phone "?"
   datetime email_verified_at "?"
@@ -98,13 +98,13 @@ users {
 
 tenants {
   u64 id PK
-  uuid uuid UK
   u64 user_id FK
+  uuid uuid UK
+  varchar(63) slug UK
+  varchar(32) document_prefix UK
   varchar internal_label
   varchar shop_name
-  varchar(63) slug UK
   u64 profile_version
-  varchar(32) document_prefix UK
   varchar creation_key
   char(64) creation_hash
   u8 status
@@ -121,8 +121,8 @@ tenants {
 
 domains {
   u64 id PK
-  uuid uuid UK
   u64 tenant_id FK
+  uuid uuid UK
   varchar(253) domain UK
   u8 type
   boolean is_primary
@@ -136,8 +136,8 @@ domains {
 
 contact_verifications {
   u64 id PK
-  uuid uuid UK
   u64 user_id FK
+  uuid uuid UK
   u8 channel
   varchar normalized_destination
   varchar code_hash
@@ -177,13 +177,13 @@ permissions {
 roles {
   u64 id PK
   uuid uuid UK
+  u8 super_admin_slot UK "?"
   varchar(125) name
   varchar(32) guard_name
   varchar label
   boolean is_system
   boolean is_protected
   boolean is_super_admin
-  u8 super_admin_slot UK "?"
   u64 permission_version
   datetime created_at
   datetime updated_at
@@ -208,10 +208,10 @@ model_has_permissions {
 
 permission_overrides {
   u64 id PK
-  uuid uuid UK
   u64 user_id FK
   u64 permission_id FK
   u64 assigned_by_id FK
+  uuid uuid UK
   u8 effect
   u8 status
   datetime started_at
@@ -226,13 +226,13 @@ permission_overrides {
 
 admin_restrictions {
   u64 id PK
-  uuid uuid UK
   u64 admin_id FK
   u64 permission_id FK
   u64 target_tenant_id FK "?"
   u64 target_user_id FK "?"
   u64 target_role_id FK "?"
   u64 created_by_id FK
+  uuid uuid UK
   u8 effect
   u8 status
   datetime started_at
@@ -263,9 +263,9 @@ plans {
 
 plan_features {
   u64 id PK
-  uuid uuid UK
   u64 plan_id FK
   u64 feature_id FK
+  uuid uuid UK
   boolean is_active
   bigint limit "?"
   datetime created_at
@@ -274,12 +274,14 @@ plan_features {
 
 subscriptions {
   u64 id PK
-  uuid uuid UK
   u64 user_id FK
   u64 parent_subscription_id FK "?"
   u64 tenant_id FK "?"
   u64 plan_id FK "?"
   u64 assigned_by_id FK "?"
+  uuid uuid UK
+  varchar(191) installment_number UK "?"
+  varchar(191) operation_key UK
   u8 record_type
   u8 parent_record_type "?"
   u8 status "?"
@@ -291,23 +293,21 @@ subscriptions {
   datetime trial_ends_at "?"
   datetime ended_at "?"
   boolean auto_renew "?"
-  varchar(191) installment_number UK "?"
   decimal installment_amount "?"
   datetime due_at "?"
   u8 installment_status "?"
   u8 active_owner_slot "?"
-  varchar(191) operation_key UK
   datetime created_at
   datetime updated_at
 }
 
 feature_overrides {
   u64 id PK
-  uuid uuid UK
   u64 user_id FK
   u64 tenant_id FK "?"
   u64 feature_id FK
   u64 assigned_by_id FK
+  uuid uuid UK
   boolean is_active
   bigint limit "?"
   datetime started_at
@@ -319,10 +319,10 @@ feature_overrides {
 
 feature_usage {
   u64 id PK
-  uuid uuid UK
   u64 user_id FK
   u64 tenant_id FK "?"
   u64 feature_id FK
+  uuid uuid UK
   datetime period_starts_at
   datetime period_ends_at "?"
   bigint quantity
@@ -332,9 +332,9 @@ feature_usage {
 
 geographic_areas {
   u64 id PK
-  uuid uuid UK
   u64 country_id FK
   u64 parent_id FK "?"
+  uuid uuid UK
   u8 type
   u8 parent_type "?"
   u64 parent_key
@@ -352,10 +352,11 @@ geographic_areas {
 
 activity_log {
   u64 id PK
+  u64 tenant_id FK "?"
   uuid uuid UK
+  varchar(191) operation_key UK "?"
   u64 subject_id "?"
   u64 causer_id "?"
-  u64 tenant_id FK "?"
   varchar(64) log_name "?"
   text description
   varchar(64) subject_type "?"
@@ -363,7 +364,6 @@ activity_log {
   varchar(64) causer_type "?"
   json attribute_changes "?"
   json properties "?"
-  varchar(191) operation_key UK "?"
   uuid correlation_id
   u8 origin
   datetime created_at
@@ -372,8 +372,8 @@ activity_log {
 
 tenant_schema_deployments {
   u64 id PK
-  uuid uuid UK
   u64 tenant_id FK
+  uuid uuid UK
   varchar source_version "?"
   varchar target_version
   u8 operation
@@ -392,7 +392,6 @@ tenant_schema_deployments {
 
 saas_invoices {
   u64 id PK
-  uuid uuid UK
   u64 user_id FK
   u64 subscription_id FK
   u64 installment_id FK
@@ -400,6 +399,9 @@ saas_invoices {
   u64 original_invoice_id FK "?"
   u64 sequence_id FK "?"
   u64 document_media_id FK "?"
+  uuid uuid UK
+  varchar(191) number UK "?"
+  varchar(191) operation_key UK
   u8 document_type
   u8 subscription_record_type
   u8 installment_record_type
@@ -409,7 +411,6 @@ saas_invoices {
   json billing_rule_snapshot
   int fiscal_year "?"
   bigint sequence_number "?"
-  varchar(191) number UK "?"
   decimal net_amount
   json taxes
   decimal tax_amount
@@ -425,7 +426,6 @@ saas_invoices {
   datetime issued_at "?"
   datetime cancelled_at "?"
   text cancellation_reason "?"
-  varchar(191) operation_key UK
   uuid correlation_id "?"
   datetime created_at
   datetime updated_at
@@ -433,11 +433,12 @@ saas_invoices {
 
 saas_invoice_lines {
   u64 id PK
-  uuid uuid UK
   u64 document_id FK
   u64 user_id FK
   u64 original_invoice_id FK "?"
   u64 original_invoice_line_id FK "?"
+  uuid uuid UK
+  varchar(191) operation_key UK
   u8 document_type
   u8 original_line_document_type
   int line_number
@@ -450,7 +451,6 @@ saas_invoice_lines {
   decimal tax_amount
   decimal total_amount
   text reason "?"
-  varchar(191) operation_key UK
   uuid correlation_id "?"
   datetime created_at
   datetime updated_at
@@ -458,9 +458,10 @@ saas_invoice_lines {
 
 saas_billing_settings {
   u64 id PK
-  uuid uuid UK
   u64 created_by_id FK "?"
   u64 validated_by_id FK "?"
+  uuid uuid UK
+  varchar(191) operation_key UK
   u8 record_type
   u8 document_type "?"
   int fiscal_year "?"
@@ -477,7 +478,6 @@ saas_billing_settings {
   datetime effective_at "?"
   datetime ends_at "?"
   datetime validated_at "?"
-  varchar(191) operation_key UK
   uuid correlation_id "?"
   datetime created_at
   datetime updated_at
@@ -485,11 +485,12 @@ saas_billing_settings {
 
 saas_document_deliveries {
   u64 id PK
-  uuid uuid UK
   u64 user_id FK
   u64 document_id FK
   u64 created_by_id FK "?"
   u64 proof_media_id FK "?"
+  uuid uuid UK
+  varchar(191) operation_key UK
   u8 document_type
   u8 channel
   text encrypted_recipient
@@ -502,7 +503,6 @@ saas_document_deliveries {
   varchar provider_reference "?"
   varchar error_code "?"
   datetime sending_started_at "?"
-  varchar(191) operation_key UK
   uuid correlation_id
   datetime created_at
   datetime updated_at
@@ -510,7 +510,6 @@ saas_document_deliveries {
 
 saas_transfers {
   u64 id PK
-  uuid uuid UK
   u64 user_id FK
   u64 document_id FK
   u64 original_payment_id FK "?"
@@ -521,6 +520,9 @@ saas_transfers {
   u64 validated_by_id FK "?"
   u64 performed_by_id FK "?"
   u64 reversal_of_id FK "?"
+  uuid uuid UK
+  char(64) active_transaction_fingerprint UK
+  varchar(191) operation_key UK
   u8 record_type
   u8 document_type
   u8 original_payment_record_type
@@ -534,13 +536,11 @@ saas_transfers {
   varchar(191) transfer_reference "?"
   varchar(64) financial_account_key "?"
   char(64) transaction_fingerprint "?"
-  char(64) active_transaction_fingerprint UK
   text encrypted_transfer_details "?"
   datetime occurred_at "?"
   datetime sending_started_at "?"
   datetime validated_at "?"
   varchar error_code "?"
-  varchar(191) operation_key UK
   uuid correlation_id
   datetime created_at
   datetime updated_at
@@ -548,13 +548,13 @@ saas_transfers {
 
 media {
   u64 id PK
-  uuid uuid UK
-  u64 model_id
   u64 created_by_id FK "?"
+  uuid uuid UK
+  varchar storage_key UK
+  u64 model_id
   varchar(64) model_type
   varchar(64) collection_name
   varchar(64) disk
-  varchar storage_key UK
   varchar mime_type
   varchar original_name
   u64 size_bytes
@@ -590,9 +590,9 @@ shipping_carriers {
 
 carrier_geo_mappings {
   u64 id PK
-  uuid uuid UK
   u64 carrier_id FK
   u64 geographic_area_id FK
+  uuid uuid UK
   u8 zone_type
   varchar external_code
   varchar external_name
@@ -608,10 +608,10 @@ carrier_geo_mappings {
 
 pickup_points {
   u64 id PK
-  uuid uuid UK
   u64 carrier_id FK
   u64 province_id FK
   u64 municipality_id FK "?"
+  uuid uuid UK
   u8 province_type
   u8 municipality_type "?"
   varchar external_code

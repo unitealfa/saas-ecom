@@ -81,11 +81,11 @@ erDiagram
 
 shop {
   u64 id PK
-  uuid uuid UK
-  uuid tenant_uuid "REF central.tenants.uuid"
   u64 logo_media_id FK "?"
   u64 favicon_media_id FK "?"
+  uuid uuid UK
   tinyint singleton UK
+  uuid tenant_uuid "REF central.tenants.uuid"
   bigint central_profile_version
   varchar name
   text description "?"
@@ -107,9 +107,9 @@ shop {
 
 shop_addresses {
   u64 id PK
-  uuid uuid UK
   u64 shop_id FK
   u64 shop_address_id FK "?"
+  uuid uuid UK
   uuid province_uuid "? ; REF central.geographic_areas.uuid"
   uuid municipality_uuid "? ; REF central.geographic_areas.uuid"
   u8 record_type
@@ -127,8 +127,8 @@ shop_addresses {
 
 content_pages {
   u64 id PK
-  uuid uuid UK
   u64 product_id FK "?"
+  uuid uuid UK
   u8 page_kind
   varchar slug
   varchar type "?"
@@ -148,13 +148,13 @@ content_pages {
 
 media {
   u64 id PK
-  uuid uuid UK
-  u64 model_id
   u64 created_by_id FK "?"
+  uuid uuid UK
+  varchar storage_key UK
+  u64 model_id
   varchar(64) model_type
   varchar(64) collection_name
   varchar(64) disk
-  varchar storage_key UK
   varchar mime_type
   varchar original_name
   u64 size_bytes
@@ -174,9 +174,9 @@ media {
 
 categories {
   u64 id PK
-  uuid uuid UK
   u64 parent_id FK "?"
   u64 media_id FK "?"
+  uuid uuid UK
   u8 record_type
   u8 parent_record_type "?"
   varchar name
@@ -193,8 +193,8 @@ categories {
 
 products {
   u64 id PK
-  uuid uuid UK
   u64 category_id FK "?"
+  uuid uuid UK
   u8 category_record_type "?"
   varchar name
   varchar slug
@@ -222,8 +222,8 @@ products {
 
 product_variants {
   u64 id PK
-  uuid uuid UK
   u64 product_id FK
+  uuid uuid UK
   varchar label
   varchar sku
   varchar barcode "?"
@@ -250,9 +250,9 @@ product_variants {
 
 product_options {
   u64 id PK
-  uuid uuid UK
   u64 product_id FK
   u64 parent_id FK "?"
+  uuid uuid UK
   u8 record_type
   u8 parent_record_type "?"
   varchar name
@@ -267,11 +267,11 @@ product_options {
 
 variant_option_values {
   u64 id PK
-  uuid uuid UK
   u64 product_id FK
   u64 variant_id FK
   u64 option_id FK
   u64 value_id FK
+  uuid uuid UK
   u8 option_record_type
   u8 value_record_type
   datetime created_at
@@ -280,9 +280,9 @@ variant_option_values {
 
 product_tags {
   u64 id PK
-  uuid uuid UK
   u64 product_id FK
   u64 tag_id FK
+  uuid uuid UK
   u8 tag_record_type
   datetime created_at
   datetime updated_at
@@ -290,10 +290,10 @@ product_tags {
 
 product_promotions {
   u64 id PK
-  uuid uuid UK
   u64 product_id FK
   u64 variant_id FK "?"
   u64 sales_page_id FK "?"
+  uuid uuid UK
   varchar name
   u8 discount_type
   decimal value
@@ -309,11 +309,11 @@ product_promotions {
 
 product_reviews {
   u64 id PK
-  uuid uuid UK
   u64 product_id FK
   u64 visitor_id FK "?"
   u64 order_item_id FK "?"
   u64 moderated_by_id FK "?"
+  uuid uuid UK
   varchar display_name
   int note
   text comment
@@ -338,8 +338,8 @@ visitors {
 
 visit_sessions {
   u64 id PK
-  uuid uuid UK
   u64 visitor_id FK
+  uuid uuid UK
   datetime started_at
   datetime last_activity_at
   datetime ended_at "?"
@@ -355,13 +355,13 @@ visit_sessions {
 
 navigation_events {
   u64 id PK
-  uuid uuid UK
   u64 session_id FK
   u64 product_id FK "?"
   u64 variant_id FK "?"
   u64 sales_page_id FK "?"
   u64 content_page_id FK "?"
   u64 cart_id FK "?"
+  uuid uuid UK
   u8 sales_page_kind "?"
   u8 content_page_kind "?"
   varchar type
@@ -374,8 +374,8 @@ navigation_events {
 
 carts {
   u64 id PK
-  uuid uuid UK
   u64 visitor_id FK
+  uuid uuid UK
   u8 status
   datetime last_activity_at
   datetime expires_at
@@ -386,11 +386,11 @@ carts {
 
 cart_items {
   u64 id PK
-  uuid uuid UK
   u64 cart_id FK
   u64 variant_id FK
   u64 product_id FK
   u64 sales_page_id FK "?"
+  uuid uuid UK
   int quantity
   text customization_text "?"
   char(64) customization_signature
@@ -400,7 +400,6 @@ cart_items {
 
 orders {
   u64 id PK
-  uuid uuid UK
   u64 visitor_id FK "?"
   u64 cart_id FK "?"
   u64 original_session_id FK "?"
@@ -412,6 +411,7 @@ orders {
   u64 confirmed_revision_id FK "?"
   u64 confirmation_owner_id FK "?"
   u64 operationally_confirmed_by_id FK "?"
+  uuid uuid UK
   u8 original_sales_page_kind "?"
   u8 unpaid_resend_slot "?"
   varchar number
@@ -437,11 +437,11 @@ orders {
 
 order_revisions {
   u64 id PK
-  uuid uuid UK
   u64 order_id FK
   u64 author_id FK "?"
-  uuid pickup_point_uuid "? ; REF central.pickup_points.uuid"
   u64 free_shipping_rule_id FK "?"
+  uuid uuid UK
+  uuid pickup_point_uuid "? ; REF central.pickup_points.uuid"
   uuid province_uuid "REF central.geographic_areas.uuid"
   uuid municipality_uuid "REF central.geographic_areas.uuid"
   int revision_number
@@ -479,12 +479,12 @@ order_revisions {
 
 order_items {
   u64 id PK
-  uuid uuid UK
   u64 revision_id FK
   u64 variant_id FK
   u64 product_id FK
   u64 promotion_id FK "?"
   u64 sales_page_id FK "?"
+  uuid uuid UK
   varchar product_name
   varchar variant_name
   varchar sku
@@ -510,11 +510,11 @@ order_items {
 
 order_history {
   u64 id PK
-  uuid uuid UK
   u64 order_id FK
   u64 previous_revision_id FK "?"
   u64 next_revision_id FK "?"
   u64 actor_id FK "?"
+  uuid uuid UK
   varchar action
   u8 contact_outcome "?"
   datetime next_callback_at "?"
@@ -529,12 +529,12 @@ order_history {
 
 stock_movements {
   u64 id PK
-  uuid uuid UK
   u64 variant_id FK
   u64 order_item_id FK "?"
   u64 return_item_id FK "?"
   u64 actor_id FK "?"
   u64 reversal_of_id FK "?"
+  uuid uuid UK
   bigint variant_sequence
   u8 type
   int physical_delta
@@ -560,11 +560,11 @@ stock_movements {
 
 order_returns {
   u64 id PK
-  uuid uuid UK
   u64 shipment_id FK
   u64 order_id FK
   u64 shipped_revision_id FK
   u64 received_by_id FK "?"
+  uuid uuid UK
   u8 reason
   text detail "?"
   u8 status
@@ -577,12 +577,12 @@ order_returns {
 
 return_items {
   u64 id PK
-  uuid uuid UK
   u64 return_id FK
   u64 order_item_id FK
   u64 shipped_revision_id FK
   u64 variant_id FK
   u64 inspected_by_id FK "?"
+  uuid uuid UK
   int expected_quantity
   int received_quantity
   int restocked_quantity
@@ -599,9 +599,9 @@ return_items {
 
 shipping_providers {
   u64 id PK
-  uuid uuid UK
   u64 user_id FK "?"
   u64 carrier_account_id FK "?"
+  uuid uuid UK
   u8 type
   varchar name
   varchar phone "?"
@@ -616,10 +616,10 @@ shipping_providers {
 
 shipping_rates {
   u64 id PK
-  uuid uuid UK
   u64 provider_id FK "?"
   u64 carrier_account_id FK "?"
   u64 created_by_id FK "?"
+  uuid uuid UK
   uuid province_uuid "? ; REF central.geographic_areas.uuid"
   uuid municipality_uuid "? ; REF central.geographic_areas.uuid"
   u8 record_type
@@ -641,8 +641,8 @@ shipping_rates {
 
 free_shipping_rules {
   u64 id PK
-  uuid uuid UK
   u64 product_id FK "?"
+  uuid uuid UK
   uuid province_uuid "? ; REF central.geographic_areas.uuid"
   varchar name
   u8 delivery_mode "?"
@@ -658,13 +658,13 @@ free_shipping_rules {
 
 shipments {
   u64 id PK
-  uuid uuid UK
   u64 order_id FK
   u64 shipped_revision_id FK
   u64 provider_id FK
-  uuid pickup_point_uuid "? ; REF central.pickup_points.uuid"
   u64 label_media_id FK "?"
   u64 assigned_by_id FK
+  uuid uuid UK
+  uuid pickup_point_uuid "? ; REF central.pickup_points.uuid"
   u8 delivery_mode
   u8 status
   varchar raw_external_status "?"
@@ -685,9 +685,9 @@ shipments {
 
 shipment_events {
   u64 id PK
-  uuid uuid UK
   u64 shipment_id FK
   u64 actor_id FK "?"
+  uuid uuid UK
   u8 logistics_status "?"
   u8 financial_status "?"
   varchar external_code "?"
@@ -713,7 +713,6 @@ shipment_events {
 
 carrier_operations {
   u64 id PK
-  uuid uuid UK
   u64 provider_id FK
   u64 shipment_id FK "?"
   u64 order_id FK "?"
@@ -721,6 +720,7 @@ carrier_operations {
   u64 revision_id FK "?"
   u64 superseded_by_operation_id FK "?"
   u64 triggered_by_id FK "?"
+  uuid uuid UK
   u8 type
   varchar operation_key
   json sanitized_request
@@ -743,8 +743,8 @@ carrier_operations {
 
 carrier_operation_attempts {
   u64 id PK
-  uuid uuid UK
   u64 operation_id FK
+  uuid uuid UK
   int attempt_number
   int http_status_code "?"
   json sanitized_response "?"
@@ -759,8 +759,8 @@ carrier_operation_attempts {
 
 collections {
   u64 id PK
-  uuid uuid UK
   u64 shipment_id FK
+  uuid uuid UK
   u8 declared_status
   decimal expected_amount
   decimal declared_collected_amount "?"
@@ -775,12 +775,12 @@ collections {
 
 remittance_statements {
   u64 id PK
-  uuid uuid UK
   u64 provider_id FK
   u64 carrier_remittance_batch_id FK "?"
   u64 validated_by_id FK "?"
   u64 proof_media_id FK "?"
   u64 reversal_of_id FK "?"
+  uuid uuid UK
   varchar number
   varchar external_reference "?"
   u8 type
@@ -800,7 +800,6 @@ remittance_statements {
 
 carrier_settlement_lines {
   u64 id PK
-  uuid uuid UK
   u64 provider_id FK
   u64 remittance_statement_id FK "?"
   u64 collection_id FK "?"
@@ -811,20 +810,20 @@ carrier_settlement_lines {
   u64 proof_media_id FK "?"
   u64 reversal_of_id FK "?"
   u64 correction_of_id FK "?"
+  uuid uuid UK
+  varchar operation_key UK
   u8 record_type
   decimal amount
   u8 fee_payment_mode "?"
   u8 receivable_settlement_type "?"
   varchar reason "?"
   varchar external_reference "?"
-  varchar operation_key UK
   datetime performed_at "?"
   datetime created_at
 }
 
 expenses {
   u64 id PK
-  uuid uuid UK
   u64 product_id FK "?"
   u64 order_id FK "?"
   u64 shipment_id FK "?"
@@ -833,6 +832,7 @@ expenses {
   u64 author_id FK
   u64 reversal_of_id FK "?"
   u64 correction_of_id FK "?"
+  uuid uuid UK
   varchar category
   varchar label
   decimal amount
@@ -848,7 +848,6 @@ expenses {
 
 customer_adjustments {
   u64 id PK
-  uuid uuid UK
   u64 order_id FK
   u64 return_id FK "?"
   u64 incident_id FK
@@ -857,6 +856,7 @@ customer_adjustments {
   u64 proof_media_id FK "?"
   u64 reversal_of_id FK "?"
   u64 correction_of_id FK "?"
+  uuid uuid UK
   int compensated_quantity
   u8 amount_kind
   u8 type
@@ -872,11 +872,11 @@ customer_adjustments {
 
 order_documents {
   u64 id PK
-  uuid uuid UK
   u64 order_id FK
   u64 revision_id FK
   u64 media_id FK
   u64 generated_by_id FK
+  uuid uuid UK
   varchar number
   int document_version
   json issuer_snapshot
@@ -887,6 +887,7 @@ order_documents {
 activity_log {
   u64 id PK
   uuid uuid UK
+  varchar(191) operation_key UK "?"
   u64 subject_id "?"
   u64 causer_id "?"
   varchar(64) log_name "?"
@@ -896,7 +897,6 @@ activity_log {
   varchar(64) causer_type "?"
   json attribute_changes "?"
   json properties "?"
-  varchar(191) operation_key UK "?"
   uuid correlation_id "?"
   u8 origin
   datetime performed_at "?"
@@ -906,7 +906,6 @@ activity_log {
 
 carrier_fees {
   u64 id PK
-  uuid uuid UK
   u64 shipment_id FK
   u64 provider_id FK
   u64 return_id FK "?"
@@ -915,6 +914,7 @@ carrier_fees {
   u64 proof_media_id FK "?"
   u64 reversal_of_id FK "?"
   u64 correction_of_id FK "?"
+  uuid uuid UK
   json rate_snapshot "?"
   u8 source_rate_record_type "?"
   u8 fee_type
@@ -933,11 +933,11 @@ carrier_fees {
 
 carrier_receivables {
   u64 id PK
-  uuid uuid UK
   u64 provider_id FK
   u64 carrier_fee_id FK
   u64 original_fee_payment_id FK "?"
   u64 reversal_of_id FK "?"
+  uuid uuid UK
   decimal initial_amount
   decimal remaining_amount
   varchar reason
@@ -952,12 +952,12 @@ carrier_receivables {
 
 collection_entries {
   u64 id PK
-  uuid uuid UK
   u64 collection_id FK
   u64 verified_by_id FK
   u64 proof_media_id FK "?"
   u64 reversal_of_id FK "?"
   u64 correction_of_id FK "?"
+  uuid uuid UK
   decimal amount
   datetime collected_at
   datetime verified_at
@@ -969,7 +969,6 @@ collection_entries {
 
 invoices {
   u64 id PK
-  uuid uuid UK
   u64 order_id FK
   u64 revision_id FK
   u64 original_invoice_id FK "?"
@@ -977,6 +976,7 @@ invoices {
   u64 media_id FK "?"
   u64 issued_by_id FK "?"
   u64 incident_id FK "?"
+  uuid uuid UK
   u8 document_type
   u8 sequence_record_type
   int fiscal_year "?"
@@ -1000,7 +1000,6 @@ invoices {
 
 order_incidents {
   u64 id PK
-  uuid uuid UK
   u64 order_id FK
   u64 shipment_id FK
   u64 shipped_revision_id FK
@@ -1008,11 +1007,12 @@ order_incidents {
   u64 return_id FK "?"
   u64 opened_by_id FK "?"
   u64 validated_by_id FK "?"
+  uuid uuid UK
+  varchar operation_key UK
   int affected_quantity
   decimal eligible_product_amount
   decimal eligible_shipping_amount
   u8 status
-  varchar operation_key UK
   text reason
   datetime validated_at "?"
   datetime closed_at "?"
@@ -1022,9 +1022,9 @@ order_incidents {
 
 order_incident_details {
   u64 id PK
-  uuid uuid UK
   u64 incident_id FK
   u64 author_id FK "?"
+  uuid uuid UK
   u8 type
   int quantity
   text reason
@@ -1034,8 +1034,8 @@ order_incident_details {
 
 billing_rules {
   u64 id PK
-  uuid uuid UK
   u64 validated_by_id FK "?"
+  uuid uuid UK
   u8 record_type
   u8 document_type "?"
   int fiscal_year "?"
@@ -1060,26 +1060,27 @@ billing_rules {
 
 sales_terms_acceptances {
   u64 id PK
-  uuid uuid UK
   u64 order_id FK
   u64 revision_id FK
+  uuid uuid UK
+  varchar operation_key UK
   varchar sales_terms_version
   char(64) terms_hash
   datetime accepted_at
   u8 acceptance_mode
   json sanitized_proof "?"
-  varchar operation_key UK
   datetime created_at
 }
 
 billing_obligations {
   u64 id PK
-  uuid uuid UK
   u64 order_id FK
   u64 revision_id FK
   u64 billing_rule_id FK
   u64 original_invoice_id FK "?"
   u64 invoice_id FK "?"
+  uuid uuid UK
+  varchar operation_key UK
   u64 event_id
   u8 billing_rule_record_type
   json rule_snapshot
@@ -1087,7 +1088,6 @@ billing_obligations {
   datetime triggered_at
   u8 document_type
   u8 status
-  varchar operation_key UK
   int attempts_count
   datetime next_attempt_at "?"
   varchar error_code "?"
@@ -1097,12 +1097,13 @@ billing_obligations {
 
 commercial_corrections {
   u64 id PK
-  uuid uuid UK
   u64 order_id FK
   u64 source_revision_id FK
   u64 incident_id FK "?"
   u64 correction_of_id FK "?"
   u64 actor_id FK "?"
+  uuid uuid UK
+  varchar operation_key UK
   u8 correction_type
   u8 status
   decimal non_product_revenue_delta
@@ -1110,16 +1111,15 @@ commercial_corrections {
   datetime effective_at
   datetime recorded_at
   text reason
-  varchar operation_key UK
   datetime created_at
 }
 
 commercial_correction_lines {
   u64 id PK
-  uuid uuid UK
   u64 correction_id FK
   u64 source_revision_id FK
   u64 order_item_id FK
+  uuid uuid UK
   int affected_quantity
   decimal reference_sale_amount
   decimal revenue_delta
@@ -1132,9 +1132,9 @@ users {
   u64 id PK
   uuid uuid UK
   uuid central_user_uuid UK "? ; REF central.users.uuid"
+  varchar email UK
   varchar name
   varchar first_name "?"
-  varchar email UK
   varchar password
   varchar phone "?"
   datetime email_verified_at "?"
@@ -1163,13 +1163,13 @@ permissions {
 roles {
   u64 id PK
   uuid uuid UK
+  u8 super_admin_slot UK "?"
   varchar(125) name
   varchar(32) guard_name
   varchar label
   boolean is_system
   boolean is_protected
   boolean is_super_admin
-  u8 super_admin_slot UK "?"
   u64 permission_version
   datetime created_at
   datetime updated_at
@@ -1194,10 +1194,10 @@ model_has_permissions {
 
 permission_overrides {
   u64 id PK
-  uuid uuid UK
   u64 user_id FK
   u64 permission_id FK
   u64 assigned_by_id FK
+  uuid uuid UK
   u8 effect
   u8 status
   datetime started_at
@@ -1212,11 +1212,11 @@ permission_overrides {
 
 team_invitations {
   u64 id PK
-  uuid uuid UK
   u64 initial_role_id FK
   u64 invited_by_id FK
-  varchar email
+  uuid uuid UK
   varchar token_hash UK
+  varchar email
   u64 role_permission_version
   datetime expires_at
   datetime accepted_at "?"
@@ -1227,8 +1227,8 @@ team_invitations {
 
 contact_verifications {
   u64 id PK
-  uuid uuid UK
   u64 user_id FK
+  uuid uuid UK
   u8 channel
   varchar normalized_destination
   varchar code_hash
@@ -1241,8 +1241,8 @@ contact_verifications {
 
 carrier_accounts {
   u64 id PK
-  uuid uuid UK
   u64 created_by_id FK
+  uuid uuid UK
   uuid carrier_uuid "REF central.shipping_carriers.uuid"
   varchar label
   varchar adapter
@@ -1258,18 +1258,18 @@ carrier_accounts {
 
 carrier_remittance_batches {
   u64 id PK
-  uuid uuid UK
   u64 carrier_account_id FK
   u64 proof_media_id FK "?"
   u64 reversal_of_id FK "?"
   u64 validated_by_id FK "?"
+  uuid uuid UK
+  varchar operation_key UK
   varchar external_reference "?"
   decimal reported_account_net_amount "?"
   decimal computed_shop_net_amount
   decimal verified_net_amount "?"
   u8 status
   datetime received_at "?"
-  varchar operation_key UK
   datetime created_at
   datetime updated_at
 }
