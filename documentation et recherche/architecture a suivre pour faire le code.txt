@@ -1,0 +1,926 @@
+# Architecture Laravel du projet SaaS multi-tenant
+
+## 1. Objectif général
+
+Avant de commencer à développer les fonctionnalités, il faut organiser le projet Laravel de manière propre.
+
+L’idée est de :
+
+- séparer clairement la partie **centrale** de la plateforme ;
+- séparer clairement la partie **boutique / tenant** ;
+- éviter de mettre toute la logique dans les Controllers ;
+- utiliser une architecture proche du principe **MVC** ;
+- séparer la validation, la logique métier, les données et l’accès à la base de données ;
+- garder un code simple à maintenir lorsque le projet devient grand.
+
+Le projet utilise donc Laravel avec une organisation personnalisée autour de :
+
+```text
+Models
+Controllers
+Requests
+Services
+DTO
+Migrations
+Seeders
+Routes
+```
+
+---
+
+# 2. Séparer Central et Tenant
+
+Le projet possède deux types de données.
+
+## Central
+
+La base centrale contient les informations appartenant à la plateforme.
+
+Exemples :
+
+```text
+users
+tenants
+plans
+subscriptions
+countries
+platform_roles
+platform_permissions
+```
+
+## Tenant
+
+Chaque boutique possède sa propre base de données.
+
+Exemples :
+
+```text
+products
+product_variants
+orders
+order_items
+customers
+stock_movements
+delivery_rates
+```
+
+Il faut donc retrouver cette séparation directement dans le code.
+
+---
+
+# 3. Organisation des Models
+
+Dans :
+
+```text
+app/Models/
+```
+
+créer deux dossiers :
+
+```text
+app/
+└── Models/
+    ├── Central/
+    └── Tenant/
+```
+
+Par exemple :
+
+```text
+app/
+└── Models/
+    ├── Central/
+    │   ├── User.php
+    │   ├── Tenant.php
+    │   ├── Plan.php
+    │   └── Subscription.php
+    │
+    └── Tenant/
+        ├── Product.php
+        ├── ProductVariant.php
+        ├── Order.php
+        └── Customer.php
+```
+
+Donc :
+
+```text
+User
+```
+
+appartient à la base centrale.
+
+Alors que :
+
+```text
+Product
+```
+
+appartient à la base de données de la boutique.
+
+Il ne faut pas mettre tous les Models directement dans :
+
+```text
+app/Models/
+```
+
+sans séparation.
+
+---
+
+# 4. Organisation des migrations
+
+Il faut appliquer exactement la même logique pour les migrations.
+
+Au lieu d'avoir toutes les migrations dans le même dossier :
+
+```text
+database/migrations/
+```
+
+on peut organiser :
+
+```text
+database/
+└── migrations/
+    ├── central/
+    └── tenant/
+```
+
+Exemple :
+
+```text
+database/
+└── migrations/
+    ├── central/
+    │   ├── create_users_table.php
+    │   ├── create_tenants_table.php
+    │   ├── create_plans_table.php
+    │   └── create_subscriptions_table.php
+    │
+    └── tenant/
+        ├── create_products_table.php
+        ├── create_product_variants_table.php
+        ├── create_orders_table.php
+        └── create_order_items_table.php
+```
+
+Les migrations `central` servent uniquement à créer les tables de la base centrale.
+
+Les migrations `tenant` servent uniquement à créer les tables présentes dans chaque boutique.
+
+---
+
+# 5. À quoi sert une migration ?
+
+Une migration permet de décrire la structure d'une table.
+
+Par exemple :
+
+```php
+Schema::create('products', function (Blueprint $table) {
+    $table->id();
+    $table->uuid('uuid')->unique();
+    $table->string('name');
+    $table->decimal('price', 10, 2);
+    $table->timestamps();
+});
+```
+
+Laravel comprend alors :
+
+```text
+Si la table products n'existe pas,
+crée-la avec ces colonnes.
+```
+
+Une migration représente donc le **schéma de la base de données**.
+
+C'est comparable à la définition des schemas/models que l'on peut retrouver dans d'autres frameworks comme Node.js / Express.
+
+---
+
+# 6. Organisation des Seeders
+
+Même principe pour les seeders.
+
+Créer :
+
+```text
+database/
+└── seeders/
+    ├── Central/
+    └── Tenant/
+```
+
+Par exemple :
+
+```text
+database/
+└── seeders/
+    ├── Central/
+    │   ├── CountrySeeder.php
+    │   ├── RoleSeeder.php
+    │   └── PlanSeeder.php
+    │
+    └── Tenant/
+        ├── RoleSeeder.php
+        ├── SettingSeeder.php
+        └── DefaultCategorySeeder.php
+```
+
+L'intérêt est de pouvoir exécuter séparément :
+
+```text
+les seeders Central
+```
+
+et :
+
+```text
+les seeders Tenant
+```
+
+Quand une nouvelle boutique est créée, Laravel peut :
+
+```text
+1. créer la base de données du tenant
+2. exécuter les migrations tenant
+3. exécuter les seeders tenant
+```
+
+Donc une nouvelle boutique reçoit automatiquement sa structure et ses données par défaut.
+
+---
+
+# 7. Organisation des Controllers
+
+Même principe dans les Controllers.
+
+Dans :
+
+```text
+app/Http/Controllers/
+```
+
+avoir :
+
+```text
+app/
+└── Http/
+    └── Controllers/
+        ├── Central/
+        └── Tenant/
+```
+
+Exemple :
+
+```text
+app/
+└── Http/
+    └── Controllers/
+        ├── Central/
+        │   ├── UserController.php
+        │   ├── TenantController.php
+        │   └── PlanController.php
+        │
+        └── Tenant/
+            ├── ProductController.php
+            ├── OrderController.php
+            └── CustomerController.php
+```
+
+Le principe est simple :
+
+```text
+Controller Central
+→ travaille avec la plateforme centrale
+
+Controller Tenant
+→ travaille avec une boutique
+```
+
+---
+
+# 8. Le rôle du Controller
+
+Le Controller ne doit pas contenir toute la logique métier.
+
+Son rôle principal est :
+
+```text
+1. recevoir la requête HTTP
+2. récupérer les données validées
+3. appeler le Service
+4. retourner la réponse
+```
+
+Par exemple :
+
+```php
+public function store(
+    StoreProductRequest $request,
+    ProductService $productService
+) {
+    $product = $productService->create(
+        ProductData::fromRequest($request)
+    );
+
+    return response()->json($product, 201);
+}
+```
+
+Le Controller doit rester relativement petit.
+
+Il ne faut pas faire :
+
+```text
+validation
++ vérifications métier
++ création produit
++ stock
++ logs
++ notifications
++ calculs
+```
+
+directement dans le Controller.
+
+---
+
+# 9. Validation avec les Form Requests
+
+Les données envoyées par le frontend doivent être validées avant d'être utilisées.
+
+Par exemple :
+
+```text
+name
+first_name
+last_name
+email
+phone
+price
+```
+
+Il faut utiliser les **Form Requests Laravel**.
+
+Exemple :
+
+```text
+app/
+└── Http/
+    └── Requests/
+        ├── Central/
+        └── Tenant/
+```
+
+Puis :
+
+```text
+app/Http/Requests/Tenant/StoreProductRequest.php
+```
+
+Exemple :
+
+```php
+class StoreProductRequest extends FormRequest
+{
+    public function rules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:255'],
+            'price' => ['required', 'numeric', 'min:0'],
+        ];
+    }
+}
+```
+
+Le Request sert uniquement à vérifier les données reçues.
+
+Il ne doit pas contenir la logique métier principale.
+
+---
+
+# 10. Utiliser des Services
+
+La logique métier doit être placée dans des Services.
+
+Créer par exemple :
+
+```text
+app/
+└── Services/
+    ├── Central/
+    └── Tenant/
+```
+
+Exemple :
+
+```text
+app/Services/Tenant/ProductService.php
+```
+
+```php
+class ProductService
+{
+    public function create(ProductData $data): Product
+    {
+        return Product::create([
+            'name' => $data->name,
+            'price' => $data->price,
+        ]);
+    }
+}
+```
+
+Le Service peut gérer :
+
+```text
+vérifications métier
+création
+modification
+calculs
+transactions
+appels à plusieurs Models
+stock
+commandes
+abonnements
+etc.
+```
+
+Donc :
+
+```text
+Controller
+→ reçoit la demande
+
+Service
+→ exécute le travail
+```
+
+---
+
+# 11. Utiliser des DTO
+
+DTO signifie :
+
+```text
+Data Transfer Object
+```
+
+Son rôle est d'avoir une structure de données claire entre les différentes parties de l'application.
+
+Par exemple le frontend peut envoyer :
+
+```text
+firstName
+lastName
+```
+
+alors que la base contient :
+
+```text
+first_name
+last_name
+```
+
+Sans règle claire, un développeur peut utiliser :
+
+```text
+fname
+lname
+firstName
+first_name
+```
+
+et cela devient rapidement désordonné.
+
+Le DTO permet de définir une forme unique.
+
+Par exemple :
+
+```php
+class UserData
+{
+    public function __construct(
+        public string $firstName,
+        public string $lastName,
+        public string $email,
+    ) {}
+}
+```
+
+Puis :
+
+```php
+$userData = new UserData(
+    firstName: $request->first_name,
+    lastName: $request->last_name,
+    email: $request->email,
+);
+```
+
+Le Service reçoit alors toujours la même structure.
+
+---
+
+# 12. Flux complet recommandé
+
+Lorsqu'une requête arrive depuis le frontend :
+
+```text
+Frontend
+   ↓
+Route
+   ↓
+Form Request
+   ↓
+Controller
+   ↓
+DTO
+   ↓
+Service
+   ↓
+Model
+   ↓
+Base de données
+```
+
+Puis dans le sens retour :
+
+```text
+Base de données
+   ↓
+Model
+   ↓
+Service
+   ↓
+Controller
+   ↓
+Response JSON
+   ↓
+Frontend
+```
+
+Exemple concret :
+
+```text
+Le marchand clique sur "Créer un produit"
+```
+
+Le frontend envoie :
+
+```http
+POST /api/products
+```
+
+avec :
+
+```json
+{
+    "name": "Chaussure Nike",
+    "price": 9500
+}
+```
+
+Laravel passe par :
+
+```text
+Route
+↓
+StoreProductRequest
+↓
+ProductController
+↓
+ProductData
+↓
+ProductService
+↓
+Product Model
+↓
+BDD Tenant
+```
+
+---
+
+# 13. Routes Central et Tenant
+
+Il est également conseillé de séparer les routes.
+
+Par exemple :
+
+```text
+routes/
+├── central.php
+└── tenant.php
+```
+
+### Central
+
+Contient les routes de la plateforme :
+
+```text
+/users
+/tenants
+/plans
+/subscriptions
+```
+
+### Tenant
+
+Contient les routes des boutiques :
+
+```text
+/products
+/orders
+/customers
+/stock
+```
+
+Cela évite de mélanger les deux environnements.
+
+---
+
+# 14. Architecture finale possible
+
+Une structure globale pourrait ressembler à :
+
+```text
+app/
+│
+├── Models/
+│   ├── Central/
+│   └── Tenant/
+│
+├── Http/
+│   ├── Controllers/
+│   │   ├── Central/
+│   │   └── Tenant/
+│   │
+│   └── Requests/
+│       ├── Central/
+│       └── Tenant/
+│
+├── Services/
+│   ├── Central/
+│   └── Tenant/
+│
+├── DTO/
+│   ├── Central/
+│   └── Tenant/
+│
+database/
+│
+├── migrations/
+│   ├── central/
+│   └── tenant/
+│
+└── seeders/
+    ├── Central/
+    └── Tenant/
+
+routes/
+├── central.php
+└── tenant.php
+```
+
+---
+
+# 15. Dans quel ordre commencer le développement ?
+
+Il ne faut pas commencer immédiatement par créer les Controllers.
+
+Le meilleur ordre est :
+
+### Étape 1 — Préparer l'architecture
+
+Créer les dossiers :
+
+```text
+Models/Central
+Models/Tenant
+
+Controllers/Central
+Controllers/Tenant
+
+Requests/Central
+Requests/Tenant
+
+Services/Central
+Services/Tenant
+
+DTO/Central
+DTO/Tenant
+
+migrations/central
+migrations/tenant
+
+seeders/Central
+seeders/Tenant
+```
+
+---
+
+### Étape 2 — Commencer par la base centrale
+
+Créer d'abord les migrations centrales importantes.
+
+Par exemple :
+
+```text
+countries
+users
+tenants
+roles
+permissions
+plans
+subscriptions
+```
+
+Puis créer leurs Models.
+
+---
+
+### Étape 3 — Mettre en place la création d'un tenant
+
+Le système doit être capable de faire :
+
+```text
+Créer boutique
+↓
+Créer tenant dans BDD centrale
+↓
+Créer base de données boutique
+↓
+Exécuter migrations tenant
+↓
+Exécuter seeders tenant
+↓
+Boutique prête
+```
+
+C'est une des parties les plus importantes du SaaS.
+
+---
+
+### Étape 4 — Créer les tables de base Tenant
+
+Ensuite commencer les migrations des boutiques.
+
+Par exemple :
+
+```text
+roles
+permissions
+settings
+categories
+products
+product_variants
+customers
+orders
+order_items
+```
+
+---
+
+### Étape 5 — Développer module par module
+
+Ne pas créer tout le projet en même temps.
+
+Par exemple commencer par :
+
+```text
+Module Produits
+```
+
+Créer :
+
+```text
+Product migration
+Product model
+StoreProductRequest
+UpdateProductRequest
+ProductData DTO
+ProductService
+ProductController
+routes
+tests
+```
+
+Puis seulement après passer au module suivant.
+
+---
+
+# 16. Exemple complet d'un module
+
+Pour le module Produit :
+
+```text
+app/
+├── Models/
+│   └── Tenant/
+│       └── Product.php
+│
+├── Http/
+│   ├── Controllers/
+│   │   └── Tenant/
+│   │       └── ProductController.php
+│   │
+│   └── Requests/
+│       └── Tenant/
+│           ├── StoreProductRequest.php
+│           └── UpdateProductRequest.php
+│
+├── Services/
+│   └── Tenant/
+│       └── ProductService.php
+│
+└── DTO/
+    └── Tenant/
+        └── ProductData.php
+```
+
+Migration :
+
+```text
+database/migrations/tenant/create_products_table.php
+```
+
+Route :
+
+```text
+routes/tenant.php
+```
+
+Ainsi tout ce qui concerne Product reste organisé.
+
+---
+
+# 17. Principe à retenir
+
+L'objectif n'est pas d'avoir une architecture extrêmement compliquée.
+
+L'objectif est :
+
+```text
+simple
++
+claire
++
+séparée
++
+maintenable
+```
+
+Il ne faut donc pas essayer d'appliquer tous les patterns possibles.
+
+On reste sur :
+
+```text
+MVC
++
+Form Requests
++
+Services
++
+DTO
++
+séparation Central / Tenant
+```
+
+avec quelques principes SOLID lorsque cela apporte réellement quelque chose.
+
+La règle principale est :
+
+```text
+Une classe = une responsabilité principale.
+```
+
+Par exemple :
+
+```text
+Request
+→ validation
+
+Controller
+→ entrée / sortie HTTP
+
+DTO
+→ transport des données
+
+Service
+→ logique métier
+
+Model
+→ données / relations BDD
+
+Migration
+→ structure BDD
+
+Seeder
+→ données initiales
+```
+
+C'est cette architecture qui permet ensuite de commencer le développement proprement sans mélanger toute la logique du SaaS.

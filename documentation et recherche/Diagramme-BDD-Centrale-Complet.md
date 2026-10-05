@@ -1,28 +1,26 @@
 # Diagramme complet de la BDD centrale
 
-Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.8 du 4 octobre 2026. Ce document présente **les 30 tables centrales et leurs 489 champs dans un seul diagramme Mermaid**, puis explique chaque table et chaque champ simplement. Les 27 tables centrales précédentes conservent tous leurs champs ; trois catalogues publics de livraison sont ajoutés. Aucune migration n’est exécutée.
+Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.9 du 5 octobre 2026. Ce document présente **les 28 tables centrales et leurs 464 champs dans un seul diagramme Mermaid**, puis explique chaque table et chaque champ simplement. Les permissions SaaS portent leurs durées dans les tables existantes ; les quotas viennent des offres. Aucune migration n’est exécutée.
 
-## 1. Les 30 tables expliquées très simplement
+## 1. Les 28 tables expliquées très simplement
 
 | Table | Explication très simple |
 |---|---|
 | **`countries`** | La liste des pays : Algérie, France, Arabie saoudite, Soudan et Égypte. |
-| **`users`** | Les comptes des propriétaires de boutiques et des administrateurs du SaaS : nom, e-mail, mot de passe protégé, téléphone, pays… Elle contient aussi les informations professionnelles du propriétaire. |
+| **`users`** | Les comptes des propriétaires et administrateurs du SaaS : prénom (first_name), nom de famille (last_name), e-mail, mot de passe protégé, téléphone, pays et informations professionnelles prévues. Le nom de chaque boutique est dans tenants.shop_name. |
 | **`tenants`** | La liste des boutiques : leur nom, leur propriétaire, leur état et les informations pour retrouver leur propre base de données. |
 | **`domains`** | Les adresses Internet des boutiques. Elle indique à quelle boutique appartient chaque adresse. |
 | **`contact_verifications`** | Les demandes de vérification d’un e-mail ou d’un téléphone : code protégé, expiration, essais et résultat. |
 | **`features`** | Le catalogue des possibilités des abonnements. Exemple : pouvoir créer plusieurs boutiques ou utiliser une fonctionnalité particulière. |
 | **`permissions`** | La liste des actions qu’une personne peut être autorisée à faire. Exemple : gérer les offres ou valider un paiement. |
-| **`roles`** | Les groupes d’autorisations. Exemple : le rôle « gestionnaire des abonnements » rassemble les actions utiles à ce travail. |
-| **`role_has_permissions`** | Indique quelles actions sont autorisées pour chaque rôle. Exemple : un gestionnaire peut attribuer un abonnement. |
-| **`model_has_roles`** | Indique quel compte possède quel rôle. Exemple : Ahmed possède le rôle de gestionnaire. |
-| **`model_has_permissions`** | Donne une autorisation directement à un compte. Exemple : Ahmed peut valider un paiement grâce à une autorisation personnelle. |
-| **`permission_overrides`** | Les autorisations ou interdictions exceptionnelles, avec leurs dates. Exemple : interdire temporairement une action à un compte. |
+| **`roles`** | Les groupes d’actions autorisées. Chaque rôle a un nom unique ; deux rôles de mêmes actions et mêmes durées sont refusés, même avec des noms différents. |
+| **`role_has_permissions`** | Les actions de chaque rôle avec la durée de chacune : 9999 jours par défaut et au maximum, ou une durée plus courte. |
+| **`model_has_roles`** | Les rôles attribués à chaque compte et leur date de départ. Plusieurs rôles sont possibles, sans action commune entre eux. |
+| **`model_has_permissions`** | Une autorisation directement attribuée à un compte, si ce chemin natif est utilisé, avec ses dates. Elle ne peut pas doubler une action déjà donnée par un rôle. |
 | **`admin_restrictions`** | Limite les comptes, boutiques ou rôles sur lesquels un administrateur peut agir dans l’administration centrale. |
 | **`plans`** | Les offres d’abonnement proposées aux commerçants, avec leurs versions. Exemple : Gratuit et Pro. Une ancienne version reste conservée pour comprendre les anciens abonnements. |
 | **`plan_features`** | Indique ce que chaque offre permet et ses limites. Exemple : l’offre Gratuit autorise 1 boutique et l’offre Pro en autorise 3. |
 | **`subscriptions`** | Une seule table contient les abonnements et leurs échéances. Une ligne de type 1 décrit « Karim a le plan Pro ». Ses lignes de type 2 décrivent « Karim doit payer 3 000 DA pour septembre », puis octobre, etc. Les échéances gardent leurs propres UUID, montants, dates et états ; elles ne remplacent pas la ligne d’abonnement. tenant_id reste facultatif sur l’abonnement et désigne une boutique du même propriétaire. |
-| **`feature_overrides`** | Un changement particulier aux possibilités ou aux limites habituelles de l’abonnement. Exemple : autoriser temporairement Karim à tester une fonction normalement absente de son offre. |
 | **`feature_usage`** | Les quantités déjà utilisées pour une fonctionnalité pendant une période. Elle aide à suivre les limites de l’abonnement. |
 | **`geographic_areas`** | Les wilayas et communes dans une seule table. Chaque commune est reliée à sa wilaya, et les zones à leur pays. |
 | **`activity_log`** | Le journal des actions de la partie centrale : qui a fait quoi et quand. Exemple : un administrateur a validé un paiement. |
@@ -39,11 +37,11 @@ Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md),
 
 ## 2. Un seul diagramme pour toute la BDD centrale
 
-**Lecture :** PK = clé primaire ; FK = lien SQL dans cette même BDD ; UK = unicité ; REF = référence UUID externe, sans FK entre bases. u64 = BIGINT UNSIGNED ; u8 = TINYINT UNSIGNED ; « ? » = champ pouvant être NULL selon sa phase/type. Identifiants d’abord, FK/références ensuite, autres champs après. Les pivots Spatie gardent leurs clés composites natives, sans id/uuid inventés.
+**Lecture :** PK = clé primaire ; FK = lien SQL dans cette même BDD ; UK = unicité ; REF = référence UUID externe, sans FK entre bases. u64 = BIGINT UNSIGNED ; u16 = SMALLINT UNSIGNED ; u8 = TINYINT UNSIGNED ; « ? » = champ pouvant être NULL selon sa phase/type. Identifiants d’abord, FK/références ensuite, autres champs après. Les pivots Spatie gardent leurs clés composites natives, sans id/uuid inventés.
 
 **Un « ? » ne signifie pas « toujours facultatif » :** une date de validation peut être vide avant validation, mais devient obligatoire après ; les champs d'abonnement/échéance dépendent du type de ligne, et un avoir exige sa facture d'origine. Les règles du schéma imposent ces obligations. Les colonnes calculées sont remplies par la BDD, sans saisie utilisateur.
 
-Les 69 liens FK couvrent toutes les colonnes marquées FK. Les 31 liens POLY sont conditionnels : subject_type, causer_type ou model_type choisissent un modèle explicitement autorisé ; aucune FK SQL universelle n’est créée. Les traits pleins participent à la PK ; les autres sont pointillés. Les FK composites, types, phases, plafonds et transactions restent obligatoires selon le schéma principal, même si le dessin montre chaque colonne séparément.
+Les 62 liens FK couvrent toutes les colonnes marquées FK. Les 29 liens POLY sont conditionnels : subject_type, causer_type ou model_type choisissent un modèle explicitement autorisé ; aucune FK SQL universelle n’est créée. Les traits pleins participent à la PK ; les autres sont pointillés. Les FK composites, types, phases, plafonds et transactions restent obligatoires selon le schéma principal, même si le dessin montre chaque colonne séparément.
 
 Les comptes et pivots utilisent central_user ; les comptes employés restent locaux. Les sujets du nouveau catalogue sont audités au central ; les décisions privées de boutique sont auditées localement. Les PDF fiscaux et preuves de virements restent dans media, avec leurs parents typés et contrôles de §7.6. Aucun bureau central ne contient les clés API, clients ou tarifs privés d’une boutique.
 
@@ -69,14 +67,13 @@ users {
   u64 country_id FK
   u64 legal_verified_by_id FK "?"
   varchar email UK
-  varchar name
+  varchar last_name
   varchar first_name "?"
   varchar password
   varchar phone "?"
   datetime email_verified_at "?"
   datetime phone_verified_at "?"
   datetime whatsapp_verified_at "?"
-  varchar legal_name "?"
   varchar legal_form "?"
   varchar activity_nature "?"
   varchar nif "?"
@@ -85,7 +82,6 @@ users {
   varchar artisan_card_number "?"
   text legal_address "?"
   decimal share_capital "?"
-  varchar tax_regime "?"
   u64 legal_profile_version "?"
   u8 legal_verification_status "?"
   datetime legal_verified_at "?"
@@ -180,6 +176,7 @@ roles {
   u64 id PK
   uuid uuid UK
   u8 super_admin_slot UK "?"
+  char(64) permission_signature UK
   varchar(125) name
   varchar(32) guard_name
   varchar label
@@ -194,36 +191,22 @@ roles {
 role_has_permissions {
   u64 permission_id PK,FK
   u64 role_id PK,FK
+  u16 duration_days
 }
 
 model_has_roles {
   u64 role_id PK,FK
   varchar(64) model_type PK
   u64 model_id PK
+  datetime assigned_at
 }
 
 model_has_permissions {
   u64 permission_id PK,FK
   varchar(64) model_type PK
   u64 model_id PK
-}
-
-permission_overrides {
-  u64 id PK
-  uuid uuid UK
-  u64 user_id FK
-  u64 permission_id FK
-  u64 assigned_by_id FK
-  u8 effect
-  u8 status
-  datetime started_at
-  datetime ended_at "?"
-  u8 active_slot "?"
-  datetime expires_at "?"
-  text reason "?"
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  datetime assigned_at
+  datetime expires_at
 }
 
 admin_restrictions {
@@ -299,22 +282,6 @@ subscriptions {
   datetime due_at "?"
   u8 installment_status "?"
   u8 active_owner_slot "?"
-  datetime created_at
-  datetime updated_at
-}
-
-feature_overrides {
-  u64 id PK
-  uuid uuid UK
-  u64 user_id FK
-  u64 tenant_id FK "?"
-  u64 feature_id FK
-  u64 assigned_by_id FK
-  boolean is_active
-  bigint limit "?"
-  datetime started_at
-  datetime expires_at "?"
-  text reason "?"
   datetime created_at
   datetime updated_at
 }
@@ -639,9 +606,6 @@ permissions ||--o{ role_has_permissions : "FK permission_id"
 roles ||--o{ role_has_permissions : "FK role_id"
 roles ||--o{ model_has_roles : "FK role_id"
 permissions ||--o{ model_has_permissions : "FK permission_id"
-users ||..o{ permission_overrides : "FK user_id"
-permissions ||..o{ permission_overrides : "FK permission_id"
-users ||..o{ permission_overrides : "FK assigned_by_id"
 users ||..o{ admin_restrictions : "FK admin_id"
 permissions ||..o{ admin_restrictions : "FK permission_id"
 tenants |o..o{ admin_restrictions : "FK target_tenant_id"
@@ -655,10 +619,6 @@ subscriptions |o..o{ subscriptions : "FK parent_subscription_id"
 tenants |o..o{ subscriptions : "FK tenant_id"
 plans |o..o{ subscriptions : "FK plan_id"
 users |o..o{ subscriptions : "FK assigned_by_id"
-users ||..o{ feature_overrides : "FK user_id"
-tenants |o..o{ feature_overrides : "FK tenant_id"
-features ||..o{ feature_overrides : "FK feature_id"
-users ||..o{ feature_overrides : "FK assigned_by_id"
 users ||..o{ feature_usage : "FK user_id"
 tenants |o..o{ feature_usage : "FK tenant_id"
 features ||..o{ feature_usage : "FK feature_id"
@@ -712,12 +672,10 @@ contact_verifications |o..o{ activity_log : "POLY subject_id ; si modele auditab
 features |o..o{ activity_log : "POLY subject_id ; si modele auditable autorise"
 permissions |o..o{ activity_log : "POLY subject_id ; si modele auditable autorise"
 roles |o..o{ activity_log : "POLY subject_id ; si modele auditable autorise"
-permission_overrides |o..o{ activity_log : "POLY subject_id ; si modele auditable autorise"
 admin_restrictions |o..o{ activity_log : "POLY subject_id ; si modele auditable autorise"
 plans |o..o{ activity_log : "POLY subject_id ; si modele auditable autorise"
 plan_features |o..o{ activity_log : "POLY subject_id ; si modele auditable autorise"
 subscriptions |o..o{ activity_log : "POLY subject_id ; subscription ou subscription_installment ; record_type 1/2"
-feature_overrides |o..o{ activity_log : "POLY subject_id ; si modele auditable autorise"
 feature_usage |o..o{ activity_log : "POLY subject_id ; si modele auditable autorise"
 geographic_areas |o..o{ activity_log : "POLY subject_id ; si modele auditable autorise"
 tenant_schema_deployments |o..o{ activity_log : "POLY subject_id ; si modele auditable autorise"
@@ -756,7 +714,7 @@ La liste des pays : Algérie, France, Arabie saoudite, Soudan et Égypte.
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 
-### 2. `users` — 32 champs
+### 2. `users` — 30 champs
 
 Les comptes des propriétaires de boutiques et des administrateurs du SaaS : nom, e-mail, mot de passe protégé, téléphone, pays… Elle contient aussi les informations professionnelles du propriétaire.
 
@@ -766,15 +724,14 @@ Les comptes des propriétaires de boutiques et des administrateurs du SaaS : nom
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `country_id` | Le pays du compte, à retrouver dans countries. |
 | `legal_verified_by_id` | L’administrateur central qui a vérifié les informations professionnelles du propriétaire. |
-| `name` | Le nom du titulaire du compte. |
-| `first_name` | Le prénom du titulaire du compte. |
 | `email` | Son adresse e-mail, unique parmi les comptes de cette base. |
+| `last_name` | Le nom de famille du titulaire du compte, par exemple Amrani. |
+| `first_name` | Le prénom du titulaire du compte, par exemple Karim. |
 | `password` | La version protégée, dite hachée, du mot de passe. Elle sert à vérifier la connexion. |
 | `phone` | Le numéro de téléphone du compte. |
 | `email_verified_at` | La date où l’adresse e-mail a été confirmée. |
 | `phone_verified_at` | La date où le numéro de téléphone a été confirmé. |
 | `whatsapp_verified_at` | La date où le contact WhatsApp a été confirmé. |
-| `legal_name` | Le nom officiel de l’entreprise lorsqu’il est différent du nom de la personne. |
 | `legal_form` | La forme juridique déclarée de l’activité ou de l’entreprise. |
 | `activity_nature` | Le genre d’activité professionnelle exercée par le propriétaire. |
 | `nif` | Le numéro d’identification fiscale du professionnel. |
@@ -783,7 +740,6 @@ Les comptes des propriétaires de boutiques et des administrateurs du SaaS : nom
 | `artisan_card_number` | Le numéro de carte d’artisan si ce document concerne cette activité. |
 | `legal_address` | L’adresse professionnelle officielle du propriétaire ou de son entreprise. |
 | `share_capital` | Le montant du capital de l’entreprise, lorsque cette information s’applique. |
-| `tax_regime` | Le régime fiscal déclaré pour cette activité. |
 | `legal_profile_version` | Le numéro de version du dossier professionnel. Il augmente quand les informations importantes changent. |
 | `legal_verification_status` | L’état de vérification du dossier professionnel. Choix : 1 = en attente ; 2 = vérifié ; 3 = échec ; 4 = expiré ; 5 = incomplet. |
 | `legal_verified_at` | La date où le dossier professionnel a été validé. |
@@ -893,7 +849,7 @@ La liste des actions qu’une personne peut être autorisée à faire. Exemple :
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 
-### 8. `roles` — 12 champs
+### 8. `roles` — 13 champs
 
 Les groupes d’autorisations. Exemple : le rôle « gestionnaire des abonnements » rassemble les actions utiles à ce travail.
 
@@ -901,18 +857,19 @@ Les groupes d’autorisations. Exemple : le rôle « gestionnaire des abonnement
 |---|---|
 | `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
+| `super_admin_slot` | Vaut 1 pour le rôle racine et reste vide pour les autres. Cette valeur calculée empêche d’avoir deux rôles racines dans cette base. |
+| `permission_signature` | Une empreinte des actions et de leurs durées, utilisée pour refuser deux rôles identiques même s’ils ont des noms différents. |
 | `name` | Le nom technique qui reconnaît ce rôle. |
 | `guard_name` | L’espace d’authentification auquel ce rôle ou cette permission appartient. Ici : central, pour le SaaS. |
 | `label` | Le nom lisible affiché à l’utilisateur, à la place du code technique. |
 | `is_system` | Indique un rôle créé et géré par le système. |
 | `is_protected` | Indique un rôle dont les modifications et la suppression sont spécialement limitées. |
 | `is_super_admin` | Indique le rôle racine qui donne les droits complets dans l’administration centrale. |
-| `super_admin_slot` | Vaut 1 pour le rôle racine et reste vide pour les autres. Cette valeur calculée empêche d’avoir deux rôles racines dans cette base. |
 | `permission_version` | Un numéro qui augmente quand les autorisations du rôle changent, pour actualiser les droits gardés en mémoire. |
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 
-### 9. `role_has_permissions` — 2 champs
+### 9. `role_has_permissions` — 3 champs
 
 Indique quelles actions sont autorisées pour chaque rôle. Exemple : un gestionnaire peut attribuer un abonnement.
 
@@ -920,8 +877,9 @@ Indique quelles actions sont autorisées pour chaque rôle. Exemple : un gestion
 |---|---|
 | `permission_id` | L’action que ce rôle permet, à retrouver dans permissions. |
 | `role_id` | Le rôle qui reçoit cette autorisation, à retrouver dans roles. |
+| `duration_days` | Le nombre de jours pendant lesquels cette action est autorisée à partir de l’attribution du rôle. Par défaut et au maximum : 9999 ; minimum : 1. |
 
-### 10. `model_has_roles` — 3 champs
+### 10. `model_has_roles` — 4 champs
 
 Indique quel compte possède quel rôle. Exemple : Ahmed possède le rôle de gestionnaire.
 
@@ -930,8 +888,9 @@ Indique quel compte possède quel rôle. Exemple : Ahmed possède le rôle de ge
 | `role_id` | Le rôle attribué à ce compte, à retrouver dans roles. |
 | `model_type` | Le type du compte recevant le rôle. Ici, central_user désigne un compte de users. |
 | `model_id` | Le numéro du compte qui reçoit ce rôle. Son sens est donné par model_type. |
+| `assigned_at` | La date de départ des durées pour ce compte. La même personne ne reçoit pas un nouveau délai lors d’un simple retry. |
 
-### 11. `model_has_permissions` — 3 champs
+### 11. `model_has_permissions` — 5 champs
 
 Donne une autorisation directement à un compte. Exemple : Ahmed peut valider un paiement grâce à une autorisation personnelle.
 
@@ -940,30 +899,10 @@ Donne une autorisation directement à un compte. Exemple : Ahmed peut valider un
 | `permission_id` | L’autorisation donnée directement à ce compte, à retrouver dans permissions. |
 | `model_type` | Le type du compte recevant l’autorisation. Ici, central_user désigne un compte de users. |
 | `model_id` | Le numéro du compte qui reçoit directement l’autorisation. Son sens est donné par model_type. |
+| `assigned_at` | La date de début de cette autorisation directe, enregistrée par le serveur. |
+| `expires_at` | La date à partir de laquelle cette autorisation ne donne plus accès. Obligatoire, après le début et au maximum 9999 jours plus tard. |
 
-### 12. `permission_overrides` — 15 champs
-
-Les autorisations ou interdictions exceptionnelles, avec leurs dates. Exemple : interdire temporairement une action à un compte.
-
-| Champ | Explication très simple |
-|---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
-| `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
-| `user_id` | Le compte qui bénéficie de cette autorisation ou subit cette interdiction. |
-| `permission_id` | L’action autorisée concernée, à retrouver dans permissions. |
-| `assigned_by_id` | Le compte de la personne qui a accordé ce droit ou cette exception. |
-| `effect` | Indique si l’action est autorisée ou interdite par cette exception. Choix : 1 = autoriser ; 2 = interdire. |
-| `status` | L’état de cette exception : active, révoquée, expirée ou clôturée. Choix : 1 = actif ; 2 = révoqué ; 3 = expiré ; 4 = clôturé. |
-| `started_at` | Le début de la période pendant laquelle cette exception s’applique. |
-| `ended_at` | La fin de la période pendant laquelle cette exception s’applique, lorsqu’une date de fin est connue. |
-| `active_slot` | Vaut 1 pour une exception marquée active et non supprimée. Cette valeur calculée empêche un doublon actif pour ce compte et cette permission ; les dates sont vérifiées séparément. |
-| `expires_at` | La date d’expiration prévue de cette exception. |
-| `reason` | Le texte qui explique pourquoi cette décision ou cette opération a été prise. |
-| `created_at` | La date et l’heure où cette ligne a été créée. |
-| `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
-| `deleted_at` | La date où cette ligne a été retirée de l’utilisation courante tout en restant conservée dans la base. |
-
-### 13. `admin_restrictions` — 19 champs
+### 12. `admin_restrictions` — 19 champs
 
 Limite les comptes, boutiques ou rôles sur lesquels un administrateur peut agir dans l’administration centrale.
 
@@ -989,7 +928,7 @@ Limite les comptes, boutiques ou rôles sur lesquels un administrateur peut agir
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 | `deleted_at` | La date où cette ligne a été retirée de l’utilisation courante tout en restant conservée dans la base. |
 
-### 14. `plans` — 12 champs
+### 13. `plans` — 12 champs
 
 Les offres d’abonnement proposées aux commerçants, avec leurs versions. Exemple : Gratuit et Pro. Une ancienne version reste conservée pour comprendre les anciens abonnements.
 
@@ -1008,7 +947,7 @@ Les offres d’abonnement proposées aux commerçants, avec leurs versions. Exem
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 | `deleted_at` | La date où cette ligne a été retirée de l’utilisation courante tout en restant conservée dans la base. |
 
-### 15. `plan_features` — 8 champs
+### 14. `plan_features` — 8 champs
 
 Indique ce que chaque offre permet et ses limites. Exemple : l’offre Gratuit autorise 1 boutique et l’offre Pro en autorise 3.
 
@@ -1023,7 +962,7 @@ Indique ce que chaque offre permet et ses limites. Exemple : l’offre Gratuit a
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 
-### 16. `subscriptions` — 26 champs
+### 15. `subscriptions` — 26 champs
 
 Une seule table contient les abonnements et leurs échéances. Une ligne de type 1 décrit « Karim a le plan Pro ». Ses lignes de type 2 décrivent « Karim doit payer 3 000 DA pour septembre », puis octobre, etc. Les échéances gardent leurs propres UUID, montants, dates et états ; elles ne remplacent pas la ligne d’abonnement. tenant_id reste facultatif sur l’abonnement et désigne une boutique du même propriétaire.
 
@@ -1056,27 +995,7 @@ Une seule table contient les abonnements et leurs échéances. Une ligne de type
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 
-### 17. `feature_overrides` — 13 champs
-
-Un changement particulier aux possibilités ou aux limites habituelles de l’abonnement. Exemple : autoriser temporairement Karim à tester une fonction normalement absente de son offre.
-
-| Champ | Explication très simple |
-|---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
-| `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
-| `user_id` | Le propriétaire auquel cette exception de fonctionnalité s’applique. |
-| `tenant_id` | La boutique précisément concernée. Vide signifie que l’exception concerne le propriétaire entier. |
-| `feature_id` | La fonctionnalité concernée, à retrouver dans features. |
-| `assigned_by_id` | Le compte de la personne qui a accordé ce droit ou cette exception. |
-| `is_active` | La valeur choisie pour la fonctionnalité : autorisée ou interdite. La durée de l’exception est déterminée par ses dates. |
-| `limit` | Le nombre maximum autorisé. Exemple : 3 boutiques. Vide signifie illimité pour un quota autorisé ; pour une fonction oui/non, ce champ reste vide. |
-| `started_at` | Le début de la période pendant laquelle cette exception s’applique. |
-| `expires_at` | La date et l’heure à partir desquelles cet élément n’est plus valable. |
-| `reason` | Le texte qui explique pourquoi cette décision ou cette opération a été prise. |
-| `created_at` | La date et l’heure où cette ligne a été créée. |
-| `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
-
-### 18. `feature_usage` — 10 champs
+### 16. `feature_usage` — 10 champs
 
 Les quantités déjà utilisées pour une fonctionnalité pendant une période. Elle aide à suivre les limites de l’abonnement.
 
@@ -1093,7 +1012,7 @@ Les quantités déjà utilisées pour une fonctionnalité pendant une période. 
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 
-### 19. `geographic_areas` — 17 champs
+### 17. `geographic_areas` — 17 champs
 
 Les wilayas et communes dans une seule table. Chaque commune est reliée à sa wilaya, et les zones à leur pays.
 
@@ -1117,7 +1036,7 @@ Les wilayas et communes dans une seule table. Chaque commune est reliée à sa w
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 | `deleted_at` | La date où cette ligne a été retirée de l’utilisation courante tout en restant conservée dans la base. |
 
-### 20. `activity_log` — 17 champs
+### 18. `activity_log` — 17 champs
 
 Le journal des actions de la partie centrale : qui a fait quoi et quand. Exemple : un administrateur a validé un paiement.
 
@@ -1141,7 +1060,7 @@ Le journal des actions de la partie centrale : qui a fait quoi et quand. Exemple
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | Un champ conservé pour la compatibilité du journal. Les activités restent protégées contre les modifications ordinaires. |
 
-### 21. `tenant_schema_deployments` — 17 champs
+### 19. `tenant_schema_deployments` — 17 champs
 
 L’historique de création et de mise à jour technique des bases des boutiques. Exemple : la mise à jour de la boutique de Karim a réussi, tandis qu’une autre doit être réessayée.
 
@@ -1165,7 +1084,7 @@ L’historique de création et de mise à jour technique des bases des boutiques
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 
-### 22. `saas_invoices` — 38 champs
+### 20. `saas_invoices` — 38 champs
 
 Les factures et les avoirs du SaaS. Chaque fiche indique qui doit payer, pour quel abonnement, la période, les montants et le PDF. Un avoir réduit une facture déjà émise.
 
@@ -1201,7 +1120,7 @@ Les factures et les avoirs du SaaS. Chaque fiche indique qui doit payer, pour qu
 | `period_ends_at` | La fin de la période couverte par la facture ou l’avoir. |
 | `due_at` | La date limite de paiement de la facture. Un avoir laisse ce champ vide. |
 | `saas_identity_snapshot` | La copie de l’identité professionnelle du SaaS au moment de l’émission du document. |
-| `customer_identity_snapshot` | La copie de l’identité du propriétaire qui paie le SaaS au moment de l’émission du document. |
+| `customer_identity_snapshot` | L’identité figée du propriétaire qui paie : first_name, last_name et informations professionnelles applicables. Le nom de boutique éventuel est celui du tenant concerné ; les nouveaux formats ne contiennent plus legal_name ni tax_regime. |
 | `issued_at` | La date officielle d’émission de la facture ou de l’avoir. |
 | `cancelled_at` | La date où le brouillon de document a été annulé. |
 | `cancellation_reason` | Le texte qui explique pourquoi ce brouillon a été annulé. |
@@ -1210,7 +1129,7 @@ Les factures et les avoirs du SaaS. Chaque fiche indique qui doit payer, pour qu
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 
-### 23. `saas_invoice_lines` — 22 champs
+### 21. `saas_invoice_lines` — 22 champs
 
 Le détail des factures et des avoirs : description, quantité, prix, remise, taxes et total. Une correction retrouve la vraie ligne de facture d’origine.
 
@@ -1239,7 +1158,7 @@ Le détail des factures et des avoirs : description, quantité, prix, remise, ta
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 
-### 24. `saas_billing_settings` — 24 champs
+### 22. `saas_billing_settings` — 24 champs
 
 Les réglages de la facturation : les règles qui disent quand facturer et les compteurs qui donnent des numéros uniques aux factures et aux avoirs.
 
@@ -1270,7 +1189,7 @@ Les réglages de la facturation : les règles qui disent quand facturer et les c
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 
-### 25. `saas_document_deliveries` — 22 champs
+### 23. `saas_document_deliveries` — 22 champs
 
 Les envois des factures et des avoirs : à qui, par quel moyen, quand, combien d’essais et si le document a bien été remis.
 
@@ -1299,7 +1218,7 @@ Les envois des factures et des avoirs : à qui, par quel moyen, quand, combien d
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 
-### 26. `saas_transfers` — 35 champs
+### 24. `saas_transfers` — 35 champs
 
 Les paiements reçus et remboursements effectués à distance par banque, CCP ou BaridiMob : montant, preuve PDF, référence, auteur et vérification.
 
@@ -1341,7 +1260,7 @@ Les paiements reçus et remboursements effectués à distance par banque, CCP ou
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 
-### 27. `media` — 23 champs
+### 25. `media` — 23 champs
 
 Les informations pour retrouver les fichiers du SaaS : factures PDF, reçus, preuves, images… Le fichier lui-même est stocké séparément.
 
@@ -1371,7 +1290,7 @@ Les informations pour retrouver les fichiers du SaaS : factures PDF, reçus, pre
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 | `deleted_at` | La date où cette ligne a été retirée de l’utilisation courante tout en restant conservée dans la base. |
 
-### 28. `shipping_carriers` — 13 champs
+### 26. `shipping_carriers` — 13 champs
 
 Le catalogue commun des sociétés et réseaux de livraison : leur nom, leur code et le connecteur serveur prévu. Il ne contient aucun compte privé de boutique.
 
@@ -1391,7 +1310,7 @@ Le catalogue commun des sociétés et réseaux de livraison : leur nom, leur cod
 | `updated_at` | La date de dernière actualisation de sa fiche. |
 | `deleted_at` | Sa date d’archivage, sans supprimer les anciennes références. |
 
-### 29. `carrier_geo_mappings` — 15 champs
+### 27. `carrier_geo_mappings` — 15 champs
 
 Le dictionnaire commun qui traduit une wilaya ou une commune en code compris par un réseau de livraison. Les exceptions privées d’un compte restent dans sa boutique.
 
@@ -1413,7 +1332,7 @@ Le dictionnaire commun qui traduit une wilaya ou une commune en code compris par
 | `created_at` | La date d’ajout de cette correspondance. |
 | `updated_at` | La date de dernière actualisation autorisée. |
 
-### 30. `pickup_points` — 19 champs
+### 28. `pickup_points` — 19 champs
 
 Le catalogue commun des bureaux officiels des transporteurs, avec leur adresse, leur code et leur emplacement. Chaque commerçant choisit séparément les bureaux qu’il autorise.
 
@@ -1453,11 +1372,43 @@ Un bureau est utilisable seulement si le réseau le propose encore, le commerça
 
 ## 6. Contraintes à respecter avec le dessin
 
+Les règles suivantes complètent obligatoirement le diagramme ; elles sont identiques aux contrats centraux C2.1/C2.2 du schéma principal.
+
+### C2.1 — Durées et règles communes des attributions
+
+Ces règles sont appliquées séparément dans la BDD centrale et dans chaque BDD boutique. Elles ont la même structure, mais aucune attribution, date, signature ou décision d’autorisation n’est synchronisée entre ces BDD. Le guard central ne donne jamais une permission tenant ; les noms/compositions de rôles sont uniques dans leur propre BDD seulement.
+
+| Table/champ dans chaque BDD | Rôle |
+|---|---|
+| roles.permission_signature | Empêche deux rôles de même ensemble de permissions et de mêmes durées, indépendamment de leur nom et de l’ordre de saisie. |
+| role_has_permissions.duration_days | Durée de chaque action du rôle : SMALLINT UNSIGNED NOT NULL DEFAULT 9999, CHECK entre 1 et 9999 inclus. |
+| model_has_roles.assigned_at | Début du compteur propre au compte qui reçoit ce rôle ; DATETIME NOT NULL, UTC. |
+| model_has_permissions.assigned_at / expires_at | Dates obligatoires d’une attribution directe native, si ce chemin est utilisé ; il ne crée ni exception ni priorité sur un rôle. |
+
+**Rôle et personne :** les durées font partie du rôle. Pour donner une action supplémentaire ou une durée différente à une seule personne, créer/utiliser un autre rôle de composition différente, puis remplacer l’attribution concernée atomiquement. Deux utilisateurs recevant le même rôle à des dates différentes ont des échéances différentes. Modifier un rôle existant change sa règle pour tous ses bénéficiaires, avec contrôle et audit de cet impact ; cela ne déplace pas leurs dates d’attribution. Un nom identique est toujours refusé, même si les permissions diffèrent ; deux compositions identiques sont aussi refusées. Deux compositions qui ne diffèrent que par une durée sont différentes.
+
+**Période effective :** pour une permission du rôle, début=model_has_roles.assigned_at et fin=DATE_ADD(assigned_at, INTERVAL duration_days DAY). L’autorisation vaut sur [début,fin) : à l’instant exact de fin, elle ne vaut plus. Chaque permission expire indépendamment des autres. 9999 est un nombre réel de jours, environ 27 ans et 4 mois, pas un code « illimité ». La BDD et le service exigent 1<=duration_days<=9999. Une attribution directe est bornée par CHECK(expires_at>assigned_at AND expires_at<=DATE_ADD(assigned_at,INTERVAL 9999 DAY)) ; son service utilise 9999 jours par défaut. Les dates de début sont produites par le serveur au moment de l’attribution, jamais par un formulaire libre. Aucun calcul d’expiration utilisant NOW() n’est une colonne générée.
+
+**Plusieurs rôles, aucun recoupement :** un compte peut recevoir plusieurs rôles dans sa BDD, mais les ensembles de permissions de tous ses rôles encore attribués sont deux à deux disjoints. Le contrôle porte sur la composition, même si une permission a déjà expiré ; enlever/remplacer explicitement l’attribution qui bloque avant une nouvelle attribution. Un droit direct, si utilisé, ne peut pas être aussi présent dans un de ses rôles. Un même rôle n’est attribué qu’une fois par la PK native. Ces règles s’appliquent également quand on ajoute une permission à un rôle déjà attribué : contrôler chacun de ses bénéficiaires et refuser toute la mutation si elle créerait un recoupement. Il n’existe ni priorité entre sources, ni table secondaire ALLOW/DENY de permissions. Root au central et shop-owner dans sa boutique, dont les capacités sont implicites et protégées, ne se cumulent avec aucun autre rôle ou droit direct dans leur BDD. Leur accès privilégié existant n’est pas une délégation ordinaire à durée ; leurs contrôles de compte, contexte, propriété, quotas et état métier restent obligatoires.
+
+**Prolongation et reprise :** changer duration_days conserve assigned_at ; la nouvelle fin reste calculée depuis le début existant, avec le même maximum. Un retry d’attribution retrouve la ligne et ne remet jamais le compteur à zéro. Une réattribution/renouvellement volontaire utilise une intention distincte, motivée et auditée ; elle change assigned_at explicitement et relance toutes les durées de ce rôle. Retirer une attribution révoque immédiatement ses droits, sans toucher aux autres rôles disjoints. Aucun cron n’est nécessaire pour que l’expiration soit effective.
+
+### C2.2 — Contrôles centraux, concurrence et intégration Spatie
+
+**Écriture atomique :** création/modification de rôle, changement de durée, attribution/retrait/remplacement et droit direct passent par le même service sur la connexion centrale. Le rôle root protégé et non supprimable sert de ligne stable de sérialisation des mutations d’autorisation, sans table supplémentaire : verrouiller sa ligne FOR UPDATE, puis les autres rôles et comptes concernés dans l’ordre croissant de leurs id. Après les verrous, relire compositions et attributions en lecture courante, vérifier guard, acteur habilité, nom/signature, durées et absence de recoupement, puis écrire pivots/signature/permission_version et activité dans une transaction. Les UNIQUE SQL ferment les courses de noms/signatures ; les PK ferment les doubles attributions. Un conflit annule toute la mutation. Le rôle root est amorcé une seule fois par le bootstrap protégé avant ce service ; il ne peut être supprimé ou remplacé comme ligne de catalogue. Toutes les voies (UI, API, imports, jobs, seeders ordinaires) respectent ce protocole. Les contrôles inter-lignes exigent le service et une protection dédiée pour tout écrivain SQL de maintenance ; ils ne sont pas prétendus couverts par un simple CHECK. Les imports ne fabriquent pas un début d’attribution depuis la date d’import si la date réelle est inconnue.
+
+**Lecture effective :** le résolveur central vérifie compte actif, bon guard, attribution unique de chaque capacité, date actuelle, restrictions de cible C3 et protections système. Les relations/méthodes d’autorisation Spatie de chaque contexte sont adaptées pour lire dates de pivots et durées ; l’union native non datée ne suffit pas. Configurer register_permission_check_method=false et enregistrer le contrôle personnalisé pour éviter que le Gate::before natif autorise avant le contrôle temporel ; ne jamais combiner un chemin natif non daté et un chemin daté pour la même capacité. Pour une capacité connue saas.*, le hook central rend false en cas d’expiration/absence/blocage et true seulement pour un droit effectif ou root protégé ; ne pas retourner null après un refus temporel. Les actions d’objet des Policies restent évaluées séparément : le hook retourne null pour leurs noms génériques. Les vérifications brutes de présence de rôle/permission ne sécurisent pas une opération datée. Utiliser un catalogue de capacités concrètes, sans permissions wildcard attribuables qui contourneraient les ensembles disjoints. Les invariants métier et l’isolation des boutiques restent obligatoires même pour root. Le contrôle local est décrit en T24.1.
+
+**Caches et audit :** à chaque décision sensible, relire les attributions et leurs dates actuelles ainsi que les versions des rôles, recalculer la validité à l’heure serveur et revalider avant l’effet dans les services concernés. Une version de rôle seule ne détecte pas un retrait de rôle ou un changement de assigned_at ; une relation chargée auparavant n’est pas l’autorité de cette lecture. Les caches ne dépassent jamais la prochaine échéance ; une mutation invalide les relations chargées et les caches concernés après commit, y compris dans les workers. Un cache encore présent ou un cron arrêté ne conserve aucun droit expiré. Les activités d’attribution/révocation/renouvellement/changement de composition ou durée, doublons refusés et délégations refusées ont leurs phases distinctes et propriétés filtrées : utilisateur/rôle/permissions par UUID, anciennes/nouvelles durées et dates, acteur et motif. Les pivots sans id/uuid ne deviennent pas des sujets polymorphes fictifs ; le sujet est le compte ou le rôle et les clés de pivot sont dans les propriétés. Le temps qui passe est contrôlé lors de la décision ; ne pas promettre un événement de révocation ponctuel produit par la seule horloge.
+
+Cette adaptation est un choix du projet, pas une option native de tenancy/teams. Les cinq tables Spatie restent, leurs clés composites restent, et les contrôles temporels et d’unicité sont à implémenter lors du développement. Source technique : [Spatie, contrôle personnalisé](https://github.com/spatie/laravel-permission/blob/main/docs/advanced-usage/custom-permission-check.md), [Spatie, contrôles de permissions](https://github.com/spatie/laravel-permission/blob/main/src/Traits/HasPermissions.php) et [extension des modèles](https://github.com/spatie/laravel-permission/blob/main/docs/advanced-usage/extending.md).
+
+
 ### 6.8 Classifications, références communes et renvoi impayé — V4.8
 
 **Dictionnaire de classement local :** UNIQUE(categories.id,record_type), UNIQUE(categories.record_type,slug) ; FK(categories.parent_id,parent_record_type) → categories(id,record_type), FK(products.category_id,category_record_type) → categories(id,record_type), FK(product_tags.tag_id,tag_record_type) → categories(id,record_type). parent_record_type=CASE WHEN parent_id IS NOT NULL THEN 1 ELSE NULL END ; category_record_type=CASE WHEN category_id IS NOT NULL THEN 1 ELSE NULL END ; tag_record_type=2, tous GENERATED ALWAYS AS (...) STORED. record_type IN (1,2), TAG impose parent_id NULL. Références RESTRICT, types/identité immuables, cycles/auto-parent contrôlés sous verrou par service/trigger avec les colonnes de base. Les helpers calculés ne remplacent pas les CHECK/triggers de forme ; UNIQUE(product_id,tag_id) conserve la relation multiple.
 
-**Référentiel central C10 :** UNIQUE(geographic_areas.id,type), UNIQUE(geographic_areas.id,parent_id,type). FK(carrier_geo_mappings.geographic_area_id,zone_type) → geographic_areas(id,type). province_type=1 et municipality_type=CASE WHEN municipality_id IS NOT NULL THEN 2 ELSE NULL END STORED pour pickup_points. FK(pickup_points.province_id,province_type) → geographic_areas(id,type) ; FK(pickup_points.municipality_id,province_id,municipality_type) → geographic_areas(id,parent_id,type). province_id non NULL ; municipality_id facultatif, mais s’il existe son parent correspond exactement à la wilaya. Les FK simples restent présentes. RESTRICT pour ces liens et ceux au réseau ; pas de cascade/codes réaffectés ni de FK vers une BDD tenant. Index réseau/état/zone et UUID selon lectures. Les 27 tables centrales antérieures conservent tous leurs champs ; les clés composites ajoutées sur geographic_areas ne changent ni ses valeurs ni son modèle pays/wilaya/commune.
+**Référentiel central C10 :** UNIQUE(geographic_areas.id,type), UNIQUE(geographic_areas.id,parent_id,type). FK(carrier_geo_mappings.geographic_area_id,zone_type) → geographic_areas(id,type). province_type=1 et municipality_type=CASE WHEN municipality_id IS NOT NULL THEN 2 ELSE NULL END STORED pour pickup_points. FK(pickup_points.province_id,province_type) → geographic_areas(id,type) ; FK(pickup_points.municipality_id,province_id,municipality_type) → geographic_areas(id,parent_id,type). province_id non NULL ; municipality_id facultatif, mais s’il existe son parent correspond exactement à la wilaya. Les FK simples restent présentes. RESTRICT pour ces liens et ceux au réseau ; pas de cascade/codes réaffectés ni de FK vers une BDD tenant. Index réseau/état/zone et UUID selon lectures. En V4.8, les 27 tables centrales antérieures conservaient tous leurs champs ; V4.9 adapte C1–C4 ; les clés composites ajoutées sur geographic_areas ne changent ni ses valeurs ni son modèle pays/wilaya/commune.
 
 **Bureau central dans les colis locaux :** order_revisions.pickup_point_uuid et shipments.pickup_point_uuid ont exactement le même stockage UUID/collation ; FK locale(shipped_revision_id,order_id,pickup_point_uuid) → order_revisions(id,order_id,pickup_point_uuid), avec UNIQUE parent. Aucun FK local ne cible central.pickup_points ou un pickup_points local retiré. À domicile UUID et snapshot NULL ; stop desk UUID/snapshot requis. CHECK de mode et FK(shipped_revision_id,order_id,delivery_mode) empêchent qu’un NULL fasse disparaître la protection. Le service résout l’UUID central, contrôle réseau du compte, géographie et autorisation boutique avant la révision, puis conserve le choix exact pour l’envoi. Un changement de disponibilité/code du catalogue ne change pas le snapshot historique.
 
@@ -1467,7 +1418,7 @@ Un bureau est utilisable seulement si le réseau le propose encore, le commerça
 
 Les restrictions MySQL 8.4 sur les FK de colonnes générées STORED, les actions référentielles et les CHECK restent celles du §6.7 : aucun CASCADE/SET NULL et aucun contrôle NEW/OLD d’une colonne générée. Contrôler la forme à partir des colonnes de base, avec vérifications transactionnelles quand un parent est nécessaire. [Documentation MySQL : colonnes générées](https://dev.mysql.com/doc/refman/8.4/en/create-table-generated-columns.html), [clés étrangères](https://dev.mysql.com/doc/refman/8.4/en/create-table-foreign-keys.html), [CHECK](https://dev.mysql.com/doc/refman/8.4/en/create-table-check-constraints.html).
 
-Les protections centrales C1–C9/§6.7 restent applicables : propriété et souscriptions/échéances typées, correspondance facture/avoir/lignes, compteurs et règles séparés par type, virements/préuves, budgets et contrepassations. Les 27 définitions initiales sont conservées ; C10 ajoute uniquement les références publiques communes et leurs clés composites.
+Les protections centrales C1–C9/§6.7 restent applicables : propriété et souscriptions/échéances typées, correspondance facture/avoir/lignes, compteurs et règles séparés par type, virements/préuves, budgets et contrepassations. En V4.8, les 27 définitions initiales étaient conservées ; C10 ajoutait uniquement les références publiques communes et leurs clés composites.
 
 ## 7. Traçabilité et préparation
 
@@ -1488,7 +1439,7 @@ Les protections centrales C1–C9/§6.7 restent applicables : propriété et sou
 | Factures/avoirs, remboursements payés et corrections économiques | Boutique, faits/pièces/encaissements réels distincts |
 | Audit | Journal de la BDD qui exécute l’action ; secrets filtrés, références publiques seulement entre bases |
 
-**Retraits et correspondances :** tags est fusionnée dans categories ; attributes/product_attributes, visitor_preferences, processing_activity_register et exchange_offsets sont retirées du périmètre. Aucun remplacement caché pour préférences ou registre. La description et les champs directs conservés suffisent aux informations produit prévues ; les options vendables restent inchangées. Les anciennes carrier_geo_mappings/pickup_points locales deviennent des références au catalogue central et seules les exceptions réellement privées restent locales. Le code OrderTypeEnum 3 EXCHANGE et AmountKindEnum 4 EXCHANGE_DIFFERENCE sont retirés sans réattribution ; RESEND_UNPAID reçoit 4. Les mécanismes de paiements/remboursements SaaS centraux et leurs 27 tables d’origine restent inchangés.
+**Retraits et correspondances :** tags est fusionnée dans categories ; attributes/product_attributes, visitor_preferences, processing_activity_register et exchange_offsets sont retirées du périmètre. Aucun remplacement caché pour préférences ou registre. La description et les champs directs conservés suffisent aux informations produit prévues ; les options vendables restent inchangées. Les anciennes carrier_geo_mappings/pickup_points locales deviennent des références au catalogue central et seules les exceptions réellement privées restent locales. Le code OrderTypeEnum 3 EXCHANGE et AmountKindEnum 4 EXCHANGE_DIFFERENCE sont retirés sans réattribution ; RESEND_UNPAID reçoit 4. V4.9 adapte l’identité et les autorisations centrales ; les cinq tables de facturation et les mécanismes de paiements/remboursements SaaS restent inchangés.
 
 **Préparation de migration, aucune exécution ici :** analyser les données réellement présentes avant bascule. Pour tags → categories, conserver UUID/name/slug/dates/deleted_at avec record_type=2 ; les catégories antérieures reçoivent 1. Réallouer les PK numériques si elles entrent en collision, réécrire product_tags et les morphs tag selon une correspondance vérifiée, conserver les signatures/options/produits et imposer les FK typées. Aucun tag ne devient un produit. Pour références de livraison, rapprocher par réseau officiel/code externe/zone, pas par nom approximatif ; les divergences non vérifiées restent bloquées. Conserver les UUID centraux stables, traduire les anciens pickup_point_id locaux en pickup_point_uuid, et figer les anciens snapshots avant tout retrait. Les désactivations commerçant deviennent disabled_pickup_point_uuids ou ALLOWLIST ; ne pas fusionner les contrats/secrets/tarifs privés. Les comptes transporteur gardent leurs UUID et clés locales ; carrier_uuid provient du réseau identifié, aucune identité ne se devine.
 
@@ -1497,3 +1448,36 @@ Si des écritures de l’ancien échange payé existent, archiver/réconcilier l
 **Sources de décision :** demandes confirmées dans la conversation, truc.txt, notes du dépôt, recherches Laravel/Spatie et historique complet disponible (37 commits jusqu’à 374bbac). Les notes historiques ne remplacent pas les derniers choix métier explicites. Les diagrammes et glossaires décrivent seulement la version active. Aucune migration/application n’est créée ou exécutée.
 
 Les 37 commits jusqu’à 374bbac et les notes servent à préserver les contraintes déjà identifiées. Ce document décrit la version active ; les anciennes décisions incompatibles restent uniquement dans la traçabilité historique du schéma principal. Aucune donnée ni migration n’est exécutée.
+
+### Traçabilité V4.9 — identités et permissions dans les deux contextes
+
+Décisions confirmées : first_name/last_name pour les personnes centrales et locales, tenants.shop_name pour chaque boutique et shop.shop_name pour sa projection ; retrait de legal_name/tax_regime du profil central courant et des nouveaux formats de snapshot ; retrait de feature_overrides au central et de permission_overrides au central et dans chaque boutique. Les quotas viennent de l’offre et plan_features. Les cinq tables Spatie sont conservées dans chaque BDD ; admin_restrictions reste uniquement centrale. Durées par permission de rôle, 9999 jours par défaut et au maximum ; noms uniques ; compositions identiques en permissions/durées refusées ; plusieurs rôles par compte sans aucune permission commune. La fin est calculée depuis la date d’attribution propre à cette personne. Aucun registre d’exceptions caché ni nouvelle table n’est ajouté.
+
+**Portée et compatibilité :** la dernière instruction étend les règles aux boutiques. La BDD centrale passe de 30 à 28 tables, 464 champs ; chaque boutique passe de 60 à 59 tables, 1005 champs. users, roles et les trois pivots sont adaptés dans chaque contexte ; shop.name devient shop.shop_name sans créer une seconde source publique. Les autres définitions sont conservées. Toutes les boutiques gardent le même schéma, mais leurs rôles/permissions/dates sont indépendants ; les noms/compositions identiques entre BDD sont permis. Les invitations commencent les durées à leur acceptation, conservent un début existant et refusent les recoupements. Identifiants/UUID, guards, audit, propriété, quotas, facturation, stock et référentiels publics gardent leurs protections. PermissionEffectEnum est retiré du catalogue actif ; OverrideStatusEnum reste utilisé par admin_restrictions.
+
+**Préparation future, aucune migration exécutée :** si des données existent dans chaque BDD, établir le sens réel de l’ancien users.name avant sa correspondance vers last_name ; ne pas découper arbitrairement un nom complet. Conserver first_name et les noms publics des boutiques ; shop.name est renommé en shop_name sans changer sa valeur. Ne pas réécrire anciens snapshots/PDF/audits. Pour les attributions, récupérer les dates réelles prouvées ; une date inconnue bloque la bascule jusqu’à une décision explicite, sans prolonger un droit par la date d’import. Calculer signatures, contrôler noms/compositions/recoupements et résoudre les conflits avant UNIQUE/CHECK. Ne pas convertir une ancienne permission temporaire en 9999 jours : reconstruire une composition/durée/datation équivalente quand cela est possible, sinon signaler le cas sans élargir le droit. Une ancienne interdiction exige une décision explicite de retrait/remplacement du droit/rôle ; au central seulement, une restriction de cible compatible peut conserver son sens ; elle n’est pas convertie en autorisation. Les exceptions de quota requièrent une offre/version adaptée et une souscription cohérente. Archiver les décisions remplacées et leurs audits ; aucune suppression physique de donnée ne découle de ces documents.
+
+**Scénarios de conception à vérifier au développement :**
+
+| Cas | Résultat attendu |
+|---|---|
+| Durée non renseignée, centrale ou locale | 9999 jours ; début serveur enregistré lors de l’attribution |
+| Durée 0, négative, 10000 ou NULL | Refus du validateur et du CHECK central |
+| Permission à son instant exact d’expiration, cron arrêté/cache présent | Refus immédiat ; les autres permissions du rôle encore valides restent disponibles |
+| Même rôle attribué à A puis à B à des dates différentes | Deux débuts propres et fins calculées séparément |
+| Deux rôles de même nom, permissions différentes | Refus UNIQUE(name,guard_name) |
+| Noms différents, mêmes permissions/durées dans un autre ordre | Même signature canonique ; seconde création refusée, y compris en concurrence |
+| Même ensemble de permissions, une durée différente | Composition différente possible sous un nom distinct |
+| Deux rôles sans permission commune pour un compte | Attribution permise, durées propres à chaque rôle |
+| Deux rôles avec une permission commune, même si elle a expiré dans l’un | Refus ; retrait/remplacement explicite avant attribution |
+| Droit direct et rôle accordant la même permission | Refus, sans règle prioritaire |
+| Ajout de permission à un rôle utilisé créant un doublon chez un bénéficiaire | Modification entière refusée ; version/signature/pivots/audit de succès inchangés |
+| Attribution identique rejouée | Aucun nouveau début ni prolongation implicite |
+| Durée du rôle modifiée | Date initiale conservée ; tous les bénéficiaires concernés revalidés et impact audité |
+| Renouvellement explicitement demandé et retry | Nouveau début une seule fois ; toutes les durées de ce rôle relancées, motif et audit conservés |
+| Root ou shop-owner reçoit un rôle/droit direct supplémentaire dans sa BDD | Refus ; le rôle privilégié demeure unique et protégé |
+| Offre particulière demandée pour un commerçant | Nouveau plan/version et plan_features ; aucune feature_overrides centrale |
+| Modification du prénom/nom ou nom public de boutique | Identité personnelle dans sa BDD ; nom public central projeté vers shop.shop_name ; pièces déjà émises immuables |
+
+
+Les scénarios d’invitation, réactivation, concurrence et isolation propres aux boutiques sont détaillés en T24.1 ; les contrôles temporels et la protection des callbacks Spatie sont requis dans les deux modèles utilisateurs.

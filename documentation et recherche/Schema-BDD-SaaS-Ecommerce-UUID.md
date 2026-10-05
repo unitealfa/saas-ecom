@@ -1,8 +1,8 @@
 # Schéma BDD — SaaS e-commerce algérien
 
-Version V4.8 — 4 octobre 2026. Classifications regroupées, références de livraison communes au central et renvois après retour impayé.
+Version V4.9 — 5 octobre 2026. Identités clarifiées, permissions datées dans les attributions centrales et locales, rôles sans doublons et quotas définis uniquement par les offres.
 
-Ce document contient **30 tables centrales et 60 tables par boutique**. Les tables techniques Laravel et les passkeys facultatives restent hors décompte. Les cinq tables Spatie Permission et activity_log sont incluses ; les trois pivots natifs gardent leurs clés composites. V4.8 ajoute trois référentiels centraux publics, conserve les 27 définitions centrales précédentes et synchronise les deux diagrammes avec les changements locaux.
+Ce document contient **28 tables centrales et 59 tables par boutique**. Les tables techniques Laravel et les passkeys facultatives restent hors décompte. Les cinq tables Spatie Permission et activity_log sont incluses ; les trois pivots gardent leurs clés composites. V4.9 retire feature_overrides au central et permission_overrides dans les deux contextes, puis porte les durées dans leurs attributions existantes. Les règles de rôles sont communes, mais les comptes, rôles, permissions, dates et activités restent indépendants dans chaque BDD.
 
 Les diagrammes sont répartis en modules pour rester exploitables. **Les champs, les références et les contraintes écrites font ensemble le schéma** : Mermaid ne peut pas imposer toutes les règles transactionnelles. Ce document n’est pas une migration SQL déjà exécutée.
 
@@ -167,7 +167,6 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `QuotaScopeEnum` | 1 OWNER ; 2 TENANT |
 | `QuotaPeriodEnum` | 1 LIFETIME ; 2 DAILY ; 3 MONTHLY ; 4 YEARLY |
 | `BillingPeriodEnum` | 1 MONTHLY ; 2 YEARLY |
-| `PermissionEffectEnum` | 1 ALLOW ; 2 DENY |
 | `RestrictionEffectEnum` | 1 DENY ; 2 ALLOW_ONLY |
 | `OverrideStatusEnum` | 1 ACTIVE ; 2 REVOKED ; 3 EXPIRED ; 4 CLOSED |
 | `SubscriptionStatusEnum` | 1 SCHEDULED ; 2 TRIAL ; 3 ACTIVE ; 4 EXPIRED ; 5 CANCELLED |
@@ -253,8 +252,6 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `features.value_type` | `FeatureValueTypeEnum` | non |
 | `features.quota_scope` | `QuotaScopeEnum` | non |
 | `features.period` | `QuotaPeriodEnum` | non |
-| `permission_overrides.effect` | `PermissionEffectEnum` | non |
-| `permission_overrides.status` | `OverrideStatusEnum` | non |
 | `admin_restrictions.effect` | `RestrictionEffectEnum` | non |
 | `admin_restrictions.status` | `OverrideStatusEnum` | non |
 | `subscriptions.record_type` | `SubscriptionRecordTypeEnum` | non |
@@ -394,7 +391,7 @@ erDiagram
     users {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        varchar name
+        varchar last_name "nom de famille du titulaire"
         varchar first_name "nullable"
         varchar email UK
         varchar password
@@ -403,7 +400,6 @@ erDiagram
         datetime phone_verified_at "nullable"
         datetime whatsapp_verified_at "nullable"
         bigint_unsigned country_id FK "countries.id"
-        varchar legal_name "nullable ; raison sociale seulement si distincte du nom de la personne"
         varchar legal_form "nullable avant dossier professionnel"
         varchar activity_nature "nullable avant dossier professionnel"
         varchar nif "nullable avant verification"
@@ -412,7 +408,6 @@ erDiagram
         varchar artisan_card_number "nullable selon activite"
         text legal_address "nullable avant verification"
         decimal share_capital "nullable si inapplicable"
-        varchar tax_regime "nullable avant verification"
         bigint_unsigned legal_profile_version "nullable pour administrateur ; 1 au premier profil vendeur"
         tinyint_unsigned legal_verification_status "nullable pour administrateur ; VerificationStatusEnum"
         datetime legal_verified_at "nullable"
@@ -504,7 +499,7 @@ erDiagram
 
 - **`id`** : clé primaire numérique interne, auto-incrémentée ; jamais envoyée au client.
 - **`uuid`** : identifiant public unique et indexé, utilisé dans les routes, formulaires, exports et ressources JSON.
-- **`name / first_name`** : nom et prénom du compte central.
+- **`last_name / first_name`** : nom de famille et prénom du titulaire du compte central. Le nom de chaque boutique est `tenants.shop_name`.
 - **`email`** : e-mail normalisé et unique dans cette base ; ne garantit aucune identité dans une boutique.
 - **`password / remember_token`** : hachage du mot de passe et secret de session Laravel ; exclus des activités et du JSON.
 - **`phone / email_verified_at / phone_verified_at / whatsapp_verified_at`** : contact et dates de vérification.
@@ -551,11 +546,11 @@ erDiagram
 
 Aucun `shop_members`, mot de passe, rôle ou invitation de collaborateur de boutique n’est conservé au central. Aucun booléen de super-admin n’existe sur users : il est porté par roles (C2/T24).
 
-**Profil professionnel du propriétaire, dans users :** le propriétaire a une seule fiche centrale. name/first_name, email, phone et country_id sont réutilisés ; aucune colonne legal_phone, legal_email ou copie du code pays n’est ajoutée. legal_name reste NULL pour une personne exerçant en son propre nom ; elle est renseignée seulement si la raison sociale est différente de l’identité du titulaire. legal_form, activity_nature, nif, nis, registration_number, artisan_card_number, legal_address, share_capital et tax_regime ajoutent uniquement les informations professionnelles absentes du compte. Le nom commercial de chaque boutique reste shop.name/tenants.shop_name ; ce n’est pas une seconde raison sociale.
+**Profil professionnel du propriétaire, dans users :** `first_name` désigne le prénom et `last_name` le nom de famille ; `last_name` remplace l’ancien champ `name`. `email`, `phone` et `country_id` restent la seule source courante des contacts et du pays. Le nom de chaque boutique est `tenants.shop_name`, projeté vers `shop.shop_name` dans sa BDD ; un propriétaire peut avoir plusieurs boutiques aux noms différents. Le nom officiel d’une société distincte du titulaire et son régime fiscal ne sont plus stockés dans ce profil : `legal_name` et `tax_regime` sont retirés. `legal_form`, `activity_nature`, `nif`, `nis`, `registration_number`, `artisan_card_number`, `legal_address` et `share_capital` restent les informations professionnelles prévues.
 
 legal_profile_version commence à 1 sur le premier dossier vendeur et augmente pour toute modification matérielle de l’identité ou des contacts réutilisés. legal_verification_status suit VerificationStatusEnum : 5 INCOMPLETE, 1 PENDING, 2 VERIFIED, 3 FAILED ou 4 EXPIRED. Les comptes d’administration sans activité vendeur ont ces champs professionnels NULL. Le service exige les informations applicables au régime déclaré, notamment un identifiant RC ou carte artisan lorsque requis ; identifiants en chaînes, capital NULL si inapplicable et sinon >=0. Une validation exige legal_verified_at et legal_verified_by_id, avec un administrateur central habilité. Changement matériel : incrémenter la version et revalider sous verrou du propriétaire ; aucun formulaire d’équipe ne peut modifier ce profil central. Une identité vérifiée est requise pour l’activation commerciale, tandis qu’un brouillon de boutique peut exister avant vérification. L’hypothèse d’un profil vendeur par propriétaire reste celle des notes ; aucun transfert de propriétaire n’est ajouté.
 
-**Une seule source courante et des snapshots historiques :** la lecture autorisée de users/countries fournit uniquement la projection professionnelle nécessaire, jamais password, tokens, rôles ou autres comptes. Le serveur fige owner_uuid (users.uuid), legal_profile_version et les valeurs applicables dans legal_seller_snapshot/seller_snapshot et customer_identity_snapshot selon le document. Ces copies immuables préservent ce qui était vrai à la commande ou à la facture ; elles ne sont pas des profils éditables parallèles. Modifier le compte ne réécrit aucune pièce déjà émise. Il n’existe aucune FK SQL entre ce snapshot local et le propriétaire central. Le changement vers une société juridiquement distincte exige une décision métier explicite et de nouveaux snapshots, sans recycler l’historique.
+**Une seule source courante et des snapshots historiques :** la lecture autorisée de users/countries fournit uniquement la projection professionnelle nécessaire, jamais password, tokens, rôles ou autres comptes. Les nouveaux formats figent owner_uuid (users.uuid), legal_profile_version, first_name, last_name et les valeurs professionnelles applicables ; le nom de boutique est résolu depuis tenants.shop_name pour le tenant concerné. seller_snapshot conserve son champ trade_name pour ce nom public. customer_identity_snapshot conserve l’identité personnelle du propriétaire qui paie le SaaS ; un shop_name éventuel ne désigne que le tenant du document et reste NULL pour un document au niveau du compte. Les nouveaux formats n’écrivent plus de legal_name ni tax_regime. Chaque format est versionné ; les anciens snapshots et PDF, y compris leurs anciennes clés s’ils existent, restent immuables et lisibles. Aucune FK SQL entre BDD ni profil local éditable parallèle n’est ajouté. Le projet ne représente plus une raison sociale juridiquement distincte de la personne titulaire.
 
 | Données rapprochées | Source courante retenue | Motif de conservation d’une autre représentation |
 |---|---|---|
@@ -609,22 +604,27 @@ erDiagram
         boolean is_super_admin
         tinyint_unsigned super_admin_slot UK "generated nullable ; 1 si is_super_admin"
         bigint_unsigned permission_version
+        char(64) permission_signature UK "NOT NULL ; SHA-256 permissions+durees ; UNIQUE guard_name+signature"
         datetime created_at
         datetime updated_at
     }
     role_has_permissions {
         bigint_unsigned permission_id PK,FK "permissions.id"
         bigint_unsigned role_id PK,FK "roles.id"
+        smallint_unsigned duration_days "NOT NULL DEFAULT 9999 ; CHECK 1 a 9999 jours"
     }
     model_has_roles {
         bigint_unsigned role_id PK,FK "roles.id"
         varchar(64) model_type PK "alias morph local"
         bigint_unsigned model_id PK "users.id pour un utilisateur"
+        datetime assigned_at "NOT NULL ; debut des durees pour ce compte ; UTC"
     }
     model_has_permissions {
         bigint_unsigned permission_id PK,FK "permissions.id"
         varchar(64) model_type PK "alias morph local"
         bigint_unsigned model_id PK "users.id pour un utilisateur"
+        datetime assigned_at "NOT NULL ; debut de cette attribution directe ; UTC"
+        datetime expires_at "NOT NULL ; apres assigned_at, au plus 9999 jours"
     }
     roles ||--o{ role_has_permissions : role_id
     permissions ||--o{ role_has_permissions : permission_id
@@ -636,40 +636,53 @@ erDiagram
 
 **`permissions`** conserve `id`, `name`, `guard_name` et les timestamps natifs, plus `uuid`, `label` et `feature_code` facultatif. `name` est une capacité stable en anglais (`saas.users.create`, `saas.plans.manage`, `saas.subscriptions.assign`) ; `label` est sa présentation. UNIQUE(name,guard_name). Au central, feature_code reste NULL pour l’administration ; en boutique, il peut relier logiquement une action au catalogue central de fonctionnalités.
 
-**`roles`** conserve les colonnes natives et reçoit uuid, label, is_system, is_protected, is_super_admin et permission_version. UNIQUE(name,guard_name). `is_super_admin` signifie une exception d’autorisation dans cette base et ce guard seulement ; ce booléen est une adaptation du projet. `super_admin_slot = CASE WHEN is_super_admin THEN 1 ELSE NULL END`, avec UNIQUE(super_admin_slot), réserve un seul rôle racine par BDD. `permission_version` augmente lors d’un changement de composition pour revalider les invitations et les caches. Le rôle central root est protégé ; au plus une attribution de ce rôle existe dans cette BDD. Le service/trigger verrouille la ligne du rôle avant attribution ou changement, vérifie les pivots et le compte et empêche les attributions concurrentes. Une rotation centrale dédiée préserve un accès root valide après commit ; aucune autre attribution de rôle n’a cette limite. En boutique, la même protection réserve shop-owner au seul propriétaire local. un administrateur IT peut recevoir saas.users.create sans pouvoir distribuer root ni attribuer un plan s’il n’en a pas la permission.
+**`roles`** conserve les colonnes natives et reçoit uuid, label, is_system, is_protected, is_super_admin, permission_version et permission_signature dans chaque BDD. UNIQUE(name,guard_name), avec nom non vide normalisé à l’écriture. UNIQUE(guard_name,permission_signature) refuse deux rôles de mêmes permissions et mêmes durées, même avec des noms différents. Le service calcule avant écriture le SHA-256 de la liste canonique des paires (permission_id,duration_days), triée par permission_id ; l’ordre des cases cochées et le nom du rôle ne changent pas cette signature. Comparer aussi la composition exacte ; toute collision est refusée sans attribuer de droits. Un rôle déléguable contient au moins une permission. L’unicité est locale : deux boutiques peuvent avoir des rôles identiques, sans partage d’attribution. `super_admin_slot = CASE WHEN is_super_admin THEN 1 ELSE NULL END`, UNIQUE(super_admin_slot), réserve un seul rôle privilégié par BDD. permission_version augmente lors de toute modification de permission ou de durée. Au central, root est protégé, au plus une attribution existe et sa rotation dédiée préserve un accès valide. En boutique, shop-owner est réservé au seul propriétaire local et ses protections sont définies en T24.
 
 **Pivots natifs :** role_has_permissions a pour PK composite (permission_id,role_id). model_has_roles a pour PK (role_id,model_id,model_type) ; model_has_permissions a pour PK (permission_id,model_id,model_type). Ajouter les index (model_id,model_type). Les role_id/permission_id sont des FK BIGINT UNSIGNED locales ; model_id est la PK numérique du modèle indiqué par model_type. Le lien polymorphe n’est pas une FK SQL universelle : service, morph map et procédure de nettoyage contrôlent l’existence et le type. model_type central autorisé : `central_user`, mappé à App\Models\Central\User.
 
-Ces trois pivots purement techniques constituent l’exception à la règle id+uuid : aucun id autonome, UUID, timestamp ou route de pivot. Une attribution externe reçoit les UUID de l’utilisateur et du rôle/permission, les résout dans la bonne BDD, puis utilise les méthodes du paquet (`assignRole`, `syncRoles`, `givePermissionTo`, `syncPermissions`). Son auteur, sa date et sa révocation sont tracés dans activity_log. Les autres liaisons métier (plan_features, variant_option_values...) gardent id+uuid et leur unicité métier.
+Ces trois pivots gardent leur PK composite, sans id/uuid autonome ni route de pivot. Dans chaque BDD, ils portent les informations métier de durée/début ci-dessous, sans timestamps génériques created_at/updated_at. Une attribution externe reçoit les UUID, les résout dans la bonne BDD et passe par le service audité de ce contexte qui valide dates, guards et recoupements avant d’appeler les méthodes Spatie adaptées. assignRole/syncRoles/givePermissionTo/syncPermissions bruts ne sont pas des points d’écriture autorisés. L’auteur, la date, les anciens/nouveaux droits et la révocation sont tracés dans activity_log de cette même BDD. Les autres liaisons métier gardent leurs id+uuid et leur unicité.
 
 Le modèle central User utilise HasRoles, la connexion central et le guard central ; le modèle local User utilise HasRoles, tenant et le guard tenant. Étendre Role/Permission pour la génération de uuid et leurs connexions ; configurer les modèles dans permission.php. À l’initialisation de chaque contexte, les modèles, la connexion et le PermissionRegistrar sont configurés ensemble, y compris dans les commandes et workers. Vérifier les migrations de Permission v8 réellement verrouillées avant développement. Aucune ancienne table parallèle d’attribution n’est maintenue.
 
 **Archivage des droits :** aucun SoftDeletes sur les modèles Spatie dans ce schéma. Pour retirer un rôle, révoquer explicitement les attributions et invitations concernées via un service audité, puis supprimer seulement un rôle personnalisable devenu inutilisé. Les références métier requises sont protégées par RESTRICT ; ne pas laisser une cascade supprimer silencieusement une autorisation historique. Les rôles système et le catalogue de permissions ne sont pas supprimables depuis l’administration ordinaire. L’activité conserve les UUID et libellés filtrés nécessaires après disparition du sujet.
 
-### C3 — Exceptions datées et restrictions de l’administration centrale
+### C2.1 — Durées et règles communes des attributions
 
-Spatie fournit les autorisations positives (rôles et permissions directes). Les interdictions, dates d’effet et restrictions de cibles déjà prévues restent des règles métier autour des Gates/Policies, jamais des pivots concurrents. Une autorisation permanente exceptionnelle utilise model_has_permissions ; une exception temporaire utilise permission_overrides et est évaluée à chaque décision. Spatie n’interprète pas nativement une interdiction.
+Ces règles sont appliquées séparément dans la BDD centrale et dans chaque BDD boutique. Elles ont la même structure, mais aucune attribution, date, signature ou décision d’autorisation n’est synchronisée entre ces BDD. Le guard central ne donne jamais une permission tenant ; les noms/compositions de rôles sont uniques dans leur propre BDD seulement.
+
+| Table/champ dans chaque BDD | Rôle |
+|---|---|
+| roles.permission_signature | Empêche deux rôles de même ensemble de permissions et de mêmes durées, indépendamment de leur nom et de l’ordre de saisie. |
+| role_has_permissions.duration_days | Durée de chaque action du rôle : SMALLINT UNSIGNED NOT NULL DEFAULT 9999, CHECK entre 1 et 9999 inclus. |
+| model_has_roles.assigned_at | Début du compteur propre au compte qui reçoit ce rôle ; DATETIME NOT NULL, UTC. |
+| model_has_permissions.assigned_at / expires_at | Dates obligatoires d’une attribution directe native, si ce chemin est utilisé ; il ne crée ni exception ni priorité sur un rôle. |
+
+**Rôle et personne :** les durées font partie du rôle. Pour donner une action supplémentaire ou une durée différente à une seule personne, créer/utiliser un autre rôle de composition différente, puis remplacer l’attribution concernée atomiquement. Deux utilisateurs recevant le même rôle à des dates différentes ont des échéances différentes. Modifier un rôle existant change sa règle pour tous ses bénéficiaires, avec contrôle et audit de cet impact ; cela ne déplace pas leurs dates d’attribution. Un nom identique est toujours refusé, même si les permissions diffèrent ; deux compositions identiques sont aussi refusées. Deux compositions qui ne diffèrent que par une durée sont différentes.
+
+**Période effective :** pour une permission du rôle, début=model_has_roles.assigned_at et fin=DATE_ADD(assigned_at, INTERVAL duration_days DAY). L’autorisation vaut sur [début,fin) : à l’instant exact de fin, elle ne vaut plus. Chaque permission expire indépendamment des autres. 9999 est un nombre réel de jours, environ 27 ans et 4 mois, pas un code « illimité ». La BDD et le service exigent 1<=duration_days<=9999. Une attribution directe est bornée par CHECK(expires_at>assigned_at AND expires_at<=DATE_ADD(assigned_at,INTERVAL 9999 DAY)) ; son service utilise 9999 jours par défaut. Les dates de début sont produites par le serveur au moment de l’attribution, jamais par un formulaire libre. Aucun calcul d’expiration utilisant NOW() n’est une colonne générée.
+
+**Plusieurs rôles, aucun recoupement :** un compte peut recevoir plusieurs rôles dans sa BDD, mais les ensembles de permissions de tous ses rôles encore attribués sont deux à deux disjoints. Le contrôle porte sur la composition, même si une permission a déjà expiré ; enlever/remplacer explicitement l’attribution qui bloque avant une nouvelle attribution. Un droit direct, si utilisé, ne peut pas être aussi présent dans un de ses rôles. Un même rôle n’est attribué qu’une fois par la PK native. Ces règles s’appliquent également quand on ajoute une permission à un rôle déjà attribué : contrôler chacun de ses bénéficiaires et refuser toute la mutation si elle créerait un recoupement. Il n’existe ni priorité entre sources, ni table secondaire ALLOW/DENY de permissions. Root au central et shop-owner dans sa boutique, dont les capacités sont implicites et protégées, ne se cumulent avec aucun autre rôle ou droit direct dans leur BDD. Leur accès privilégié existant n’est pas une délégation ordinaire à durée ; leurs contrôles de compte, contexte, propriété, quotas et état métier restent obligatoires.
+
+**Prolongation et reprise :** changer duration_days conserve assigned_at ; la nouvelle fin reste calculée depuis le début existant, avec le même maximum. Un retry d’attribution retrouve la ligne et ne remet jamais le compteur à zéro. Une réattribution/renouvellement volontaire utilise une intention distincte, motivée et auditée ; elle change assigned_at explicitement et relance toutes les durées de ce rôle. Retirer une attribution révoque immédiatement ses droits, sans toucher aux autres rôles disjoints. Aucun cron n’est nécessaire pour que l’expiration soit effective.
+
+### C2.2 — Contrôles centraux, concurrence et intégration Spatie
+
+**Écriture atomique :** création/modification de rôle, changement de durée, attribution/retrait/remplacement et droit direct passent par le même service sur la connexion centrale. Le rôle root protégé et non supprimable sert de ligne stable de sérialisation des mutations d’autorisation, sans table supplémentaire : verrouiller sa ligne FOR UPDATE, puis les autres rôles et comptes concernés dans l’ordre croissant de leurs id. Après les verrous, relire compositions et attributions en lecture courante, vérifier guard, acteur habilité, nom/signature, durées et absence de recoupement, puis écrire pivots/signature/permission_version et activité dans une transaction. Les UNIQUE SQL ferment les courses de noms/signatures ; les PK ferment les doubles attributions. Un conflit annule toute la mutation. Le rôle root est amorcé une seule fois par le bootstrap protégé avant ce service ; il ne peut être supprimé ou remplacé comme ligne de catalogue. Toutes les voies (UI, API, imports, jobs, seeders ordinaires) respectent ce protocole. Les contrôles inter-lignes exigent le service et une protection dédiée pour tout écrivain SQL de maintenance ; ils ne sont pas prétendus couverts par un simple CHECK. Les imports ne fabriquent pas un début d’attribution depuis la date d’import si la date réelle est inconnue.
+
+**Lecture effective :** le résolveur central vérifie compte actif, bon guard, attribution unique de chaque capacité, date actuelle, restrictions de cible C3 et protections système. Les relations/méthodes d’autorisation Spatie de chaque contexte sont adaptées pour lire dates de pivots et durées ; l’union native non datée ne suffit pas. Configurer register_permission_check_method=false et enregistrer le contrôle personnalisé pour éviter que le Gate::before natif autorise avant le contrôle temporel ; ne jamais combiner un chemin natif non daté et un chemin daté pour la même capacité. Pour une capacité connue saas.*, le hook central rend false en cas d’expiration/absence/blocage et true seulement pour un droit effectif ou root protégé ; ne pas retourner null après un refus temporel. Les actions d’objet des Policies restent évaluées séparément : le hook retourne null pour leurs noms génériques. Les vérifications brutes de présence de rôle/permission ne sécurisent pas une opération datée. Utiliser un catalogue de capacités concrètes, sans permissions wildcard attribuables qui contourneraient les ensembles disjoints. Les invariants métier et l’isolation des boutiques restent obligatoires même pour root. Le contrôle local est décrit en T24.1.
+
+**Caches et audit :** à chaque décision sensible, relire les attributions et leurs dates actuelles ainsi que les versions des rôles, recalculer la validité à l’heure serveur et revalider avant l’effet dans les services concernés. Une version de rôle seule ne détecte pas un retrait de rôle ou un changement de assigned_at ; une relation chargée auparavant n’est pas l’autorité de cette lecture. Les caches ne dépassent jamais la prochaine échéance ; une mutation invalide les relations chargées et les caches concernés après commit, y compris dans les workers. Un cache encore présent ou un cron arrêté ne conserve aucun droit expiré. Les activités d’attribution/révocation/renouvellement/changement de composition ou durée, doublons refusés et délégations refusées ont leurs phases distinctes et propriétés filtrées : utilisateur/rôle/permissions par UUID, anciennes/nouvelles durées et dates, acteur et motif. Les pivots sans id/uuid ne deviennent pas des sujets polymorphes fictifs ; le sujet est le compte ou le rôle et les clés de pivot sont dans les propriétés. Le temps qui passe est contrôlé lors de la décision ; ne pas promettre un événement de révocation ponctuel produit par la seule horloge.
+
+Cette adaptation est un choix du projet, pas une option native de tenancy/teams. Les cinq tables Spatie restent, leurs clés composites restent, et les contrôles temporels et d’unicité sont à implémenter lors du développement. Source technique : [Spatie, contrôle personnalisé](https://github.com/spatie/laravel-permission/blob/main/docs/advanced-usage/custom-permission-check.md), [Spatie, contrôles de permissions](https://github.com/spatie/laravel-permission/blob/main/src/Traits/HasPermissions.php) et [extension des modèles](https://github.com/spatie/laravel-permission/blob/main/docs/advanced-usage/extending.md).
+
+### C3 — Restrictions de l’administration centrale
+
+Les permissions centrales sont attribuées dans les cinq tables Spatie avec les durées de C2.1 ; aucune table permission_overrides n’est conservée, au central ou en boutique. admin_restrictions reste exclusivement au central pour contrôler les cibles sur lesquelles un administrateur délégué peut agir ; ses dates et interdictions de cible sont indépendantes de la durée d’une attribution et restent évaluées dans les Policies.
 
 ```mermaid
 erDiagram
     direction TB
-    permission_overrides {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        bigint_unsigned user_id FK "users.id"
-        bigint_unsigned permission_id FK "permissions.id"
-        tinyint_unsigned effect "PermissionEffectEnum"
-        tinyint_unsigned status "OverrideStatusEnum"
-        datetime started_at
-        datetime ended_at "nullable"
-        tinyint_unsigned active_slot "generated nullable"
-        datetime expires_at "nullable"
-        bigint_unsigned assigned_by_id FK "users.id"
-        text reason "nullable"
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
-    }
+
     admin_restrictions {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
@@ -691,13 +704,9 @@ erDiagram
         datetime updated_at
         datetime deleted_at "nullable"
     }
-    users ||--o{ permission_overrides : user_id
-    permissions ||--o{ permission_overrides : permission_id
     users ||--o{ admin_restrictions : admin_id
     permissions ||--o{ admin_restrictions : permission_id
 ```
-
-permission_overrides : user_id désigne le bénéficiaire central, permission_id une permission du guard central, assigned_by_id l’auteur habilité ; effect vaut 1 ALLOW ou 2 DENY. Les dates bornent la validité ; status clôture/révoque l’exception ; reason justifie la décision. active_slot vaut 1 uniquement si status=1 et deleted_at IS NULL, sinon NULL ; UNIQUE(user_id,permission_id,active_slot). L’expiration est aussi évaluée à l’heure courante, jamais dans une colonne générée avec NOW(). Il n’existe plus de tenant_id pour l’appartenance ou la portée d’une permission centrale.
 
 admin_restrictions : admin_id désigne l’administrateur délégué. permission_id décrit son action centrale ; exactement une cible parmi target_tenant_id, target_user_id, target_role_id peut être renseignée, ou aucune pour une règle globale. effect=1 DENY ou 2 ALLOW_ONLY ; une règle ALLOW_ONLY introduit une liste fermée de cibles, les DENY priment. Normaliser le type et la PK de cible dans des colonnes générées `normalized_target_type` et `normalized_target_id` (sentinelle numérique 0 uniquement pour absence de cible ; aucun parent réel n’a id=0), avec UNIQUE(admin_id,permission_id,normalized_target_type,normalized_target_id,effect,active_slot). Les règles ne peuvent pas ouvrir l’intérieur d’une boutique. Leur créateur, état et validité sont contrôlés à l’écriture et à la lecture.
 
@@ -710,8 +719,6 @@ Les invitations d’équipe ont été déplacées intégralement en T24. La raci
 **`plan_features` — Indique ce que chaque offre permet et ses limites. Exemple : l’offre Gratuit autorise 1 boutique et l’offre Pro en autorise 3.**
 
 **`subscriptions` — Une seule table contient les abonnements et leurs échéances. Une ligne de type 1 décrit « Karim a le plan Pro ». Ses lignes de type 2 décrivent « Karim doit payer 3 000 DA pour septembre », puis octobre, etc. Les échéances gardent leurs propres UUID, montants, dates et états ; elles ne remplacent pas la ligne d’abonnement. tenant_id reste facultatif sur l’abonnement et désigne une boutique du même propriétaire.**
-
-**`feature_overrides` — Un changement particulier aux possibilités ou aux limites habituelles de l’abonnement. Exemple : autoriser temporairement Karim à tester une fonction normalement absente de son offre.**
 
 ```mermaid
 erDiagram
@@ -768,21 +775,7 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
-    feature_overrides {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        bigint_unsigned user_id FK "users.id"
-        bigint_unsigned tenant_id FK "nullable ; tenants.id"
-        bigint_unsigned feature_id FK "features.id"
-        boolean is_active
-        bigint limit "nullable"
-        datetime started_at
-        datetime expires_at "nullable"
-        bigint_unsigned assigned_by_id FK "users.id"
-        text reason "nullable"
-        datetime created_at
-        datetime updated_at
-    }
+
     plans ||--o{ plan_features : plan_id
     users ||--o{ subscriptions : user_id
     tenants |o--o{ subscriptions : tenant_id
@@ -832,24 +825,6 @@ erDiagram
 | installment_number, installment_amount, due_at, installment_status | Numéro de dette unique, montant dû, date limite et état PENDING/PARTIALLY_PAID/PAID/CANCELLED de chaque échéance |
 | active_owner_slot, operation_key, created_at, updated_at | Une seule attribution active par propriétaire, déduplication des créations/renouvellements et historique technique |
 
-**`feature_overrides` :**
-
-- **`id`** : le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`.
-- **`uuid`** : identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique.
-- **`user_id`** : l’identifiant du propriétaire. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`tenant_id`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`feature_id`** : l’identifiant de la fonctionnalité. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`is_active`** : indique si cette possibilité est autorisée. `true` = oui, `false` = non.
-- **`limit`** : le nombre maximum autorisé. Exemple : `3` peut vouloir dire maximum 3 boutiques. Si le champ est vide dans un cas prévu comme illimité, il n’y a pas de nombre maximum. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`started_at`** : la date et l’heure où la période ou l’action commence.
-- **`expires_at`** : la date où l’élément n’est plus valable. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`assigned_by_id`** : l’identifiant de la personne qui a donné ce droit. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
-- **`reason`** : explique pourquoi l’action ou la décision a été faite. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`created_at`** : la date où cette ligne a été créée dans la base.
-- **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
-
-
-
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **`plans` :** Le couple `code + version` est unique. Les prix sont en DZD dans ce MVP. Dès qu’un plan a été utilisé par un abonnement, on ne modifie plus son ancienne version. Exemple : si `Pro v1` autorisait 3 boutiques et qu’on veut passer à 5, on crée `Pro v2` au lieu de transformer le passé. Le plan gratuit coûte `0` et autorise 1 boutique.
@@ -866,7 +841,7 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 **Modèles logiques :** Subscription (type 1) et SubscriptionInstallment (type 2) utilisent tous deux subscriptions et la connexion centrale, avec scopes, créations typées et Policies distincts. Une route de plan refuse le UUID d’une échéance. Les Resource publient des UUID ; les lignes de type 2 ne créent pas un deuxième abonnement actif. Paiement client et remboursement admin s’effectuent à distance hors application, puis sont déclarés/vérifiés avec preuve PDF dans C8 ; aucun virement automatique n’est supposé.
 
-- **`feature_overrides` :** Une exception change temporairement une fonctionnalité pour un propriétaire ou pour une boutique. Sa période commence à `started_at` et s’arrête avant `expires_at` lorsqu’une date de fin existe. `is_active=false` peut servir à interdire une fonction pendant cette période ; ce champ ne dit pas si l’exception est « expirée ». Deux exceptions qui concernent le même propriétaire, la même fonctionnalité et le même contexte ne doivent pas se chevaucher dans le temps. Pour éviter les collisions, on verrouille le propriétaire, on vérifie les périodes existantes puis on écrit le changement dans la même transaction. `tenant_id=NULL` signifie que l’exception concerne tout le compte. Une exception de boutique est plus précise et passe avant l’exception du compte, qui passe elle-même avant le plan. Si un quota est défini au niveau du compte, on n’autorise pas une exception au niveau d’une seule boutique. La boutique indiquée doit réellement appartenir à ce propriétaire. Les changements de dates sont audités et on ne réécrit pas une ancienne période déjà utilisée.
+- **Droits d’usage par offre :** les possibilités et quotas viennent uniquement du plan applicable et de ses plan_features. Pour accorder une composition particulière, créer/versionner une offre adaptée puis l’attribuer via subscriptions. Aucune exception par propriétaire/boutique ni date parallèle ne passe devant le plan. Les permissions datées d’une personne ne modifient aucun quota commercial.
 
 ### C5 — Suivi SaaS et référentiel géographique fusionné
 
@@ -967,9 +942,6 @@ erDiagram
 Les détails normatifs, la couverture des actions, les relations polymorphes, la connexion, les exemples et la rétention sont décrits au §7.7. Le SaaS consulte uniquement ce journal central : les activités internes des boutiques restent dans leurs BDD. Les journaux de stock, comptabilité, documents et données personnelles gardent leur rôle de preuve spécialisée.
 
 
-
-
-
 ### C7 — Historique des déploiements des BDD
 
 **`tenant_schema_deployments` — L’historique de création et de mise à jour technique des bases des boutiques. Exemple : la mise à jour de la boutique de Karim a réussi, tandis qu’une autre doit être réessayée.**
@@ -1021,11 +993,7 @@ erDiagram
 - **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
 
 
-
 **Contraintes :** UNIQUE(operation_key), index(tenant_id,created_at). operation=1 PROVISIONING ou 2 MIGRATION ; status=1 PENDING, 2 RUNNING, 3 SUCCEEDED, 4 FAILED ou 5 CANCELLED. Une seule opération en cours par tenant, via clé générée conditionnelle UNIQUE et verrou de déploiement. Chaque reprise garde l’échec et crée une nouvelle tentative. runtime_versions fige PHP, Laravel, tenancy, MySQL et version applicative réellement utilisés. tenants.schema_version change seulement après succès ; migrations locales détaillent les migrations exécutées. Une migration échouée ne rend pas la boutique active. La reprise technique concerne l’étape de provisioning/migration, sans opération de retour de la BDD à un état antérieur.
-
-
-
 
 
 ### C8 — Facturation SaaS optimisée : cinq tables complémentaires
@@ -1040,7 +1008,7 @@ erDiagram
 | `saas_document_deliveries` | 22 | Chaque envoi d’un document : destinataire, canal, essais et confirmation de remise. |
 | `saas_transfers` | 35 | Chaque paiement reçu ou remboursement effectué à distance, avec preuve et vérification. |
 
-**Pourquoi cinq :** fusionner à nouveau documents, lignes, envois et argent réintroduirait de nombreux champs sans rapport avec la ligne. Séparer factures/avoirs, paiements/remboursements ou compteurs/règles ajouterait des tables évitables dans ce périmètre. Ce choix est un compromis pour ce projet, pas un minimum mathématique ni une garantie de vitesse. L’optimisation porte sur la lisibilité, les groupes de colonnes, les index et la maîtrise des mutations ; les gains de temps et d’espace seront mesurés sur MySQL réel. Lors de la révision V4.5, le total central devenait 27 tables ; ces 27 définitions sont conservées, puis complétées par C10 en V4.8.
+**Pourquoi cinq :** fusionner à nouveau documents, lignes, envois et argent réintroduirait de nombreux champs sans rapport avec la ligne. Séparer factures/avoirs, paiements/remboursements ou compteurs/règles ajouterait des tables évitables dans ce périmètre. Ce choix est un compromis pour ce projet, pas un minimum mathématique ni une garantie de vitesse. L’optimisation porte sur la lisibilité, les groupes de colonnes, les index et la maîtrise des mutations ; les gains de temps et d’espace seront mesurés sur MySQL réel. La V4.5 comptait 27 tables centrales ; C10 en a ajouté trois en V4.8. V4.9 retire les deux tables d’exceptions centrales et adapte users/les autorisations ; les cinq tables de facturation restent inchangées.
 
 ```mermaid
 erDiagram
@@ -1558,7 +1526,7 @@ erDiagram
 
 ## 5. BDD de chaque boutique : `tenant_<uuid>`
 
-Le décompte actuel est de **60 tables locales**. Le [diagramme boutique complet](Diagramme-BDD-Boutique-Complet.md) les réunit en un seul dessin et explique chaque champ. Les décomptes cités dans les annotations V4.2–V4.6 restent historiques.
+Le décompte actuel est de **59 tables locales**. Le [diagramme boutique complet](Diagramme-BDD-Boutique-Complet.md) les réunit en un seul dessin et explique chaque champ. Les décomptes des versions antérieures restent historiques.
 
 Ce même modèle est migré dans chaque BDD tenant. Aucun `tenant_id` n’est ajouté à toutes les lignes : le contexte de connexion assure déjà la séparation. La ligne unique `shop` conserve la référence de rattachement.
 
@@ -1581,7 +1549,7 @@ erDiagram
         bigint_unsigned favicon_media_id FK "nullable ; media.id"
         tinyint singleton UK "NOT NULL DEFAULT 1 CHECK egal 1"
         bigint central_profile_version
-        varchar name
+        varchar shop_name "projection versionnee de central.tenants.shop_name"
         text description "nullable"
         text about "nullable"
         varchar business_type
@@ -1651,7 +1619,7 @@ erDiagram
 - **`tenant_uuid`** : l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données.
 - **`singleton`** : un petit verrou technique qui garantit qu’il n’existe qu’une seule ligne de ce type dans la base. Exemple : une seule fiche `shop`.
 - **`central_profile_version`** : la dernière version du profil central que cette boutique a reçue. Cela permet de voir si elle est à jour.
-- **`name`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
+- **`shop_name`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
 - **`description`** : un texte qui explique l’élément plus en détail. Il peut rester vide si aucune explication supplémentaire n’est nécessaire.
 - **`about`** : le texte de présentation de la boutique. Exemple : son histoire ou ce qu’elle vend. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`business_type`** : le type d’activité de la boutique. Exemple : vêtements, restaurant ou salon.
@@ -1743,10 +1711,9 @@ Le payload est un objet obligatoire. Son schéma dépend exclusivement du record
 - **`deleted_at`** : sa date d’archivage ; archiver conserve la page et ses liens historiques.
 
 
-
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
-- **`shop` :** Il doit exister une seule ligne `shop` dans la BDD de la boutique. Le champ technique `singleton=1` avec `UNIQUE(singleton)` empêche d’en créer une deuxième, même avec un autre `tenant_uuid`. Le provisionnement doit créer cette ligne et un contrôle de santé vérifie qu’elle existe bien. `tenant_uuid` doit correspondre au `central.tenants.uuid` attendu et ne change plus après l’insertion. L’application refuse de supprimer ce profil. Par défaut, la devise est DZD, le fuseau est `Africa/Algiers` et le thème est le template initial. `name` est une copie du nom central `tenants.shop_name` : pour renommer une boutique, on change d’abord le nom au central, puis on réplique la nouvelle version ici. On ne permet jamais un renommage uniquement local. Si la projection locale échoue, le nom courant reste celui du central et la projection sera reprise ; seul le slug/domaine est réservé de manière unique. Le logo, les contacts et les couleurs restent propres à cette BDD boutique. Au MVP, après la première commande, la devise ne peut plus être changée.
+- **`shop` :** Il doit exister une seule ligne `shop` dans la BDD de la boutique. Le champ technique `singleton=1` avec `UNIQUE(singleton)` empêche d’en créer une deuxième, même avec un autre `tenant_uuid`. Le provisionnement doit créer cette ligne et un contrôle de santé vérifie qu’elle existe bien. `tenant_uuid` doit correspondre au `central.tenants.uuid` attendu et ne change plus après l’insertion. L’application refuse de supprimer ce profil. Par défaut, la devise est DZD, le fuseau est `Africa/Algiers` et le thème est le template initial. `shop_name` est une copie du nom central `tenants.shop_name` : pour renommer une boutique, on change d’abord le nom au central, puis on réplique la nouvelle version ici. On ne permet jamais un renommage uniquement local. Si la projection locale échoue, le nom courant reste celui du central et la projection sera reprise ; seul le slug/domaine est réservé de manière unique. Le logo, les contacts et les couleurs restent propres à cette BDD boutique. Au MVP, après la première commande, la devise ne peut plus être changée.
 
 - **`shop_addresses` :** Le profil reste dans shop, sans gros objet JSON regroupant toute la boutique. Les entrées publiques de 17 champs remplacent les deux anciennes tables d’adresses et de liens. Le modèle ShopAddress impose record_type=1 ADDRESS ; SocialLink impose record_type=2 SOCIAL pour toute requête, route, Policy, média et activité. Plusieurs adresses et plusieurs liens du même réseau restent autorisés ; aucune unicité de network n’est ajoutée. Un lien général a shop_address_id=NULL ; un lien associé vise une adresse ADDRESS du même shop. L’ancienne propriété SocialLink.is_active devient l’alias logique de visible, sans confondre masquage et archivage. Les adresses restent publiques, sans caisse, stock ou entrepôt distinct. Les géographies ADDRESS sont validées au central par UUID/type/appartenance ; une modification du référentiel ne réécrit pas l’histoire.
 
@@ -1962,7 +1929,6 @@ erDiagram
 - **`created_at`** : la date où cette ligne a été créée dans la base.
 - **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
 - **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
-
 
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
@@ -2184,7 +2150,6 @@ erDiagram
 - **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
 
 
-
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **Pages de vente :** Les lignes content_pages de page_kind=2 conservent un slug unique dans cet espace de routes et un produit immuable. Pour présenter un autre produit, archiver l’ancienne page et en créer une nouvelle. Un même produit peut avoir plusieurs pages de vente. Aucun prix ou stock propre à la page : les valeurs viennent des variantes et promotions. Une commande peut commencer sans page de vente ; aucune redirection automatique vers la catégorie n’est ajoutée. Les FK commerciales visent uniquement ces lignes SALES, du même produit.
@@ -2376,13 +2341,11 @@ erDiagram
 - **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
 
 
-
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **`carts` :** Un panier utilise `CartStatusEnum` : `1 ACTIVE`, `2 CONVERTED`, `3 EXPIRED`, `4 ABANDONED`. Un visiteur ne peut avoir qu’un seul panier actif à la fois. Un panier abandonné peut redevenir actif si le parcours reprend. Dès qu’un panier est converti en commande, son contenu est figé. Ajouter un produit au panier ne réserve aucun stock : quelqu’un d’autre peut encore acheter le produit avant la confirmation téléphonique.
 
 - **`cart_items` :** Dans un même panier, une ligne est unique selon la variante, la personnalisation et la page d’origine. Deux bouquets de la même variante avec deux messages personnalisés différents restent donc deux lignes différentes. `quantity` doit être supérieure à 0. Le navigateur n’est jamais la source de vérité du prix : le serveur recalcule les prix au moment nécessaire. `product_id` est obligatoire. La variante choisie doit appartenir à ce produit, et si une `sales_page_id` est fournie, elle doit elle aussi présenter ce même produit. Une page de vente facultative ne peut donc pas être utilisée pour faire commander un autre produit. Garantir UNIQUE(cart_id,variant_id,customization_signature,(COALESCE(sales_page_id,0))) par index d’expression ; 0 est interdit comme PK réelle. L’origine NULL est ainsi une seule origine, sans doublons permis par la sémantique SQL des NULL. Deux pages SALES différentes restent deux origines distinctes. Aucun champ métier déclaré supplémentaire ; MySQL utilise une colonne virtuelle cachée pour cet index, sans l’utiliser comme parent de FK. [MySQL 8.4, index d’expression](https://dev.mysql.com/doc/refman/8.4/en/create-index.html).
-
 
 
 **Personnalisation texte libre :** customization_text est un texte facultatif, normalisé au serveur et limité en longueur, sans modifier le sens demandé : Unicode NFC et fins de ligne canoniques, sans suppression des accents, mise en minuscules ou suppression arbitraire de mots ; la même normalisation versionnée sert au texte conservé et à sa signature. La personnalisation reste sans JSON de champs configurables ni supplément automatique. Le prix reste celui de la variante/promotion ou le prix exceptionnel motivé de la commande. customization_signature=SHA-256 du texte normalisé (chaîne vide si aucune demande) sert uniquement à l’unicité de la ligne panier ; deux textes différents restent deux lignes. order_items.customization_text conserve le texte exact validé de cette révision.
@@ -2668,7 +2631,6 @@ erDiagram
 - **`created_at`** : la date où cette ligne a été créée dans la base.
 
 
-
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **`orders` :** `number` et `submission_key` sont uniques, et un même panier ne peut créer qu’une seule commande. `order_type` utilise `OrderTypeEnum` : `1 SALE`, `2 REPLACEMENT`, `4 RESEND_UNPAID` (ancien code 3 retiré). `channel` utilise `OrderChannelEnum` : `1 STOREFRONT` pour le parcours public et `2 MANUAL` pour une saisie manuelle. `commercial_status` utilise uniquement `OrderStatusEnum` : `1 AWAITING_CONFIRMATION`, `2 CONFIRMED`, `5 DRAFT` ; les anciens codes 3 et 4 sont retirés et ne sont pas réutilisés ; aucune fonction d’annulation ou de clôture commerciale de commande n’est prévue. `confirmation_owner_id` garde l’employé affecté au suivi interne de confirmation ; rappels et résultats d’appel restent dans `order_history`. Aucun lien ou écran public de suivi de commande destiné à l’acheteur n’est prévu. Le refus du client reste un résultat d’appel dans `order_history`, sans inventer un nouvel état d’annulation. Une commande standard n’a aucune origine. Un remplacement gratuit type 2 conserve ses liens de commande/incident/ligne et ses plafonds SAV, avec produits à 0. Un renvoi impayé type 4 lie la commande précédente par original_order_id et son retour par original_return_id ; il peut reprendre/modifier l’ensemble du colis, pas seulement une ligne d’incident. Il exige une réception locale et inspection suffisante avant toute transformation ou remise physique. L’incident est facultatif pour ce renvoi ; s’il existe, il appartient à l’origine. La première commande n’a aucun encaissement client vérifié et n’a pas produit de crédit payé ; vérifier aussi les observations distantes et résultats incertains avant de confirmer ce cas. Les nouveaux produits ont leur prix entier annoncé au client, et les frais antérieurs ne sont ajoutés que manuellement selon T22. Le renvoi reçoit sa révision, ses réservations et son unique livraison propres, sans changer l’ancien colis ni son contenu. Les quantités revenues ne peuvent financer deux renvois actifs concurrents ; T22 définit le verrou et l’allocation. Toute nouvelle commande avec coordonnées conserve `data_policy_version` et `data_notice_acknowledged_at`, et éventuellement `notice_text_hash` ; ces champs prouvent l’information fournie, sans consentement marketing implicite. `current_revision_id` identifie la version préparée ou affichée et ne peut être NULL qu’à l’intérieur de la transaction de création. `confirmed_revision_id` identifie exclusivement la dernière version validée après l’appel ; une proposition ultérieure ne la remplace pas automatiquement. Les deux liens sont renforcés par FK composites `(current_revision_id,id)` et `(confirmed_revision_id,id)` vers `order_revisions(id,order_id)` et par UNIQUE(id,order_id) sur les révisions. `confirmed_revision_id` et `validated_at` sont NULL ensemble avant la première validation, renseignés ensemble après succès ; `commercial_status=2` exige ces deux projections. Connaître la clé de soumission ne donne jamais accès à la commande.
@@ -2839,7 +2801,6 @@ erDiagram
 - **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
 
 
-
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **Réservations dans order_items :** la relation historique était au maximum une réservation par ligne, avec exactement sa quantity ; la fusion supprime cette identité et ce doublon de quantité, en conservant toutes ses dates. StockReservationStatusEnum reste 1 ACTIVE, 2 RELEASED, 3 CONSUMED ; NULL signifie aucune réservation, sans inventer 0. CHECK : soit les cinq projections sont NULL, soit reservation_status est explicitement non NULL et IN (1,2,3), reserved_at/reservation_created_at/reservation_updated_at sont non NULL et reservation_released_at est non NULL exactement pour RELEASED. La forme interdit toute projection partiellement renseignée, y compris le statut NULL avec des dates. Aucun défaut ACTIVE avant le clic. À la première réservation, utiliser le même instant UTC canonique que validated_at pour reserved_at/reservation_created_at/reservation_updated_at ; ensuite reserved_at et reservation_created_at ne changent plus. ACTIVE→RELEASED remplit reservation_released_at et actualise reservation_updated_at ; ACTIVE→CONSUMED conserve reservation_released_at=NULL et actualise reservation_updated_at. RELEASED et CONSUMED sont terminaux pour cette ligne. La consommation est datée par cette projection et son mouvement d’expédition immuable ; aucun horodatage ni événement ne disparaît. Pour chaque variante, SUM(order_items.quantity WHERE reservation_status=1) = reserved_stock. Les autres révisions proposées ne réservent rien.
@@ -2984,7 +2945,6 @@ erDiagram
 - **`created_at`** : la date où cette ligne a été créée dans la base.
 - **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
 - **`deleted_at`** : la date où l’élément a été retiré sans effacer son ancienne ligne. Si ce champ est vide, l’élément n’est pas supprimé.
-
 
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
@@ -3154,9 +3114,7 @@ erDiagram
 - **`created_at`** : la date où cette ligne a été créée dans la base.
 
 
-
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
-
 
 
 - **`shipments` :** Une commande ne peut avoir qu’une seule livraison dans ce MVP, et un tracking donné ne peut apparaître qu’une seule fois pour le même prestataire. La livraison doit pointer vers la bonne commande et exactement vers la révision expédiée. Tous les articles de cette révision partent ensemble dans le même colis. Le mode et le point relais doivent être identiques à ceux enregistrés dans la révision : `domicile` sans point relais, ou `stop_desk` avec exactement le point relais choisi. Avant la remise physique, une modification reste possible seulement après avoir vérifié qu’aucune opération distante n’est en cours ou incertaine. Dès que le transporteur a validé le colis ou que le colis est réellement expédié, la révision, son contenu et le montant COD ne changent plus. Une validation API signifie seulement que le transporteur a accepté l’ordre : elle ne prouve pas encore que le colis lui a été remis et elle ne sort donc pas le stock. Le COD utilisé est exactement `order_revisions.amount_to_collect` de la révision expédiée, même s’il vaut 0 ; on ne le recalcule jamais depuis une facture ou un tarif plus récent. Pour une société de livraison, merchant_reference est persistée dans ce colis local avant l’appel ; UNIQUE(provider_id,merchant_reference) et UNIQUE(provider_id,tracking) hors NULL assurent le rattachement local décrit en T25. Aucun registre central n’est nécessaire. Les vrais frais restent dans `carrier_fees`. Le fait logistique livré est accepté depuis la déclaration du livreur ou le statut interprété du transporteur. delivered_at garde la date déclarée, avec sa source et son historique dans shipment_events. Aucun accusé, signature, photo ou PDF de réception du client n’est exigé ni conservé. Une étiquette reste un fichier de transport ; cette confiance logistique ne prouve aucun encaissement ni reversement d’argent. Lorsqu’un retour existe, la révision expédiée ne peut plus être remplacée par une autre. Après une création réussie chez le transporteur, le prestataire et son compte ne peuvent plus être changés au MVP. Une opération en cours ou au résultat incertain bloque aussi ce changement.
@@ -3266,7 +3224,6 @@ erDiagram
 - **`started_at`** : la date et l’heure où la période ou l’action commence.
 - **`ended_at`** : la date et l’heure où elle s’est terminée. Peut rester vide tant que ce n’est pas terminé.
 - **`created_at`** : la date où cette ligne a été créée dans la base.
-
 
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
@@ -3588,7 +3545,6 @@ erDiagram
 - **`created_at`** : la date où cette ligne a été créée dans la base.
 
 
-
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
 - **`expenses` :** `operation_key` empêche les doublons et une dépense ne peut avoir qu’une contrepassation directe. Le statut utilise `ExpenseStatusEnum` : `1 DRAFT`, `2 POSTED`, `3 CANCELLED`, `4 REVERSED`. Une dépense normale a un montant positif. Une valeur négative est autorisée uniquement pour annuler exactement une dépense déjà constatée. Exemple : si 650 DA ont été enregistrés alors qu’il fallait 600 DA, on garde `+650`, on ajoute `-650`, puis on ajoute `+600`. On ne modifie pas la ligne `+650` et on ne l’enlève pas une deuxième fois du calcul. Un brouillon peut être annulé simplement ; une dépense déjà constatée reste immuable. Les frais transporteur ne vont jamais ici, car leur source officielle est `carrier_fees`. Les pertes de stock restent dans `stock_movements`. Si une dépense pointe à la fois vers une livraison, une commande ou un retour, ces références doivent toutes parler du même dossier. Une même dépense calculée pour un produit et une période ne doit être comptée qu’une fois.
@@ -3795,7 +3751,6 @@ erDiagram
 - **`created_at`** : la date où cette ligne a été créée dans la base.
 
 
-
 - **`carrier_fees` :** UNIQUE(operation_key), UNIQUE(reversal_of_id) hors NULL. fee_type=1 OUTBOUND | 2 RETURN | 3 STORAGE | 4 OTHER | 5 SECOND_ATTEMPT | 6 REPLACEMENT. payer=1 CUSTOMER | 2 MERCHANT | 3 COURIER | 4 CARRIER ; settlement_mode=1 DEDUCTION | 3 OFFSET | 2 SEPARATE_PAYMENT | 4 COVERED. status=`1 ESTIMATED | 2 RECOGNIZED | 3 SETTLED | 4 CANCELLED | 5 REVERSED`. Un frais RETURN ordinaire peut valoir 0 seulement si la gratuité est réellement confirmée et sa source/snapshot conservés ; son inverse exact vaut aussi 0 sans paiement ni allocation fictifs. Un montant inconnu n’est pas reconnu comme 0. Les frais payés par le client et retenus sur le COD sont enregistrés pour expliquer le net, sans être une charge du commerçant. Les charges transporteur sont la somme signée des frais à payer=2 MERCHANT qui ont été constatés : status=2 RECOGNIZED ou 3 SETTLED. Un original status=5 REVERSED reste également dans cette somme lorsqu’il possède son inverse effectif RECOGNIZED/SETTLED : original positif + inverse exact négatif s’annulent une fois. Les montants simplement estimés et les brouillons annulés avant constatation sont exclus. Les frais pris en charge par client, livreur ou transporteur ne sont pas une charge du commerçant. Le règlement change la dette restant à payer et la trésorerie, jamais le montant de la charge déjà reconnue. Les allocations carrier_settlement_lines de record_type=2 règlent ces frais sans créer une deuxième charge. Un même service partagé entre payeurs produit plusieurs lignes correspondant à leurs quotes-parts, jamais le total répété pour chacun. FK(shipment_id,provider_id) → shipments(id,provider_id), FK(return_id,shipment_id) → order_returns(id,shipment_id). carrier_account_id doit correspondre au compte du prestataire, validé par le serveur ; NULL pour interne. Snapshot du tarif appliqué immuable même si la grille locale évolue. Frais retour automatiques dédupliqués avec une clé dérivée du retour et du type de frais ; ne pas utiliser un UUID aléatoire à chaque polling. Toute écriture constatée est immuable ; correction par inverse exact puis nouvelle écriture. Une constatation client retenue ne peut excéder l’encaissement vérifié ni le montant de livraison client éligible sans traiter un écart explicite.
 - **`carrier_settlement_lines` type 2 FEE_PAYMENT :** UNIQUE(operation_key), UNIQUE(reversal_of_id) hors NULL. fee_payment_mode=3 OFFSET | 2 SEPARATE_PAYMENT. Frais du même prestataire que le bordereau, payer=2 (MERCHANT), déjà constatés. Sous les verrous du frais et des créances concernés, 0<=paiements monétaires nets effectifs type 2 + crédits non cash nets type 3 réellement affectés à ce même frais<=montant effectif du frais (original + contrepassation). Un même crédit ne réduit la dette qu’une fois ; égalité nécessaire pour SETTLED. Les allocations historiques corrigées n’altèrent pas les montants ni la preuve du bordereau déjà rapproché. Pour corriger un frais déjà payé, contrepasser/réaffecter son allocation sans créer de mouvement bancaire fictif ; le trop-payé reconnu devient une `carrier_receivables`. Une écriture d’allocation n’est jamais une seconde charge.
 - **`carrier_receivables` — AUD-02 :** représente un montant reconnu dû par le transporteur après correction d’un frais déjà payé, sans présumer qu’il a été encaissé. UNIQUE(operation_key), UNIQUE(reversal_of_id) hors NULL. Pour une créance ordinaire sans reversal_of_id : initial_amount>0 et 0<=remaining_amount<=initial_amount ; remaining_amount=initial_amount−apurements nets effectifs lorsqu’elle est consommable. Pour son inverse : initial_amount est exactement l’opposé du montant initial ordinaire, remaining_amount=0 ; cette ligne signée n’est jamais une nouvelle créance consommable. Les statuts CANCELLED/REVERSED ne rendent aucun solde réutilisable. La somme signée des originaux et inverses restitue la dette historique, distincte des seuls soldes ordinaires ouverts. status=`1 OPEN | 2 PARTIALLY_SETTLED | 3 SETTLED | 4 CANCELLED | 5 REVERSED`. La manière de règlement (remboursement bancaire, compensation de frais, compensation de bordereau, autre) est portée uniquement par `carrier_settlement_lines.receivable_settlement_type`, pas dupliquée dans le statut. Exemple : paiement réel 650, frais corrigé 600 → charge nette 600, trésorerie -650, créance 50. La création de la créance ne produit aucun `+50` bancaire. Une erreur sur une créance finalisée se corrige par un inverse unique puis une nouvelle créance ordinaire, avec même prestataire et même source. Refuser auto-référence, inverse d’inverse et seconde contrepassation. Sous les verrous communs, rapprocher ou réaffecter explicitement les apurements déjà réalisés vers leur bonne contrepartie avant correction ; aucune allocation ne cible un inverse ou un original devenu non consommable. Garder les preuves et le cash réellement reçu/payant ; une réaffectation ne crée ni remboursement bancaire ni paiement supplémentaire. Le montant initial finalisé n’est jamais réécrit.
@@ -3875,7 +3830,6 @@ erDiagram
 - **`incident_id`** : l’identifiant de l’incident de commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`created_at`** : la date où cette ligne a été créée dans la base.
 - **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
-
 
 
 - **`carrier_settlement_lines` type 4 COMPENSATION :** UNIQUE(operation_key), UNIQUE(reversal_of_id) hors NULL. Un dédommagement pour perte/casse ou autre sinistre payé par le prestataire au commerçant est séparé du COD et du remboursement client. La livraison et le bordereau ont le même prestataire ; un remplacement éventuel se rattache à la commande de cette livraison, contrôlé sous verrou. Montant>0 sauf inverse exact. L’indemnisation devient effective uniquement avec un bordereau rapproché ; les promesses peuvent rester sur un brouillon. Les pièces et références sont contrôlées pour ne pas importer deux fois la même indemnisation. **Le remboursement d’un trop-payé issu d’une correction de frais n’est pas une indemnisation : il apure `carrier_receivables` via T16.** Ne pas enregistrer simultanément une baisse de frais et une indemnisation pour une seule réduction de dette.
@@ -3972,7 +3926,6 @@ erDiagram
 - **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
 
 
-
 Dossier lié à la **ligne expédiée précise**, donc deux bouquets de même variante avec deux personnalisations restent distincts. UNIQUE(order_item_id) au MVP : un seul dossier par ligne, réouvrable et enrichi par order_history. Cette décision évite de dupliquer des incidents pour contourner le plafond ; plusieurs causes sont ventilées dans order_incident_details. Chaque détail : type=`1 DAMAGED | 2 DEFECTIVE | 3 INCORRECT | 4 MISSING | 5 LOST | 6 OTHER` (`IncidentTypeEnum`), quantite>0 et motif requis. Sous verrou commande puis incident, SUM(details.quantite)<=article_commande.quantite et affected_quantity=SUM(details.quantite). Une unité n’est comptée qu’une fois dans cette ventilation : choisir sa cause principale et décrire les causes secondaires dans le motif. Exemple 3 unités : 1 cassée + 1 manquante, la troisième correcte ne consomme aucun budget. Création/modification des détails et projection sont atomiques, auditées ; aucune diminution sous les remèdes déjà engagés. Le dossier porte exactement `IncidentStatusEnum` : `1 OPEN`, `2 VALIDATED`, `3 REJECTED`, `4 RESOLVED`, `5 CLOSED`, `6 CANCELLED`. Quantité affectée >0 et <= quantité expédiée ; ne jamais la diminuer sous la quantité déjà engagée. Montants éligibles>=0, alloués par décision documentée, pas automatiquement égaux au total commande. La clôture du dossier incident ne libère aucun budget consommé.
 
 Clés parents : UNIQUE(id,order_id) ; FK(shipment_id,order_id,shipped_revision_id) → shipments(id,order_id,shipped_revision_id), FK(order_item_id,shipped_revision_id) → order_items(id,revision_id), FK(return_id,shipment_id) → order_returns(id,shipment_id). Définir les parents avant d’ajouter les FK cycliques. L’incident peut exister sans retour : une photo et une décision de SAV peuvent justifier un remplacement sans collecte physique. **En revanche, si une prise en charge nécessite un retour physique dans le MVP, il n’existe pas de réception SAV isolée par article : le retour T9 porte sur tout le colis.**
@@ -3982,7 +3935,6 @@ Clés parents : UNIQUE(id,order_id) ; FK(shipment_id,order_id,shipped_revision_i
 Mêmes contrôles sur les montants : somme des remboursements produits engagés <= eligible_product_amount ET valeur TTC réellement payée des quantités concernées ; une unité remboursée partiellement compte comme unité compensée et ne peut recevoir un remplacement au MVP. Paiements fractionnés d’un même remède non gérés sans entité d’allocation supplémentaire. Frais de livraison : compensated_quantity=0, plafond séparé par incident ET cumul de la commande <= livraison nette éligible réellement payée. Contrôle global des remboursements <= encaissement vérifié. Les remboursements de produits et de livraison utilisent des lignes distinctes si nécessaire. Le renvoi impayé de T22 ne crée aucun remboursement ni quantité compensée ; ses unités revenues sont contrôlées séparément sous le verrou du retour. Les montants sont réservés dès brouillon, pour empêcher deux décisions simultanées.
 
 Après incident sur un remplacement gratuit type 2, le MVP ne crée pas automatiquement une chaîne de remplacements : traitement SAV manuel documenté et évolution à concevoir avant automatisation. Ne pas contourner cela en ouvrant un second dossier pour la ligne initiale. Une commande de renvoi type 4 finalement acceptée et réellement payée permet son propre SAV comme une vente, avec ses faits, lignes et plafonds ; un renvoi resté impayé suit T22. Les décisions, plafonds et preuves sont audités sans exposer inutilement les données de l’acheteur.
-
 
 
 ### T20 — Réglages de facturation : règles et compteurs dans une même table
@@ -4276,7 +4228,6 @@ erDiagram
 - **`created_at`** : la date où cette ligne a été créée dans la base.
 
 
-
 - **`commercial_corrections` — AUD-06/AUD-12 :** UNIQUE(operation_key), UNIQUE(correction_of_id) hors NULL, UNIQUE(id,source_revision_id), UNIQUE(id,order_id,source_revision_id). FK(source_revision_id,order_id) → order_revisions(id,order_id) ; si incident renseigné, FK(incident_id,order_id) → order_incidents(id,order_id). FK composite `(correction_of_id,order_id,source_revision_id)` → `commercial_corrections(id,order_id,source_revision_id)` et trigger/validation interdisant correction_of_id=id : une correction de correction reste sur la même commande et la même révision source. `correction_type=1 RETURN | 2 PRICE_REDUCTION | 4 EXCHANGE | 5 GOODWILL | 6 REVERSAL | 7 OTHER` (`CommercialCorrectionTypeEnum`). L’ancien code 3 CANCELLATION est retiré et jamais réattribué ; aucune correction économique ne crée une fonction d’annulation/clôture manuelle de commande. `status=1 DRAFT | 2 FINALIZED | 3 CANCELLED | 4 REVERSED` (`CommercialCorrectionStatusEnum`). `non_product_kind=1 NONE | 2 SHIPPING | 3 GLOBAL_GOODWILL | 4 OTHER` (`NonProductKindEnum`) et `non_product_revenue_delta` est signé. CHECK : nature=`aucune` ⇒ delta=0 ; nature différente de `aucune` ⇒ delta<>0. Une correction peut comporter uniquement des lignes produit, uniquement un impact hors produit, ou les deux ; à la finalisation, au moins un impact non nul doit exister. Exemple : remboursement commercial des seuls 650 DZD de livraison → `non_product_kind=livraison`, `non_product_revenue_delta=-650`, aucune ligne produit. `effective_at` est la période économique utilisée par les indicateurs ; `recorded_at` est l’instant où la décision est réellement enregistrée. Au MVP, une décision finalisée prend effet à sa date commerciale explicite ; elle ne réécrit pas silencieusement une période déjà publiée. Une ligne finalisée est immuable ; une erreur se corrige par un nouvel événement lié via `correction_of_id`, jamais par UPDATE destructif. L’ouverture d’un incident ou la réception d’un retour ne crée pas automatiquement cette correction.
 - **`commercial_correction_lines` :** UNIQUE(correction_id,order_item_id). FK(correction_id,source_revision_id) → commercial_corrections(id,source_revision_id) et FK(order_item_id,source_revision_id) → order_items(id,revision_id), avec clés parents UNIQUE ; la ligne concernée appartient donc obligatoirement à la révision source. `affected_quantity>0`. Sous verrou de la commande/révision puis des lignes concernées, la **quantité corrigée nette cumulée** de chaque `order_item_id` (corrections finalisées moins leurs contrepassations exactes) + la nouvelle quantité ne peut jamais dépasser la quantité admissible de la ligne. Une seconde correction quantité=1 sur une ligne vendue quantité=1 est donc refusée, sauf si elle constitue l’inverse documenté d’une correction précédente. Une contrepassation doit reprendre les mêmes lignes/quantités et inverser exactement les deltas correspondants ; elle ne crée pas un nouveau budget de correction tant qu’elle n’est pas finalisée. `reference_sale_amount>=0`. `revenue_delta` et `sold_cost_delta` sont signés et expliquent exactement l’impact de gestion ; exemple de correction économique de 8 000 après retour accepté : `revenue_delta=-8000`. La commande est conservée sans annulation commerciale. L’impact revenu total de l’événement = Σ `commercial_correction_lines.revenue_delta` + `commercial_corrections.non_product_revenue_delta`. Les quantités/statistiques produit utilisent uniquement les lignes produit ; une correction de livraison ne doit jamais être attribuée artificiellement à un article. Les montants fiscaux restent dans factures/avoirs et le mouvement de trésorerie dans `customer_adjustments`/journaux financiers : cette table ne simule ni document fiscal ni paiement.
 
@@ -4296,7 +4247,7 @@ erDiagram
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
         uuid central_user_uuid UK "nullable ; propriétaire seulement ; REF central.users.uuid"
-        varchar name
+        varchar last_name "nom de famille du compte local"
         varchar first_name "nullable"
         varchar email UK
         varchar password
@@ -4333,40 +4284,29 @@ erDiagram
         boolean is_super_admin
         tinyint_unsigned super_admin_slot UK "generated nullable ; 1 si is_super_admin"
         bigint_unsigned permission_version
+        char(64) permission_signature UK "NOT NULL ; SHA-256 permissions+durees ; UNIQUE guard_name+signature"
         datetime created_at
         datetime updated_at
     }
     role_has_permissions {
         bigint_unsigned permission_id PK,FK "permissions.id"
         bigint_unsigned role_id PK,FK "roles.id"
+        smallint_unsigned duration_days "NOT NULL DEFAULT 9999 ; CHECK 1 a 9999 jours"
     }
     model_has_roles {
         bigint_unsigned role_id PK,FK "roles.id"
         varchar(64) model_type PK "alias morph local"
         bigint_unsigned model_id PK "users.id pour un utilisateur"
+        datetime assigned_at "NOT NULL ; debut des durees pour ce compte ; UTC"
     }
     model_has_permissions {
         bigint_unsigned permission_id PK,FK "permissions.id"
         varchar(64) model_type PK "alias morph local"
         bigint_unsigned model_id PK "users.id pour un utilisateur"
+        datetime assigned_at "NOT NULL ; debut de cette attribution directe ; UTC"
+        datetime expires_at "NOT NULL ; apres assigned_at, au plus 9999 jours"
     }
-    permission_overrides {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        bigint_unsigned user_id FK "users.id"
-        bigint_unsigned permission_id FK "permissions.id"
-        bigint_unsigned assigned_by_id FK "users.id"
-        tinyint_unsigned effect "PermissionEffectEnum"
-        tinyint_unsigned status "OverrideStatusEnum"
-        datetime started_at
-        datetime ended_at "nullable"
-        tinyint_unsigned active_slot "generated nullable"
-        datetime expires_at "nullable"
-        text reason "nullable"
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
-    }
+
     team_invitations {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
@@ -4400,29 +4340,56 @@ erDiagram
     permissions ||--o{ model_has_permissions : permission_id
     roles ||--o{ team_invitations : initial_role_id
     users ||--o{ team_invitations : invited_by_id
-    users ||--o{ permission_overrides : user_id
     users ||--o{ contact_verifications : user_id
 ```
 
-**`users`, expliqué simplement :** chaque ligne est le compte d’une personne dans cette boutique. Elle garde son nom, son e-mail unique local, son mot de passe haché, ses contacts, sa langue et ses dates de connexion. `status` utilise `UserStatusEnum` : `1 ACTIVE`, `2 INACTIVE`, `3 SUSPENDED`, `4 DELETED`. `membership_status` utilise `MemberStatusEnum` : `1 ACTIVE`, `2 INVITED`, `3 SUSPENDED`, `4 REVOKED`. Un compte peut donc rester enregistré alors que son accès à l’équipe est retiré. `joined_at` est la date de première activation de cet accès et ne se réécrit pas à une réactivation. Une appartenance active exige `joined_at` non NULL ; elle n’est jamais obtenue par une valeur libre envoyée dans un formulaire.
+**`users`, expliqué simplement :** chaque ligne est le compte d’une personne dans cette boutique. first_name contient son prénom, last_name son nom de famille ; l’ancien name devient last_name comme au central. Le nom public de la boutique est shop.shop_name, pas un champ de ce compte. Elle conserve e-mail unique local, mot de passe haché, contacts, langue et dates de connexion. status utilise UserStatusEnum : 1 ACTIVE, 2 INACTIVE, 3 SUSPENDED, 4 DELETED. membership_status utilise MemberStatusEnum : 1 ACTIVE, 2 INVITED, 3 SUSPENDED, 4 REVOKED. Un compte peut rester enregistré alors que son accès à l’équipe est retiré. joined_at garde la première activation et ne se réécrit pas à une réactivation ; une appartenance active exige joined_at non NULL et ne provient jamais d’un formulaire libre. Le profil légal vendeur reste lu depuis l’identité centrale autorisée, sans partager les credentials ni les comptes employés.
 
-**Accès d’équipe :** avant toute permission ou exception locale, exiger `users.status=1`, `users.membership_status=1`, `users.deleted_at IS NULL` et un tenant accessible. Un compte suspendu ou révoqué ne retrouve pas l’accès parce qu’il conserve un rôle. La révocation de l’accès et la suspension du compte sont motivées, auditées et appliquées aux sessions/tokens concernés. Une réactivation réévalue le rôle, les exceptions et le quota ; elle ne réattribue pas des privilèges devenus interdits. Les parcours limités d’acceptation d’invitation, de vérification et de récupération restent protégés par leur jeton/identité propre ; ils n’autorisent aucune consultation métier avant l’activation de l’accès.
+**Accès d’équipe :** avant toute permission locale, exiger users.status=1, users.membership_status=1, users.deleted_at IS NULL et un tenant accessible. Un compte suspendu ou révoqué ne retrouve pas l’accès parce qu’il conserve un rôle. La révocation de l’accès et la suspension sont motivées, auditées et appliquées aux sessions/tokens concernés. Une réactivation réévalue rôles, dates actuelles et quota ; elle ne remet pas assigned_at à zéro et ne réattribue pas un droit expiré. Les parcours limités d’acceptation d’invitation, de vérification et de récupération restent protégés par leur jeton/identité propre ; aucun accès métier avant activation.
 
 **Propriétaire local :** `central_user_uuid` est rempli exclusivement sur son compte ; il sert à vérifier la concordance avec `tenants.user_id` par lecture centrale. Les collaborateurs ont NULL. Ce lien est immuable, non modifiable par les formulaires d’équipe, et ne constitue pas une connexion centrale. Le central ne reçoit aucun miroir des employés. Le rôle `shop-owner` reste réservé à ce propriétaire et protégé contre attribution, retrait ou remplacement par la gestion ordinaire d’équipe. Cette gestion ne peut supprimer/révoquer l’accès du propriétaire pour contourner cette protection. Aucune rotation de rôle ne change la propriété centrale immuable.
 
-**`roles`, `permissions` et pivots :** structure et méthodes identiques à C2, avec `guard_name=tenant`, modèle local et cache de cette boutique. Le rôle système `shop-owner` porte `is_super_admin=true` et `is_protected=true`, uniquement pour le propriétaire provisionné. Un rôle de gestionnaire personnalisé ne confère aucune propriété. Les permissions locales (`product.create`, `order.confirm`, `team.invite`, `role.create`...) ne comprennent jamais les capacités `saas.*`. Les services/migrations refusent un guard incompatible ; aucun rôle central n’est réutilisé. Les pivots ciblent `users` via `model_type=shop_user` et `model_id` numérique : l’accès d’équipe est contrôlé sur cette même ligne, sans deuxième chemin d’attribution. Les pivots Spatie gardent leurs clés composites natives, sans `id`/`uuid` autonome. Les changements de rôles et de droits sont journalisés explicitement dans la transaction tenant.
+**`roles`, `permissions` et pivots :** mêmes cinq tables et mêmes règles de C2.1, avec guard_name=tenant, modèle local, horloge d’attribution locale et cache de cette boutique. role_has_permissions.duration_days définit chaque action entre 1 et 9999 jours, défaut/max 9999. model_has_roles.assigned_at démarre les compteurs pour la personne ; les éventuels droits directs portent assigned_at/expires_at obligatoires. roles.permission_signature refuse les compositions identiques en permissions et durées, même sous un autre nom ; UNIQUE(name,guard_name) refuse un nom déjà pris. Ces unicités ne traversent jamais les BDD. Plusieurs rôles sont possibles sans permission commune, y compris après modification d’un rôle utilisé ; une attribution directe ne duplique pas un rôle. Le système shop-owner conserve is_super_admin/is_protected et son attribution unique au propriétaire ; il ne se cumule avec aucune autre attribution locale. Un gestionnaire n’acquiert aucune propriété. Les capacités locales ne comprennent jamais saas.*. Les pivots gardent leur PK composite et ciblent users via model_type=shop_user et model_id numérique. Les métadonnées datées ne créent ni seconde attribution, ni table d’exceptions.
 
-**`permission_overrides` :** même structure temporelle que C3, toutes les FK étant locales ; aucune portée `tenant_id` à normaliser. `UNIQUE(user_id,permission_id,active_slot)`. Les DENY actifs priment pour tous les comptes locaux. Les contrôles supplémentaires passent par Laravel Gates/Policies ; `hasPermissionTo` seul n’applique ni interdictions, ni accès d’équipe, ni quotas. Les droits effectifs restent l’union des droits Spatie et ALLOW temporaires valides après application des DENY prioritaires.
-
-**`team_invitations`, expliqué simplement :** elles permettent d’inviter un employé avec un rôle initial et un lien secret qui expire. `initial_role_id` cible un rôle local attribuable ; `invited_by_id` est l’invitant local habilité ; l’e-mail est normalisé ; le jeton n’est enregistré que sous forme hachée et sert une seule fois. `role_permission_version` capture la version du rôle. L’acceptation verrouille d’abord la ligne `shop` de quota, puis l’invitation et le compte existant s’il existe, dans un ordre stable partagé avec les autres opérations d’équipe ; elle revalide expiration/révocation, droit actuel de l’invitant, rôle et quota. Elle crée un compte local vérifié ou réutilise un compte existant seulement après authentification locale et concordance de son e-mail vérifié, puis active `membership_status`, renseigne `joined_at` si c’est sa première activation et attribue le rôle dans une seule transaction. Un compte suspendu/supprimé n’est jamais réactivé implicitement par l’acceptation d’un lien. Si le rôle a changé, exiger une validation explicite de l’invitation au lieu d’accepter silencieusement de nouveaux droits. Une invitation ne peut jamais attribuer `shop-owner`.
+**`team_invitations`, expliqué simplement :** elles invitent un employé avec un rôle initial et un lien secret qui expire. initial_role_id cible un rôle local attribuable ; invited_by_id est l’invitant local habilité ; e-mail normalisé, token haché et consommation unique. role_permission_version capture la composition et les durées du rôle. Dans la transaction tenant, verrouiller shop.singleton=1, puis rôles/comptes concernés et invitation dans l’ordre commun de T24.1 ; revalider expiration/révocation, identité, droit actuel de l’invitant, version du rôle, absence de recoupement et quota. Créer le compte vérifié ou réutiliser un compte existant seulement après authentification locale et concordance de son e-mail vérifié, activer membership_status et renseigner joined_at uniquement pour sa première activation. model_has_roles.assigned_at est fixé à l’acceptation effective, pas à l’envoi : l’attente d’invitation ne consomme aucun jour de permission. Un compte suspendu/supprimé n’est jamais réactivé implicitement. Un changement de composition ou durée exige une revalidation explicite de l’invitation ; une consommation rejouée ne modifie aucun début. Si le compte avait déjà exactement ce rôle, garder son assigned_at existant, sans renouvellement implicite ; si ses autres attributions se recoupent avec le rôle proposé, refuser l’acceptation entière sans consommer le jeton ni la place. shop-owner n’est jamais attribuable par invitation.
 
 **Places d’équipe et invitations :** compter les accès locaux qui consomment une place selon la règle de quota existante, puis ajouter les invitations ouvertes réservant une nouvelle place. Une invitation concernant un compte déjà compté ne consomme pas une deuxième place ; une réactivation qui ne consommait plus de place la réserve avant de réussir. Une suspension temporaire du compte ou de son accès ne libère pas artificiellement une place ; une libération définitive suit la règle de quota versionnée et le même verrou. Les invitations ouvertes pour un même e-mail normalisé réservent au plus une place, sans permettre une double attribution concurrente. Réservation, acceptation, révocation et changement d’accès utilisent le verrou `shop.singleton=1`, afin que deux actions simultanées ne dépassent pas la limite. Une rétrogradation du plan conserve les comptes/rôles historiques et bloque les nouvelles créations au-delà du quota ; elle ne supprime pas l’équipe.
 
 **`contact_verifications` et authentification :** vérification du contact du compte local par code haché, durée limitée, nombre d’essais contrôlé et consommation unique. Sessions, récupération/réinitialisation de mot de passe et fermeture de sessions utilisent les mécanismes techniques installés sur cette même connexion, avec protection contre énumération et abus. Les messages de sécurité destinés au propriétaire et aux employés — activation, invitations, vérification et récupération — restent explicitement autorisés. Ce sont des parcours de compte local ; ils ne réintroduisent ni messages aux acheteurs, ni campagnes, ni envoi automatique de documents commerciaux. Les passkeys restent une option distincte de l’authentification ; si activées, utiliser la migration réelle du paquet avec provider/connexion/RP cohérents, sans leur donner de rôle supplémentaire.
 
-**Création du propriétaire local :** après réservation centrale du tenant, le provisioning idempotent crée `users` avec compte et accès d’équipe actifs, `joined_at` réel et attribution `shop-owner` dans la BDD tenant. Le propriétaire définit son mot de passe local via un jeton d’activation court, transmis pour cette boutique ; aucun partage ou copie du mot de passe central. Le tenant devient actif seulement après validation des migrations, du seeding et du rattachement au propriétaire. Une nouvelle connexion authentifie ce compte local. Root central et personnel du SaaS ne peuvent ni se connecter à sa place ni gérer ses employés. La réparation technique du provisioning ne constitue pas un écran de gestion d’équipe centrale.
+**Création du propriétaire local :** après réservation centrale du tenant, le provisioning idempotent crée users avec compte et accès d’équipe actifs, joined_at réel et attribution shop-owner avec assigned_at dans la BDD tenant. Un retry conserve l’attribution et sa date. Les cinq tables locales et leurs protections sont initialisées avant activation. Le propriétaire définit son mot de passe local via un jeton court transmis pour cette boutique ; aucun partage/copie du mot de passe central. Le tenant devient actif après migrations, seeding et rattachement au propriétaire validés. Root central et personnel du SaaS ne peuvent ni se connecter à sa place ni gérer ses employés ; une réparation technique de provisioning n’est pas une délégation centrale d’équipe.
 
 **Fusion et conservation :** les auteurs des commandes, mouvements de stock, paiements, remboursements, preuves, médias et activités continuent de viser le même `users.id`. Retirer une appartenance d’équipe signifie modifier son état sur ce compte et écrire une activité locale ; aucune suppression en cascade n’efface ses actes passés. Pour une migration future d’un schéma déjà installé, vérifier `UNIQUE(user_id)` dans l’ancienne appartenance, conserver `users.id`/`uuid`, reporter son état et sa première date d’activation, et traiter un accès ancien supprimé comme révoqué. L’ancienne clé de membre n’était aucune identité d’authentification ; les éventuels alias ou liens d’archive doivent être résolus explicitement avant retrait. Aucun déplacement de données ni migration SQL n’est exécuté par ce document.
+
+### T24.1 — Durées locales, absence de doublons et invitations
+
+Le contrat de C2.1 est appliqué dans cette seule BDD, guard tenant, morph shop_user. Le nom public projeté est shop.shop_name ; first_name/last_name désignent uniquement la personne. Les nouveaux champs des pivots sont obligatoires ; aucun id/uuid de pivot n’est ajouté. Les permissions ordinaires du rôle expirent chacune à model_has_roles.assigned_at + role_has_permissions.duration_days jours UTC, intervalle [début,fin). À fin exacte, le droit est refusé même si les autres actions du rôle restent valides. Les droits directs natifs sont eux aussi datés et bornés à 9999 jours ; ils ne servent pas à passer devant un rôle. Une permission temporelle ne remplace jamais le plan, le quota ni la Policy de l’objet.
+
+**Concurrence et quota :** toutes les écritures locales de rôles, compositions/durées, attributions/retraits/renouvellements, droits directs et invitations prennent d’abord shop.singleton=1 FOR UPDATE sur la connexion tenant. Ce même verrou sert déjà aux quotas d’équipe ; aucune nouvelle table de verrou ni ligne centrale n’est créée. Prendre ensuite les rôles par id, les comptes par id et les invitations par id ; relire les parents/version/compositions/attributions, contrôler garde, acteur, dates, signatures et recoupements, puis quota, écrire et auditer atomiquement. Une modification de rôle est refusée si elle ferait doubler une permission chez l’un de ses bénéficiaires. Les UNIQUE SQL de nom/signature et les PK ferment les courses ; les contrôles inter-lignes passent par le service et les protections d’un écrivain SQL autorisé. Une invitation est consommée dans cette transaction, pas avant. Pas d’e-mail/HTTP dans le verrou ; les intentions des seuls messages d’accès partent après commit. Le provisioning crée le singleton avant ces opérations, conserve sa date d’attribution au retry et reste distinct de la gestion d’équipe ordinaire.
+
+**Contrôles d’accès :** le hook tenant du catalogue de capacités locales vérifie compte, membership_status/joined_at, tenant accessible, date actuelle et droit effectif, ou shop-owner protégé. Pour une capacité connue absente/expirée, rendre false sans laisser le contrôle natif non daté réautoriser. Désactiver le callback natif par register_permission_check_method=false et utiliser le résolveur daté dans les modèles/relations d’autorisation, Gates et middleware ; l’ordre des callbacks ne doit pas permettre un true natif avant le refus temporel. Les noms génériques des actions de Policy retournent null pour exécuter ses contrôles d’objet et de contexte. APIs, Livewire, exports, champs de coût/marge et jobs passent par ce même contrat ; chaque worker le réévalue à l’exécution. Les coûts/marges sont masqués dès que leur permission dédiée n’est plus valide, y compris dans JSON et exports. Le propriétaire reste soumis aux états de compte/tenant, aux fonctionnalités et quotas, aux objets de sa boutique et aux invariants métier ; aucun privilège central n’est reconnu localement.
+
+**Dates, cache et historique :** réattribuer volontairement un rôle exige une intention auditable distincte ; un simple retry, une réactivation d’appartenance ou un login ne relance aucun délai. Modifier une durée dans le rôle garde le début des bénéficiaires existants ; pour une différence destinée à une personne seulement, utiliser un rôle distinct et remplacer l’attribution atomiquement. Relire attributions/dates courantes et permission_version à chaque décision sensible ; ne pas utiliser un ancien pivot chargé comme autorité. Invalider caches/relations après commit ; les caches expirent au plus tard à la prochaine fin et un cron arrêté ne conserve aucun droit. Audit local explicite des anciennes/nouvelles dates/durées, attribution, retrait, renouvellement, composition, invitation et refus de nom/composition/recoupement, avec acteur/motif et UUID filtrés. Ni un rôle ni une activité interne de boutique n’est copié au central.
+
+**Retrait des exceptions :** permission_overrides n’existe plus dans le modèle actif local. Pour retirer une action à un employé, retirer/remplacer son attribution ou utiliser un rôle qui n’a pas cette action ; pour la limiter dans le temps, régler sa durée dans la composition choisie. Il n’existe plus de DENY individuel superposé à un rôle. Les blocages de compte/appartenance, quotas et états métier restent leurs contrôles propres. D’anciennes règles et décisions restent traçables dans les archives/audits ; une éventuelle migration doit retrouver un état équivalent sans élargir les droits, et signaler les cas incompatibles plutôt que fabriquer une date d’attribution.
+
+**Cas d’acceptation locaux à implémenter :**
+
+| Cas | Résultat attendu |
+|---|---|
+| Durée absente / 0 / 10000 | 9999 jours par défaut / refus / refus ; CHECK 1..9999 |
+| Noms différents, mêmes permissions/durées dans un autre ordre | Création refusée par signature dans cette boutique |
+| Même nom/composition dans boutiques A et B | Permis : deux définitions locales indépendantes, aucune attribution commune |
+| Deux rôles locaux avec une permission commune | Attribution refusée, même si ce droit a déjà expiré dans l’un |
+| Modification d’un rôle créant un recoupement pour un membre | Mutation entière refusée, sans version ni succès d’audit partiel |
+| Invitation envoyée lundi, acceptée vendredi | Début des permissions vendredi ; délai du jeton séparé |
+| Durée/composition du rôle changée après invitation | Version différente ; revalidation explicite avant acceptation |
+| Invitation acceptée pour un compte au rôle déjà attribué | Date existante conservée, aucun renouvellement implicite |
+| Rôle d’invitation recoupant un autre droit du compte | Acceptation entière refusée, jeton/place non consommés |
+| Deux attributions concurrentes, permissions communes | Une seule peut être validée ; relecture après verrou shop |
+| Droit expiré, cron arrêté, worker/API/export ou cache encore présent | Refus ; coût/marge non exposés si leur droit expire |
+| Suspension puis réactivation ou retry du provisioning | Aucune date de début réinitialisée |
+| Tentative de cumul ou attribution de shop-owner à un employé | Refus, propriété immuable |
 
 ### T25 — Comptes transporteur, tarifs et lots de reversement locaux
 
@@ -4604,7 +4571,7 @@ L’exhaustivité des axes/valeurs actifs d’une variante sélectionnable pour 
 
 | Clé parent UNIQUE | FK enfant locale |
 |---|---|
-| tenants(id,user_id) | subscriptions(tenant_id,user_id), feature_overrides(tenant_id,user_id), feature_usage(tenant_id,user_id) |
+| tenants(id,user_id) | subscriptions(tenant_id,user_id), feature_usage(tenant_id,user_id) |
 | shipping_rates(id,carrier_account_id,record_type) en boutique | carrier_fees(source_rate_id,carrier_account_id,source_rate_record_type=3), avec FK simple sur source_rate_id et compte du prestataire contrôlé |
 | users(id), roles(id), permissions(id) | FK locales des tables de leur BDD ; rôle/permission du même guard |
 | users(id) en boutique | invitations et acteurs métier locaux ; appartenance portée par users.membership_status/joined_at |
@@ -4615,9 +4582,9 @@ Les FK d’appartenance/rôle/tenant de l’ancienne organisation centrale sont 
 
 tenants.user_id est le propriétaire central immuable. tenant users.central_user_uuid, uniquement pour le propriétaire local, correspond à ce propriétaire par UUID ; vérifier via la connexion centrale au provisioning et à la reprise. Tout transfert de propriétaire, modification de cette liaison, suppression du propriétaire protégé ou attribution de shop-owner à un collaborateur est refusé. Le rôle système ne crée pas une deuxième source de propriété.
 
-**AUD-05 adapté :** les exceptions temporaires sont locales à leur BDD et leur guard. permission_overrides ne contient plus une portée plateforme/tenant ni un tenant_id ; le DENY et les dates restent prioritaires et contrôlés par le service. admin_restrictions reste exclusivement au central et ses cibles ne désignent que des objets centraux.
+**AUD-05 adapté :** la validité temporelle est portée par les attributions C2.1/T24.1 dans chaque BDD et son guard, sans permission_overrides centrale ou locale. Les rôles d’un compte n’ont pas de permission commune ; les droits directs ne les doublent pas. Noms/signatures et dates restent locaux. admin_restrictions reste exclusivement au central et ses cibles ne désignent que des objets centraux ; aucune attribution tenant_id ni FK inter-BDD n’est ajoutée.
 
-Unicités conditionnelles : domaine principal actif, abonnement actif type 1 du propriétaire, panier actif, adresse principale, média principal par parent/collection, déploiement en cours, exception/restriction active. Les expressions utilisent un état explicite, jamais NOW(). Les cibles facultatives et quotas sont normalisés avec une sentinelle numérique interdite comme PK réelle (0), et non un UUID fictif. Le rôle racine unique est porté par roles.super_admin_slot ; la gestion de son attribution verrouille ce rôle et préserve un administrateur valide dans sa BDD. Le central n’entretient aucune unicité sur les collaborateurs de boutique.
+Unicités conditionnelles : domaine principal actif, abonnement actif type 1 du propriétaire, panier actif, adresse principale, média principal par parent/collection, déploiement en cours et restriction administrative centrale active. Les expressions utilisent un état explicite, jamais NOW(). Les cibles facultatives et quotas sont normalisés avec une sentinelle numérique interdite comme PK réelle (0), et non un UUID fictif. Le rôle racine unique est porté par roles.super_admin_slot ; la gestion de son attribution verrouille ce rôle et préserve un administrateur valide dans sa BDD. Le central n’entretient aucune unicité sur les collaborateurs de boutique.
 
 ### 6.4 Exemples de protections supplémentaires
 
@@ -4633,14 +4600,6 @@ ALTER TABLE shop
 ALTER TABLE shipments
   ADD CONSTRAINT uq_shipment_merchant_reference UNIQUE (provider_id, merchant_reference);
 
--- Remplace l'ancienne unicité permanente ; supprimer l'ancien index
--- par son nom réel dans la migration avant d'ajouter celui-ci.
-ALTER TABLE permission_overrides
-  ADD COLUMN active_slot TINYINT UNSIGNED
-    GENERATED ALWAYS AS
-      (CASE WHEN status = 1 AND deleted_at IS NULL THEN 1 ELSE NULL END) STORED,
-  ADD CONSTRAINT uq_permission_override_active
-    UNIQUE (user_id, permission_id, active_slot);
 ```
 
 Le trigger de variante compare OLD.product_id et NEW.product_id avec `<=>` et émet SIGNAL SQLSTATE '45000' en cas de différence. **AUD-01 :** la modification de `variant_option_values` et toute mutation de composition doit aussi verrouiller `product_variants`; si `used_at IS NOT NULL`, toute modification d’identité physique est refusée. La première réservation, le premier mouvement et la première ligne de commande renseignent `used_at` sous ce même verrou. Premier usage et mutation des axes/valeurs partagés prennent également le verrou commun du produit avant les variantes triées ; tester les références aux variantes utilisées après acquisition. Les mutations de record_type, product_id et parent_id dans product_options sont refusées par trigger ; toute mutation de signification d’un axe/valeur déjà utilisé et toute mutation de composition/signature d’une variante utilisée sont refusées. Une nouvelle dimension crée de nouvelles variantes sans requalifier les anciennes. Les imports utilisent le même service. Un trigger dédié à order_items bloque DELETE et UPDATE du contenu commercial immuable ; seules reservation_status, reserved_at, reservation_released_at, reservation_created_at et reservation_updated_at peuvent être modifiées par le circuit stock autorisé, dans la transaction de leurs mouvements/compteurs. Il refuse les transitions autres que NULL→ACTIVE, ACTIVE→RELEASED ou ACTIVE→CONSUMED et toute mutation d’une projection terminale ; après première réservation, reserved_at et reservation_created_at restent inchangés. Des CHECK imposent la forme complète de la projection ; les transitions métier et sommes inter-lignes sont aussi validées transactionnellement. Même mécanisme pour les propriétés centrales immuables. Les droits DDL restent hors du rôle applicatif. Les colonnes générées ne contiennent aucun appel à l’heure courante ; les services vérifient les dates à chaque décision [S3, S4, S7].
@@ -4752,7 +4711,7 @@ Chaque index parent UNIQUE est créé une seule fois même s’il reçoit plusie
 
 **Dictionnaire de classement local :** UNIQUE(categories.id,record_type), UNIQUE(categories.record_type,slug) ; FK(categories.parent_id,parent_record_type) → categories(id,record_type), FK(products.category_id,category_record_type) → categories(id,record_type), FK(product_tags.tag_id,tag_record_type) → categories(id,record_type). parent_record_type=CASE WHEN parent_id IS NOT NULL THEN 1 ELSE NULL END ; category_record_type=CASE WHEN category_id IS NOT NULL THEN 1 ELSE NULL END ; tag_record_type=2, tous GENERATED ALWAYS AS (...) STORED. record_type IN (1,2), TAG impose parent_id NULL. Références RESTRICT, types/identité immuables, cycles/auto-parent contrôlés sous verrou par service/trigger avec les colonnes de base. Les helpers calculés ne remplacent pas les CHECK/triggers de forme ; UNIQUE(product_id,tag_id) conserve la relation multiple.
 
-**Référentiel central C10 :** UNIQUE(geographic_areas.id,type), UNIQUE(geographic_areas.id,parent_id,type). FK(carrier_geo_mappings.geographic_area_id,zone_type) → geographic_areas(id,type). province_type=1 et municipality_type=CASE WHEN municipality_id IS NOT NULL THEN 2 ELSE NULL END STORED pour pickup_points. FK(pickup_points.province_id,province_type) → geographic_areas(id,type) ; FK(pickup_points.municipality_id,province_id,municipality_type) → geographic_areas(id,parent_id,type). province_id non NULL ; municipality_id facultatif, mais s’il existe son parent correspond exactement à la wilaya. Les FK simples restent présentes. RESTRICT pour ces liens et ceux au réseau ; pas de cascade/codes réaffectés ni de FK vers une BDD tenant. Index réseau/état/zone et UUID selon lectures. Les 27 tables centrales antérieures conservent tous leurs champs ; les clés composites ajoutées sur geographic_areas ne changent ni ses valeurs ni son modèle pays/wilaya/commune.
+**Référentiel central C10 :** UNIQUE(geographic_areas.id,type), UNIQUE(geographic_areas.id,parent_id,type). FK(carrier_geo_mappings.geographic_area_id,zone_type) → geographic_areas(id,type). province_type=1 et municipality_type=CASE WHEN municipality_id IS NOT NULL THEN 2 ELSE NULL END STORED pour pickup_points. FK(pickup_points.province_id,province_type) → geographic_areas(id,type) ; FK(pickup_points.municipality_id,province_id,municipality_type) → geographic_areas(id,parent_id,type). province_id non NULL ; municipality_id facultatif, mais s’il existe son parent correspond exactement à la wilaya. Les FK simples restent présentes. RESTRICT pour ces liens et ceux au réseau ; pas de cascade/codes réaffectés ni de FK vers une BDD tenant. Index réseau/état/zone et UUID selon lectures. En V4.8, les 27 tables centrales antérieures conservaient tous leurs champs ; V4.9 adapte uniquement les éléments centraux décrits en C1–C4 ; les clés composites ajoutées sur geographic_areas ne changent ni ses valeurs ni son modèle pays/wilaya/commune.
 
 **Bureau central dans les colis locaux :** order_revisions.pickup_point_uuid et shipments.pickup_point_uuid ont exactement le même stockage UUID/collation ; FK locale(shipped_revision_id,order_id,pickup_point_uuid) → order_revisions(id,order_id,pickup_point_uuid), avec UNIQUE parent. Aucun FK local ne cible central.pickup_points ou un pickup_points local retiré. À domicile UUID et snapshot NULL ; stop desk UUID/snapshot requis. CHECK de mode et FK(shipped_revision_id,order_id,delivery_mode) empêchent qu’un NULL fasse disparaître la protection. Le service résout l’UUID central, contrôle réseau du compte, géographie et autorisation boutique avant la révision, puis conserve le choix exact pour l’envoi. Un changement de disponibilité/code du catalogue ne change pas le snapshot historique.
 
@@ -4764,9 +4723,9 @@ Les restrictions MySQL 8.4 sur les FK de colonnes générées STORED, les action
 
 ## 7. Autorisations, propriété et intégration Laravel
 
-**Membre de boutique :** users local actif, membership_status=1 ACTIVE, deleted_at NULL, tenant accessible, permission effective locale, aucune interdiction, fonctionnalité du plan et quota disponibles. La permission effective est l’union des rôles/permissions directes Spatie et des ALLOW temporaires valides, à laquelle les DENY s’imposent. Les coûts et marges sont également filtrés dans les réponses. Les jobs réévaluent ces conditions à l’exécution.
+**Membre de boutique :** users local actif, membership_status=1 ACTIVE, joined_at renseigné, deleted_at NULL, tenant accessible, permission effective locale non expirée, fonctionnalité du plan et quota disponibles. Le droit vient d’une attribution datée de C2.1/T24.1 ; aucun rôle ou droit direct ne duplique la même permission. Les coûts et marges sont filtrés dans toutes les réponses par leurs droits actuels. Les jobs réévaluent ces conditions à l’exécution.
 
-**Propriétaire :** propriété centrale définie uniquement par tenants.user_id et protégée contre toute modification. L’accès au back-office de chaque boutique exige son compte local distinct, lié par central_user_uuid au propriétaire central, et son appartenance active. Son rôle système local shop-owner donne les capacités de cette boutique sous réserve des interdictions explicites, du plan, des quotas et de l’état métier. Aucun transfert n’est offert.
+**Propriétaire :** propriété centrale définie uniquement par tenants.user_id et protégée contre toute modification. L’accès au back-office de chaque boutique exige son compte local distinct, lié par central_user_uuid au propriétaire central, et son appartenance active. Son rôle système local shop-owner donne les capacités de cette boutique sous réserve du compte/appartenance/tenant accessibles, du plan, des quotas et de l’état métier. Aucun transfert n’est offert.
 
 **Administrateur central délégué :** compte users central, permission saas.* et cibles autorisées par admin_restrictions. Un IT peut créer des comptes centraux si cette capacité lui est attribuée ; un gestionnaire peut attribuer des plans sans disposer des autres droits root. Ils n’administrent aucun compte d’équipe local, ne lisent pas les données internes des boutiques et ne se connectent à leur place.
 
@@ -4774,13 +4733,13 @@ Les restrictions MySQL 8.4 sur les FK de colonnes générées STORED, les action
 
 ### 7.1 Provisionnement sous quota et renommage
 
-Toutes les mutations pouvant changer le quota ou son occupation utilisent **la même ligne users du propriétaire comme verrou stable** : créations de tenants, libération définitive de place, activation/rétrogradation d’abonnement type 1 et exceptions fonctionnelles. Une désactivation simple ne libère aucune place.
+Toutes les mutations pouvant changer le quota ou son occupation utilisent **la même ligne users du propriétaire comme verrou stable** : créations de tenants, libération définitive de place et activation/rétrogradation/changement d’offre de l’abonnement type 1. Les versions de plan déjà utilisées et leurs plan_features restent figées ; une nouvelle composition passe par une nouvelle offre/version. Une désactivation simple ne libère aucune place.
 
 ```text
 TRANSACTION sur connexion centrale
   verrouiller la ligne users WHERE id = user_id du propriétaire FOR UPDATE
   rechercher (user_id,creation_key) ; si existe, comparer hash et reprendre
-  résoudre abonnement record_type=1 et exceptions à la date courante
+  résoudre abonnement record_type=1, plan et plan_features à la date courante
   lire en lecture courante les tenants non supprimés du propriétaire
   compter ces lignes, y compris provisionnements en cours/échoués
   si quota disponible : INSERT tenant status=1 (PROVISIONING), sans membre central
@@ -4797,7 +4756,7 @@ Renommage : modifier shop_name et incrémenter profile_version sur la connexion 
 
 ### 7.2 Expiration du payant et choix des boutiques actives
 
-Le gratuit est le plan de repli obligatoire, même si aucune souscription payante n’est active. Sous verrou users du propriétaire : clôturer le payant type 1 échu, retrouver/créer le gratuit type 1 avec une clé déterministe de transition, résoudre quota et exceptions, puis sélectionner les boutiques éligibles. La date d’expiration est contrôlée à chaque décision sensible ; un cron arrêté ne prolonge pas les droits payants.
+Le gratuit est le plan de repli obligatoire, même si aucune souscription payante n’est active. Sous verrou users du propriétaire : clôturer le payant type 1 échu, retrouver/créer le gratuit type 1 avec une clé déterministe de transition, résoudre le quota depuis le plan et ses plan_features, puis sélectionner les boutiques éligibles. La date d’expiration est contrôlée à chaque décision sensible ; un cron arrêté ne prolonge pas les droits payants.
 
 Ordre de sélection : choix explicite `activation_priority`, sinon boutique `is_primary`, sinon active la plus ancienne ; UUID départage les égalités. Pour le quota gratuit=1, un seul tenant éligible reste actif. L’éligibilité exclut archive, échec/provisionnement et suspensions administratives ; un recalcul de quota ne les annule pas. Excédentaires → hors_quota et date ; aucune suppression des commandes, médias, catalogue ou BDD. Le choix principal et les priorités appartiennent au propriétaire et restent uniques/cohérents sous son verrou.
 
@@ -4814,7 +4773,7 @@ Une requête de création déjà acceptée retrouve son tenant via (user_id,crea
 |---|---|---|
 | Résolution d’un domaine, tenant, statut et versions | Central domains/tenants | Lecture contrôlée et initialisation de la bonne BDD par UUID |
 | Propriété, profil public et préfixe documentaire | Central tenants/users | Projection versionnée dans shop et vérification du propriétaire local ; aucun partage de mot de passe |
-| Plan, fonctionnalités, quotas et exceptions fonctionnelles | Central subscriptions/features/plan_features | Résolution serveur des droits d’usage ; lecture minimale/cache versionné ; aucun compte d’équipe envoyé |
+| Plan, fonctionnalités et quotas | Central subscriptions/features/plan_features | Résolution serveur des droits d’usage ; lecture minimale/cache versionné ; aucun compte d’équipe envoyé |
 | Pays, wilayas et communes | Central countries/geographic_areas | Références externes par UUID, validation serveur, snapshots des noms/codes au moment métier |
 | Profil professionnel vendeur | Central users/countries | Lecture minimale et snapshot professionnel versionné, sans duplication des contacts ni partage des credentials |
 | Catalogue commun de livraison | C10 central ; références UUID et snapshots locaux T8/T10/T11/T25 | Aucun accès central aux secrets/tarifs/commandes ; exceptions et bureaux autorisés locaux |
@@ -4835,11 +4794,11 @@ Le middleware auth reconnaît une identité ; can contrôle une capacité Larave
 
 Les Gates de capacité contrôlent une permission nommée ; les Policies contrôlent un objet précis (viewAny, view, create, update, delete, restore). Une Policy de produit vérifie que le modèle est bien issu du contexte tenant actif avant de demander product.edit, puis le service verrouille les invariants. `Gate::authorize('create', Product::class)` concerne une création ; `Gate::authorize('update', $product)` un objet existant.
 
-**Hooks :** un Gate::before retourne false pour un blocage prioritaire, true pour une permission effective autorisée et null pour laisser Spatie/Policy décider. Une autorisation root/ALLOW n’intercepte que les **capacités du catalogue** du bon guard (saas.* au central, capacités locales au tenant), jamais directement les noms d’actions de Policy `update`/`delete`. Ainsi les contrôles d’objet de la Policy s’exécutent toujours. Avant toute exception, compte, appartenance, contexte et DENY sont vérifiés. Ne pas appeler la même Gate via $user->can dans son propre hook ; un service de capacité distinct lit les attributions, les dates et le rôle protégé sans récursion. Un hook global `return true` fondé seulement sur un nom de rôle est exclu. Gate::allowIf/denyIf ne passe pas par ces hooks et n’est pas utilisé pour les contrôles qui en dépendent.
+**Hooks :** les capacités du catalogue sont distinctes des noms génériques d’actions de Policy. Au central, le hook saas.* applique C2.2 ; en boutique, le hook de son catalogue applique T24.1. Chacun vérifie identité et contexte, droit daté ou rôle privilégié protégé, puis ses restrictions propres : une capacité absente/expirée/refusée retourne false sans recours à l’union native non datée. register_permission_check_method=false remplace le callback Spatie par les résolveurs datés de chaque contexte. Une autorisation root/shop-owner n’intercepte jamais les noms de Policy update/delete ; les contrôles d’objet s’exécutent. Ne pas appeler $user->can sur la même Gate dans son propre hook ; utiliser un résolveur distinct sans récursion. Un hook global return true fondé seulement sur un nom de rôle est exclu. Gate::allowIf/denyIf ne passe pas par ces hooks et n’est pas utilisé pour les contrôles qui en dépendent.
 
-**Délégation :** posséder un droit ne suffit pas à pouvoir le donner. Le service revalide acteur, bénéficiaire local, rôle/permission du guard, catalogue attribuable, exceptions prioritaires et protections. Les champs is_super_admin/is_system/is_protected/guard_name/central_user_uuid ne sont pas mass assignables. Il est interdit de créer/renommer un rôle pour se faire passer pour un rôle système ou de distribuer une permission saas.* depuis une boutique. Un utilisateur perdant l’appartenance ne conserve aucun accès effectif malgré ses anciennes attributions ; la révocation explicite et ses effets sur sessions/tokens sont journalisés.
+**Délégation :** posséder un droit ne suffit pas à pouvoir le donner. Le service revalide acteur, bénéficiaire local, rôle/permission du guard, catalogue attribuable, dates actuelles, absence de recoupement et protections. Les champs is_super_admin/is_system/is_protected/guard_name/central_user_uuid ne sont pas mass assignables. Il est interdit de créer/renommer un rôle pour se faire passer pour un rôle système ou de distribuer une permission saas.* depuis une boutique. Un utilisateur perdant l’appartenance ne conserve aucun accès effectif malgré ses anciennes attributions ; la révocation explicite et ses effets sur sessions/tokens sont journalisés.
 
-**Même schéma, limites différentes :** toutes les boutiques reçoivent les mêmes migrations et le même catalogue versionné. Les fonctionnalités `team.custom_roles` et `team.members` de portée tenant portent leurs limites dans plan_features/feature_overrides. Exemple : limite de 2 rôles personnalisés pour une boutique, 5 pour une autre. Les rôles système protégés ne consomment pas ce quota ; un rôle personnalisé existant le consomme même si aucun utilisateur ne l’utilise. Pour changer ce calcul, changer la règle versionnée, pas le schéma.
+**Même schéma, limites différentes :** toutes les boutiques reçoivent les mêmes migrations et le même catalogue versionné. Les fonctionnalités `team.custom_roles` et `team.members` de portée tenant portent leurs limites dans plan_features, dans la version de l’offre applicable. Exemple : limite de 2 rôles personnalisés pour une boutique, 5 pour une autre. Les rôles système protégés ne consomment pas ce quota ; un rôle personnalisé existant le consomme même si aucun utilisateur ne l’utilise. Pour changer ce calcul, changer la règle versionnée, pas le schéma.
 
 Créer un rôle ou réserver une invitation se fait sous verrou de la ligne shop identifiée par singleton=1, sur la connexion tenant. Recontrôler les droits d’usage centraux actuels (ou snapshot versionné encore valide selon la règle de mode dégradé), compter les rôles personnalisés/membres et places d’invitations, puis écrire une fois. Deux requêtes concurrentes ne peuvent dépasser le quota. Une rétrogradation conserve les données et bloque les nouvelles créations au-delà du quota ; elle n’efface pas des employés ou rôles. Suppression/libération de place, acceptation/révocation d’invitation et changement de quota utilisent le même verrou ou protocole coordonné. Si une décision exige des droits d’usage centraux actuels et qu’aucune réponse ou projection encore valide ne permet de les établir, bloquer cette nouvelle action. Les comptes transporteur, tarifs, règles et preuves financières restent locaux ; leur autorisation est évaluée dans la boutique. Le rapprochement des colis déjà envoyés et la clôture des obligations existantes suivent le périmètre local contrôlé de §7.2, sans dépendre d’un courtier central.
 
@@ -4980,8 +4939,8 @@ Le service Valider réalise réservation/transfert et projections dans cette mê
 | Catalogue log_name | Actions à couvrir | Base |
 |---|---|---|
 | auth | connexions, échecs, déconnexion, reset/revocation session, passkey créée/supprimée/utilisée si activée | Identité concernée, centrale ou locale |
-| users / permissions / teams | comptes, invitations, suspensions, rôles, composition de permissions, exceptions, refus de délégation | Central pour administration ; tenant pour équipe |
-| shops / plans / subscriptions | provisioning, slug/domaines, activation, plan et quotas, exceptions, reçus/validation | Central |
+| users / permissions / teams | comptes, invitations, suspensions, rôles, composition/durées, attributions datées, renouvellements, doublons/recoupements/refus de délégation ; restrictions de cibles au central seulement | Central pour administration ; tenant pour équipe |
+| shops / plans / subscriptions | provisioning, slug/domaines, activation, versions d’offres, plan et quotas, reçus/validation | Central |
 | catalog / content / media / settings | catalogue, publication, prix/promotion, variantes, configuration, pièces | BDD du modèle |
 | orders / stock / shipping | checkout soumis, validation par clic, révision, réservations, corrections, retours, événements et intentions transporteur | Tenant |
 | finance / documents | encaissement vérifié, reversement, frais, créances, remboursement, avoir, correction, émission interne boutique ; transmission des seuls documents SaaS centraux | BDD de la preuve concernée |
@@ -5107,7 +5066,7 @@ Les éléments fiscaux sont prévus dès le calcul de la révision et conservés
 
 | Snapshot | Champs obligatoires du format serveur |
 |---|---|
-| seller_snapshot | format_version, owner_uuid, legal_profile_version, legal_name (raison sociale ou nom/prénom résolus), trade_name (nom de boutique), legal_form, activity_nature, nif, nis, registration_number ou artisan_card_number selon régime, legal_address, country_code résolu depuis countries, phone/email du propriétaire, share_capital si applicable, tax_regime |
+| seller_snapshot | format_version, owner_uuid, legal_profile_version, first_name (nullable selon users), last_name, trade_name (nom de boutique résolu depuis tenants.shop_name), legal_form, activity_nature, nif, nis, registration_number ou artisan_card_number selon activité, legal_address, country_code résolu depuis countries, phone/email du propriétaire, share_capital si applicable |
 | client_snapshot | type=particulier au MVP, nom, prénom si renseigné, adresse, country_code, coordonnées nécessaires ; B2B futur exige les identifiants et mentions adaptés |
 | items_snapshot[] | order_item_id, designation, options/personnalisation pertinentes, quantite, net_unit_price, prix_unitaire_ttc, net_discount, total_ht, taxes[], total_taxes, total_ttc, motif_exoneration éventuel |
 | taxes[] | code, nature, base_ht, taux (chaîne décimale), montant ; entrée explicite même si exonération, avec motif applicable |
@@ -5239,7 +5198,7 @@ Créer les index des FK et des contraintes UNIQUE, puis les index de lecture sui
 - expenses(expense_date,product_id), expenses(shipment_id), expenses(return_id).
 - tenant_schema_deployments(tenant_id,created_at), carrier_remittance_batches(carrier_account_id,status,received_at), remittance_statements(carrier_remittance_batch_id,status).
 
-Index complémentaires : tenants(user_id,deleted_at,status), permission_overrides(user_id,status,expires_at), feature_overrides(user_id,feature_id,tenant_id,started_at), order_incidents(order_id,status), orders(original_incident_id,commercial_status), customer_adjustments(incident_id,status), orders(confirmed_revision_id), shipment_events(shipment_id,occurred_at), et payload_expires_at sur les diagnostics purgés. Valider la longueur des clés composées de plusieurs VARCHAR avant migration ; les empreintes et UUID ont des types fixes.
+Index complémentaires : tenants(user_id,deleted_at,status), order_incidents(order_id,status), orders(original_incident_id,commercial_status), customer_adjustments(incident_id,status), orders(confirmed_revision_id), shipment_events(shipment_id,occurred_at), et payload_expires_at sur les diagnostics purgés. Dans chaque BDD, UNIQUE(name,guard_name), UNIQUE(guard_name,permission_signature), PK des pivots et index (model_id,model_type) couvrent les recherches d’attribution ; réutiliser leurs préfixes avant tout index complémentaire. Valider la longueur des clés composées de plusieurs VARCHAR avant migration ; les empreintes et UUID ont des types fixes.
 
 Index complémentaires métier : order_incident_details(incident_id), billing_obligations(status,next_attempt_at), carrier_receivables(provider_id,status,remaining_amount), carrier_settlement_lines(record_type,receivable_id,performed_at), commercial_corrections(status,effective_at), commercial_correction_lines(order_item_id), carrier_operations(request_expires_at), activity_log(log_name,performed_at,id), saas_invoices(user_id,document_type,issued_at,id), saas_invoice_lines(document_id,line_number), subscriptions(record_type,user_id,status), subscriptions(parent_subscription_id,installment_status,due_at), geographic_areas(country_id,type,parent_id,is_active), saas_transfers(user_id,record_type,transfer_status,created_at,id), saas_transfers(document_id,record_type,transfer_status,id), saas_document_deliveries(delivery_status,next_attempt_at,id), billing_rules(record_type,code,policy_status,effective_at), saas_billing_settings(code,policy_status,effective_at), shipping_rates(record_type,carrier_account_id,is_active,starts_at).
 
@@ -5344,8 +5303,8 @@ Confirmer les index avec EXPLAIN sur données représentatives. Pour reconstitue
 | Correction précédente avec colis réellement remis / état distant incompatible / solde intermédiaire impossible | Rejet entier ; vraie réception via retour/quarantaine, aucune réservation terminale réactivée |
 | Avis lié à une ligne d’un autre produit | Refus SQL ; preuve d’identité toujours contrôlée en plus |
 | Rôle et permission de guards incompatibles | Refus service/contrôle SQL ; guard parent immuable, aucune capacité saas.* au tenant |
-| Exception permission ciblant un compte ou une permission du mauvais contexte/guard | Refus sans chargement inter-BDD ; exception reste locale et DENY prioritaire |
-| Admin tente une exception qu’il ne peut déléguer, y compris pour lui-même | Refus |
+| Attribution de rôle/droit ciblant un compte ou une permission du mauvais contexte/guard | Refus sans chargement inter-BDD ; dates et attributions restent dans leur BDD |
+| Administrateur/employé tente une attribution datée qu’il ne peut déléguer, y compris pour lui-même | Refus dans la BDD concernée |
 | Même creation_key pour deux propriétaires | Deux demandes permises ; même propriétaire/autre hash=409 |
 | Payload transporteur expiré | Coordonnées chiffrées effacées, références/empreinte/résultat conservés ; pas de retry aveugle |
 | Même nom média dans A et B | Clés physiques distinctes ; accès privé croisé refusé |
@@ -5392,12 +5351,12 @@ Ces scénarios sont des critères à implémenter sur MySQL réel, avec connexio
 
 ### 13.1 Enveloppe de capacité multi-BDD — AUD-17
 
-Le choix « une BDD par boutique » est conservé. Avec **60 tables par boutique dans cette version V4.8**, sans table réservée au thème futur et hors tables techniques Laravel/passkeys, le décompte documentaire est le suivant :
+Le choix « une BDD par boutique » est conservé. Avec **59 tables par boutique dans cette version V4.9**, sans table réservée au thème futur et hors tables techniques Laravel/passkeys, le décompte documentaire est le suivant :
 
-- 100 boutiques ≈ 6 000 tables tenant ;
-- 500 boutiques ≈ 30 000 tables tenant ;
-- 2 000 boutiques ≈ 120 000 tables tenant ;
-- 5 000 boutiques ≈ 300 000 tables tenant.
+- 100 boutiques ≈ 5 900 tables tenant ;
+- 500 boutiques ≈ 29 500 tables tenant ;
+- 2 000 boutiques ≈ 118 000 tables tenant ;
+- 5 000 boutiques ≈ 295 000 tables tenant.
 
 Ces nombres ne constituent pas une limite MySQL. Ce sont des paliers de benchmark avant d’annoncer une capacité commerciale. Mesurer temps de provisioning, migration de tous les tenants, fenêtre de déploiement, CPU/RAM, connexions, workers/jobs, métadonnées InnoDB et reprise d’une étape technique en échec.
 
@@ -5411,7 +5370,7 @@ L’architecture actuelle `carrier_operations`/`carrier_operation_attempts` est 
 
 ## 14. Traçabilité des notes professionnelles et corrections intégrées en V3.2
 
-**Historique V3–V4.7 :** les décisions ci-dessous décrivent leurs versions d’origine. Lorsqu’elles diffèrent de V4.8 (registre, préférences, caractéristiques, échange payé, localisation des bureaux/codes), la décision active est celle des sections 1–13 et de la traçabilité V4.8 ci-dessous. Ces mentions ne recréent aucune table retirée.
+**Historique V3–V4.8 :** les décisions ci-dessous décrivent leurs versions d’origine. Lorsqu’elles diffèrent de V4.9 (notamment exceptions centrales, identité et durées, ou retraits locaux antérieurs), la décision active est celle des sections 1–13 et des traçabilités V4.8/V4.9 ci-dessous. Ces mentions ne recréent aucune table retirée.
 
 La ressource présente dans le dépôt est « les derniere modiff toujour les notes.docx ». Ses premiers paragraphes utilisent aussi DB-11 à DB-15 et PRIV-01, alors que les développements sont numérotés DB-1 à DB-5 et F1 à F15 : la correspondance ci-dessous suit le contenu. Le tableau conserve la traçabilité historique ; les décisions du jour 4 remplacent les architectures retirées.
 
@@ -5496,7 +5455,7 @@ Les anciennes tables d’attribution maison, l’appartenance centrale d’équi
 2. Root central/IT ne peut ni s’authentifier dans un tenant ni modifier un collaborateur ; shop-owner n’obtient aucune capacité saas.*.
 3. Créer/synchroniser des rôles et permissions utilise les cinq tables Spatie, leurs PK/FK numériques et le guard autorisé ; tentative de rôle protégé ou de mauvais guard refusée, y compris accès SQL direct contrôlé.
 4. Deux créations de rôles simultanées au dernier emplacement du quota (2/5) donnent une seule création supplémentaire ; invitation expirée/révoquée et rôle modifié sont revalidés à l’acceptation.
-5. Une suspension, un DENY temporaire et une révocation pendant l’attente d’un job bloquent l’action locale ; l’expiration et la levée contrôlée restaurent seulement les droits actuels.
+5. Une suspension, une permission expirée ou une révocation pendant l’attente d’un job bloquent l’action locale ; une réactivation ne renouvelle aucune date et restaure seulement les droits encore valides.
 6. Route/API/export/activité ne révèle aucun id ou FK numérique, y compris dans propriétés JSON ; UUID d’une autre boutique refusé avant mutation.
 7. slug valide résout son domaine ; collision/noms réservés refusés ; changement du nom conserve l’adresse ; changement de slug garde tenant UUID, BDD, propriétaire et préfixe documentaire.
 8. Chaque état interne accepte uniquement les codes de son enum ; statuts bruts externes inconnus restent des chaînes sans transition fictive ; CHECK de mode home/pickup fonctionne avec 1/2.
@@ -5721,7 +5680,7 @@ La boutique passe de 77 à **68 tables**, en gardant les fonctions validées en 
 | `billing_rules`, `billing_obligations`, `sales_terms_acceptances` | Conserver : règle/compteur déjà regroupés, intention d’émission et conditions réellement acceptées ne sont pas des factures ni un accord téléphonique. |
 | `exchange_offsets`, `commercial_corrections`, `commercial_correction_lines` | Conserver : affectation d’avoir, correction commerciale et quantités de plusieurs articles ont des invariants propres. |
 | `users`, `team_invitations`, `contact_verifications` | Conserver : compte durable, invitation et secret temporaire de vérification ; messages d’accès autorisés. |
-| `permissions`, `roles`, `role_has_permissions`, `model_has_roles`, `model_has_permissions`, `permission_overrides` | Conserver : cinq tables natives Spatie et exception locale ; compatibilité des guards, droits et quotas indépendants. |
+| `permissions`, `roles`, `role_has_permissions`, `model_has_roles`, `model_has_permissions` | Conserver les cinq tables Spatie ; V4.9 retire l’exception locale et ajoute les durées/contrôles dans les attributions existantes, avec guards et quotas indépendants. |
 | `activity_log`, `processing_activity_register` | Conserver : faits d’audit multiples et registre descriptif des traitements ; ni journal de stock ni historique de préférences remplacés. |
 
 **Fonctions conservées et contrôle des familles :** profil public multi-adresses/multi-liens et contenu, catalogue/choix/variantes/galeries, caractéristiques/étiquettes, promotions/avis, panier invité/texte libre, quatre sources de statistiques globales avec historique des choix, validation par clic/audit/rappels/révisions, contrôle opérationnel, stock/retours/inspection, incidents et budgets de remèdes, APIs/tarifs/desks, encaissements/versements/frais/créances/indemnités, dépenses/remboursements, bons/factures/avoirs/obligations/compteurs/règles, comptes locaux/droits/invitations/vérifications, audit/conditions/registre. Les cinq tables natives Spatie Permission restent séparées. Les historiques, lignes commerciales, sources fiscales et écritures financières gardent leurs rôles distincts ; aucune fusion ne transforme l’audit en stock ou un versement en vente.
@@ -5763,13 +5722,46 @@ Déduire provider_id et shipment_id uniquement des parents métier déjà liés 
 | Factures/avoirs, remboursements payés et corrections économiques | Boutique, faits/pièces/encaissements réels distincts |
 | Audit | Journal de la BDD qui exécute l’action ; secrets filtrés, références publiques seulement entre bases |
 
-**Retraits et correspondances :** tags est fusionnée dans categories ; attributes/product_attributes, visitor_preferences, processing_activity_register et exchange_offsets sont retirées du périmètre. Aucun remplacement caché pour préférences ou registre. La description et les champs directs conservés suffisent aux informations produit prévues ; les options vendables restent inchangées. Les anciennes carrier_geo_mappings/pickup_points locales deviennent des références au catalogue central et seules les exceptions réellement privées restent locales. Le code OrderTypeEnum 3 EXCHANGE et AmountKindEnum 4 EXCHANGE_DIFFERENCE sont retirés sans réattribution ; RESEND_UNPAID reçoit 4. Les mécanismes de paiements/remboursements SaaS centraux et leurs 27 tables d’origine restent inchangés.
+**Retraits et correspondances :** tags est fusionnée dans categories ; attributes/product_attributes, visitor_preferences, processing_activity_register et exchange_offsets sont retirées du périmètre. Aucun remplacement caché pour préférences ou registre. La description et les champs directs conservés suffisent aux informations produit prévues ; les options vendables restent inchangées. Les anciennes carrier_geo_mappings/pickup_points locales deviennent des références au catalogue central et seules les exceptions réellement privées restent locales. Le code OrderTypeEnum 3 EXCHANGE et AmountKindEnum 4 EXCHANGE_DIFFERENCE sont retirés sans réattribution ; RESEND_UNPAID reçoit 4. La V4.8 conservait les 27 tables centrales d’origine. V4.9 adapte C1–C4 ; les cinq tables de facturation et les mécanismes de paiements/remboursements SaaS restent inchangés.
 
 **Préparation de migration, aucune exécution ici :** analyser les données réellement présentes avant bascule. Pour tags → categories, conserver UUID/name/slug/dates/deleted_at avec record_type=2 ; les catégories antérieures reçoivent 1. Réallouer les PK numériques si elles entrent en collision, réécrire product_tags et les morphs tag selon une correspondance vérifiée, conserver les signatures/options/produits et imposer les FK typées. Aucun tag ne devient un produit. Pour références de livraison, rapprocher par réseau officiel/code externe/zone, pas par nom approximatif ; les divergences non vérifiées restent bloquées. Conserver les UUID centraux stables, traduire les anciens pickup_point_id locaux en pickup_point_uuid, et figer les anciens snapshots avant tout retrait. Les désactivations commerçant deviennent disabled_pickup_point_uuids ou ALLOWLIST ; ne pas fusionner les contrats/secrets/tarifs privés. Les comptes transporteur gardent leurs UUID et clés locales ; carrier_uuid provient du réseau identifié, aucune identité ne se devine.
 
 Si des écritures de l’ancien échange payé existent, archiver/réconcilier leurs avoirs, remboursements, affectations et COD avant retrait ; ne jamais les convertir en impayé ni effacer leurs pièces/audits. Aucun crédit payé n’est simplement réduit à 0 et aucun ancien code d’enum n’est réutilisé. Les caractéristiques/preferences/registres déjà présents exigent une décision explicite de conservation documentaire/export si nécessaire avant une suppression physique future ; ce document ne lance aucune suppression. Les anciennes activités/morphs disposent d’une correspondance historique sans rendre les modèles retirés créables. Vérifier commandes/revisions/colis, unicités, budgets, médias/PDF, réservations et projections de stock après toute migration. Conserver les règles de contrepassation exactes, reçus privés, remboursements réels, manquants et plafonds issus des notes professionnelles.
 
 **Sources de décision :** demandes confirmées dans la conversation, truc.txt, notes du dépôt, recherches Laravel/Spatie et historique complet disponible (37 commits jusqu’à 374bbac). Les notes historiques ne remplacent pas les derniers choix métier explicites. Les diagrammes et glossaires décrivent seulement la version active. Aucune migration/application n’est créée ou exécutée.
+
+### Traçabilité V4.9 — identités et permissions dans les deux contextes
+
+Décisions confirmées : first_name/last_name pour les personnes centrales et locales, tenants.shop_name pour chaque boutique et shop.shop_name pour sa projection ; retrait de legal_name/tax_regime du profil central courant et des nouveaux formats de snapshot ; retrait de feature_overrides au central et de permission_overrides au central et dans chaque boutique. Les quotas viennent de l’offre et plan_features. Les cinq tables Spatie sont conservées dans chaque BDD ; admin_restrictions reste uniquement centrale. Durées par permission de rôle, 9999 jours par défaut et au maximum ; noms uniques ; compositions identiques en permissions/durées refusées ; plusieurs rôles par compte sans aucune permission commune. La fin est calculée depuis la date d’attribution propre à cette personne. Aucun registre d’exceptions caché ni nouvelle table n’est ajouté.
+
+**Portée et compatibilité :** la dernière instruction étend les règles aux boutiques. La BDD centrale passe de 30 à 28 tables, 464 champs ; chaque boutique passe de 60 à 59 tables, 1005 champs. users, roles et les trois pivots sont adaptés dans chaque contexte ; shop.name devient shop.shop_name sans créer une seconde source publique. Les autres définitions sont conservées. Toutes les boutiques gardent le même schéma, mais leurs rôles/permissions/dates sont indépendants ; les noms/compositions identiques entre BDD sont permis. Les invitations commencent les durées à leur acceptation, conservent un début existant et refusent les recoupements. Identifiants/UUID, guards, audit, propriété, quotas, facturation, stock et référentiels publics gardent leurs protections. PermissionEffectEnum est retiré du catalogue actif ; OverrideStatusEnum reste utilisé par admin_restrictions.
+
+**Préparation future, aucune migration exécutée :** si des données existent dans chaque BDD, établir le sens réel de l’ancien users.name avant sa correspondance vers last_name ; ne pas découper arbitrairement un nom complet. Conserver first_name et les noms publics des boutiques ; shop.name est renommé en shop_name sans changer sa valeur. Ne pas réécrire anciens snapshots/PDF/audits. Pour les attributions, récupérer les dates réelles prouvées ; une date inconnue bloque la bascule jusqu’à une décision explicite, sans prolonger un droit par la date d’import. Calculer signatures, contrôler noms/compositions/recoupements et résoudre les conflits avant UNIQUE/CHECK. Ne pas convertir une ancienne permission temporaire en 9999 jours : reconstruire une composition/durée/datation équivalente quand cela est possible, sinon signaler le cas sans élargir le droit. Une ancienne interdiction exige une décision explicite de retrait/remplacement du droit/rôle ; au central seulement, une restriction de cible compatible peut conserver son sens ; elle n’est pas convertie en autorisation. Les exceptions de quota requièrent une offre/version adaptée et une souscription cohérente. Archiver les décisions remplacées et leurs audits ; aucune suppression physique de donnée ne découle de ces documents.
+
+**Scénarios de conception à vérifier au développement :**
+
+| Cas | Résultat attendu |
+|---|---|
+| Durée non renseignée, centrale ou locale | 9999 jours ; début serveur enregistré lors de l’attribution |
+| Durée 0, négative, 10000 ou NULL | Refus du validateur et du CHECK central |
+| Permission à son instant exact d’expiration, cron arrêté/cache présent | Refus immédiat ; les autres permissions du rôle encore valides restent disponibles |
+| Même rôle attribué à A puis à B à des dates différentes | Deux débuts propres et fins calculées séparément |
+| Deux rôles de même nom, permissions différentes | Refus UNIQUE(name,guard_name) |
+| Noms différents, mêmes permissions/durées dans un autre ordre | Même signature canonique ; seconde création refusée, y compris en concurrence |
+| Même ensemble de permissions, une durée différente | Composition différente possible sous un nom distinct |
+| Deux rôles sans permission commune pour un compte | Attribution permise, durées propres à chaque rôle |
+| Deux rôles avec une permission commune, même si elle a expiré dans l’un | Refus ; retrait/remplacement explicite avant attribution |
+| Droit direct et rôle accordant la même permission | Refus, sans règle prioritaire |
+| Ajout de permission à un rôle utilisé créant un doublon chez un bénéficiaire | Modification entière refusée ; version/signature/pivots/audit de succès inchangés |
+| Attribution identique rejouée | Aucun nouveau début ni prolongation implicite |
+| Durée du rôle modifiée | Date initiale conservée ; tous les bénéficiaires concernés revalidés et impact audité |
+| Renouvellement explicitement demandé et retry | Nouveau début une seule fois ; toutes les durées de ce rôle relancées, motif et audit conservés |
+| Root ou shop-owner reçoit un rôle/droit direct supplémentaire dans sa BDD | Refus ; le rôle privilégié demeure unique et protégé |
+| Offre particulière demandée pour un commerçant | Nouveau plan/version et plan_features ; aucune feature_overrides centrale |
+| Modification du prénom/nom ou nom public de boutique | Identité personnelle dans sa BDD ; nom public central projeté vers shop.shop_name ; pièces déjà émises immuables |
+
+
+Les scénarios d’invitation, réactivation, concurrence et isolation propres aux boutiques sont détaillés en T24.1 ; les contrôles temporels et la protection des callbacks Spatie sont requis dans les deux modèles utilisateurs.
 
 ## 15. Ordre de mise en œuvre
 
@@ -5785,6 +5777,8 @@ Si des écritures de l’ancien échange payé existent, archiver/réconcilier l
 | Évolution | Personnalisation avancée, agrégats après mesure ; pas de sharding/microservices requis |
 
 ## 16. Sources et limites
+
+Les décisions V4.9 confirmées dans la conversation du 5 octobre 2026, puis étendues explicitement aux boutiques, prévalent sur les anciennes notes pour identités, exceptions, durées et recoupements. Les adaptations du projet sont documentées en C2.1/C2.2/T24.1 ; les recherches originales restent inchangées.
 
 **Sources de cette révision, par ordre de priorité :** les instructions explicites du propriétaire du projet du 30 septembre 2026 sur les fusions centrales, le retrait du module de rétention et les remboursements à distance, complétées par sa demande actuelle d’optimiser saas_invoices avec plusieurs tables en nombre limité, fixent la V4.5. Les versions principales V4.2/V4.3 et [les consignes du jour 4](<les modiff a efectuer le jours 4.txt>), [les notes de suivi](<les note pendans le suivie.txt>), [la précédente liste](<les truc a modifier .txt.txt>) restent les ressources métier. [Documentation Laravel/Spatie/Passkeys](Documentation-Laravel-Spatie-Permissions-Passkeys.md), [Recherche Activity Log](Recherche_complete_Spatie_Laravel_Activity_Log.md), [last one notes](<last one notes.md>), [premières remarques](<les notes et remarque deja apliquer pour ameliorer le premiere version du shema.docx>), [notes v2](<note et machin v2.docx>), [dernières notes](<les derniere modiff toujour les notes.docx>) et [bugs complémentaires](<des bug et des truc encore.docx>) conservent leur rôle de préparation. Aucune de ces dix ressources n’est modifiée. Les décisions remplacées sont signalées dans la traçabilité, notamment AUD-16 : les remboursements SaaS sont désormais suivis dans saas_transfers, bien que leur exécution bancaire reste manuelle.
 
@@ -5823,7 +5817,7 @@ Les noms/adaptations et décisions de connexion/quota/délégation, ainsi que le
 
 ## Annexe Inventaire complet
 
-### BDD centrale — 30 tables
+### BDD centrale — 28 tables
 
 1. `countries`
 2. `users`
@@ -5836,27 +5830,25 @@ Les noms/adaptations et décisions de connexion/quota/délégation, ainsi que le
 9. `role_has_permissions`
 10. `model_has_roles`
 11. `model_has_permissions`
-12. `permission_overrides`
-13. `admin_restrictions`
-14. `plans`
-15. `plan_features`
-16. `subscriptions`
-17. `feature_overrides`
-18. `feature_usage`
-19. `geographic_areas`
-20. `activity_log`
-21. `tenant_schema_deployments`
-22. `saas_invoices`
-23. `saas_invoice_lines`
-24. `saas_billing_settings`
-25. `saas_document_deliveries`
-26. `saas_transfers`
-27. `media`
-28. `shipping_carriers`
-29. `carrier_geo_mappings`
-30. `pickup_points`
+12. `admin_restrictions`
+13. `plans`
+14. `plan_features`
+15. `subscriptions`
+16. `feature_usage`
+17. `geographic_areas`
+18. `activity_log`
+19. `tenant_schema_deployments`
+20. `saas_invoices`
+21. `saas_invoice_lines`
+22. `saas_billing_settings`
+23. `saas_document_deliveries`
+24. `saas_transfers`
+25. `media`
+26. `shipping_carriers`
+27. `carrier_geo_mappings`
+28. `pickup_points`
 
-### BDD boutique — 60 tables
+### BDD boutique — 59 tables
 
 1. `shop`
 2. `shop_addresses`
@@ -5913,8 +5905,7 @@ Les noms/adaptations et décisions de connexion/quota/délégation, ainsi que le
 53. `role_has_permissions`
 54. `model_has_roles`
 55. `model_has_permissions`
-56. `permission_overrides`
-57. `team_invitations`
-58. `contact_verifications`
-59. `carrier_accounts`
-60. `carrier_remittance_batches`
+56. `team_invitations`
+57. `contact_verifications`
+58. `carrier_accounts`
+59. `carrier_remittance_batches`
