@@ -84,7 +84,7 @@ Cet extrait illustre les types ; il ne remplace pas les autres champs/contrainte
 - Pays historiques : CHAR(2) ISO ; devise CHAR(3) ISO ; couleur CHAR(7) ; SHA-256 CHAR(64) ASCII. country_code reste conservé dans les snapshots juridiques/commerciaux, indépendamment de users.country_id.
 - Argent : DECIMAL(14,2), aucun flottant ; dimensions/poids selon échelle appropriée ; decimal_geo=DECIMAL(10,7).
 - datetime=DATETIME(6) UTC ; date reste un jour civil ; statistiques calendaires en Africa/Algiers avec bornes converties en UTC. Les instants et jours ne sont pas confondus.
-- nullable signifie facultatif ; autres champs requis sauf phase transactionnelle explicitement documentée. PK=clé primaire ; FK=référence locale ; UK=unicité simple ; PK répétée signifie clé composite.
+- nullable signifie que NULL est autorisé dans les cas prévus ; cela ne rend pas le champ facultatif dans tous les états ou types de ligne. Un champ nullable peut devenir obligatoire après validation, émission, paiement ou pour une nature précise ; les règles de forme/phase l'imposent. Les autres champs sont requis sauf phase transactionnelle explicitement documentée. PK=clé primaire ; FK=référence locale ; UK=unicité simple ; PK répétée signifie clé composite.
 - Les champs, diagrammes et contraintes forment ensemble la spécification. Les colonnes générées utilisées par les unicités sont définies dans le texte et réalisées dans les migrations. Aucun CHECK ne garantit à lui seul une somme entre tables.
 - Sessions, cache, jobs, migrations, reset de mot de passe et stockage optionnel de passkeys suivent les migrations techniques réellement installées ; leurs tokens opaques ne deviennent pas des UUID métier.
 
@@ -1059,8 +1059,8 @@ erDiagram
         tinyint_unsigned subscription_record_type "generated STORED ; 1"
         tinyint_unsigned installment_record_type "generated STORED ; 2"
         tinyint_unsigned billing_rule_record_type "generated STORED ; 2"
-        tinyint_unsigned original_invoice_document_type "generated STORED ; 1 si original_invoice_id non NULL"
-        tinyint_unsigned sequence_record_type "generated STORED ; 1 si sequence_id non NULL"
+        tinyint_unsigned original_invoice_document_type "generated STORED ; nullable ; 1 si original_invoice_id non NULL, sinon NULL"
+        tinyint_unsigned sequence_record_type "generated STORED ; nullable ; 1 si sequence_id non NULL, sinon NULL"
         json billing_rule_snapshot "regle appliquee figee"
         int fiscal_year "nullable avant reservation"
         bigint sequence_number "nullable avant reservation"
@@ -1094,7 +1094,7 @@ erDiagram
         bigint_unsigned original_invoice_id FK "nullable facture ; requis ligne avoir ; saas_invoices.id"
         bigint_unsigned original_invoice_line_id FK "nullable facture ; requis ligne avoir ; saas_invoice_lines.id"
         tinyint_unsigned document_type "DocumentTypeEnum ; 1/2 ; identique au parent ; serveur"
-        tinyint_unsigned original_line_document_type "generated STORED ; 1 si original_invoice_line_id non NULL"
+        tinyint_unsigned original_line_document_type "generated STORED ; nullable ; 1 si original_invoice_line_id non NULL, sinon NULL"
         int line_number
         varchar description
         decimal quantity "strictement positive"
@@ -1178,8 +1178,8 @@ erDiagram
         bigint_unsigned reversal_of_id FK "nullable ; saas_transfers.id ; inverse exact"
         tinyint_unsigned record_type "SaasTransferRecordTypeEnum ; 1 PAYMENT / 2 REFUND"
         tinyint_unsigned document_type "generated STORED ; 1"
-        tinyint_unsigned original_payment_record_type "generated STORED ; 1 si original_payment_id non NULL"
-        tinyint_unsigned credit_note_document_type "generated STORED ; 2 si credit_note_id non NULL"
+        tinyint_unsigned original_payment_record_type "generated STORED ; nullable ; 1 si original_payment_id non NULL, sinon NULL"
+        tinyint_unsigned credit_note_document_type "generated STORED ; nullable ; 2 si credit_note_id non NULL, sinon NULL"
         tinyint_unsigned transfer_method "SaasTransferMethodEnum"
         tinyint_unsigned transfer_status "SaasTransferStatusEnum"
         tinyint_unsigned refund_reason "nullable paiement ; SaasRefundReasonEnum"
@@ -1189,7 +1189,7 @@ erDiagram
         varchar(191) transfer_reference "nullable avant verification"
         varchar(64) financial_account_key "nullable avant verification ; alias compte SaaS"
         char(64) transaction_fingerprint "nullable avant verification ; transaction normalisee"
-        char(64) active_transaction_fingerprint UK "generated STORED ; VERIFIED sans reversal_of_id"
+        char(64) active_transaction_fingerprint UK "generated STORED ; nullable ; VERIFIED sans reversal_of_id, sinon NULL"
         text encrypted_transfer_details "nullable ; donnees bancaires minimales chiffrees"
         datetime occurred_at "nullable avant preuve ; date du transfert reel"
         datetime sending_started_at "nullable ; remboursement reel seulement"
@@ -3822,7 +3822,7 @@ erDiagram
         bigint_unsigned issued_by_id FK "nullable ; users.id"
         bigint_unsigned incident_id FK "nullable ; order_incidents.id"
         tinyint_unsigned document_type "DocumentTypeEnum"
-        tinyint_unsigned sequence_record_type "generated STORED ; 1 si sequence_id non NULL"
+        tinyint_unsigned sequence_record_type "generated STORED ; nullable ; 1 si sequence_id non NULL, sinon NULL"
         int fiscal_year "nullable avant réservation ; exercice du compteur"
         bigint sequence_number "nullable before emission"
         int snapshot_format_version

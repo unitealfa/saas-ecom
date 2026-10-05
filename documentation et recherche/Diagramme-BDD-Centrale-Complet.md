@@ -41,6 +41,8 @@ Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md),
 
 **Lecture :** PK = clé primaire ; FK = lien SQL dans cette même BDD ; UK = unicité ; REF = référence UUID externe, sans FK entre bases. u64 = BIGINT UNSIGNED ; u8 = TINYINT UNSIGNED ; « ? » = champ pouvant être NULL selon sa phase/type. Identifiants d’abord, FK/références ensuite, autres champs après. Les pivots Spatie gardent leurs clés composites natives, sans id/uuid inventés.
 
+**Un « ? » ne signifie pas « toujours facultatif » :** une date de validation peut être vide avant validation, mais devient obligatoire après ; les champs d'abonnement/échéance dépendent du type de ligne, et un avoir exige sa facture d'origine. Les règles du schéma imposent ces obligations. Les colonnes calculées sont remplies par la BDD, sans saisie utilisateur.
+
 Les 69 liens FK couvrent toutes les colonnes marquées FK. Les 31 liens POLY sont conditionnels : subject_type, causer_type ou model_type choisissent un modèle explicitement autorisé ; aucune FK SQL universelle n’est créée. Les traits pleins participent à la PK ; les autres sont pointillés. Les FK composites, types, phases, plafonds et transactions restent obligatoires selon le schéma principal, même si le dessin montre chaque colonne séparément.
 
 Les comptes et pivots utilisent central_user ; les comptes employés restent locaux. Les sujets du nouveau catalogue sont audités au central ; les décisions privées de boutique sont auditées localement. Les PDF fiscaux et preuves de virements restent dans media, avec leurs parents typés et contrôles de §7.6. Aucun bureau central ne contient les clés API, clients ou tarifs privés d’une boutique.
@@ -63,9 +65,9 @@ countries {
 
 users {
   u64 id PK
+  uuid uuid UK
   u64 country_id FK
   u64 legal_verified_by_id FK "?"
-  uuid uuid UK
   varchar email UK
   varchar name
   varchar first_name "?"
@@ -98,8 +100,8 @@ users {
 
 tenants {
   u64 id PK
-  u64 user_id FK
   uuid uuid UK
+  u64 user_id FK
   varchar(63) slug UK
   varchar(32) document_prefix UK
   varchar internal_label
@@ -121,8 +123,8 @@ tenants {
 
 domains {
   u64 id PK
-  u64 tenant_id FK
   uuid uuid UK
+  u64 tenant_id FK
   varchar(253) domain UK
   u8 type
   boolean is_primary
@@ -136,8 +138,8 @@ domains {
 
 contact_verifications {
   u64 id PK
-  u64 user_id FK
   uuid uuid UK
+  u64 user_id FK
   u8 channel
   varchar normalized_destination
   varchar code_hash
@@ -208,10 +210,10 @@ model_has_permissions {
 
 permission_overrides {
   u64 id PK
+  uuid uuid UK
   u64 user_id FK
   u64 permission_id FK
   u64 assigned_by_id FK
-  uuid uuid UK
   u8 effect
   u8 status
   datetime started_at
@@ -226,13 +228,13 @@ permission_overrides {
 
 admin_restrictions {
   u64 id PK
+  uuid uuid UK
   u64 admin_id FK
   u64 permission_id FK
   u64 target_tenant_id FK "?"
   u64 target_user_id FK "?"
   u64 target_role_id FK "?"
   u64 created_by_id FK
-  uuid uuid UK
   u8 effect
   u8 status
   datetime started_at
@@ -263,9 +265,9 @@ plans {
 
 plan_features {
   u64 id PK
+  uuid uuid UK
   u64 plan_id FK
   u64 feature_id FK
-  uuid uuid UK
   boolean is_active
   bigint limit "?"
   datetime created_at
@@ -274,12 +276,12 @@ plan_features {
 
 subscriptions {
   u64 id PK
+  uuid uuid UK
   u64 user_id FK
   u64 parent_subscription_id FK "?"
   u64 tenant_id FK "?"
   u64 plan_id FK "?"
   u64 assigned_by_id FK "?"
-  uuid uuid UK
   varchar(191) installment_number UK "?"
   varchar(191) operation_key UK
   u8 record_type
@@ -303,11 +305,11 @@ subscriptions {
 
 feature_overrides {
   u64 id PK
+  uuid uuid UK
   u64 user_id FK
   u64 tenant_id FK "?"
   u64 feature_id FK
   u64 assigned_by_id FK
-  uuid uuid UK
   boolean is_active
   bigint limit "?"
   datetime started_at
@@ -319,10 +321,10 @@ feature_overrides {
 
 feature_usage {
   u64 id PK
+  uuid uuid UK
   u64 user_id FK
   u64 tenant_id FK "?"
   u64 feature_id FK
-  uuid uuid UK
   datetime period_starts_at
   datetime period_ends_at "?"
   bigint quantity
@@ -332,9 +334,9 @@ feature_usage {
 
 geographic_areas {
   u64 id PK
+  uuid uuid UK
   u64 country_id FK
   u64 parent_id FK "?"
-  uuid uuid UK
   u8 type
   u8 parent_type "?"
   u64 parent_key
@@ -352,8 +354,8 @@ geographic_areas {
 
 activity_log {
   u64 id PK
-  u64 tenant_id FK "?"
   uuid uuid UK
+  u64 tenant_id FK "?"
   varchar(191) operation_key UK "?"
   u64 subject_id "?"
   u64 causer_id "?"
@@ -372,8 +374,8 @@ activity_log {
 
 tenant_schema_deployments {
   u64 id PK
-  u64 tenant_id FK
   uuid uuid UK
+  u64 tenant_id FK
   varchar source_version "?"
   varchar target_version
   u8 operation
@@ -392,6 +394,7 @@ tenant_schema_deployments {
 
 saas_invoices {
   u64 id PK
+  uuid uuid UK
   u64 user_id FK
   u64 subscription_id FK
   u64 installment_id FK
@@ -399,15 +402,14 @@ saas_invoices {
   u64 original_invoice_id FK "?"
   u64 sequence_id FK "?"
   u64 document_media_id FK "?"
-  uuid uuid UK
   varchar(191) number UK "?"
   varchar(191) operation_key UK
   u8 document_type
   u8 subscription_record_type
   u8 installment_record_type
   u8 billing_rule_record_type
-  u8 original_invoice_document_type
-  u8 sequence_record_type
+  u8 original_invoice_document_type "?"
+  u8 sequence_record_type "?"
   json billing_rule_snapshot
   int fiscal_year "?"
   bigint sequence_number "?"
@@ -433,14 +435,14 @@ saas_invoices {
 
 saas_invoice_lines {
   u64 id PK
+  uuid uuid UK
   u64 document_id FK
   u64 user_id FK
   u64 original_invoice_id FK "?"
   u64 original_invoice_line_id FK "?"
-  uuid uuid UK
   varchar(191) operation_key UK
   u8 document_type
-  u8 original_line_document_type
+  u8 original_line_document_type "?"
   int line_number
   varchar description
   decimal quantity
@@ -458,9 +460,9 @@ saas_invoice_lines {
 
 saas_billing_settings {
   u64 id PK
+  uuid uuid UK
   u64 created_by_id FK "?"
   u64 validated_by_id FK "?"
-  uuid uuid UK
   varchar(191) operation_key UK
   u8 record_type
   u8 document_type "?"
@@ -485,11 +487,11 @@ saas_billing_settings {
 
 saas_document_deliveries {
   u64 id PK
+  uuid uuid UK
   u64 user_id FK
   u64 document_id FK
   u64 created_by_id FK "?"
   u64 proof_media_id FK "?"
-  uuid uuid UK
   varchar(191) operation_key UK
   u8 document_type
   u8 channel
@@ -510,6 +512,7 @@ saas_document_deliveries {
 
 saas_transfers {
   u64 id PK
+  uuid uuid UK
   u64 user_id FK
   u64 document_id FK
   u64 original_payment_id FK "?"
@@ -520,13 +523,12 @@ saas_transfers {
   u64 validated_by_id FK "?"
   u64 performed_by_id FK "?"
   u64 reversal_of_id FK "?"
-  uuid uuid UK
-  char(64) active_transaction_fingerprint UK
+  char(64) active_transaction_fingerprint UK "?"
   varchar(191) operation_key UK
   u8 record_type
   u8 document_type
-  u8 original_payment_record_type
-  u8 credit_note_document_type
+  u8 original_payment_record_type "?"
+  u8 credit_note_document_type "?"
   u8 transfer_method
   u8 transfer_status
   u8 refund_reason "?"
@@ -548,8 +550,8 @@ saas_transfers {
 
 media {
   u64 id PK
-  u64 created_by_id FK "?"
   uuid uuid UK
+  u64 created_by_id FK "?"
   varchar storage_key UK
   u64 model_id
   varchar(64) model_type
@@ -590,9 +592,9 @@ shipping_carriers {
 
 carrier_geo_mappings {
   u64 id PK
+  uuid uuid UK
   u64 carrier_id FK
   u64 geographic_area_id FK
-  uuid uuid UK
   u8 zone_type
   varchar external_code
   varchar external_name
@@ -608,10 +610,10 @@ carrier_geo_mappings {
 
 pickup_points {
   u64 id PK
+  uuid uuid UK
   u64 carrier_id FK
   u64 province_id FK
   u64 municipality_id FK "?"
-  uuid uuid UK
   u8 province_type
   u8 municipality_type "?"
   varchar external_code
@@ -1182,8 +1184,8 @@ Les factures et les avoirs du SaaS. Chaque fiche indique qui doit payer, pour qu
 | `subscription_record_type` | Vaut automatiquement 1 si subscription_id est rempli, pour imposer un vrai abonnement. |
 | `installment_record_type` | Vaut automatiquement 2 si installment_id est rempli, pour imposer une vraie échéance. |
 | `billing_rule_record_type` | Vaut automatiquement 2 pour imposer une vraie règle de facturation. |
-| `original_invoice_document_type` | Vaut automatiquement 1 quand une facture d’origine est indiquée, pour imposer une vraie facture. |
-| `sequence_record_type` | Vaut automatiquement 1 quand un compteur de numérotation est indiqué. |
+| `original_invoice_document_type` | Vaut automatiquement 1 quand une facture d’origine est indiquée, pour imposer une vraie facture ; reste vide sans cette origine. |
+| `sequence_record_type` | Vaut automatiquement 1 quand un compteur de numérotation est indiqué ; reste vide avant réservation du numéro. |
 | `billing_rule_snapshot` | La copie exacte de la règle appliquée, gardée pour comprendre une ancienne facture même si les règles changent. |
 | `fiscal_year` | L’année de la série qui a donné son numéro au document. Elle reste vide avant la réservation de ce numéro. |
 | `sequence_number` | Le nombre réservé dans le compteur pour cette facture ou cet avoir. |
@@ -1221,7 +1223,7 @@ Le détail des factures et des avoirs : description, quantité, prix, remise, ta
 | `original_invoice_id` | La facture d’origine que cet avoir ou sa ligne vient corriger, à retrouver dans saas_invoices. |
 | `original_invoice_line_id` | La vraie ligne de facture corrigée par cette ligne d’avoir, à retrouver dans saas_invoice_lines. Une ligne de facture laisse ce champ vide. |
 | `document_type` | La même nature que le document parent : 1 = ligne de facture ; 2 = ligne d’avoir. Le serveur fixe cette valeur. |
-| `original_line_document_type` | Vaut automatiquement 1 quand une ligne d’origine est indiquée, pour imposer une ligne de facture. |
+| `original_line_document_type` | Vaut automatiquement 1 quand une ligne d’origine est indiquée, pour imposer une ligne de facture ; reste vide sans cette origine. |
 | `line_number` | La position de cette ligne dans la facture ou l’avoir. Exemple : 1 pour la première ligne. |
 | `description` | Le texte qui explique ce qui est facturé ou corrigé sur cette ligne. |
 | `quantity` | La quantité facturée ou corrigée sur cette ligne. |
@@ -1317,8 +1319,8 @@ Les paiements reçus et remboursements effectués à distance par banque, CCP ou
 | `reversal_of_id` | L’écriture financière d’origine que l’on corrige en ajoutant un montant opposé. L’original reste conservé. |
 | `record_type` | Le sens de l’opération : 1 = paiement reçu du client ; 2 = remboursement versé par le SaaS. |
 | `document_type` | Vaut automatiquement 1, pour garantir que le virement est relié à une facture. |
-| `original_payment_record_type` | Vaut automatiquement 1 quand original_payment_id est rempli, pour imposer un vrai paiement source. |
-| `credit_note_document_type` | Vaut automatiquement 2 quand credit_note_id est rempli, pour imposer un vrai avoir. |
+| `original_payment_record_type` | Vaut automatiquement 1 quand original_payment_id est rempli, pour imposer un vrai paiement source ; reste vide sans paiement d'origine. |
+| `credit_note_document_type` | Vaut automatiquement 2 quand credit_note_id est rempli, pour imposer un vrai avoir ; reste vide sans avoir lié. |
 | `transfer_method` | Le moyen utilisé pour effectuer le paiement ou le remboursement à distance. Choix : 1 = virement bancaire ; 2 = virement CCP ; 3 = BaridiMob ; 4 = autre transfert manuel. |
 | `transfer_status` | L’état du virement. Une correction par écriture inverse conserve l’original et son historique. Choix : 1 = déclaré ; 2 = approuvé ; 3 = vérifié ; 4 = refusé ; 5 = annulé ; 6 = résultat incertain ; 7 = corrigé par une écriture inverse. |
 | `refund_reason` | Le genre de raison qui justifie le remboursement. Choix : 1 = avoir ; 2 = trop-payé ; 3 = transfert reçu en double ; 4 = exception approuvée. |
@@ -1328,7 +1330,7 @@ Les paiements reçus et remboursements effectués à distance par banque, CCP ou
 | `transfer_reference` | La référence réelle donnée pour le virement bancaire, CCP ou BaridiMob. |
 | `financial_account_key` | Le code interne qui reconnaît le compte bancaire ou CCP utilisé par le SaaS. |
 | `transaction_fingerprint` | Un résumé calculé du réseau, du compte, du sens et de la référence du virement, pour reconnaître la même transaction. |
-| `active_transaction_fingerprint` | Cette empreinte est activée automatiquement pour un virement vérifié et non corrigé par un inverse. Elle empêche de compter deux fois la même transaction. |
+| `active_transaction_fingerprint` | Cette empreinte est activée automatiquement pour un virement vérifié et non corrigé par un inverse. Elle empêche de compter deux fois la même transaction ; reste vide dans les autres cas. |
 | `encrypted_transfer_details` | Les informations bancaires nécessaires au transfert, conservées de manière protégée. |
 | `occurred_at` | La date réelle du virement, contrôlée lors de sa vérification. |
 | `sending_started_at` | La date enregistrée avant de faire le virement manuel de remboursement. Un paiement reçu laisse ce champ vide. |

@@ -71,6 +71,8 @@ Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md),
 
 **Lecture :** PK = clé primaire ; FK = lien SQL dans cette même BDD ; UK = unicité ; REF = référence UUID externe, sans FK entre bases. u64 = BIGINT UNSIGNED ; u8 = TINYINT UNSIGNED ; « ? » = champ pouvant être NULL selon sa phase/type. Identifiants d’abord, FK/références ensuite, autres champs après. Les pivots Spatie gardent leurs clés composites natives, sans id/uuid inventés.
 
+**Un « ? » ne signifie pas « toujours facultatif » :** la date et la révision de confirmation sont obligatoires après le clic Valider ; un bureau de retrait et son snapshot sont obligatoires en stop desk ; le PDF et la date d'émission sont obligatoires pour une facture émise. Les règles du schéma imposent ces obligations. Les colonnes calculées sont remplies par la BDD, sans saisie utilisateur.
+
 Les 195 liens FK couvrent toutes les colonnes marquées FK. Les 73 liens POLY sont conditionnels : subject_type, causer_type ou model_type choisissent un modèle explicitement autorisé ; aucune FK SQL universelle n’est créée. Les traits pleins participent à la PK ; les autres sont pointillés. Les FK composites, types, phases, plafonds et transactions restent obligatoires selon le schéma principal, même si le dessin montre chaque colonne séparément.
 
 Les comptes, pivots, médias et audits utilisent seulement les modèles de cette boutique. Les alias des tables typées imposent leur rôle : catégorie/étiquette, adresse/lien social, contenu/page de vente, axe/valeur, type de tarif ou règlement. Les UUID centraux visibles ne recopient pas les tables centrales et ne donnent aucun accès à leurs comptes. Le stop desk garde l’UUID et le snapshot du bureau accepté.
@@ -81,9 +83,9 @@ erDiagram
 
 shop {
   u64 id PK
+  uuid uuid UK
   u64 logo_media_id FK "?"
   u64 favicon_media_id FK "?"
-  uuid uuid UK
   tinyint singleton UK
   uuid tenant_uuid "REF central.tenants.uuid"
   bigint central_profile_version
@@ -107,9 +109,9 @@ shop {
 
 shop_addresses {
   u64 id PK
+  uuid uuid UK
   u64 shop_id FK
   u64 shop_address_id FK "?"
-  uuid uuid UK
   uuid province_uuid "? ; REF central.geographic_areas.uuid"
   uuid municipality_uuid "? ; REF central.geographic_areas.uuid"
   u8 record_type
@@ -127,8 +129,8 @@ shop_addresses {
 
 content_pages {
   u64 id PK
-  u64 product_id FK "?"
   uuid uuid UK
+  u64 product_id FK "?"
   u8 page_kind
   varchar slug
   varchar type "?"
@@ -148,8 +150,8 @@ content_pages {
 
 media {
   u64 id PK
-  u64 created_by_id FK "?"
   uuid uuid UK
+  u64 created_by_id FK "?"
   varchar storage_key UK
   u64 model_id
   varchar(64) model_type
@@ -174,9 +176,9 @@ media {
 
 categories {
   u64 id PK
+  uuid uuid UK
   u64 parent_id FK "?"
   u64 media_id FK "?"
-  uuid uuid UK
   u8 record_type
   u8 parent_record_type "?"
   varchar name
@@ -193,8 +195,8 @@ categories {
 
 products {
   u64 id PK
-  u64 category_id FK "?"
   uuid uuid UK
+  u64 category_id FK "?"
   u8 category_record_type "?"
   varchar name
   varchar slug
@@ -222,8 +224,8 @@ products {
 
 product_variants {
   u64 id PK
-  u64 product_id FK
   uuid uuid UK
+  u64 product_id FK
   varchar label
   varchar sku
   varchar barcode "?"
@@ -250,9 +252,9 @@ product_variants {
 
 product_options {
   u64 id PK
+  uuid uuid UK
   u64 product_id FK
   u64 parent_id FK "?"
-  uuid uuid UK
   u8 record_type
   u8 parent_record_type "?"
   varchar name
@@ -267,11 +269,11 @@ product_options {
 
 variant_option_values {
   u64 id PK
+  uuid uuid UK
   u64 product_id FK
   u64 variant_id FK
   u64 option_id FK
   u64 value_id FK
-  uuid uuid UK
   u8 option_record_type
   u8 value_record_type
   datetime created_at
@@ -280,9 +282,9 @@ variant_option_values {
 
 product_tags {
   u64 id PK
+  uuid uuid UK
   u64 product_id FK
   u64 tag_id FK
-  uuid uuid UK
   u8 tag_record_type
   datetime created_at
   datetime updated_at
@@ -290,10 +292,10 @@ product_tags {
 
 product_promotions {
   u64 id PK
+  uuid uuid UK
   u64 product_id FK
   u64 variant_id FK "?"
   u64 sales_page_id FK "?"
-  uuid uuid UK
   varchar name
   u8 discount_type
   decimal value
@@ -309,11 +311,11 @@ product_promotions {
 
 product_reviews {
   u64 id PK
+  uuid uuid UK
   u64 product_id FK
   u64 visitor_id FK "?"
   u64 order_item_id FK "?"
   u64 moderated_by_id FK "?"
-  uuid uuid UK
   varchar display_name
   int note
   text comment
@@ -338,8 +340,8 @@ visitors {
 
 visit_sessions {
   u64 id PK
-  u64 visitor_id FK
   uuid uuid UK
+  u64 visitor_id FK
   datetime started_at
   datetime last_activity_at
   datetime ended_at "?"
@@ -355,13 +357,13 @@ visit_sessions {
 
 navigation_events {
   u64 id PK
+  uuid uuid UK
   u64 session_id FK
   u64 product_id FK "?"
   u64 variant_id FK "?"
   u64 sales_page_id FK "?"
   u64 content_page_id FK "?"
   u64 cart_id FK "?"
-  uuid uuid UK
   u8 sales_page_kind "?"
   u8 content_page_kind "?"
   varchar type
@@ -374,8 +376,8 @@ navigation_events {
 
 carts {
   u64 id PK
-  u64 visitor_id FK
   uuid uuid UK
+  u64 visitor_id FK
   u8 status
   datetime last_activity_at
   datetime expires_at
@@ -386,11 +388,11 @@ carts {
 
 cart_items {
   u64 id PK
+  uuid uuid UK
   u64 cart_id FK
   u64 variant_id FK
   u64 product_id FK
   u64 sales_page_id FK "?"
-  uuid uuid UK
   int quantity
   text customization_text "?"
   char(64) customization_signature
@@ -400,6 +402,7 @@ cart_items {
 
 orders {
   u64 id PK
+  uuid uuid UK
   u64 visitor_id FK "?"
   u64 cart_id FK "?"
   u64 original_session_id FK "?"
@@ -411,7 +414,6 @@ orders {
   u64 confirmed_revision_id FK "?"
   u64 confirmation_owner_id FK "?"
   u64 operationally_confirmed_by_id FK "?"
-  uuid uuid UK
   u8 original_sales_page_kind "?"
   u8 unpaid_resend_slot "?"
   varchar number
@@ -437,10 +439,10 @@ orders {
 
 order_revisions {
   u64 id PK
+  uuid uuid UK
   u64 order_id FK
   u64 author_id FK "?"
   u64 free_shipping_rule_id FK "?"
-  uuid uuid UK
   uuid pickup_point_uuid "? ; REF central.pickup_points.uuid"
   uuid province_uuid "REF central.geographic_areas.uuid"
   uuid municipality_uuid "REF central.geographic_areas.uuid"
@@ -479,12 +481,12 @@ order_revisions {
 
 order_items {
   u64 id PK
+  uuid uuid UK
   u64 revision_id FK
   u64 variant_id FK
   u64 product_id FK
   u64 promotion_id FK "?"
   u64 sales_page_id FK "?"
-  uuid uuid UK
   varchar product_name
   varchar variant_name
   varchar sku
@@ -510,11 +512,11 @@ order_items {
 
 order_history {
   u64 id PK
+  uuid uuid UK
   u64 order_id FK
   u64 previous_revision_id FK "?"
   u64 next_revision_id FK "?"
   u64 actor_id FK "?"
-  uuid uuid UK
   varchar action
   u8 contact_outcome "?"
   datetime next_callback_at "?"
@@ -529,12 +531,12 @@ order_history {
 
 stock_movements {
   u64 id PK
+  uuid uuid UK
   u64 variant_id FK
   u64 order_item_id FK "?"
   u64 return_item_id FK "?"
   u64 actor_id FK "?"
   u64 reversal_of_id FK "?"
-  uuid uuid UK
   bigint variant_sequence
   u8 type
   int physical_delta
@@ -560,11 +562,11 @@ stock_movements {
 
 order_returns {
   u64 id PK
+  uuid uuid UK
   u64 shipment_id FK
   u64 order_id FK
   u64 shipped_revision_id FK
   u64 received_by_id FK "?"
-  uuid uuid UK
   u8 reason
   text detail "?"
   u8 status
@@ -577,12 +579,12 @@ order_returns {
 
 return_items {
   u64 id PK
+  uuid uuid UK
   u64 return_id FK
   u64 order_item_id FK
   u64 shipped_revision_id FK
   u64 variant_id FK
   u64 inspected_by_id FK "?"
-  uuid uuid UK
   int expected_quantity
   int received_quantity
   int restocked_quantity
@@ -599,9 +601,9 @@ return_items {
 
 shipping_providers {
   u64 id PK
+  uuid uuid UK
   u64 user_id FK "?"
   u64 carrier_account_id FK "?"
-  uuid uuid UK
   u8 type
   varchar name
   varchar phone "?"
@@ -616,10 +618,10 @@ shipping_providers {
 
 shipping_rates {
   u64 id PK
+  uuid uuid UK
   u64 provider_id FK "?"
   u64 carrier_account_id FK "?"
   u64 created_by_id FK "?"
-  uuid uuid UK
   uuid province_uuid "? ; REF central.geographic_areas.uuid"
   uuid municipality_uuid "? ; REF central.geographic_areas.uuid"
   u8 record_type
@@ -641,8 +643,8 @@ shipping_rates {
 
 free_shipping_rules {
   u64 id PK
-  u64 product_id FK "?"
   uuid uuid UK
+  u64 product_id FK "?"
   uuid province_uuid "? ; REF central.geographic_areas.uuid"
   varchar name
   u8 delivery_mode "?"
@@ -658,12 +660,12 @@ free_shipping_rules {
 
 shipments {
   u64 id PK
+  uuid uuid UK
   u64 order_id FK
   u64 shipped_revision_id FK
   u64 provider_id FK
   u64 label_media_id FK "?"
   u64 assigned_by_id FK
-  uuid uuid UK
   uuid pickup_point_uuid "? ; REF central.pickup_points.uuid"
   u8 delivery_mode
   u8 status
@@ -685,9 +687,9 @@ shipments {
 
 shipment_events {
   u64 id PK
+  uuid uuid UK
   u64 shipment_id FK
   u64 actor_id FK "?"
-  uuid uuid UK
   u8 logistics_status "?"
   u8 financial_status "?"
   varchar external_code "?"
@@ -713,6 +715,7 @@ shipment_events {
 
 carrier_operations {
   u64 id PK
+  uuid uuid UK
   u64 provider_id FK
   u64 shipment_id FK "?"
   u64 order_id FK "?"
@@ -720,7 +723,6 @@ carrier_operations {
   u64 revision_id FK "?"
   u64 superseded_by_operation_id FK "?"
   u64 triggered_by_id FK "?"
-  uuid uuid UK
   u8 type
   varchar operation_key
   json sanitized_request
@@ -743,8 +745,8 @@ carrier_operations {
 
 carrier_operation_attempts {
   u64 id PK
-  u64 operation_id FK
   uuid uuid UK
+  u64 operation_id FK
   int attempt_number
   int http_status_code "?"
   json sanitized_response "?"
@@ -759,8 +761,8 @@ carrier_operation_attempts {
 
 collections {
   u64 id PK
-  u64 shipment_id FK
   uuid uuid UK
+  u64 shipment_id FK
   u8 declared_status
   decimal expected_amount
   decimal declared_collected_amount "?"
@@ -775,12 +777,12 @@ collections {
 
 remittance_statements {
   u64 id PK
+  uuid uuid UK
   u64 provider_id FK
   u64 carrier_remittance_batch_id FK "?"
   u64 validated_by_id FK "?"
   u64 proof_media_id FK "?"
   u64 reversal_of_id FK "?"
-  uuid uuid UK
   varchar number
   varchar external_reference "?"
   u8 type
@@ -800,6 +802,7 @@ remittance_statements {
 
 carrier_settlement_lines {
   u64 id PK
+  uuid uuid UK
   u64 provider_id FK
   u64 remittance_statement_id FK "?"
   u64 collection_id FK "?"
@@ -810,7 +813,6 @@ carrier_settlement_lines {
   u64 proof_media_id FK "?"
   u64 reversal_of_id FK "?"
   u64 correction_of_id FK "?"
-  uuid uuid UK
   varchar operation_key UK
   u8 record_type
   decimal amount
@@ -824,6 +826,7 @@ carrier_settlement_lines {
 
 expenses {
   u64 id PK
+  uuid uuid UK
   u64 product_id FK "?"
   u64 order_id FK "?"
   u64 shipment_id FK "?"
@@ -832,7 +835,6 @@ expenses {
   u64 author_id FK
   u64 reversal_of_id FK "?"
   u64 correction_of_id FK "?"
-  uuid uuid UK
   varchar category
   varchar label
   decimal amount
@@ -848,6 +850,7 @@ expenses {
 
 customer_adjustments {
   u64 id PK
+  uuid uuid UK
   u64 order_id FK
   u64 return_id FK "?"
   u64 incident_id FK
@@ -856,7 +859,6 @@ customer_adjustments {
   u64 proof_media_id FK "?"
   u64 reversal_of_id FK "?"
   u64 correction_of_id FK "?"
-  uuid uuid UK
   int compensated_quantity
   u8 amount_kind
   u8 type
@@ -872,11 +874,11 @@ customer_adjustments {
 
 order_documents {
   u64 id PK
+  uuid uuid UK
   u64 order_id FK
   u64 revision_id FK
   u64 media_id FK
   u64 generated_by_id FK
-  uuid uuid UK
   varchar number
   int document_version
   json issuer_snapshot
@@ -906,6 +908,7 @@ activity_log {
 
 carrier_fees {
   u64 id PK
+  uuid uuid UK
   u64 shipment_id FK
   u64 provider_id FK
   u64 return_id FK "?"
@@ -914,7 +917,6 @@ carrier_fees {
   u64 proof_media_id FK "?"
   u64 reversal_of_id FK "?"
   u64 correction_of_id FK "?"
-  uuid uuid UK
   json rate_snapshot "?"
   u8 source_rate_record_type "?"
   u8 fee_type
@@ -933,11 +935,11 @@ carrier_fees {
 
 carrier_receivables {
   u64 id PK
+  uuid uuid UK
   u64 provider_id FK
   u64 carrier_fee_id FK
   u64 original_fee_payment_id FK "?"
   u64 reversal_of_id FK "?"
-  uuid uuid UK
   decimal initial_amount
   decimal remaining_amount
   varchar reason
@@ -952,12 +954,12 @@ carrier_receivables {
 
 collection_entries {
   u64 id PK
+  uuid uuid UK
   u64 collection_id FK
   u64 verified_by_id FK
   u64 proof_media_id FK "?"
   u64 reversal_of_id FK "?"
   u64 correction_of_id FK "?"
-  uuid uuid UK
   decimal amount
   datetime collected_at
   datetime verified_at
@@ -969,6 +971,7 @@ collection_entries {
 
 invoices {
   u64 id PK
+  uuid uuid UK
   u64 order_id FK
   u64 revision_id FK
   u64 original_invoice_id FK "?"
@@ -976,9 +979,8 @@ invoices {
   u64 media_id FK "?"
   u64 issued_by_id FK "?"
   u64 incident_id FK "?"
-  uuid uuid UK
   u8 document_type
-  u8 sequence_record_type
+  u8 sequence_record_type "?"
   int fiscal_year "?"
   bigint sequence_number "?"
   int snapshot_format_version
@@ -1000,6 +1002,7 @@ invoices {
 
 order_incidents {
   u64 id PK
+  uuid uuid UK
   u64 order_id FK
   u64 shipment_id FK
   u64 shipped_revision_id FK
@@ -1007,7 +1010,6 @@ order_incidents {
   u64 return_id FK "?"
   u64 opened_by_id FK "?"
   u64 validated_by_id FK "?"
-  uuid uuid UK
   varchar operation_key UK
   int affected_quantity
   decimal eligible_product_amount
@@ -1022,9 +1024,9 @@ order_incidents {
 
 order_incident_details {
   u64 id PK
+  uuid uuid UK
   u64 incident_id FK
   u64 author_id FK "?"
-  uuid uuid UK
   u8 type
   int quantity
   text reason
@@ -1034,8 +1036,8 @@ order_incident_details {
 
 billing_rules {
   u64 id PK
-  u64 validated_by_id FK "?"
   uuid uuid UK
+  u64 validated_by_id FK "?"
   u8 record_type
   u8 document_type "?"
   int fiscal_year "?"
@@ -1060,9 +1062,9 @@ billing_rules {
 
 sales_terms_acceptances {
   u64 id PK
+  uuid uuid UK
   u64 order_id FK
   u64 revision_id FK
-  uuid uuid UK
   varchar operation_key UK
   varchar sales_terms_version
   char(64) terms_hash
@@ -1074,12 +1076,12 @@ sales_terms_acceptances {
 
 billing_obligations {
   u64 id PK
+  uuid uuid UK
   u64 order_id FK
   u64 revision_id FK
   u64 billing_rule_id FK
   u64 original_invoice_id FK "?"
   u64 invoice_id FK "?"
-  uuid uuid UK
   varchar operation_key UK
   u64 event_id
   u8 billing_rule_record_type
@@ -1097,12 +1099,12 @@ billing_obligations {
 
 commercial_corrections {
   u64 id PK
+  uuid uuid UK
   u64 order_id FK
   u64 source_revision_id FK
   u64 incident_id FK "?"
   u64 correction_of_id FK "?"
   u64 actor_id FK "?"
-  uuid uuid UK
   varchar operation_key UK
   u8 correction_type
   u8 status
@@ -1116,10 +1118,10 @@ commercial_corrections {
 
 commercial_correction_lines {
   u64 id PK
+  uuid uuid UK
   u64 correction_id FK
   u64 source_revision_id FK
   u64 order_item_id FK
-  uuid uuid UK
   int affected_quantity
   decimal reference_sale_amount
   decimal revenue_delta
@@ -1194,10 +1196,10 @@ model_has_permissions {
 
 permission_overrides {
   u64 id PK
+  uuid uuid UK
   u64 user_id FK
   u64 permission_id FK
   u64 assigned_by_id FK
-  uuid uuid UK
   u8 effect
   u8 status
   datetime started_at
@@ -1212,9 +1214,9 @@ permission_overrides {
 
 team_invitations {
   u64 id PK
+  uuid uuid UK
   u64 initial_role_id FK
   u64 invited_by_id FK
-  uuid uuid UK
   varchar token_hash UK
   varchar email
   u64 role_permission_version
@@ -1227,8 +1229,8 @@ team_invitations {
 
 contact_verifications {
   u64 id PK
-  u64 user_id FK
   uuid uuid UK
+  u64 user_id FK
   u8 channel
   varchar normalized_destination
   varchar code_hash
@@ -1241,8 +1243,8 @@ contact_verifications {
 
 carrier_accounts {
   u64 id PK
-  u64 created_by_id FK
   uuid uuid UK
+  u64 created_by_id FK
   uuid carrier_uuid "REF central.shipping_carriers.uuid"
   varchar label
   varchar adapter
@@ -1258,11 +1260,11 @@ carrier_accounts {
 
 carrier_remittance_batches {
   u64 id PK
+  uuid uuid UK
   u64 carrier_account_id FK
   u64 proof_media_id FK "?"
   u64 reversal_of_id FK "?"
   u64 validated_by_id FK "?"
-  uuid uuid UK
   varchar operation_key UK
   varchar external_reference "?"
   decimal reported_account_net_amount "?"
@@ -2666,7 +2668,7 @@ Les factures de vente de la boutique et les avoirs qui les corrigent, avec leur 
 | `issued_by_id` | l’identifiant de la personne qui a émis. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
 | `incident_id` | l’identifiant de l’incident de commande. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
 | `document_type` | 1 INVOICE pour une facture de cette boutique ; 2 CREDIT_NOTE pour un avoir qui corrige une facture. |
-| `sequence_record_type` | Colonne SQL calculée qui impose que sequence_id vise un compteur, jamais une règle de facturation. |
+| `sequence_record_type` | Colonne SQL calculée qui impose que sequence_id vise un compteur, jamais une règle de facturation ; reste vide avant réservation du numéro. |
 | `fiscal_year` | L’exercice du numéro réservé ; il doit être identique à celui du compteur choisi. |
 | `sequence_number` | le nombre utilisé à l’intérieur de la série du document. Exemple : `123` dans `FAC-2026-000123`. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
 | `snapshot_format_version` | une **copie figée** de version format au moment important de l’opération. Si l’information d’origine change plus tard, cette ancienne ligne garde la valeur utilisée à ce moment-là. |
