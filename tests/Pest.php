@@ -1,10 +1,37 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 require_once __DIR__.'/DocumentedConstraintAssertions.php';
+
+function isolateLocalFixtureStorage(): void
+{
+    $original = app()->storagePath();
+    $path = $original.'/framework/testing/local-fixtures-'.Str::uuid();
+    config(['testing.local_fixture_storage' => ['original' => $original, 'path' => $path]]);
+    app()->useStoragePath($path);
+    config(['filesystems.disks.local.root' => $path.'/app/private']);
+    Storage::forgetDisk('local');
+}
+
+function cleanLocalFixtureStorage(): void
+{
+    $paths = config('testing.local_fixture_storage');
+    app()->useStoragePath($paths['original']);
+    $resolved = realpath($paths['path']);
+    $parent = realpath($paths['original'].'/framework/testing');
+    if ($resolved !== false) {
+        if ($parent === false || ! str_starts_with(strtolower($resolved), strtolower($parent).DIRECTORY_SEPARATOR.'local-fixtures-')) {
+            throw new LogicException('Refusing to delete storage outside the isolated fixture test directory.');
+        }
+        File::deleteDirectory($resolved);
+    }
+}
 
 /*
 |--------------------------------------------------------------------------

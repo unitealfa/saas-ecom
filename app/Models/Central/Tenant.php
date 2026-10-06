@@ -47,7 +47,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
 
     public function getTenantKeyName(): string
     {
-        return 'uuid';
+        return 'id';
     }
 
     protected function casts(): array
@@ -68,6 +68,16 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             if (! preg_match('/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $tenant->slug) || in_array($tenant->slug, $reserved, true)) {
                 throw new LogicException('Invalid or reserved shop slug.');
             }
+
+            $databaseName = $tenant->database()->getName()
+                ?? throw new LogicException('The tenant database name is missing.');
+
+            if (static::withTrashed()->where('data->tenancy_db_name', $databaseName)->exists()
+                || $tenant->database()->manager()->databaseExists($databaseName)) {
+                throw new LogicException('The tenant database name is already reserved or exists.');
+            }
+
+            $tenant->setInternal('db_name', $databaseName);
         });
 
         static::updating(function (self $tenant): void {

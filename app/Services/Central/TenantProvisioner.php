@@ -62,7 +62,13 @@ class TenantProvisioner
                 }
             });
 
-            $tenant->schema_version = 'foundation-2026-10-06';
+            $schemaVersion = DB::connection('tenant')->table('migrations')->orderByDesc('id')->value('migration');
+
+            if (! is_string($schemaVersion)) {
+                throw new LogicException('The tenant migration history is missing.');
+            }
+
+            $tenant->schema_version = $schemaVersion;
             $tenant->status = TenantStatus::Provisioning;
             $tenant->save();
         } catch (Throwable $exception) {

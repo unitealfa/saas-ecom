@@ -1,40 +1,49 @@
 <?php
 
-namespace Database\Seeders\Central;
+namespace Tests\Tenant\Tenancy;
 
 use App\Models\Central\Country;
 use App\Models\Tenant;
+use App\Models\Tenant\User as ShopUser;
 use App\Models\User;
 use App\Services\Central\TenantProvisioner;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 
-class DemoTenantSeeder extends Seeder
+class TenantTestSeeder extends Seeder
 {
     /**
      * Run the database seeds.
      */
     public function run(): void
     {
-        if (! app()->environment(['local', 'testing'])) {
-            throw new LogicException('Demonstration credentials are limited to development and tests.');
+        if (! app()->environment('testing')) {
+            throw new LogicException('Example accounts and shops are limited to tests.');
         }
 
         if (tenancy()->initialized) {
-            throw new LogicException('The demo seeder must run in the central context.');
+            throw new LogicException('The test seeder must run in the central context.');
         }
 
         $country = Country::where('code', 'DZ')->firstOrFail();
 
         foreach ([1, 2] as $number) {
-            $user = User::firstOrNew(['email' => "boutique_{$number}@gmail.com"]);
+            $email = "boutique{$number}@test.com";
+            $legacyEmail = "boutique_{$number}@gmail.com";
+            $user = User::where('email', $email)->first()
+                ?? User::where('email', $legacyEmail)->first()
+                ?? new User;
 
             if (! $user->exists) {
-                $user->name = "user_{$number}";
+                $user->first_name = 'Owner';
+                $user->last_name = "Boutique {$number}";
+                $user->email = $email;
                 $user->password = 'password';
                 $user->country_id = $country->id;
                 $user->save();
+            } elseif ($user->email === $legacyEmail) {
+                $user->update(['first_name' => 'Owner', 'last_name' => "Boutique {$number}", 'email' => $email]);
             }
 
             $attributes = [
@@ -62,19 +71,40 @@ class DemoTenantSeeder extends Seeder
                 return Tenant::create([...$attributes, 'creation_hash' => $hash]);
             }, attempts: 3);
 
-            if (! $tenant->domains()->where('domain', "boutique{$number}.aydra.localhost")->exists()) {
+            $domainName = $tenant->slug.'.'.config('tenancy.saas_base_domain');
+            $primaryDomain = $tenant->domains()->where('is_primary', true)->first();
+
+            if ($primaryDomain === null) {
                 $tenant->domains()->create([
-                    'domain' => "boutique{$number}.aydra.localhost",
+                    'domain' => $domainName,
                     'type' => 1,
                     'is_primary' => true,
                     'verification_status' => 2,
                     'verified_at' => now(),
                 ]);
+            } elseif ($primaryDomain->domain !== $domainName) {
+                $primaryDomain->update(['domain' => $domainName]);
             }
 
             if (! $tenant->wasRecentlyCreated) {
+                $database = $tenant->database();
+
+                if (! $database->manager()->databaseExists($database->getName())) {
+                    $tenant->setInternal('db_name', null);
+                    $tenant->setInternal('db_name', $tenant->database()->getName());
+                    $tenant->save();
+                }
+
                 app(TenantProvisioner::class)->provision($tenant);
             }
+
+            $tenant->run(function () use ($user, $legacyEmail, $email): void {
+                $localOwner = ShopUser::where('central_user_uuid', $user->uuid)->firstOrFail();
+
+                if ($localOwner->email === $legacyEmail) {
+                    $localOwner->update(['first_name' => $user->first_name, 'last_name' => $user->last_name, 'email' => $email]);
+                }
+            });
         }
     }
 }

@@ -1,3 +1,5 @@
+**Actualisation Aydra — 6 octobre 2026 :** ce fichier conserve une analyse historique de V3, dont certaines décisions ont été remplacées. La référence active est [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), V4.10 : PK `id` numériques auto-incrémentées, UUID distincts pour le public/inter-BDD, clé technique Tenancy numérique et nouvelles bases `boutique_{slug_initial}`. Les anciennes prescriptions de restauration ne réintroduisent pas ce module retiré. Les clés de fichiers ci-dessous sont internes ; leurs URL publiques passent par les UUID et les autorisations.
+
 **A. Verdict argumenté**
 
 **Développement
@@ -2163,11 +2165,11 @@ S3 / MinIO
 avec une clé
 telle que :
 
-tenants/{tenant_uuid}/private/factures/{document_uuid}.pdf
+tenants/{tenant_id}/private/factures/{document_uuid}.pdf
 
 ou :
 
-tenants/{tenant_uuid}/private/avoirs/{document_uuid}.pdf
+tenants/{tenant_id}/private/avoirs/{document_uuid}.pdf
 
 Le stockage
 documentaire doit rester indépendant d’une restauration MySQL du tenant.

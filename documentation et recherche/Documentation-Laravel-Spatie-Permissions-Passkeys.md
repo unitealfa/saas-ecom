@@ -1,5 +1,7 @@
 # Laravel, Spatie Permission et Passkeys — Documentation et recherche consolidées
 
+**Application à Aydra — 6 octobre 2026 :** les conventions effectives sont celles du [schéma principal](Schema-BDD-SaaS-Ecommerce-UUID.md), V4.10, §3.1–3.4. Les PK métier `id` sont numériques auto-incrémentées, les FK locales sont numériques et un champ `uuid` distinct sert aux liens publics et aux références inter-BDD. Les pivots Spatie conservent leurs PK composites. Les exemples génériques de configuration UUID ne remplacent pas ces conventions. Tenancy utilise `tenants.id` en interne avec `id_generator=null` ; le nom stable des nouvelles bases est `boutique_{slug_initial}`.
+
 **Date de consolidation : 29 septembre 2026**  
 **Langue des explications : français.** Les noms d’API et les extraits sources restent dans leur langue d’origine.  
 **Périmètre : les six fichiers fournis, les trois transcriptions vidéo et des vérifications ciblées dans les documentations officielles.**

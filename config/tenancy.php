@@ -10,23 +10,30 @@ use Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper;
 use Stancl\Tenancy\TenantDatabaseManagers\MySQLDatabaseManager;
 use Stancl\Tenancy\TenantDatabaseManagers\SQLiteDatabaseManager;
 
-$appUrl = env('APP_URL', 'http://aydra.localhost');
+$appUrl = env('APP_URL', 'http://localhost');
 
-if (! is_string($appUrl) || ! parse_url($appUrl, PHP_URL_HOST)) {
+if (! is_string($appUrl)) {
+    throw new InvalidArgumentException('APP_URL must be a URL string.');
+}
+
+$centralDomain = parse_url($appUrl, PHP_URL_HOST);
+
+if (! is_string($centralDomain) || $centralDomain === '') {
     throw new InvalidArgumentException('APP_URL must contain a valid application host.');
 }
+
+$centralDomain = strtolower($centralDomain);
 
 return [
     'tenant_model' => Tenant::class,
     'domain_model' => Domain::class,
     'id_generator' => null,
-    'central_domains' => array_values(array_unique(array_filter([
-        parse_url($appUrl, PHP_URL_HOST),
-        env('SAAS_BASE_DOMAIN', 'aydra.localhost'),
-        'localhost',
+    'central_domains' => [
         '127.0.0.1',
-    ]))),
-    'saas_base_domain' => env('SAAS_BASE_DOMAIN', 'aydra.localhost'),
+        'localhost',
+        'aydra.localhost',
+    ],
+    'saas_base_domain' => env('SAAS_BASE_DOMAIN', $centralDomain),
     'bootstrappers' => [
         DatabaseTenancyBootstrapper::class,
         NamespacedCacheBootstrapper::class,
@@ -37,7 +44,7 @@ return [
     'database' => [
         'central_connection' => env('DB_CONNECTION', 'mysql'),
         'template_tenant_connection' => null,
-        'prefix' => 'tenant_',
+        'prefix' => 'boutique_',
         'suffix' => '',
         'managers' => [
             'sqlite' => SQLiteDatabaseManager::class,

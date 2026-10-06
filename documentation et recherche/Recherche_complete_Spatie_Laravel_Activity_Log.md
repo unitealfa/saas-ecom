@@ -1,5 +1,7 @@
 # Recherche complète — Remplacement de l’« Audit SaaS » par Spatie Laravel Activity Log
 
+**Application à Aydra — 6 octobre 2026 :** suivre le [schéma principal](Schema-BDD-SaaS-Ecommerce-UUID.md), V4.10. `activity_log.id` est numérique auto-incrémenté ; `activity_log.uuid` est son identifiant public distinct. `subject_id` et `causer_id` désignent des PK numériques de la même BDD que l’activité. Une référence vers une autre BDD utilise un UUID explicite, jamais une FK SQL inter-BDD. Les réponses publiques filtrent les identifiants internes ; les exemples du package restent des ressources à adapter à cette règle.
+
 > Document unique regroupant les recherches fournies sur **`spatie/laravel-activitylog` v5**, la documentation officielle, les recherches vidéo sur les événements de modèles, la personnalisation, les cas d’usage e-commerce et l’affichage des logs dans une interface d’administration.
 >
 > L’objectif de ce document n’est pas de résumer les recherches, mais de **rassembler les éléments utiles dans un seul fichier**, de conserver les exemples et les points techniques, puis de montrer comment utiliser Spatie Activity Log à la place d’un système d’« Audit SaaS » développé entièrement à la main.

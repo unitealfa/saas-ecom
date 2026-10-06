@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\Tenant\DatabaseDiagnosticsController;
 use App\Http\Controllers\Tenant\StorefrontController;
+use App\Http\Middleware\EnsureLocalDiagnostics;
 use App\Http\Middleware\FinishTenantRequest;
 use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
@@ -13,4 +15,6 @@ Route::middleware([
     'web',
 ])->group(function (): void {
     Route::get('/', StorefrontController::class)->name('tenant.home');
+    Route::get('/_dev/database', DatabaseDiagnosticsController::class)
+        ->middleware(EnsureLocalDiagnostics::class)->name('tenant.database-diagnostics');
 });

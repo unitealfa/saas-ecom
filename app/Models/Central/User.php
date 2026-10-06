@@ -29,6 +29,10 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
  * @property string|null $first_name
  * @property string $name
  * @property string $email
+ * @property string|null $legal_form
+ * @property string|null $activity_nature
+ * @property string|null $legal_address
+ * @property int|null $legal_profile_version
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property string|null $two_factor_secret

@@ -231,9 +231,210 @@ Corrections détectées par les tests : déclarer explicitement `nullable(false)
 | Pint et PHPStan niveau 7 | Réussis |
 | `git diff --check` | Réussi |
 
+### 2026-10-06 — Contrôle des migrations exécutées et accès aux deux boutiques de démonstration
+
+Après les commandes de migration exécutées par l'utilisateur, les trois bases MySQL existantes ont été inspectées directement. Ce contrôle est en lecture seule : aucun `migrate:fresh`, rollback, effacement ou modification des tables métier n'est exécuté pour l'audit.
+
+| Base | Tables présentes | Migrations appliquées | CHECK appliqués | Triggers présents |
+|---|---:|---:|---:|---:|
+| `aydra` | 37 | 38/38 | 85 | 76 |
+| `tenant_83b64956-cace-47d2-a240-a6caf5c02099` | 69 | 68/68 | 151 | 205 |
+| `tenant_c606bfd5-75d4-40ea-96f6-4664b22e1b1e` | 69 | 68/68 | 151 | 205 |
+
+La comparaison avec les trois documents de référence réussit pour les champs, types, nullable, PK/UK, colonnes calculées et FK locales simples/composites : **11 428 assertions réussies**. Le test `tests/Tenant/Database/LiveMysqlSchemaAuditTest.php` est désactivé par défaut ; son exécution exige `AYDRA_AUDIT_EXISTING_DATABASES=1` et le nom explicite de la base centrale dans `AYDRA_AUDIT_CENTRAL_DATABASE`. Il vérifie aussi l'historique complet des migrations et la présence des CHECK et triggers. Les chiffres du premier lot ci-dessus restent une photographie historique ; toutes les migrations documentées sont maintenant appliquées aux trois bases.
+
+Le seeder de démonstration existant a été adapté et exécuté deux fois avec `php artisan db:seed --no-interaction`. Le registre conserve **2 utilisateurs centraux, 2 boutiques et 2 domaines**, sans doublons ni réinitialisation des mots de passe existants. Chaque boutique conserve son propriétaire local indépendant. Les UUID des utilisateurs, boutiques et domaines sont conservés.
+
+| Propriétaire central | Boutique | Domaine principal | Message de démonstration |
+|---|---|---|---|
+| `user_1`, `boutique_1@gmail.com` | Boutique 1 | `boutique1.aydra.test` | `This is your multi-tenant application. The id of the current tenant is 1` |
+| `user_2`, `boutique_2@gmail.com` | Boutique 2 | `boutique2.aydra.test` | `This is your multi-tenant application. The id of the current tenant is 2` |
+
+Le domaine de base dérive maintenant d'`APP_URL`, sauf configuration explicite de `SAAS_BASE_DOMAIN`. Ici, `.env` conserve `APP_URL=http://aydra.test` ; les domaines de démonstration ont été alignés avec cette adresse en conservant leurs UUID. Le seeder peut être relancé sans créer des domaines supplémentaires. `central_domains` réserve uniquement le domaine d'`APP_URL`, `localhost` et `127.0.0.1` au SaaS central. Un domaine de base boutique distinct n'est pas automatiquement déclaré central ; les domaines boutique sont résolus depuis la table centrale `domains`.
+
+La route publique renvoie le message demandé uniquement en environnement local/testing pour les deux boutiques du seeder, avec un propriétaire central actif, un domaine vérifié et un tenant en préparation ou actif. Les autres boutiques conservent la réponse de préparation ; la démonstration n'est pas exposée en production, pour un propriétaire désactivé ou une boutique suspendue. Les statuts commerciaux et l'activation des propriétaires locaux ne sont pas modifiés.
+
+Herd a été remis en fonctionnement. Le projet et les deux alias `boutique1.aydra`/`boutique2.aydra` sont configurés avec PHP 8.5 ; les réponses HTTP utilisent PHP 8.5.10. Les deux requêtes réelles via Herd, avec résolution locale forcée vers `127.0.0.1`, retournent **HTTP 200** et l'identifiant correct. La résolution normale des noms reste non fonctionnelle lors du contrôle ; elle relève de Herd et du réseau local. `central_domains` choisit les routes centrales après réception d'une requête et ne crée pas de résolution DNS. La consigne précédente de modification manuelle de la configuration Windows est retirée à la demande de l'utilisateur.
+
+| Vérification de ce correctif | Résultat |
+|---|---|
+| Audit des trois bases existantes | 1 test réussi, 11 428 assertions, lecture seule |
+| Tests Tenancy concernés | 15 tests réussis, 166 assertions |
+| Pint et PHPStan niveau 7 | Réussis |
+| HTTP réel via Herd avec résolution forcée | 200 pour les deux boutiques, identifiants 1 et 2 |
+| Ouverture avec résolution normale | Non fonctionnelle lors du contrôle ; configuration des noms locale distincte du routage Laravel |
+
+Les migrations, `.env`, le schéma principal et les deux diagrammes ne sont pas modifiés par ce correctif. La création des tables et cette démonstration d'isolation ne constituent pas une implémentation des modules commerciaux.
+
+Correctif demandé ensuite pour `central_domains` : séparation du domaine de base boutique et des domaines réservés au central, retrait de la consigne de modification Windows et nettoyage du cache de configuration Laravel. Aucun enregistrement Aydra n'avait été ajouté dans la configuration Windows. Les deux tests ciblés réussissent avec 11 assertions, dont le refus de considérer une base boutique distincte comme domaine central et les frontières HTTP entre les deux contextes. Pint et PHPStan réussissent.
+
+### 2026-10-06 — Démonstration avec ID numériques et domaines localhost
+
+La nouvelle demande remplace le domaine de démonstration et l'identifiant interne Tenancy des premiers lots : `central_domains` contient explicitement `127.0.0.1`, `localhost` et `monpremiersaaslaravel.localhost`, avec `id_generator=null` et le modèle Domain existant. `.env` et `.env.example` utilisent `APP_URL=http://monpremiersaaslaravel.localhost:8000` pour l'essai demandé avec le serveur Artisan lancé par l'utilisateur.
+
+Les colonnes métier `id` étaient déjà des BIGINT auto-incrémentés, distincts des UUID publics. `Tenant::getTenantKeyName()` utilise maintenant `id` ; les commandes Tenancy, jobs, cookies et préfixes de cache utilisent donc l'identifiant numérique. Les UUID documentés restent disponibles pour les références publiques/inter-BDD. Les identifiants techniques Laravel des sessions et lots de jobs conservent leur format prévu par le framework.
+
+Le préfixe des nouvelles bases devient `boutique`, donc une boutique d'ID 1 reçoit `boutique1` et une boutique d'ID 2 reçoit `boutique2`. Une base existante enregistrée dans `tenancy_db_name` est conservée lorsqu'elle existe. Le contrôle MySQL actuel constate que les deux anciens noms `tenant_<uuid>` du registre ne correspondent plus à des bases présentes : le seeder doit réparer ces références avant leur reprovisionnement. Aucune base existante n'est supprimée ou renommée.
+
+Le seeder reste dans `database/seeders/Central/DemoTenantSeeder.php`, appelé par `DatabaseSeeder`. Il prévoit deux propriétaires `Owner Boutique 1`/`Owner Boutique 2`, les e-mails `boutique1@test.com`/`boutique2@test.com` et le mot de passe initial `password`, haché par le modèle. Les anciens comptes de démonstration sont réutilisés sans changer leurs ID, UUID ou mots de passe. Les comptes locaux gardent des secrets indépendants. Les colonnes réelles sont `tenants.shop_name` et `tenants.user_id`, et non les noms d'exemple `name`/`owner_user_id`.
+
+Les domaines attendus sont `boutique1.monpremiersaaslaravel.localhost` et `boutique2.monpremiersaaslaravel.localhost`, avec le port `8000` dans les URL de l'essai Artisan. Les doublons de création Boutique 1 de l'exemple ne sont pas reproduits : deux boutiques seulement, avec des domaines uniques. La présence du schéma et le message de démonstration n'activent pas les fonctions commerciales.
+
+Le seeder a été exécuté deux fois sur MySQL. La première exécution a créé les deux bases manquantes sous leurs nouveaux noms et installé leurs migrations ; la deuxième réussit sans doublons. Les utilisateurs, boutiques et domaines centraux conservent leurs ID et UUID existants. Les anciens noms physiques n'étaient plus présents ; aucune base existante n'a été supprimée ou renommée pendant ce lot.
+
+| ID boutique | Propriétaire | Base réelle | Domaine réel |
+|---:|---|---|---|
+| 1 | `Owner Boutique 1`, `boutique1@test.com` | `boutique1` | `boutique1.monpremiersaaslaravel.localhost` |
+| 2 | `Owner Boutique 2`, `boutique2@test.com` | `boutique2` | `boutique2.monpremiersaaslaravel.localhost` |
+
+| Vérification exécutée | Résultat |
+|---|---|
+| Tests Tenancy après passage aux ID numériques | 16 tests réussis, 183 assertions |
+| Test de reprise après réparation d'une ancienne référence de base absente | 1 test réussi, 16 assertions ; identités et mots de passe conservés |
+| Audit en lecture des trois bases MySQL | 1 test réussi, 11 428 assertions ; migrations, colonnes, FK, CHECK et triggers conformes |
+| Tables réelles | Centrale : 37 ; `boutique1` : 69 ; `boutique2` : 69 |
+| Deuxième seeding | Toujours 2 utilisateurs, 2 tenants et 2 domaines centraux |
+| Colonnes `id` métier dans les trois bases | AUTO_INCREMENT ; seules `sessions.id` et `job_batches.id` gardent le format technique Laravel |
+| Pint, PHPStan et `git diff --check` | Réussis |
+| Serveur Artisan sur le port 8000 | Aucun serveur présent lors du contrôle ; à lancer par l'utilisateur pour l'essai navigateur |
+
+Les URL prévues sont `http://boutique1.monpremiersaaslaravel.localhost:8000` et `http://boutique2.monpremiersaaslaravel.localhost:8000`. Les tests HTTP Laravel confirment les messages d'identification 1 et 2 ; une réponse HTTP réelle du serveur Artisan n'est pas déclarée vérifiée puisqu'il n'est pas lancé. La photographie précédente reste historique et ne décrit pas les bases actuelles.
+
+### 2026-10-06 — Correction de la configuration réelle et séparation des données d’essai
+
+Les exemples `monpremiersaaslaravel.localhost:8000` des lots précédents sont remplacés par la configuration réelle confirmée : `APP_URL=http://aydra.localhost`. Le code dérive le domaine central et, sauf `SAAS_BASE_DOMAIN` explicite, la base des sous-domaines depuis cette variable. Aucun nom de boutique d’exemple n’est enregistré dans la configuration de production.
+
+La convention confirmée pour les nouvelles bases est `boutique_{slug_initial}_{id}`, par exemple `boutique_nour_17`. Le nom est enregistré dans `tenants.data.tenancy_db_name` lors de la réservation, puis conservé si le nom affiché ou le slug changent. Pour respecter les 64 caractères d’un identifiant MySQL, seul le slug peut être raccourci ; le préfixe et le suffixe numérique restent présents. Une base déjà renseignée n’est pas renommée automatiquement. Cette décision remplace la convention historique `tenant_<uuid>`.
+
+Le seeder normal conserve uniquement les cinq pays documentés. Les deux propriétaires et boutiques d’essai sont déplacés dans `tests/Tenant/Tenancy/TenantTestSeeder.php`, réservé à l’environnement testing et appelé explicitement par les tests. La route publique ne contient plus de branche dédiée à ces comptes et n’affiche plus leur ID interne. `schema_version` est lu dans l’historique réel des migrations appliquées.
+
+**État MySQL constaté pendant ce lot :** `boutique1` et `boutique2` existent encore, mais la base centrale `aydra` est absente (`Unknown database 'aydra'`). Aucune base n’est supprimée, renommée ou recréée. La correction des domaines existants ne peut pas être exécutée sans leur registre central ; elle n’est pas déclarée effectuée. Les résultats des audits des lots précédents restent historiques.
+
+Le schéma et les deux diagrammes passent en V4.10 : `id` numérique auto-incrémenté, `uuid` public distinct, `tenants.id` pour le contexte technique Tenancy et UUID conservés pour toutes les références métier inter-BDD. Les annotations Mermaid rendent ces rôles explicites ; les tables, champs et relations restent identiques. Les documents de recherche Spatie et les notes historiques portent un renvoi vers ces conventions actuelles. Les tables techniques Laravel gardent leurs identifiants natifs ; aucun UUID métier n’est supprimé.
+
+L’utilisateur confirme explicitement `id` pour le contexte Tenancy et `uuid` pour les interfaces publiques et les liens entre bases. La numérotation est indépendante par table/BDD et peut comporter des trous ; les UUID ne remplacent pas les PK numériques.
+
+| Vérification de ce lot | Résultat |
+|---|---|
+| Ensemble des tests Tenancy adaptés | 21 tests réussis, 206 assertions |
+| Contrôles finaux APP_URL, réservation/reprise et nouveaux cas de configuration | 7 tests réussis, 105 assertions, dont 3 nouveaux cas ; aucun appel à MySQL réel |
+| Comparaison des migrations avec le schéma principal et les deux diagrammes | 2 tests réussis, 5 248 assertions sur SQLite ; tables/champs/types/nullable/PK/UK/FK conservés |
+| Nommage long, ID distincts, nom existant et renommage avant/après commit | Réussis ; suffixe numérique conservé et nom réservé stable |
+| Seeder normal en local et production, exécuté deux fois | 5 pays, aucun utilisateur, boutique ou domaine d’essai |
+| Configuration/routes effectives | APP_URL et routes centrales sur aydra.localhost ; base de sous-domaines dérivée, id_generator null |
+| Pint, PHPStan niveau 7 et git diff --check | Réussis |
+| Correction des domaines dans MySQL | Non exécutée : registre central aydra absent ; bases boutique1/boutique2 préservées |
+
+Les validations SQLite et de configuration ne constituent pas un nouvel audit MySQL des bases existantes ni un contrôle navigateur/DNS. Aucun serveur ou alias Herd n’est lancé/modifié par ce lot. La prochaine vérification des domaines réels exige de retrouver la base centrale ; aucune donnée d’essai n’est recréée pour la remplacer.
+
+### 2026-10-06 — Recontrôle des changements et liste centrale explicite
+
+Le contrôle du fichier réel constate un écart avec la forme demandée : `central_domains` était calculé depuis APP_URL. Il est corrigé en liste littérale dans `config/tenancy.php` : `127.0.0.1`, `localhost`, `aydra.localhost`. Le cache de configuration est vidé ; la liste chargée et le contenu écrit sont vérifiés séparément. Le test de configuration et les descriptions actives du schéma/diagramme sont adaptés. APP_URL reste `http://aydra.localhost`, et la base des sous-domaines reste dérivée de cette variable sauf SAAS_BASE_DOMAIN explicite.
+
+L’état MySQL a changé depuis le lot précédent : la base centrale `aydra` existe maintenant, avec 37 tables, 38 migrations, 5 pays, aucun utilisateur, aucune boutique et aucun domaine. `boutique1` et `boutique2` existent toujours, avec 69 tables chacune. Aucun domaine central existant n’est donc disponible à corriger ; aucune boutique de démonstration n’est recréée. Le contrôle des colonnes `id` confirme leur auto-incrémentation, sauf les identifiants techniques natifs `sessions.id` et `job_batches.id`.
+
+À la demande de l’utilisateur, `AGENTS.md` impose désormais sa lecture à chaque demande, la consultation des références pertinentes, la relecture des fichiers/diffs à chaque étape et la vérification effective avant de passer à une autre tâche. Les règles distinguent code écrit et configuration chargée, tests isolés et état réel, résultat constaté et point non vérifié. Les données existantes restent protégées.
+
+| Recontrôle final | Résultat |
+|---|---|
+| Suite complète `php vendor/bin/pest --compact` | 60 tests réussis, 5 541 assertions ; 2 tests MySQL optionnels ignorés par défaut |
+| Audit MySQL explicite des bases aydra, boutique1 et boutique2 | 1 test réussi, 11 428 assertions ; lecture seule, aucune migration exécutée |
+| Historique des migrations réel | 38/38 au central, 68/68 dans chacune des deux bases boutiques |
+| ID et UUID | PK métier auto-incrémentées ; UUID et relations conformes aux trois documents ; Tenancy utilise id |
+| Dossiers séparant les contextes | 20 dossiers Central/Tenant présents |
+| Tables de base demandées | users, cache, jobs, tenants et domains présents dans les trois bases ; users local créé par create_local_accounts_tables |
+| Configuration écrite et chargée | Liste centrale littérale vérifiée, APP_URL correct, id_generator null et modèle Domain conservés |
+| Seeders et code de production | Seeder normal limité aux pays ; fixtures uniquement dans tests ; aucun ancien domaine d’exemple ou branche de démonstration dans app/config/database/routes |
+| Pint, PHPStan niveau 7 et git diff --check | Réussis |
+
+L’audit en lecture seule peut inclure des bases boutiques sans enregistrement central au moyen de `AYDRA_AUDIT_TENANT_DATABASES`, avec une liste explicite et validée ; les bases ne sont jamais devinées depuis les ID. Les deux bases existantes sont contrôlées sans réinsérer leurs comptes ou domaines dans le central. Les résultats des tests HTTP sont ceux de Laravel, sans prétendre vérifier une ouverture navigateur réelle ou le DNS.
+
+### 2026-10-06 — Remise à zéro autorisée et jeu fonctionnel local
+
+L’utilisateur confirme des données d’essai réalistes dans MySQL, un volume de 20 produits et 50 commandes par boutique, un administrateur central et un employé local par boutique. Cette décision autorise un seeder local explicite en complément des fixtures de tests ; le `DatabaseSeeder` normal reste limité aux cinq pays. Les diagrammes et le §3.4 du schéma documentent cette exception sans changement de tables ou de colonnes.
+
+Après validation sur SQLite puis dans trois bases MySQL temporaires, les bases inspectées `aydra`, `boutique1` et `boutique2` sont supprimées sur autorisation explicite. `aydra` est recréée, les 38 migrations centrales sont exécutées, puis `Central\LocalDevelopmentSeeder` crée les boutiques par le mécanisme Tenancy et leurs 68 migrations chacune. Aucun autre schéma MySQL n’est supprimé.
+
+| Propriétaire central | Tenant | Domaine enregistré | Base persistée |
+|---|---|---|---|
+| ID 1, Karim Benameur | ID 1, Boutique 1 | boutique1.aydra.localhost | boutique_boutique1_1 |
+| ID 2, Nadia Benali | ID 2, Boutique 2 | boutique2.aydra.localhost | boutique_boutique2_2 |
+
+Le troisième compte central est `admin@example.test`. Chaque base boutique contient un propriétaire local ID 1 et un employé ID 2 ; l’ID 1 du propriétaire local de la deuxième boutique n’est pas son ID central 2. La liaison exacte utilise `users.central_user_uuid`, et `shop.tenant_uuid` égale le UUID du tenant central. Les mots de passe de test sont distincts selon le contexte : central `LocalTest!2026-Owner`, propriétaire boutique `LocalTest!2026-Shop`, employé `LocalTest!2026-Team`.
+
+Chaque boutique contient un singleton `shop`, 20 produits, 40 variantes avec options/catégories/tags, 50 commandes et révisions/lignes, des visiteurs/paniers, 28 expéditions, 16 encaissements et reversements simulés, deux retours physiques complets, deux renvois impayés, 16 factures et un avoir, une correction de revenu et un remboursement de 100 DA, une dépense et les activités associées. Le retour payant coûte 300 DA au commerçant ; le retour gratuit comporte un montant explicite zéro et son snapshot. Un renvoi récupère manuellement 300 DA, l’autre zéro ; chacun conserve le destinataire du dossier original. Les statistiques mensuelles centrales comptent les commandes réellement présentes dans leur période, au lieu de confondre stock historique et usage du mois. Au central : une offre fictive, ses quotas, deux abonnements et échéances, deux factures et deux avoirs, deux paiements et deux remboursements simulés. Tous les PDF sont des fichiers valides privés marqués comme essais locaux ; aucun document fiscal ou justificatif bancaire authentique n’est prétendu créé.
+
+Les seeders refusent la production et le mélange avec des données non identifiées comme fixtures. Les marqueurs d’activité transactionnels permettent un deuxième passage sans doublons, sans réinitialiser les UUID ou mots de passe. Les comptes transporteurs fictifs restent désactivés, sans clés API ni appel réseau. Les tables techniques et les scénarios non représentés restent vides, notamment les passkeys, jobs et créances transporteur ; aucun faux credential ou paiement supplémentaire n’est fabriqué pour remplir une table.
+
+Les pages dédiées `/_dev/database` affichent les identifiants, liens, noms des bases, effectifs de toutes les tables et, en boutique, trois mesures de requêtes et le plan MySQL EXPLAIN. Elles exigent `local`/`testing`, debug actif et une adresse de boucle locale, avec réponse non mise en cache. Leur lecture de métadonnées cible explicitement la base courante : le test MySQL a détecté que la lecture sans schéma pouvait inclure d’autres bases accessibles. Les fichiers des tests sont isolés sous un dossier unique de `storage/framework/testing` et supprimés après contrôle de leur chemin ; les fichiers runtime `storage/tenant_*` sont ignorés par Git.
+
+| Vérification exécutée | Résultat |
+|---|---|
+| Nouveau seeder, données et diagnostics sur SQLite + MySQL temporaire | 9 tests réussis, 427 assertions lors du contrôle MySQL ; dernier contrôle SQLite : 8 réussis, 413 assertions, test MySQL optionnel ignoré |
+| Suite complète après corrections | 68 tests réussis, 5 954 assertions ; 3 tests MySQL optionnels ignorés par défaut |
+| Audit des trois bases MySQL réelles recréées | 1 test réussi, 11 428 assertions ; tables, colonnes, PK/UK/FK, historique de migrations, CHECK et triggers |
+| Données réelles | 5 pays, 3 utilisateurs centraux, 2 tenants, 2 domaines ; par boutique : 2 utilisateurs, 1 shop, 20 produits, 40 variantes, 50 commandes, 2 retours, 17 documents fiscaux simulés |
+| Réconciliation MySQL du stock | Aucun écart entre compteurs P/R/Q, sommes des mouvements et réservations actives |
+| Réconciliation MySQL des révisions | Aucun écart entre lignes, sous-total, livraison, récupération du retour et total |
+| Deuxième seeding local sur MySQL réel | Réussi sans doublons, mêmes comptes/boutiques/domaines |
+| Pint, PHPStan niveau 7 et diff | Réussis |
+| Accès HTTP réel aux trois diagnostics sans port | HTTP 200 en IPv4 et IPv6, PHP 8.5.10 ; base centrale et bases boutiques correctes, volumes et liens vérifiés |
+
+Le premier contrôle HTTP réel retournait 404 : Herd déclare le site historique `aydra.test`, alors que les domaines confirmés sont `aydra.localhost` et ses sous-domaines ; Apache/Laragon recevait ces requêtes sans configuration pour Aydra. Les tests HTTP Laravel réussis ne suffisaient donc pas à prouver leur accès réel. L’utilisateur a ensuite confirmé la correction de Herd/Laragon pour les domaines sans port ; cette correction et ses contrôles sont décrits ci-dessous.
+
+### 2026-10-06 — Domaines locaux sans port : correction Herd/Laragon
+
+Deux configurations locales propres à Aydra sont ajoutées, sans changer les tables, les domaines enregistrés ou le code métier :
+
+- `C:\Users\habou\.config\herd\config\valet\Nginx\aydra.localhost.conf` : hôtes `aydra.localhost` et `*.aydra.localhost`, racine `C:/Users/habou/Herd/aydra/public`, service PHP 8.5 existant de Herd ; écoute sur `127.0.0.1:80` et sur `127.0.0.1:8081` pour la liaison locale avec Apache.
+- `C:\laragon\etc\apache2\sites-enabled\aydra.localhost.conf` : hôte central et sous-domaines transmis à `http://127.0.0.1:8081/`, avec conservation du Host original pour que Tenancy choisisse la boutique. Le proxy direct est désactivé ; l’accès à ce virtual host exige une connexion locale. Cette restriction en entrée empêche qu’un client distant accède aux diagnostics via l’adresse de boucle du proxy. La configuration Apache par défaut reste présente.
+
+La syntaxe des deux configurations est contrôlée avant rechargement. Nginx est redémarré par `herd restart nginx --no-interaction`. Apache fonctionne en processus Laragon, sans service Windows `Apache2.4` : la tentative standard `httpd -k restart` échoue pour cette raison ; le rechargement du processus existant est ensuite effectué par son événement natif `ap{pid}_restart`, après vérification du PID et du chemin de l’exécutable. Le journal Apache confirme le rechargement réussi. Aucun serveur Artisan n’est lancé.
+
+Les requêtes HTTP réelles, sans ajout de port, sans résolution forcée et sans proxy système, confirment :
+
+| Adresse ou contrôle | Résultat constaté |
+|---|---|
+| `http://aydra.localhost/_dev/database` | HTTP 200 via IPv4 et IPv6 ; base `aydra`, deux propriétaires, bonnes bases et liens boutiques sans port |
+| `http://boutique1.aydra.localhost/_dev/database` | HTTP 200 via IPv4 et IPv6 ; tenant 1, base `boutique_boutique1_1`, 20 produits et 50 commandes, aucune donnée du propriétaire 2 |
+| `http://boutique2.aydra.localhost/_dev/database` | HTTP 200 via IPv4 et IPv6 ; tenant 2, base `boutique_boutique2_2`, 20 produits et 50 commandes, aucune donnée du propriétaire 1 |
+| Runtime des diagnostics | PHP 8.5.10 ; réponse `Cache-Control: no-store, private` |
+| `/` central | HTTP 200 |
+| `/` des deux boutiques | HTTP 503 avec le message applicatif existant « Cette boutique est en préparation. » ; la vitrine reste à développer |
+| Boutique inconnue | HTTP 404 |
+| `/.env`, `/composer.json`, chemin de seeder | HTTP 403 pour le fichier caché ; HTTP 404 pour les autres chemins, aucun contenu exposé |
+| Fichier Windows `hosts` | Empreinte SHA-256 identique avant et après correction ; aucune modification |
+
+Ces réglages concernent cette machine de développement. Herd conserve son TLD global `test` ; le fichier Aydra ajouté couvre les domaines `.localhost` et leurs sous-domaines sans changer ce réglage global. Le port 8081 sert uniquement à la liaison locale entre les serveurs : les adresses à ouvrir dans le navigateur restent les trois URL sans port ci-dessus. PHP 8.3 d’Apache n’exécute pas Aydra : les réponses réelles passent par PHP 8.5 de Herd. Le mécanisme de proxy et la conservation du Host suivent la [documentation Apache](https://httpd.apache.org/docs/2.4/mod/mod_proxy.html) ; la restriction locale suit [mod_authz_host](https://httpd.apache.org/docs/2.4/mod/mod_authz_host.html).
+
+### 2026-10-06 — Noms des bases boutiques sans suffixe d’ID
+
+L’utilisateur remplace la convention `boutique_{slug_initial}_{id}` par `boutique_{slug_initial}` et confirme aussi son application aux deux bases existantes, en conservant leurs données. Les lots précédents décrivent l’état historique avant ce changement. Le code, le schéma, les deux diagrammes et les annotations actives des notes sont synchronisés avec la nouvelle convention ; aucune table ou colonne n’est ajoutée ou supprimée.
+
+`TenantDatabaseName` n’ajoute plus l’ID au nom. Le nom est réservé dans les données centrales dès la création du tenant et demeure stable après changement du nom affiché ou du slug. Le préfixe `boutique_` compte neuf caractères : le slug initial est limité à 55 caractères en MySQL, sans troncature. La création refuse les noms déjà réservés, y compris par un tenant renommé ou supprimé logiquement, ainsi que les bases physiques déjà présentes ; une autre boutique ne peut pas être adoptée implicitement. Les ID, UUID, domaines, dossiers, sessions et clés de jobs conservent leur rôle antérieur.
+
+MySQL 8.0.46 ne propose pas de renommage direct de base. Une opération locale explicite utilise les clients MySQL 8.0.46, sauvegarde chaque source avec ses données et triggers, importe sous le nouveau nom, compare les résultats, puis met à jour uniquement les références `tenancy_db_name` dans une transaction centrale. La collation réelle des sources, `utf8mb4_unicode_ci`, est conservée. Les origines restent présentes jusqu’à réussite de l’audit et des contrôles HTTP ; elles sont ensuite supprimées. Aucun seeder ne recrée les comptes, produits ou commandes lors de ce transfert.
+
+| Tenant / propriétaire central | Nom avant transfert | Nom actuel | Domaine conservé |
+|---|---|---|---|
+| 1 / 1 | `boutique_boutique1_1` | `boutique_boutique1` | `boutique1.aydra.localhost` |
+| 2 / 2 | `boutique_boutique2_2` | `boutique_boutique2` | `boutique2.aydra.localhost` |
+
+La comparaison vérifie les 69 tables et 205 triggers de chaque boutique, les nombres de lignes, les empreintes SHA-256 de toutes les valeurs de chaque ligne ordonnées par PK, les définitions de tables et les propriétés des triggers. MySQL réécrit certaines déclarations d’encodage explicite sans changement de métadonnées ; cette seule différence textuelle est normalisée. Une empreinte physique `CHECKSUM TABLE` diffère pour `product_options` après reconstruction, malgré des valeurs identiques : la comparaison finale utilise les valeurs complètes et non l’agencement interne du stockage. Les sauvegardes SQL et le manifeste restent privés dans `storage/app/private/database-renames/2026-10-06-remove-id/`, ignorés par Git ; le script et le fichier de connexion temporaires sont retirés après exécution.
+
+| Contrôle après correction | Résultat |
+|---|---|
+| Suite ciblée SQLite | 34 tests réussis lors du premier passage ; le seul échec concernait la borne de longueur d’un exemple. Les 4 cas de nommage passent après correction ; le test supplémentaire de refus d’une base non enregistrée passe également |
+| Seeder et diagnostics sur MySQL temporaire, avec les nouveaux noms | 1 test réussi, 19 assertions ; bases temporaires supprimées par le test |
+| Audit en lecture seule des trois bases réelles après bascule | 1 test réussi, 11 428 assertions ; tables, colonnes, PK/UK/FK, CHECK, triggers et historique de migrations conformes |
+| Diagnostics réels des deux boutiques | HTTP 200 en IPv4 et IPv6, nouveaux noms sélectionnés, tenant 1/2 et volumes 20 produits / 50 commandes conservés |
+| Diagnostic central réel | HTTP 200, nouveaux noms et domaines correctement associés |
+| Présence des schémas MySQL | Les deux nouveaux noms existent ; `boutique_boutique1_1` et `boutique_boutique2_2` n’existent plus |
+| Pint et PHPStan niveau 7 | Réussis |
+
 ## Prochaine étape et limites explicites
 
-Le lot demandé de préparation, seeding, connexion par domaine et vérification réelle est exécuté. **L'ensemble du SaaS n'est pas terminé.** Le §25 de l'instruction et le chapitre 15 de l'architecture demandent un développement progressif, module par module.
+La fondation, la configuration, les migrations et le jeu fonctionnel local sont contrôlés selon les résultats ci-dessus. Le central contient les deux boutiques d’essai et leurs domaines correctement reliés aux nouvelles bases. Les trois diagnostics sont accessibles en HTTP réel sans port après correction du routage Herd/Laragon ; la page publique standard de boutique reste « en préparation », et les identifiants sont consultables sur le diagnostic local dédié. **L'ensemble du SaaS n'est pas terminé.** Le §25 de l'instruction et le chapitre 15 de l'architecture demandent un développement progressif, module par module.
 
 Avant toute activation commerciale : implémenter Spatie Permission et ses règles datées/signatures/absence de recoupement, le rôle propriétaire protégé, Activity Log transactionnel, les intentions/historiques de déploiement, les plans/features/abonnements et quotas concurrents, le singleton shop, les contrôles complets d'état de compte et d'accès, puis l'activation locale par jeton et le profil professionnel vérifié. Ajouter les services, Requests/DTOs/Controllers dans leurs dossiers de contexte au fur et à mesure des véritables fonctionnalités ; ne pas créer de faux endpoints métier ni de tables d'exemples hors des demandes explicites.
 

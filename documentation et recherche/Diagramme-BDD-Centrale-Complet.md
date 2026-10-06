@@ -1,8 +1,14 @@
 # Diagramme complet de la BDD centrale
 
-Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.9 du 5 octobre 2026. Ce document présente **les 28 tables centrales et leurs 464 champs dans un seul diagramme Mermaid**, puis explique chaque table et chaque champ simplement. Les permissions SaaS portent leurs durées dans les tables existantes ; les quotas viennent des offres. Aucune migration n’est exécutée.
+Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.10 du 6 octobre 2026. Ce document présente **les 28 tables centrales et leurs 464 champs dans un seul diagramme Mermaid**, puis explique chaque table et chaque champ simplement. Les permissions SaaS portent leurs durées dans les tables existantes ; les quotas viennent des offres. Aucune migration n’est exécutée.
+
+**Identifiants :** `id` est un numéro interne auto-incrémenté (1, 2, 3…), jamais un UUID. `uuid` est un champ distinct et unique pour les liens publics et les références entre BDD. Les FK locales utilisent les ID numériques ; les trois pivots Spatie gardent leurs PK composites. Le contexte technique Tenancy utilise `tenants.id`, avec `id_generator=null`, tandis que les routes publiques utilisent `tenants.uuid`.
+
+**Bases et domaines :** une nouvelle base suit `boutique_{slug_initial}`, par exemple `boutique_nour`, sans suffixe d’ID. Son nom est réservé dans `tenants.data.tenancy_db_name` avant le provisionnement et reste stable après renommage. Avec le préfixe `boutique_`, le slug initial est limité à 55 caractères ; les noms trop longs, déjà réservés ou déjà présents sont refusés, sans troncature ni adoption d’une autre base. Les bases existantes ne changent que sur autorisation explicite ; l’utilisateur confirme aussi le retrait du suffixe des deux bases d’essai actuelles. `APP_URL` vaut ici `http://aydra.localhost` et `central_domains` contient explicitement `127.0.0.1`, `localhost` et `aydra.localhost`. `{tenants.slug}.{SAAS_BASE_DOMAIN}` définit le sous-domaine boutique, avec une base dérivée d’APP_URL sauf configuration explicite. Aucune donnée d’essai n’est créée par le seeder normal.
 
 ## 1. Les 28 tables expliquées très simplement
+
+**Essais locaux :** le seeder explicite `Central\LocalDevelopmentSeeder` peut créer deux propriétaires, un administrateur et deux boutiques, selon le §3.4 du schéma. Le seeder normal reste limité aux référentiels. `/_dev/database` permet de vérifier localement les ID/UUID, liens de propriété, domaines et noms de bases ; accès seulement en `local`/`testing`, avec debug actif et requête depuis la boucle locale. Aucune table ou relation du diagramme n’est modifiée.
 
 | Table | Explication très simple |
 |---|---|
@@ -50,8 +56,8 @@ erDiagram
     direction LR
 
 countries {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   char(2) code UK
   varchar name_fr
   varchar name_en
@@ -62,8 +68,8 @@ countries {
 }
 
 users {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 country_id FK
   u64 legal_verified_by_id FK "?"
   varchar email UK
@@ -95,8 +101,8 @@ users {
 }
 
 tenants {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 user_id FK
   varchar(63) slug UK
   varchar(32) document_prefix UK
@@ -118,8 +124,8 @@ tenants {
 }
 
 domains {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 tenant_id FK
   varchar(253) domain UK
   u8 type
@@ -133,8 +139,8 @@ domains {
 }
 
 contact_verifications {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 user_id FK
   u8 channel
   varchar normalized_destination
@@ -147,8 +153,8 @@ contact_verifications {
 }
 
 features {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   varchar(100) code UK
   varchar name
   u8 value_type
@@ -162,8 +168,8 @@ features {
 }
 
 permissions {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   varchar(125) name
   varchar(32) guard_name
   varchar label
@@ -173,8 +179,8 @@ permissions {
 }
 
 roles {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u8 super_admin_slot UK "?"
   char(64) permission_signature UK
   varchar(125) name
@@ -210,8 +216,8 @@ model_has_permissions {
 }
 
 admin_restrictions {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 admin_id FK
   u64 permission_id FK
   u64 target_tenant_id FK "?"
@@ -232,8 +238,8 @@ admin_restrictions {
 }
 
 plans {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   varchar code
   int version
   varchar name
@@ -247,8 +253,8 @@ plans {
 }
 
 plan_features {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 plan_id FK
   u64 feature_id FK
   boolean is_active
@@ -258,8 +264,8 @@ plan_features {
 }
 
 subscriptions {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 user_id FK
   u64 parent_subscription_id FK "?"
   u64 tenant_id FK "?"
@@ -287,8 +293,8 @@ subscriptions {
 }
 
 feature_usage {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 user_id FK
   u64 tenant_id FK "?"
   u64 feature_id FK
@@ -300,8 +306,8 @@ feature_usage {
 }
 
 geographic_areas {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 country_id FK
   u64 parent_id FK "?"
   u8 type
@@ -320,8 +326,8 @@ geographic_areas {
 }
 
 activity_log {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 tenant_id FK "?"
   varchar(191) operation_key UK "?"
   u64 subject_id "?"
@@ -340,8 +346,8 @@ activity_log {
 }
 
 tenant_schema_deployments {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 tenant_id FK
   varchar source_version "?"
   varchar target_version
@@ -360,8 +366,8 @@ tenant_schema_deployments {
 }
 
 saas_invoices {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 user_id FK
   u64 subscription_id FK
   u64 installment_id FK
@@ -401,8 +407,8 @@ saas_invoices {
 }
 
 saas_invoice_lines {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 document_id FK
   u64 user_id FK
   u64 original_invoice_id FK "?"
@@ -426,8 +432,8 @@ saas_invoice_lines {
 }
 
 saas_billing_settings {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 created_by_id FK "?"
   u64 validated_by_id FK "?"
   varchar(191) operation_key UK
@@ -453,8 +459,8 @@ saas_billing_settings {
 }
 
 saas_document_deliveries {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 user_id FK
   u64 document_id FK
   u64 created_by_id FK "?"
@@ -478,8 +484,8 @@ saas_document_deliveries {
 }
 
 saas_transfers {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 user_id FK
   u64 document_id FK
   u64 original_payment_id FK "?"
@@ -516,8 +522,8 @@ saas_transfers {
 }
 
 media {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 created_by_id FK "?"
   varchar storage_key UK
   u64 model_id
@@ -542,8 +548,8 @@ media {
 }
 
 shipping_carriers {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   varchar code UK
   varchar name
   varchar adapter
@@ -558,8 +564,8 @@ shipping_carriers {
 }
 
 carrier_geo_mappings {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 carrier_id FK
   u64 geographic_area_id FK
   u8 zone_type
@@ -576,8 +582,8 @@ carrier_geo_mappings {
 }
 
 pickup_points {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 carrier_id FK
   u64 province_id FK
   u64 municipality_id FK "?"
@@ -704,7 +710,7 @@ La liste des pays : Algérie, France, Arabie saoudite, Soudan et Égypte.
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `code` | Le code court du pays. Exemple : DZ pour l’Algérie, FR pour la France. |
 | `name_fr` | Le nom affiché en français. |
@@ -720,7 +726,7 @@ Les comptes des propriétaires de boutiques et des administrateurs du SaaS : nom
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `country_id` | Le pays du compte, à retrouver dans countries. |
 | `legal_verified_by_id` | L’administrateur central qui a vérifié les informations professionnelles du propriétaire. |
@@ -757,7 +763,7 @@ La liste des boutiques : leur nom, leur propriétaire, leur état et les informa
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `user_id` | Le propriétaire de cette boutique, à retrouver dans users. |
 | `internal_label` | Le nom utilisé par les administrateurs pour reconnaître la boutique. |
@@ -771,7 +777,7 @@ La liste des boutiques : leur nom, leur propriétaire, leur état et les informa
 | `is_primary` | Indique la boutique principale du propriétaire, notamment lorsqu’une seule boutique peut rester active. |
 | `activation_priority` | L’ordre de préférence pour décider quelles boutiques peuvent rester actives dans les limites de l’offre. |
 | `over_quota_since_at` | La date depuis laquelle la boutique dépasse les possibilités de l’abonnement. |
-| `data` | Les réglages techniques nécessaires pour retrouver et ouvrir la bonne base de cette boutique. |
+| `data` | Les réglages techniques de cette boutique. `tenancy_db_name` garde le nom réel et stable de sa base, par exemple boutique_nour ; renommer la boutique ne change pas ce nom. |
 | `schema_version` | La version de la structure de sa base de données. |
 | `provisioned_at` | La date où la préparation initiale de la base de la boutique a été terminée. |
 | `created_at` | La date et l’heure où cette ligne a été créée. |
@@ -784,7 +790,7 @@ Les adresses Internet des boutiques. Elle indique à quelle boutique appartient 
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `tenant_id` | La boutique concernée, à retrouver dans tenants. |
 | `domain` | L’adresse Internet complète de la boutique. Exemple : karim-shoes.exemple.com. |
@@ -803,7 +809,7 @@ Les demandes de vérification d’un e-mail ou d’un téléphone : code protég
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `user_id` | Le compte dont on vérifie l’e-mail ou le téléphone. |
 | `channel` | Le moyen utilisé pour envoyer le code de vérification. Choix : 1 = SMS ; 2 = WhatsApp ; 3 = e-mail. |
@@ -821,7 +827,7 @@ Le catalogue des possibilités des abonnements. Exemple : pouvoir créer plusieu
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `code` | Le code stable qui reconnaît la fonctionnalité dans le SaaS. |
 | `name` | Le nom lisible de cette fonctionnalité. |
@@ -840,7 +846,7 @@ La liste des actions qu’une personne peut être autorisée à faire. Exemple :
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `name` | Le nom technique de l’action autorisée. Exemple : saas.plans.manage pour gérer les offres. |
 | `guard_name` | L’espace d’authentification auquel ce rôle ou cette permission appartient. Ici : central, pour le SaaS. |
@@ -855,7 +861,7 @@ Les groupes d’autorisations. Exemple : le rôle « gestionnaire des abonnement
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `super_admin_slot` | Vaut 1 pour le rôle racine et reste vide pour les autres. Cette valeur calculée empêche d’avoir deux rôles racines dans cette base. |
 | `permission_signature` | Une empreinte des actions et de leurs durées, utilisée pour refuser deux rôles identiques même s’ils ont des noms différents. |
@@ -908,7 +914,7 @@ Limite les comptes, boutiques ou rôles sur lesquels un administrateur peut agir
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `admin_id` | L’administrateur dont on limite les possibilités. |
 | `permission_id` | L’action à laquelle cette restriction s’applique. |
@@ -934,7 +940,7 @@ Les offres d’abonnement proposées aux commerçants, avec leurs versions. Exem
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `code` | Le code stable de l’offre. Il permet de regrouper ses différentes versions. |
 | `version` | Le numéro de version de cet élément. Une nouvelle version garde les anciennes informations dans l’historique. |
@@ -953,7 +959,7 @@ Indique ce que chaque offre permet et ses limites. Exemple : l’offre Gratuit a
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `plan_id` | L’offre d’abonnement concernée, à retrouver dans plans. |
 | `feature_id` | La fonctionnalité concernée, à retrouver dans features. |
@@ -968,7 +974,7 @@ Une seule table contient les abonnements et leurs échéances. Une ligne de type
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `user_id` | Le propriétaire de l’abonnement et de ses échéances, à retrouver dans users. |
 | `parent_subscription_id` | Pour une échéance, l’abonnement auquel elle appartient. Ce champ reste vide sur la ligne d’abonnement. |
@@ -1001,7 +1007,7 @@ Les quantités déjà utilisées pour une fonctionnalité pendant une période. 
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `user_id` | Le propriétaire dont on compte l’utilisation. |
 | `tenant_id` | La boutique dont on compte l’utilisation, si la limite fonctionne par boutique. Vide correspond à un suivi au niveau du propriétaire. |
@@ -1018,7 +1024,7 @@ Les wilayas et communes dans une seule table. Chaque commune est reliée à sa w
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `country_id` | Le pays auquel cette wilaya ou cette commune appartient. |
 | `parent_id` | Pour une commune, le numéro de sa wilaya. Une wilaya laisse ce champ vide. |
@@ -1042,7 +1048,7 @@ Le journal des actions de la partie centrale : qui a fait quoi et quand. Exemple
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `subject_id` | Le numéro de cet objet, à retrouver selon subject_type. |
 | `causer_id` | Le numéro du compte qui a réalisé l’action, à retrouver selon causer_type. |
@@ -1066,7 +1072,7 @@ L’historique de création et de mise à jour technique des bases des boutiques
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `tenant_id` | La boutique concernée, à retrouver dans tenants. |
 | `source_version` | La version de la base de la boutique avant cette opération. Elle peut être vide lors de sa première création. |
@@ -1090,7 +1096,7 @@ Les factures et les avoirs du SaaS. Chaque fiche indique qui doit payer, pour qu
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `user_id` | Le propriétaire qui reçoit cette facture ou cet avoir, à retrouver dans users. |
 | `subscription_id` | L’abonnement lié à la facture ou à l’avoir. Le lien vise une ligne abonnement de subscriptions. |
@@ -1135,7 +1141,7 @@ Le détail des factures et des avoirs : description, quantité, prix, remise, ta
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `document_id` | La facture ou l’avoir auquel cette ligne appartient, à retrouver dans saas_invoices. |
 | `user_id` | Le même propriétaire que celui du document. Cette référence empêche de mélanger les clients. |
@@ -1164,7 +1170,7 @@ Les réglages de la facturation : les règles qui disent quand facturer et les c
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `created_by_id` | Le compte de la personne qui a créé cet élément. Il peut rester vide pour une création du système. |
 | `validated_by_id` | L’administrateur qui a validé cette version de règle. Un compteur laisse ce champ vide. |
@@ -1195,7 +1201,7 @@ Les envois des factures et des avoirs : à qui, par quel moyen, quand, combien d
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `user_id` | Le propriétaire auquel le document envoyé appartient. |
 | `document_id` | La facture ou l’avoir déjà émis que l’on transmet, à retrouver dans saas_invoices. |
@@ -1224,7 +1230,7 @@ Les paiements reçus et remboursements effectués à distance par banque, CCP ou
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `user_id` | Le propriétaire concerné par ce paiement ou ce remboursement. |
 | `document_id` | La facture concernée par ce paiement ou remboursement, à retrouver dans saas_invoices. |
@@ -1266,7 +1272,7 @@ Les informations pour retrouver les fichiers du SaaS : factures PDF, reçus, pre
 
 | Champ | Explication très simple |
 |---|---|
-| `id` | Le numéro unique de cette ligne à l’intérieur de la base. Il est attribué automatiquement. |
+| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `model_id` | Le numéro de cet objet dans sa table, choisi selon model_type. |
 | `created_by_id` | Le compte de la personne qui a créé cet élément. |

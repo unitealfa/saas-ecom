@@ -1,8 +1,14 @@
 # Diagramme complet de la BDD boutique
 
-Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.9 du 5 octobre 2026. Ce document présente **les 59 tables locales et leurs 1005 champs dans un seul diagramme Mermaid**, puis explique chaque table et chaque champ simplement. Chaque boutique possède cette structure dans sa propre BDD ; rôles et comptes restent indépendants. Aucune migration n’est exécutée.
+Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.10 du 6 octobre 2026. Ce document présente **les 59 tables locales et leurs 1005 champs dans un seul diagramme Mermaid**, puis explique chaque table et chaque champ simplement. Chaque boutique possède cette structure dans sa propre BDD ; rôles et comptes restent indépendants. Aucune migration n’est exécutée.
+
+**Identifiants :** chaque `id` métier est un numéro interne auto-incrémenté (1, 2, 3…), propre à sa table et à sa BDD. `uuid` reste un second champ unique pour les liens publics. Les FK locales utilisent les ID numériques ; les références au central, comme `shop.tenant_uuid` et `users.central_user_uuid`, restent des UUID sans FK SQL entre bases. Les trois pivots Spatie gardent leurs PK composites. Le numéro central utilisé par Tenancy ne devient jamais l’identité d’un utilisateur ou d’un produit local.
+
+**Base de la boutique :** le central réserve `boutique_{slug_initial}`, par exemple `boutique_nour`, sans suffixe d’ID, et conserve ce nom dans `tenants.data.tenancy_db_name` avant le provisionnement. Le nom reste stable après renommage. Avec le préfixe `boutique_`, le slug initial est limité à 55 caractères ; les noms trop longs, déjà réservés ou déjà présents sont refusés, sans troncature ni adoption d’une autre base. Les bases déjà présentes ne changent que sur autorisation explicite ; l’utilisateur confirme aussi le retrait du suffixe des deux bases d’essai actuelles. Cette décision ne change aucune table ni relation du diagramme. Les espaces internes de cache, fichiers et jobs sont isolés par la clé Tenancy numérique ; aucun ID interne n’est exposé au client.
 
 ## 1. Les 59 tables expliquées très simplement
+
+**Essais locaux :** le seeder explicite `Tenant\LocalDevelopmentSeeder` ajoute un employé, 20 produits et 50 commandes par boutique, avec des exemples fictifs de livraison, retours gratuit/payant, renvoi et facturation. `/_dev/database` est une exception strictement locale à la non-exposition des ID : environnement `local`/`testing`, debug actif et requête depuis la boucle locale. Il montre les liens, les nombres de lignes et des mesures de requêtes ; il n’effectue aucun appel transporteur ni envoi client. Aucune table ou relation du diagramme n’est modifiée ; voir §3.4 du schéma.
 
 | Table | Explication très simple |
 |---|---|
@@ -81,8 +87,8 @@ erDiagram
     direction LR
 
 shop {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   uuid tenant_uuid "REF central.tenants.uuid"
   u64 logo_media_id FK "?"
   u64 favicon_media_id FK "?"
@@ -107,8 +113,8 @@ shop {
 }
 
 shop_addresses {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 shop_id FK
   u64 shop_address_id FK "?"
   uuid province_uuid "? ; REF central.geographic_areas.uuid"
@@ -127,8 +133,8 @@ shop_addresses {
 }
 
 content_pages {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 product_id FK "?"
   u8 page_kind
   varchar slug
@@ -148,8 +154,8 @@ content_pages {
 }
 
 media {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 created_by_id FK "?"
   varchar storage_key UK
   u64 model_id
@@ -174,8 +180,8 @@ media {
 }
 
 categories {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 parent_id FK "?"
   u64 media_id FK "?"
   u8 record_type
@@ -193,8 +199,8 @@ categories {
 }
 
 products {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 category_id FK "?"
   u8 category_record_type "?"
   varchar name
@@ -222,8 +228,8 @@ products {
 }
 
 product_variants {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 product_id FK
   varchar label
   varchar sku
@@ -250,8 +256,8 @@ product_variants {
 }
 
 product_options {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 product_id FK
   u64 parent_id FK "?"
   u8 record_type
@@ -267,8 +273,8 @@ product_options {
 }
 
 variant_option_values {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 product_id FK
   u64 variant_id FK
   u64 option_id FK
@@ -280,8 +286,8 @@ variant_option_values {
 }
 
 product_tags {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 product_id FK
   u64 tag_id FK
   u8 tag_record_type
@@ -290,8 +296,8 @@ product_tags {
 }
 
 product_promotions {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 product_id FK
   u64 variant_id FK "?"
   u64 sales_page_id FK "?"
@@ -309,8 +315,8 @@ product_promotions {
 }
 
 product_reviews {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 product_id FK
   u64 visitor_id FK "?"
   u64 order_item_id FK "?"
@@ -327,8 +333,8 @@ product_reviews {
 }
 
 visitors {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   varchar token_hash
   datetime first_visited_at
   datetime last_visited_at
@@ -338,8 +344,8 @@ visitors {
 }
 
 visit_sessions {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 visitor_id FK
   datetime started_at
   datetime last_activity_at
@@ -355,8 +361,8 @@ visit_sessions {
 }
 
 navigation_events {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 session_id FK
   u64 product_id FK "?"
   u64 variant_id FK "?"
@@ -374,8 +380,8 @@ navigation_events {
 }
 
 carts {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 visitor_id FK
   u8 status
   datetime last_activity_at
@@ -386,8 +392,8 @@ carts {
 }
 
 cart_items {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 cart_id FK
   u64 variant_id FK
   u64 product_id FK
@@ -400,8 +406,8 @@ cart_items {
 }
 
 orders {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 visitor_id FK "?"
   u64 cart_id FK "?"
   u64 original_session_id FK "?"
@@ -437,8 +443,8 @@ orders {
 }
 
 order_revisions {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 order_id FK
   u64 author_id FK "?"
   u64 free_shipping_rule_id FK "?"
@@ -479,8 +485,8 @@ order_revisions {
 }
 
 order_items {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 revision_id FK
   u64 variant_id FK
   u64 product_id FK
@@ -510,8 +516,8 @@ order_items {
 }
 
 order_history {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 order_id FK
   u64 previous_revision_id FK "?"
   u64 next_revision_id FK "?"
@@ -529,8 +535,8 @@ order_history {
 }
 
 stock_movements {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 variant_id FK
   u64 order_item_id FK "?"
   u64 return_item_id FK "?"
@@ -560,8 +566,8 @@ stock_movements {
 }
 
 order_returns {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 shipment_id FK
   u64 order_id FK
   u64 shipped_revision_id FK
@@ -577,8 +583,8 @@ order_returns {
 }
 
 return_items {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 return_id FK
   u64 order_item_id FK
   u64 shipped_revision_id FK
@@ -599,8 +605,8 @@ return_items {
 }
 
 shipping_providers {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 user_id FK "?"
   u64 carrier_account_id FK "?"
   u8 type
@@ -616,8 +622,8 @@ shipping_providers {
 }
 
 shipping_rates {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 provider_id FK "?"
   u64 carrier_account_id FK "?"
   u64 created_by_id FK "?"
@@ -641,8 +647,8 @@ shipping_rates {
 }
 
 free_shipping_rules {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 product_id FK "?"
   uuid province_uuid "? ; REF central.geographic_areas.uuid"
   varchar name
@@ -658,8 +664,8 @@ free_shipping_rules {
 }
 
 shipments {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 order_id FK
   u64 shipped_revision_id FK
   u64 provider_id FK
@@ -685,8 +691,8 @@ shipments {
 }
 
 shipment_events {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 shipment_id FK
   u64 actor_id FK "?"
   u8 logistics_status "?"
@@ -713,8 +719,8 @@ shipment_events {
 }
 
 carrier_operations {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 provider_id FK
   u64 shipment_id FK "?"
   u64 order_id FK "?"
@@ -743,8 +749,8 @@ carrier_operations {
 }
 
 carrier_operation_attempts {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 operation_id FK
   int attempt_number
   int http_status_code "?"
@@ -759,8 +765,8 @@ carrier_operation_attempts {
 }
 
 collections {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 shipment_id FK
   u8 declared_status
   decimal expected_amount
@@ -775,8 +781,8 @@ collections {
 }
 
 remittance_statements {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 provider_id FK
   u64 carrier_remittance_batch_id FK "?"
   u64 validated_by_id FK "?"
@@ -800,8 +806,8 @@ remittance_statements {
 }
 
 carrier_settlement_lines {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 provider_id FK
   u64 remittance_statement_id FK "?"
   u64 collection_id FK "?"
@@ -824,8 +830,8 @@ carrier_settlement_lines {
 }
 
 expenses {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 product_id FK "?"
   u64 order_id FK "?"
   u64 shipment_id FK "?"
@@ -848,8 +854,8 @@ expenses {
 }
 
 customer_adjustments {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 order_id FK
   u64 return_id FK "?"
   u64 incident_id FK
@@ -872,8 +878,8 @@ customer_adjustments {
 }
 
 order_documents {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 order_id FK
   u64 revision_id FK
   u64 media_id FK
@@ -886,8 +892,8 @@ order_documents {
 }
 
 activity_log {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   varchar(191) operation_key UK "?"
   u64 subject_id "?"
   u64 causer_id "?"
@@ -906,8 +912,8 @@ activity_log {
 }
 
 carrier_fees {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 shipment_id FK
   u64 provider_id FK
   u64 return_id FK "?"
@@ -933,8 +939,8 @@ carrier_fees {
 }
 
 carrier_receivables {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 provider_id FK
   u64 carrier_fee_id FK
   u64 original_fee_payment_id FK "?"
@@ -952,8 +958,8 @@ carrier_receivables {
 }
 
 collection_entries {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 collection_id FK
   u64 verified_by_id FK
   u64 proof_media_id FK "?"
@@ -969,8 +975,8 @@ collection_entries {
 }
 
 invoices {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 order_id FK
   u64 revision_id FK
   u64 original_invoice_id FK "?"
@@ -1000,8 +1006,8 @@ invoices {
 }
 
 order_incidents {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 order_id FK
   u64 shipment_id FK
   u64 shipped_revision_id FK
@@ -1022,8 +1028,8 @@ order_incidents {
 }
 
 order_incident_details {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 incident_id FK
   u64 author_id FK "?"
   u8 type
@@ -1034,8 +1040,8 @@ order_incident_details {
 }
 
 billing_rules {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 validated_by_id FK "?"
   u8 record_type
   u8 document_type "?"
@@ -1060,8 +1066,8 @@ billing_rules {
 }
 
 sales_terms_acceptances {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 order_id FK
   u64 revision_id FK
   varchar operation_key UK
@@ -1074,8 +1080,8 @@ sales_terms_acceptances {
 }
 
 billing_obligations {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 order_id FK
   u64 revision_id FK
   u64 billing_rule_id FK
@@ -1097,8 +1103,8 @@ billing_obligations {
 }
 
 commercial_corrections {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 order_id FK
   u64 source_revision_id FK
   u64 incident_id FK "?"
@@ -1116,8 +1122,8 @@ commercial_corrections {
 }
 
 commercial_correction_lines {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 correction_id FK
   u64 source_revision_id FK
   u64 order_item_id FK
@@ -1130,8 +1136,8 @@ commercial_correction_lines {
 }
 
 users {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   uuid central_user_uuid UK "? ; REF central.users.uuid"
   varchar email UK
   varchar last_name
@@ -1151,8 +1157,8 @@ users {
 }
 
 permissions {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   varchar(125) name
   varchar(32) guard_name
   varchar label
@@ -1162,8 +1168,8 @@ permissions {
 }
 
 roles {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u8 super_admin_slot UK "?"
   char(64) permission_signature UK
   varchar(125) name
@@ -1199,8 +1205,8 @@ model_has_permissions {
 }
 
 team_invitations {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 initial_role_id FK
   u64 invited_by_id FK
   varchar token_hash UK
@@ -1214,8 +1220,8 @@ team_invitations {
 }
 
 contact_verifications {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 user_id FK
   u8 channel
   varchar normalized_destination
@@ -1228,8 +1234,8 @@ contact_verifications {
 }
 
 carrier_accounts {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 created_by_id FK
   uuid carrier_uuid "REF central.shipping_carriers.uuid"
   varchar label
@@ -1245,8 +1251,8 @@ carrier_accounts {
 }
 
 carrier_remittance_batches {
-  u64 id PK
-  uuid uuid UK
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
   u64 carrier_account_id FK
   u64 proof_media_id FK "?"
   u64 reversal_of_id FK "?"
@@ -1559,7 +1565,7 @@ La fiche publique de la boutique : son nom affiché, son logo, ses contacts et s
 |---|---|
 | `id` | le numéro unique qui permet de reconnaître cette ligne dans la base. Deux lignes différentes ne peuvent pas avoir le même `id`. |
 | `uuid` | identifiant public UUID v4 unique et indexé ; routes, API, formulaires et exports utilisent cet identifiant, sans exposer la PK numérique. |
-| `tenant_uuid` | l’identifiant de la boutique. Il sert à relier cette ligne à la bonne information au lieu de recopier toutes ses données. |
+| `tenant_uuid` | Le UUID de la boutique dans central.tenants.uuid. Cette référence entre BDD reste distincte de l’ID numérique utilisé par Tenancy pour ouvrir sa base. |
 | `logo_media_id` | le fichier utilisé comme logo de la boutique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
 | `favicon_media_id` | la petite image affichée dans l’onglet du navigateur. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
 | `singleton` | un petit verrou technique qui garantit qu’il n’existe qu’une seule ligne de ce type dans la base. Exemple : une seule fiche `shop`. |
