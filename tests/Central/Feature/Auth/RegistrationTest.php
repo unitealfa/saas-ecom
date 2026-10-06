@@ -1,5 +1,6 @@
 <?php
 
+use Database\Seeders\Central\CountrySeeder;
 use Laravel\Fortify\Features;
 
 beforeEach(function () {
@@ -13,6 +14,7 @@ test('registration screen can be rendered', function () {
 });
 
 test('new users can register', function () {
+    $this->seed(CountrySeeder::class);
     $response = $this->post(route('register.store'), [
         'name' => 'John Doe',
         'email' => 'test@example.com',

@@ -2,10 +2,14 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'welcome')->name('home');
+$canonicalDomain = parse_url(config('app.url'), PHP_URL_HOST);
 
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::view('dashboard', 'dashboard')->name('dashboard');
-});
+foreach (config('tenancy.central_domains') as $index => $domain) {
+    $routes = Route::domain($domain);
 
-require __DIR__.'/settings.php';
+    if ($domain !== $canonicalDomain) {
+        $routes->name('central.alias.'.$index.'.');
+    }
+
+    $routes->group(__DIR__.'/central.php');
+}

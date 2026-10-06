@@ -4,6 +4,7 @@ namespace App\Actions\Fortify;
 
 use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
+use App\Models\Central\Country;
 use App\Models\User;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
@@ -24,10 +25,14 @@ class CreateNewUser implements CreatesNewUsers
             'password' => $this->passwordRules(),
         ])->validate();
 
-        return User::create([
+        $user = new User([
             'name' => $input['name'],
             'email' => $input['email'],
             'password' => $input['password'],
         ]);
+        $user->country_id = Country::where('code', 'DZ')->where('is_active', true)->firstOrFail()->id;
+        $user->save();
+
+        return $user;
     }
 }
