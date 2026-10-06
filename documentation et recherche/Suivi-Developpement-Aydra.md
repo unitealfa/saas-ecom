@@ -200,6 +200,37 @@ Vérifications de ce correctif :
 
 Ces résultats complètent la photographie MySQL du premier lot ci-dessus. Les nouvelles tables locales sont installées ; leur présence n'active pas les fonctionnalités métier encore prévues.
 
+### 2026-10-06 — Migrations complètes des deux schémas documentés
+
+Demande : créer les migrations selon `Diagramme-BDD-Centrale-Complet.md`, `Diagramme-BDD-Boutique-Complet.md` et `Schema-BDD-SaaS-Ecommerce-UUID.md`, puis comparer et corriger. Ces trois documents restent inchangés.
+
+| Contexte | Tables documentées | Champs documentés | Nouvelles migrations |
+|---|---:|---:|---:|
+| Central | 28 | 464 | 23 créations + 5 migrations de contraintes |
+| Boutique | 59 | 1 005 | 57 créations + 5 migrations de contraintes |
+
+**90 nouveaux fichiers**, soit 80 créations de tables manquantes et 10 migrations pour les index ordinaires, FK simples/composites, contraintes de ligne, protections d'identité/historique et index conditionnels. Avec les fichiers du lot précédent, les dossiers contiennent 38 migrations centrales et 68 migrations tenant. Les noms et le contenu des migrations déjà appliquées sont conservés.
+
+Les cinq tables demandées dans chaque contexte — `users`, `cache`, `jobs`, `tenants`, `domains` — et les tables techniques Laravel associées restent présentes. Les `tenants`/`domains` locales restent des tables supplémentaires demandées explicitement ; le registre et le routage demeurent centraux. Les extensions existantes du kit, notamment les passkeys, la double authentification et le discriminant calculé du domaine principal, sont conservées.
+
+La traduction conserve les PK numériques, UUID ASCII/ascii_bin, types signés/non signés, tailles de texte, précision microseconde, nullable, champs générés STORED, clés composées des pivots, valeurs des enums, durées de 1 à 9 999 jours et défaut de 9 999 jours. Les montants utilisent DECIMAL(14,2). Poids, dimensions et quantité de contenu utilisent DECIMAL(14,3), choix de précision pour les grandeurs dont le document demande une échelle appropriée sans donner de valeur numérique.
+
+Les index parents précèdent les FK ; les relations circulaires sont ajoutées après toutes les créations. Les références UUID inter-BDD et les liens polymorphes ne deviennent pas des FK fictives. Les CHECK et triggers reprennent les formes typées, identités immuables, historiques protégés, projections de réservation et contrepassations documentés. Les sommes inter-lignes, plafonds concurrents, chevauchements de rôles/périodes, validation des JSON métier et autorisations effectives restent des responsabilités des services transactionnels prévus dans le schéma ; créer les tables n'implémente pas ces modules.
+
+La comparaison automatisée lit directement les trois documents et inspecte les bases migrées : tables, ensemble exact des champs, types, nullable, PK/UK, colonnes calculées, FK simples et les tableaux de FK composites des §§6.1, 6.2, 6.3 et 6.7. Aucun champ FK dessiné ne manque de relation SQL locale. Les tests de contraintes exercent aussi les refus de doublons de rôle, durées invalides, mauvais guard, capacité SaaS locale, journal réécrit, mauvaise région/produit/axe/révision, stock insuffisant et mutation d'une réservation terminale.
+
+Corrections détectées par les tests : déclarer explicitement `nullable(false)` sur les colonnes générées obligatoires ; créer les index d'expression après les FK pour éviter leur altération pendant les reconstructions SQLite ; protéger le compte racine depuis ses rôles existants et le propriétaire local depuis `central_user_uuid`, sans inventer de drapeau dans `users`.
+
+**Portée d'exécution :** ces nouvelles migrations ne sont pas appliquées aux BDD MySQL de démonstration `aydra` et `tenant_*`. Les tests SQLite sont isolés ; le test MySQL crée des bases `aydra_migration_test_<contexte>_<UUID>`, vérifie les deux schémas et leur rollback, puis supprime uniquement ces bases qu'il a créées. MySQL installé : 8.0.46 ; les capacités utilisées sont testées sur ce serveur, distinct de la cible documentaire 8.4. Le contrôle en lecture du registre réel conserve 2 utilisateurs, 2 tenants et 2 domaines centraux.
+
+| Vérification | Résultat |
+|---|---|
+| Comparaison et contraintes SQLite | 2 tests réussis, 5 248 assertions |
+| Suite complète `php artisan test --compact` | 49 tests réussis, 5 482 assertions ; test MySQL volontairement exclu par défaut |
+| Test MySQL isolé, création/contraintes/rollback des deux contextes | Réussi : 1 test, 6 826 assertions, avec `AYDRA_TEST_MYSQL_MIGRATIONS=1` |
+| Pint et PHPStan niveau 7 | Réussis |
+| `git diff --check` | Réussi |
+
 ## Prochaine étape et limites explicites
 
 Le lot demandé de préparation, seeding, connexion par domaine et vérification réelle est exécuté. **L'ensemble du SaaS n'est pas terminé.** Le §25 de l'instruction et le chapitre 15 de l'architecture demandent un développement progressif, module par module.
