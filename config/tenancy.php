@@ -33,7 +33,7 @@ return [
         'localhost',
         'aydra.localhost',
     ],
-    'saas_base_domain' => env('SAAS_BASE_DOMAIN', $centralDomain),
+    'saas_base_domain' => getenv('SAAS_BASE_DOMAIN') ?: $centralDomain,
     'bootstrappers' => [
         DatabaseTenancyBootstrapper::class,
         NamespacedCacheBootstrapper::class,
