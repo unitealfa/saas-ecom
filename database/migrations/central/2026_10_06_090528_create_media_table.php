@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('media', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('created_by_id')->nullable();
             $table->string('storage_key')->unique();
             $table->unsignedBigInteger('model_id');
@@ -29,9 +29,8 @@ return new class extends Migration
             $table->boolean('is_primary');
             $table->unsignedTinyInteger('primary_slot')->nullable()->storedAs('CASE WHEN is_primary = 1 AND deleted_at IS NULL THEN 1 ELSE NULL END');
             $table->char('file_hash', 64)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
-            $table->dateTime('deleted_at', 6)->nullable();
+            $table->timestamps();
+            $table->softDeletes();
         });
     }
 

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->foreignId('country_id')->constrained('countries')->restrictOnDelete();
             $table->foreignId('legal_verified_by_id')->nullable()->constrained('users')->restrictOnDelete();
             $table->string('last_name');
@@ -21,9 +21,9 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('password');
             $table->string('phone')->nullable();
-            $table->dateTime('email_verified_at', 6)->nullable();
-            $table->dateTime('phone_verified_at', 6)->nullable();
-            $table->dateTime('whatsapp_verified_at', 6)->nullable();
+            $table->dateTime('email_verified_at')->nullable();
+            $table->dateTime('phone_verified_at')->nullable();
+            $table->dateTime('whatsapp_verified_at')->nullable();
             $table->string('legal_form')->nullable();
             $table->string('activity_nature')->nullable();
             $table->string('nif')->nullable();
@@ -34,14 +34,13 @@ return new class extends Migration
             $table->decimal('share_capital', 14, 2)->nullable();
             $table->unsignedBigInteger('legal_profile_version')->nullable();
             $table->unsignedTinyInteger('legal_verification_status')->nullable();
-            $table->dateTime('legal_verified_at', 6)->nullable();
+            $table->dateTime('legal_verified_at')->nullable();
             $table->string('locale', 10)->default('fr');
             $table->unsignedTinyInteger('status')->default(1);
-            $table->dateTime('last_login_at', 6)->nullable();
+            $table->dateTime('last_login_at')->nullable();
             $table->rememberToken();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
-            $table->dateTime('deleted_at', 6)->nullable();
+            $table->timestamps();
+            $table->softDeletes();
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {

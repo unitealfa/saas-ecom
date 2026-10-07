@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('remittance_statements', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('provider_id');
             $table->unsignedBigInteger('carrier_remittance_batch_id')->nullable();
             $table->unsignedBigInteger('validated_by_id')->nullable();
@@ -29,8 +29,7 @@ return new class extends Migration
             $table->text('note')->nullable();
             $table->string('operation_key');
             $table->dateTime('reconciled_at', 6)->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

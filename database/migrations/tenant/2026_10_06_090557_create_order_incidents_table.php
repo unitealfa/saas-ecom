@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('order_incidents', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('order_id');
             $table->unsignedBigInteger('shipment_id');
             $table->unsignedBigInteger('shipped_revision_id');
@@ -26,8 +26,7 @@ return new class extends Migration
             $table->text('reason');
             $table->dateTime('validated_at', 6)->nullable();
             $table->dateTime('closed_at', 6)->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

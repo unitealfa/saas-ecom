@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('billing_rules', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('validated_by_id')->nullable();
             $table->unsignedTinyInteger('record_type')->comment('TenantBillingRecordTypeEnum: 1, 2');
             $table->unsignedTinyInteger('document_type')->nullable()->comment('DocumentTypeEnum: 1, 2, 3, 4, 5');
@@ -30,8 +30,7 @@ return new class extends Migration
             $table->dateTime('validated_at', 6)->nullable();
             $table->dateTime('effective_at', 6)->nullable();
             $table->dateTime('ends_at', 6)->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

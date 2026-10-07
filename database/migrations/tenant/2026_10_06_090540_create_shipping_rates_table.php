@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('shipping_rates', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('provider_id')->nullable();
             $table->unsignedBigInteger('carrier_account_id')->nullable();
             $table->unsignedBigInteger('created_by_id')->nullable();
@@ -30,7 +30,7 @@ return new class extends Migration
             $table->unsignedTinyInteger('current_slot')->nullable()->storedAs('CASE WHEN record_type = 1 AND is_active = 1 AND deleted_at IS NULL THEN 1 WHEN record_type = 2 AND deleted_at IS NULL THEN 1 ELSE NULL END');
             $table->dateTime('created_at', 6);
             $table->dateTime('updated_at', 6)->nullable();
-            $table->dateTime('deleted_at', 6)->nullable();
+            $table->softDeletes();
         });
     }
 

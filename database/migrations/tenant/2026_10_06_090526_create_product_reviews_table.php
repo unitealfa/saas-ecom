@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('product_reviews', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('product_id');
             $table->unsignedBigInteger('visitor_id')->nullable();
             $table->unsignedBigInteger('order_item_id')->nullable();
@@ -21,9 +21,8 @@ return new class extends Migration
             $table->unsignedTinyInteger('moderation_status')->comment('ReviewModerationStatusEnum: 1, 2, 3, 4');
             $table->dateTime('moderated_at', 6)->nullable();
             $table->dateTime('published_at', 6)->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
-            $table->dateTime('deleted_at', 6)->nullable();
+            $table->timestamps();
+            $table->softDeletes();
         });
     }
 

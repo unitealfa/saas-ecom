@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('geographic_areas', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('country_id');
             $table->unsignedBigInteger('parent_id')->nullable();
             $table->unsignedTinyInteger('type')->comment('GeoZoneTypeEnum: 1, 2');
@@ -23,9 +23,8 @@ return new class extends Migration
             $table->string('reference_source');
             $table->date('effective_at');
             $table->string('reference_version');
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
-            $table->dateTime('deleted_at', 6)->nullable();
+            $table->timestamps();
+            $table->softDeletes();
         });
     }
 

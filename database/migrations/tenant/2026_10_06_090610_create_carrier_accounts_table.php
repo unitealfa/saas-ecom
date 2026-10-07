@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('carrier_accounts', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('created_by_id');
             $table->char('carrier_uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin');
             $table->string('label');
@@ -21,8 +21,7 @@ return new class extends Migration
             $table->string('encryption_key_version')->nullable();
             $table->boolean('is_active');
             $table->dateTime('last_synced_at', 6)->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

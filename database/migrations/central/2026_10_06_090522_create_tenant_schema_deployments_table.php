@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('tenant_schema_deployments', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('tenant_id');
             $table->string('source_version')->nullable();
             $table->string('target_version');
@@ -24,8 +24,7 @@ return new class extends Migration
             $table->text('sanitized_error')->nullable();
             $table->char('correlation_id', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin');
             $table->json('runtime_versions');
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

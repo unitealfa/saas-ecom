@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('roles', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedTinyInteger('super_admin_slot')->nullable()->storedAs('CASE WHEN is_super_admin = 1 THEN 1 ELSE NULL END')->unique();
             $table->char('permission_signature', 64)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin');
             $table->string('name', 125);
@@ -20,8 +20,7 @@ return new class extends Migration
             $table->boolean('is_protected');
             $table->boolean('is_super_admin');
             $table->unsignedBigInteger('permission_version');
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

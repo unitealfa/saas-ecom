@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('shop', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->char('tenant_uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin');
             $table->unsignedBigInteger('logo_media_id')->nullable();
             $table->unsignedBigInteger('favicon_media_id')->nullable();
@@ -30,8 +30,7 @@ return new class extends Migration
             $table->json('colors');
             $table->json('shipping_tax_configuration')->nullable();
             $table->integer('cart_lifetime_days');
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
 /** @property int $id */
@@ -16,7 +17,7 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
 class Country extends Model
 {
     /** @use HasFactory<CountryFactory> */
-    use CentralConnection, HasFactory, HasPublicUuid;
+    use CentralConnection, HasFactory, HasPublicUuid, SoftDeletes;
 
     protected function casts(): array
     {

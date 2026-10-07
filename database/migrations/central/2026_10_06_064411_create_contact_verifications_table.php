@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('contact_verifications', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->foreignId('user_id')->constrained('users')->restrictOnDelete();
             $table->unsignedTinyInteger('channel');
             $table->string('normalized_destination');
@@ -21,8 +21,7 @@ return new class extends Migration
             $table->dateTime('expires_at', 6);
             $table->integer('attempts_count')->default(0);
             $table->dateTime('consumed_at', 6)->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('invoices', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('order_id');
             $table->unsignedBigInteger('revision_id');
             $table->unsignedBigInteger('original_invoice_id')->nullable();
@@ -35,8 +35,7 @@ return new class extends Migration
             $table->text('cancellation_reason')->nullable();
             $table->string('operation_key');
             $table->string('document_reason')->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

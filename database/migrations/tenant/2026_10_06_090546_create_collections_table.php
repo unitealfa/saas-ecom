@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('collections', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('shipment_id');
             $table->unsignedTinyInteger('declared_status')->comment('CollectionStatusEnum: 1, 2, 3, 4, 5, 6, 7');
             $table->decimal('expected_amount', 14, 2);
@@ -20,8 +20,7 @@ return new class extends Migration
             $table->dateTime('declared_paid_at', 6)->nullable();
             $table->string('source');
             $table->dateTime('reconciled_at', 6)->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->char('central_user_uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->nullable()->unique();
             $table->string('last_name');
             $table->string('first_name')->nullable();
@@ -27,14 +27,13 @@ return new class extends Migration
             $table->dateTime('joined_at', 6)->nullable();
             $table->dateTime('last_login_at', 6)->nullable();
             $table->rememberToken();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
-            $table->dateTime('deleted_at', 6)->nullable();
+            $table->timestamps();
+            $table->softDeletes();
         });
 
         Schema::create('contact_verifications', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->foreignId('user_id')->constrained('users')->restrictOnDelete();
             $table->unsignedTinyInteger('channel');
             $table->string('normalized_destination');
@@ -42,8 +41,7 @@ return new class extends Migration
             $table->dateTime('expires_at', 6);
             $table->integer('attempts_count')->default(0);
             $table->dateTime('consumed_at', 6)->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table): void {

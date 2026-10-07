@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('content_pages', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('product_id')->nullable();
             $table->unsignedTinyInteger('page_kind')->comment('PageKindEnum: 1, 2');
             $table->string('slug');
@@ -24,9 +24,8 @@ return new class extends Migration
             $table->boolean('is_published');
             $table->dateTime('published_at', 6)->nullable();
             $table->integer('version');
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
-            $table->dateTime('deleted_at', 6)->nullable();
+            $table->timestamps();
+            $table->softDeletes();
         });
     }
 

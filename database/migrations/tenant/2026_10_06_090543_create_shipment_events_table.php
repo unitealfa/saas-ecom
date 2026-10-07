@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('shipment_events', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('shipment_id');
             $table->unsignedBigInteger('actor_id')->nullable();
             $table->unsignedTinyInteger('logistics_status')->nullable()->comment('ShipmentStatusEnum: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11');

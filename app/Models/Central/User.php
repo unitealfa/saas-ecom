@@ -19,6 +19,7 @@ use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Spatie\Permission\Traits\HasRoles;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
 /**
@@ -50,7 +51,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 
     /** @use HasFactory<UserFactory> */
     use CentralConnection, HasFactory, HasPublicUuid, Notifiable, PasskeyAuthenticatable, SoftDeletes, TwoFactorAuthenticatable;
-
+    use HasRoles;
     protected static function newFactory(): UserFactory
     {
         return UserFactory::new();

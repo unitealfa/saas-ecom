@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('saas_invoices', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('subscription_id');
             $table->unsignedBigInteger('installment_id');
@@ -45,8 +45,7 @@ return new class extends Migration
             $table->dateTime('cancelled_at', 6)->nullable();
             $table->text('cancellation_reason')->nullable();
             $table->char('correlation_id', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('collection_entries', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('collection_id');
             $table->unsignedBigInteger('verified_by_id');
             $table->unsignedBigInteger('proof_media_id')->nullable();

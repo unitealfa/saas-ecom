@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('products', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('category_id')->nullable();
             $table->unsignedTinyInteger('category_record_type')->nullable()->storedAs('CASE WHEN category_id IS NOT NULL THEN 1 ELSE NULL END');
             $table->string('name');
@@ -32,9 +32,8 @@ return new class extends Migration
             $table->string('meta_title')->nullable();
             $table->text('meta_description')->nullable();
             $table->boolean('indexable');
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
-            $table->dateTime('deleted_at', 6)->nullable();
+            $table->timestamps();
+            $table->softDeletes();
         });
     }
 

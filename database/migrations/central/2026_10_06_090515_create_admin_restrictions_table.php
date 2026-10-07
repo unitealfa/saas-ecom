@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('admin_restrictions', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('admin_id');
             $table->unsignedBigInteger('permission_id');
             $table->unsignedBigInteger('target_tenant_id')->nullable();
@@ -25,9 +25,8 @@ return new class extends Migration
             $table->unsignedBigInteger('normalized_target_id')->nullable(false)->storedAs('COALESCE(target_tenant_id, target_user_id, target_role_id, 0)');
             $table->unsignedTinyInteger('active_slot')->nullable()->storedAs('CASE WHEN status = 1 AND deleted_at IS NULL THEN 1 ELSE NULL END');
             $table->dateTime('expires_at', 6)->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
-            $table->dateTime('deleted_at', 6)->nullable();
+            $table->timestamps();
+            $table->softDeletes();
         });
     }
 

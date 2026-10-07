@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('saas_billing_settings', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('created_by_id')->nullable();
             $table->unsignedBigInteger('validated_by_id')->nullable();
             $table->string('operation_key', 191)->unique();
@@ -31,8 +31,7 @@ return new class extends Migration
             $table->dateTime('ends_at', 6)->nullable();
             $table->dateTime('validated_at', 6)->nullable();
             $table->char('correlation_id', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

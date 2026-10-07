@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('sales_terms_acceptances', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('order_id');
             $table->unsignedBigInteger('revision_id');
             $table->string('operation_key')->unique();

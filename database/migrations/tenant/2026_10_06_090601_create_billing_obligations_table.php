@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('billing_obligations', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('order_id');
             $table->unsignedBigInteger('revision_id');
             $table->unsignedBigInteger('billing_rule_id');
@@ -27,8 +27,7 @@ return new class extends Migration
             $table->integer('attempts_count');
             $table->dateTime('next_attempt_at', 6)->nullable();
             $table->string('error_code')->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

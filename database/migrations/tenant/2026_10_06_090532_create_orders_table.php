@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('orders', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('visitor_id')->nullable();
             $table->unsignedBigInteger('cart_id')->nullable();
             $table->unsignedBigInteger('original_session_id')->nullable();
@@ -41,8 +41,7 @@ return new class extends Migration
             $table->boolean('retention_hold');
             $table->text('retention_hold_reason')->nullable();
             $table->dateTime('hold_review_at', 6)->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

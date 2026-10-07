@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('pickup_points', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('carrier_id');
             $table->unsignedBigInteger('province_id');
             $table->unsignedBigInteger('municipality_id')->nullable();
@@ -25,9 +25,8 @@ return new class extends Migration
             $table->string('reference_source');
             $table->integer('reference_version');
             $table->dateTime('synced_at', 6)->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
-            $table->dateTime('deleted_at', 6)->nullable();
+            $table->timestamps();
+            $table->softDeletes();
         });
     }
 

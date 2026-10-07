@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('team_invitations', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('initial_role_id');
             $table->unsignedBigInteger('invited_by_id');
             $table->string('token_hash')->unique();
@@ -19,8 +19,7 @@ return new class extends Migration
             $table->dateTime('expires_at', 6);
             $table->dateTime('accepted_at', 6)->nullable();
             $table->dateTime('revoked_at', 6)->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

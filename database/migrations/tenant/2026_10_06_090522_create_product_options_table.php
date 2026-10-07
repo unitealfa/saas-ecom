@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('product_options', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('product_id');
             $table->unsignedBigInteger('parent_id')->nullable();
             $table->unsignedTinyInteger('record_type')->comment('ProductOptionRecordTypeEnum: 1, 2');
@@ -20,9 +20,8 @@ return new class extends Migration
             $table->unsignedTinyInteger('display_type')->nullable()->comment('OptionDisplayTypeEnum: 1, 2, 3');
             $table->char('color_hex', 7)->nullable();
             $table->integer('position');
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
-            $table->dateTime('deleted_at', 6)->nullable();
+            $table->timestamps();
+            $table->softDeletes();
         });
     }
 

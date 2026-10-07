@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('order_items', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('revision_id');
             $table->unsignedBigInteger('variant_id');
             $table->unsignedBigInteger('product_id');

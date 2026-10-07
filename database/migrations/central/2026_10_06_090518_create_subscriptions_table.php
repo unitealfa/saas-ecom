@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('subscriptions', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('parent_subscription_id')->nullable();
             $table->unsignedBigInteger('tenant_id')->nullable();
@@ -33,8 +33,7 @@ return new class extends Migration
             $table->dateTime('due_at', 6)->nullable();
             $table->unsignedTinyInteger('installment_status')->nullable()->comment('InstallmentStatusEnum: 1, 2, 3, 4');
             $table->unsignedTinyInteger('active_owner_slot')->nullable()->storedAs('CASE WHEN record_type = 1 AND status = 3 THEN 1 ELSE NULL END');
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

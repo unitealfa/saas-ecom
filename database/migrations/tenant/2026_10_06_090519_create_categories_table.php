@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('categories', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('parent_id')->nullable();
             $table->unsignedBigInteger('media_id')->nullable();
             $table->unsignedTinyInteger('record_type')->comment('CategoryRecordTypeEnum: 1, 2');
@@ -22,9 +22,8 @@ return new class extends Migration
             $table->boolean('is_active');
             $table->string('meta_title')->nullable();
             $table->text('meta_description')->nullable();
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
-            $table->dateTime('deleted_at', 6)->nullable();
+            $table->timestamps();
+            $table->softDeletes();
         });
     }
 

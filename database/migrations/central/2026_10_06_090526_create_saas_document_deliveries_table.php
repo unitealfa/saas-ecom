@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('saas_document_deliveries', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('document_id');
             $table->unsignedBigInteger('created_by_id')->nullable();
@@ -29,8 +29,7 @@ return new class extends Migration
             $table->string('error_code')->nullable();
             $table->dateTime('sending_started_at', 6)->nullable();
             $table->char('correlation_id', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin');
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

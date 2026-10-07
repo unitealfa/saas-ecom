@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('carrier_settlement_lines', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('provider_id');
             $table->unsignedBigInteger('remittance_statement_id')->nullable();
             $table->unsignedBigInteger('collection_id')->nullable();

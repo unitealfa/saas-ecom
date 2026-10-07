@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('shop_addresses', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('shop_id');
             $table->unsignedBigInteger('shop_address_id')->nullable();
             $table->char('province_uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->nullable();
@@ -23,9 +23,8 @@ return new class extends Migration
             $table->boolean('visible');
             $table->json('payload');
             $table->unsignedTinyInteger('primary_slot')->nullable()->storedAs('CASE WHEN record_type = 1 AND is_primary = 1 AND deleted_at IS NULL THEN 1 ELSE NULL END');
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
-            $table->dateTime('deleted_at', 6)->nullable();
+            $table->timestamps();
+            $table->softDeletes();
         });
     }
 

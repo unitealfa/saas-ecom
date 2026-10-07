@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('carrier_operation_attempts', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('operation_id');
             $table->integer('attempt_number');
             $table->integer('http_status_code')->nullable();

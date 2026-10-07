@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('customer_adjustments', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('order_id');
             $table->unsignedBigInteger('return_id')->nullable();
             $table->unsignedBigInteger('incident_id');
@@ -28,8 +28,7 @@ return new class extends Migration
             $table->string('reference')->nullable();
             $table->text('reason');
             $table->string('operation_key');
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

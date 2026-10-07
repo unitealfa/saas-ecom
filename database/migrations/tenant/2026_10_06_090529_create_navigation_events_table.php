@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('navigation_events', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('session_id');
             $table->unsignedBigInteger('product_id')->nullable();
             $table->unsignedBigInteger('variant_id')->nullable();

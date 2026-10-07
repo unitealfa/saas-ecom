@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('carrier_fees', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('shipment_id');
             $table->unsignedBigInteger('provider_id');
             $table->unsignedBigInteger('return_id')->nullable();
@@ -31,8 +31,7 @@ return new class extends Migration
             $table->dateTime('recognized_at', 6)->nullable();
             $table->string('external_reference')->nullable();
             $table->string('operation_key');
-            $table->dateTime('created_at', 6);
-            $table->dateTime('updated_at', 6);
+            $table->timestamps();
         });
     }
 

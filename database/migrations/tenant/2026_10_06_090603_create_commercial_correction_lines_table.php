@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('commercial_correction_lines', function (Blueprint $table): void {
             $table->id();
-            $table->char('uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
             $table->unsignedBigInteger('correction_id');
             $table->unsignedBigInteger('source_revision_id');
             $table->unsignedBigInteger('order_item_id');
