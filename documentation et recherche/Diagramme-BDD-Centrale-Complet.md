@@ -1,12 +1,20 @@
 # Diagramme complet de la BDD centrale
 
-Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.10 du 6 octobre 2026. Ce document présente **les 28 tables centrales et leurs 464 champs dans un seul diagramme Mermaid**, puis explique chaque table et chaque champ simplement. Les permissions SaaS portent leurs durées dans les tables existantes ; les quotas viennent des offres. Aucune migration n’est exécutée.
+**Mise à jour technique du 8 octobre 2026 :** MySQL, Spatie Permission 8.3.0 et Activity Log 5.0.0. `created_at`/`updated_at` proviennent de `timestamps()` et `deleted_at` de `softDeletes()` pour les tables archivables ; ces TIMESTAMP sont nullable. Les dates métier restent des DATETIME. Les migrations de création Permission et Activity Log sont publiées par les commandes officielles Spatie ; deux migrations d'extension centrales conservent les UUID, durées et informations d'audit décrits ici. Les FK conservent RESTRICT ; les index natifs ne sont pas recréés en doublon. La suppression de `protect_central_identifiers_and_ownership` est conservée ; voir la mise à jour technique du schéma principal pour ses conséquences sur les triggers. Les 62 relations FK simples centrales et 192 locales utilisent `foreignId()` avec leur vraie contrainte SQL vers la PK du parent ; cette colonne conserve un ID existant, sans AUTO_INCREMENT. Les index ordinaires et UNIQUE sont définis dans les migrations de leurs tables. Les FK simples et composites dont les parents sont disponibles sont définies au même endroit ; les références vers un parent créé ensuite, notamment le cycle commande/révision, sont ajoutées dans `add_documented_foreign_keys`, avec mention dans la migration de création. Les contrats REF/POLY restent distincts.
+
+Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.10 du 6 octobre 2026. Ce document présente **les 28 tables centrales et leurs 465 champs dans un seul diagramme Mermaid**, puis explique chaque table et chaque champ simplement. Les permissions SaaS portent leurs durées dans les tables existantes ; les quotas viennent des offres. Les migrations correspondantes sont vérifiées sur des bases MySQL de test isolées.
 
 **Identifiants :** `id` est un numéro interne auto-incrémenté (1, 2, 3…), jamais un UUID. `uuid` est un champ distinct et unique pour les liens publics et les références entre BDD. Les FK locales utilisent les ID numériques ; les trois pivots Spatie gardent leurs PK composites. Le contexte technique Tenancy utilise `tenants.id`, avec `id_generator=null`, tandis que les routes publiques utilisent `tenants.uuid`.
+
+**Tailles nécessaires seulement :** les montants se déclarent avec `decimal('champ')` ; `SchemaBlueprint` conserve une fois DECIMAL(14,2), pour les centimes et la capacité documentée. Les formats fixes UUID, SHA-256, ISO et couleur sont conservés. Les booléens s'écrivent `true`/`false` en PHP et `TRUE`/`FALSE` en SQL ; les statuts et compteurs restent numériques. `id()` est déjà unique par sa PK. `features.code` possède son index UNIQUE avec une chaîne sans longueur explicite ; les unicités composites de relations restent nécessaires.
+
+**Déclarations et casts :** `$table->uuid('uuid');` applique les règles communes de `App\Services\SchemaBlueprint` (CHAR(36), ASCII, collation `ascii_bin`, UNIQUE), sur toutes les connexions. Les VARCHAR utilisent la longueur Laravel de 255 sans argument de longueur dans les migrations ; `rememberToken()` garde son format natif. Les dates sont sans microsecondes, sans argument `6`. `tenants.slug` conserve son index UNIQUE et sa validation technique ; `tenants.shop_name` possède un index non unique. Les modèles existants castent les codes documentés vers leurs enums PHP, les indicateurs en booléens, les versions en entiers, les dates métier en dates immuables et le mot de passe via `hashed` ; voir §3.3 du schéma pour les classes.
 
 **Bases et domaines :** une nouvelle base suit `boutique_{slug_initial}`, par exemple `boutique_nour`, sans suffixe d’ID. Son nom est réservé dans `tenants.data.tenancy_db_name` avant le provisionnement et reste stable après renommage. Avec le préfixe `boutique_`, le slug initial est limité à 55 caractères ; les noms trop longs, déjà réservés ou déjà présents sont refusés, sans troncature ni adoption d’une autre base. Les bases existantes ne changent que sur autorisation explicite ; l’utilisateur confirme aussi le retrait du suffixe des deux bases d’essai actuelles. `APP_URL` vaut ici `http://aydra.localhost` et `central_domains` contient explicitement `127.0.0.1`, `localhost` et `aydra.localhost`. `{tenants.slug}.{SAAS_BASE_DOMAIN}` définit le sous-domaine boutique, avec une base dérivée d’APP_URL sauf configuration explicite. Aucune donnée d’essai n’est créée par le seeder normal.
 
 ## 1. Les 28 tables expliquées très simplement
+
+**Initialisation des boutiques :** un propriétaire central peut posséder plusieurs lignes `tenants`. Chaque ligne déclenche `TenantProvisioner` après commit : migrations tenant, création de son unique profil `shop` et du compte propriétaire local. Les quatre réglages initiaux peuvent être fournis avant la sauvegarde via `Tenant::configureShopForProvisioning()` ; leurs défauts sont `OTHER`, `default`, `{"primary":"#2563EB","secondary":"#FFFFFF"}` et `7` jours. `tenants.data.tenancy_shop_settings` porte seulement l'intention technique de création jusqu'au succès, puis est libéré ; les réglages courants appartiennent à la BDD tenant. Aucune table centrale supplémentaire ni nouvelle contrainte singleton n'est créée. Le statut de préparation reste distinct de l'activation commerciale.
 
 **Essais locaux :** le seeder explicite `Central\LocalDevelopmentSeeder` peut créer deux propriétaires, un administrateur et deux boutiques, selon le §3.4 du schéma. Le seeder normal reste limité aux référentiels. `/_dev/database` permet de vérifier localement les ID/UUID, liens de propriété, domaines et noms de bases ; accès seulement en `local`/`testing`, avec debug actif et requête depuis la boucle locale. Aucune table ou relation du diagramme n’est modifiée.
 
@@ -63,8 +71,9 @@ countries {
   varchar name_en
   varchar name_ar "?"
   boolean is_active
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 users {
@@ -91,21 +100,21 @@ users {
   u64 legal_profile_version "?"
   u8 legal_verification_status "?"
   datetime legal_verified_at "?"
-  varchar(10) locale
+  varchar locale
   u8 status
   datetime last_login_at "?"
   varchar(100) remember_token "?"
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 tenants {
   u64 id PK "AUTO_INCREMENT ; interne"
   uuid uuid UK "UUID v4 ; public"
   u64 user_id FK
-  varchar(63) slug UK
-  varchar(32) document_prefix UK
+  varchar slug UK
+  varchar document_prefix UK
   varchar internal_label
   varchar shop_name
   u64 profile_version
@@ -118,24 +127,24 @@ tenants {
   json data
   varchar schema_version "?"
   datetime provisioned_at "?"
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 domains {
   u64 id PK "AUTO_INCREMENT ; interne"
   uuid uuid UK "UUID v4 ; public"
   u64 tenant_id FK
-  varchar(253) domain UK
+  varchar domain UK
   u8 type
   boolean is_primary
   u8 verification_status
   datetime verified_at "?"
   u8 certificate_status "?"
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 contact_verifications {
@@ -148,34 +157,34 @@ contact_verifications {
   datetime expires_at
   int attempts_count
   datetime consumed_at "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 features {
   u64 id PK "AUTO_INCREMENT ; interne"
   uuid uuid UK "UUID v4 ; public"
-  varchar(100) code UK
+  varchar code UK
   varchar name
   u8 value_type
   varchar unit "?"
   u8 quota_scope
   u8 period
   boolean is_active
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 permissions {
   u64 id PK "AUTO_INCREMENT ; interne"
   uuid uuid UK "UUID v4 ; public"
-  varchar(125) name
-  varchar(32) guard_name
+  varchar name
+  varchar guard_name
   varchar label
-  varchar(100) feature_code "?"
-  datetime created_at
-  datetime updated_at
+  varchar feature_code "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 roles {
@@ -183,15 +192,15 @@ roles {
   uuid uuid UK "UUID v4 ; public"
   u8 super_admin_slot UK "?"
   char(64) permission_signature UK
-  varchar(125) name
-  varchar(32) guard_name
+  varchar name
+  varchar guard_name
   varchar label
   boolean is_system
   boolean is_protected
   boolean is_super_admin
   u64 permission_version
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 role_has_permissions {
@@ -202,14 +211,14 @@ role_has_permissions {
 
 model_has_roles {
   u64 role_id PK,FK
-  varchar(64) model_type PK
+  varchar model_type PK
   u64 model_id PK
   datetime assigned_at
 }
 
 model_has_permissions {
   u64 permission_id PK,FK
-  varchar(64) model_type PK
+  varchar model_type PK
   u64 model_id PK
   datetime assigned_at
   datetime expires_at
@@ -228,13 +237,13 @@ admin_restrictions {
   u8 status
   datetime started_at
   datetime ended_at "?"
-  varchar(16) normalized_target_type
+  varchar normalized_target_type
   u64 normalized_target_id
   u8 active_slot "?"
   datetime expires_at "?"
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 plans {
@@ -247,9 +256,9 @@ plans {
   decimal monthly_price
   decimal annual_price
   boolean is_active
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 plan_features {
@@ -259,8 +268,8 @@ plan_features {
   u64 feature_id FK
   boolean is_active
   bigint limit "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 subscriptions {
@@ -271,8 +280,8 @@ subscriptions {
   u64 tenant_id FK "?"
   u64 plan_id FK "?"
   u64 assigned_by_id FK "?"
-  varchar(191) installment_number UK "?"
-  varchar(191) operation_key UK
+  varchar installment_number UK "?"
+  varchar operation_key UK
   u8 record_type
   u8 parent_record_type "?"
   u8 status "?"
@@ -288,8 +297,8 @@ subscriptions {
   datetime due_at "?"
   u8 installment_status "?"
   u8 active_owner_slot "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 feature_usage {
@@ -301,8 +310,8 @@ feature_usage {
   datetime period_starts_at
   datetime period_ends_at "?"
   bigint quantity
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 geographic_areas {
@@ -313,36 +322,36 @@ geographic_areas {
   u8 type
   u8 parent_type "?"
   u64 parent_key
-  varchar(32) code
+  varchar code
   varchar name_fr
   varchar name_ar "?"
   boolean is_active
   varchar reference_source
   date effective_at
   varchar reference_version
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 activity_log {
   u64 id PK "AUTO_INCREMENT ; interne"
   uuid uuid UK "UUID v4 ; public"
   u64 tenant_id FK "?"
-  varchar(191) operation_key UK "?"
+  varchar operation_key UK "?"
   u64 subject_id "?"
   u64 causer_id "?"
-  varchar(64) log_name "?"
+  varchar log_name "?"
   text description
-  varchar(64) subject_type "?"
-  varchar(100) event "?"
-  varchar(64) causer_type "?"
+  varchar subject_type "?"
+  varchar event "?"
+  varchar causer_type "?"
   json attribute_changes "?"
   json properties "?"
   uuid correlation_id
   u8 origin
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 tenant_schema_deployments {
@@ -361,8 +370,8 @@ tenant_schema_deployments {
   text sanitized_error "?"
   uuid correlation_id
   json runtime_versions
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 saas_invoices {
@@ -375,8 +384,8 @@ saas_invoices {
   u64 original_invoice_id FK "?"
   u64 sequence_id FK "?"
   u64 document_media_id FK "?"
-  varchar(191) number UK "?"
-  varchar(191) operation_key UK
+  varchar number UK "?"
+  varchar operation_key UK
   u8 document_type
   u8 subscription_record_type
   u8 installment_record_type
@@ -402,8 +411,8 @@ saas_invoices {
   datetime cancelled_at "?"
   text cancellation_reason "?"
   uuid correlation_id "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 saas_invoice_lines {
@@ -413,7 +422,7 @@ saas_invoice_lines {
   u64 user_id FK
   u64 original_invoice_id FK "?"
   u64 original_invoice_line_id FK "?"
-  varchar(191) operation_key UK
+  varchar operation_key UK
   u8 document_type
   u8 original_line_document_type "?"
   int line_number
@@ -427,8 +436,8 @@ saas_invoice_lines {
   decimal total_amount
   text reason "?"
   uuid correlation_id "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 saas_billing_settings {
@@ -436,14 +445,14 @@ saas_billing_settings {
   uuid uuid UK "UUID v4 ; public"
   u64 created_by_id FK "?"
   u64 validated_by_id FK "?"
-  varchar(191) operation_key UK
+  varchar operation_key UK
   u8 record_type
   u8 document_type "?"
   int fiscal_year "?"
-  varchar(32) prefix "?"
+  varchar prefix "?"
   bigint next_number "?"
   u8 sequence_slot "?"
-  varchar(100) code "?"
+  varchar code "?"
   int version "?"
   varchar trigger_event "?"
   varchar numbering_scope "?"
@@ -454,8 +463,8 @@ saas_billing_settings {
   datetime ends_at "?"
   datetime validated_at "?"
   uuid correlation_id "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 saas_document_deliveries {
@@ -465,7 +474,7 @@ saas_document_deliveries {
   u64 document_id FK
   u64 created_by_id FK "?"
   u64 proof_media_id FK "?"
-  varchar(191) operation_key UK
+  varchar operation_key UK
   u8 document_type
   u8 channel
   text encrypted_recipient
@@ -479,8 +488,8 @@ saas_document_deliveries {
   varchar error_code "?"
   datetime sending_started_at "?"
   uuid correlation_id
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 saas_transfers {
@@ -497,7 +506,7 @@ saas_transfers {
   u64 performed_by_id FK "?"
   u64 reversal_of_id FK "?"
   char(64) active_transaction_fingerprint UK "?"
-  varchar(191) operation_key UK
+  varchar operation_key UK
   u8 record_type
   u8 document_type
   u8 original_payment_record_type "?"
@@ -508,8 +517,8 @@ saas_transfers {
   decimal amount
   char(3) currency
   text reason "?"
-  varchar(191) transfer_reference "?"
-  varchar(64) financial_account_key "?"
+  varchar transfer_reference "?"
+  varchar financial_account_key "?"
   char(64) transaction_fingerprint "?"
   text encrypted_transfer_details "?"
   datetime occurred_at "?"
@@ -517,8 +526,8 @@ saas_transfers {
   datetime validated_at "?"
   varchar error_code "?"
   uuid correlation_id
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 media {
@@ -527,9 +536,9 @@ media {
   u64 created_by_id FK "?"
   varchar storage_key UK
   u64 model_id
-  varchar(64) model_type
-  varchar(64) collection_name
-  varchar(64) disk
+  varchar model_type
+  varchar collection_name
+  varchar disk
   varchar mime_type
   varchar original_name
   u64 size_bytes
@@ -542,9 +551,9 @@ media {
   boolean is_primary
   u8 primary_slot "?"
   char(64) file_hash "?"
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 shipping_carriers {
@@ -558,9 +567,9 @@ shipping_carriers {
   varchar reference_source
   int reference_version
   datetime synced_at "?"
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 carrier_geo_mappings {
@@ -577,8 +586,8 @@ carrier_geo_mappings {
   int mapping_version
   boolean is_active
   datetime synced_at "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 pickup_points {
@@ -598,9 +607,9 @@ pickup_points {
   varchar reference_source
   int reference_version
   datetime synced_at "?"
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 countries ||..o{ users : "FK country_id"
@@ -704,7 +713,7 @@ countries/geographic_areas fournissent pays et zones ; shipping_carriers fournit
 
 Une ligne est une fiche ; un champ est une case de cette fiche. Un champ calculé est rempli par la BDD, et un lien permet de retrouver une autre fiche. « Vide » signifie NULL dans les cas prévus. Les valeurs d’enums et contraintes exactes restent dans le schéma principal.
 
-### 1. `countries` — 9 champs
+### 1. `countries` — 10 champs
 
 La liste des pays : Algérie, France, Arabie saoudite, Soudan et Égypte.
 
@@ -719,6 +728,7 @@ La liste des pays : Algérie, France, Arabie saoudite, Soudan et Égypte.
 | `is_active` | Indique si le pays peut être sélectionné au lancement. L’Algérie est active ; les autres pays restent prévus pour plus tard. |
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
+| `deleted_at` | La date du retrait du pays, sans effacer sa fiche ; vide tant qu’il n’est pas retiré. |
 
 ### 2. `users` — 30 champs
 
@@ -1451,7 +1461,7 @@ Les protections centrales C1–C9/§6.7 restent applicables : propriété et sou
 
 Si des écritures de l’ancien échange payé existent, archiver/réconcilier leurs avoirs, remboursements, affectations et COD avant retrait ; ne jamais les convertir en impayé ni effacer leurs pièces/audits. Aucun crédit payé n’est simplement réduit à 0 et aucun ancien code d’enum n’est réutilisé. Les caractéristiques/preferences/registres déjà présents exigent une décision explicite de conservation documentaire/export si nécessaire avant une suppression physique future ; ce document ne lance aucune suppression. Les anciennes activités/morphs disposent d’une correspondance historique sans rendre les modèles retirés créables. Vérifier commandes/revisions/colis, unicités, budgets, médias/PDF, réservations et projections de stock après toute migration. Conserver les règles de contrepassation exactes, reçus privés, remboursements réels, manquants et plafonds issus des notes professionnelles.
 
-**Sources de décision :** demandes confirmées dans la conversation, truc.txt, notes du dépôt, recherches Laravel/Spatie et historique complet disponible (37 commits jusqu’à 374bbac). Les notes historiques ne remplacent pas les derniers choix métier explicites. Les diagrammes et glossaires décrivent seulement la version active. Aucune migration/application n’est créée ou exécutée.
+**Sources de décision :** demandes confirmées dans la conversation, truc.txt, notes du dépôt, recherches Laravel/Spatie et historique complet disponible (37 commits jusqu’à 374bbac). Les notes historiques ne remplacent pas les derniers choix métier explicites. Les diagrammes et glossaires décrivent seulement la version active ; les migrations et leurs vérifications MySQL sont détaillées dans la mise à jour technique en tête du document.
 
 Les 37 commits jusqu’à 374bbac et les notes servent à préserver les contraintes déjà identifiées. Ce document décrit la version active ; les anciennes décisions incompatibles restent uniquement dans la traçabilité historique du schéma principal. Aucune donnée ni migration n’est exécutée.
 
@@ -1459,7 +1469,7 @@ Les 37 commits jusqu’à 374bbac et les notes servent à préserver les contrai
 
 Décisions confirmées : first_name/last_name pour les personnes centrales et locales, tenants.shop_name pour chaque boutique et shop.shop_name pour sa projection ; retrait de legal_name/tax_regime du profil central courant et des nouveaux formats de snapshot ; retrait de feature_overrides au central et de permission_overrides au central et dans chaque boutique. Les quotas viennent de l’offre et plan_features. Les cinq tables Spatie sont conservées dans chaque BDD ; admin_restrictions reste uniquement centrale. Durées par permission de rôle, 9999 jours par défaut et au maximum ; noms uniques ; compositions identiques en permissions/durées refusées ; plusieurs rôles par compte sans aucune permission commune. La fin est calculée depuis la date d’attribution propre à cette personne. Aucun registre d’exceptions caché ni nouvelle table n’est ajouté.
 
-**Portée et compatibilité :** la dernière instruction étend les règles aux boutiques. La BDD centrale passe de 30 à 28 tables, 464 champs ; chaque boutique passe de 60 à 59 tables, 1005 champs. users, roles et les trois pivots sont adaptés dans chaque contexte ; shop.name devient shop.shop_name sans créer une seconde source publique. Les autres définitions sont conservées. Toutes les boutiques gardent le même schéma, mais leurs rôles/permissions/dates sont indépendants ; les noms/compositions identiques entre BDD sont permis. Les invitations commencent les durées à leur acceptation, conservent un début existant et refusent les recoupements. Identifiants/UUID, guards, audit, propriété, quotas, facturation, stock et référentiels publics gardent leurs protections. PermissionEffectEnum est retiré du catalogue actif ; OverrideStatusEnum reste utilisé par admin_restrictions.
+**Portée et compatibilité :** la dernière instruction étend les règles aux boutiques. La BDD centrale passe de 30 à 28 tables, 465 champs ; chaque boutique passe de 60 à 59 tables, 1005 champs. users, roles et les trois pivots sont adaptés dans chaque contexte ; shop.name devient shop.shop_name sans créer une seconde source publique. Les autres définitions sont conservées. Toutes les boutiques gardent le même schéma, mais leurs rôles/permissions/dates sont indépendants ; les noms/compositions identiques entre BDD sont permis. Les invitations commencent les durées à leur acceptation, conservent un début existant et refusent les recoupements. Identifiants/UUID, guards, audit, propriété, quotas, facturation, stock et référentiels publics gardent leurs protections. PermissionEffectEnum est retiré du catalogue actif ; OverrideStatusEnum reste utilisé par admin_restrictions.
 
 **Préparation future, aucune migration exécutée :** si des données existent dans chaque BDD, établir le sens réel de l’ancien users.name avant sa correspondance vers last_name ; ne pas découper arbitrairement un nom complet. Conserver first_name et les noms publics des boutiques ; shop.name est renommé en shop_name sans changer sa valeur. Ne pas réécrire anciens snapshots/PDF/audits. Pour les attributions, récupérer les dates réelles prouvées ; une date inconnue bloque la bascule jusqu’à une décision explicite, sans prolonger un droit par la date d’import. Calculer signatures, contrôler noms/compositions/recoupements et résoudre les conflits avant UNIQUE/CHECK. Ne pas convertir une ancienne permission temporaire en 9999 jours : reconstruire une composition/durée/datation équivalente quand cela est possible, sinon signaler le cas sans élargir le droit. Une ancienne interdiction exige une décision explicite de retrait/remplacement du droit/rôle ; au central seulement, une restriction de cible compatible peut conserver son sens ; elle n’est pas convertie en autorisation. Les exceptions de quota requièrent une offre/version adaptée et une souscription cohérente. Archiver les décisions remplacées et leurs audits ; aucune suppression physique de donnée ne découle de ces documents.
 

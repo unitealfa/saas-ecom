@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -16,9 +15,9 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::statement(Schema::getConnection()->getDriverName() === 'sqlite' ? 'DROP INDEX uq_product_axis_name' : 'DROP INDEX uq_product_axis_name ON product_options');
-        DB::statement(Schema::getConnection()->getDriverName() === 'sqlite' ? 'DROP INDEX uq_product_value_name' : 'DROP INDEX uq_product_value_name ON product_options');
-        DB::statement(Schema::getConnection()->getDriverName() === 'sqlite' ? 'DROP INDEX uq_visitor_active_cart' : 'DROP INDEX uq_visitor_active_cart ON carts');
-        DB::statement(Schema::getConnection()->getDriverName() === 'sqlite' ? 'DROP INDEX uq_cart_variant_customization_origin' : 'DROP INDEX uq_cart_variant_customization_origin ON cart_items');
+        DB::statement('DROP INDEX uq_product_axis_name ON product_options');
+        DB::statement('DROP INDEX uq_product_value_name ON product_options');
+        DB::statement('DROP INDEX uq_visitor_active_cart ON carts');
+        DB::statement('DROP INDEX uq_cart_variant_customization_origin ON cart_items');
     }
 };

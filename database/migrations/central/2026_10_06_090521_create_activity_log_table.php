@@ -10,20 +10,13 @@ return new class extends Migration
     {
         Schema::create('activity_log', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
-            $table->unsignedBigInteger('tenant_id')->nullable();
-            $table->string('operation_key', 191)->nullable()->unique();
-            $table->unsignedBigInteger('subject_id')->nullable();
-            $table->unsignedBigInteger('causer_id')->nullable();
-            $table->string('log_name', 64)->nullable();
+            $table->string('log_name')->nullable()->index();
             $table->text('description');
-            $table->string('subject_type', 64)->nullable();
-            $table->string('event', 100)->nullable();
-            $table->string('causer_type', 64)->nullable();
+            $table->nullableMorphs('subject', 'subject');
+            $table->string('event')->nullable();
+            $table->nullableMorphs('causer', 'causer');
             $table->json('attribute_changes')->nullable();
             $table->json('properties')->nullable();
-            $table->char('correlation_id', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin');
-            $table->unsignedTinyInteger('origin')->comment('ActivityOriginEnum: 1, 2, 3, 4');
             $table->timestamps();
         });
     }

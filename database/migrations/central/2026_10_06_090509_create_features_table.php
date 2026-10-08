@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('features', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
-            $table->string('code', 100)->unique();
+            $table->uuid('uuid');
+            $table->string('code')->unique();
             $table->string('name');
             $table->unsignedTinyInteger('value_type')->comment('FeatureValueTypeEnum: 1, 2');
             $table->string('unit')->nullable();

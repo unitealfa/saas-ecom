@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -14,7 +13,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::statement(Schema::getConnection()->getDriverName() === 'sqlite' ? 'DROP INDEX uq_feature_usage_period' : 'DROP INDEX uq_feature_usage_period ON feature_usage');
-        DB::statement(Schema::getConnection()->getDriverName() === 'sqlite' ? 'DROP INDEX uq_tenant_deployment_running' : 'DROP INDEX uq_tenant_deployment_running ON tenant_schema_deployments');
+        DB::statement('DROP INDEX uq_feature_usage_period ON feature_usage');
+        DB::statement('DROP INDEX uq_tenant_deployment_running ON tenant_schema_deployments');
     }
 };

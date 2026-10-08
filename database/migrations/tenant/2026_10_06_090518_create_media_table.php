@@ -10,13 +10,13 @@ return new class extends Migration
     {
         Schema::create('media', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
-            $table->unsignedBigInteger('created_by_id')->nullable();
+            $table->uuid('uuid');
+            $table->foreignId('created_by_id')->nullable()->constrained('users', indexName: 'fk_media_6fb667974b')->restrictOnDelete()->restrictOnUpdate();
             $table->string('storage_key')->unique();
             $table->unsignedBigInteger('model_id');
-            $table->string('model_type', 64);
-            $table->string('collection_name', 64);
-            $table->string('disk', 64);
+            $table->string('model_type');
+            $table->string('collection_name');
+            $table->string('disk');
             $table->string('mime_type');
             $table->string('original_name');
             $table->unsignedBigInteger('size_bytes');
@@ -27,10 +27,13 @@ return new class extends Migration
             $table->unsignedTinyInteger('visibility')->comment('MediaVisibilityEnum: 1, 2');
             $table->integer('position');
             $table->boolean('is_primary');
-            $table->unsignedTinyInteger('primary_slot')->nullable()->storedAs('CASE WHEN is_primary = 1 AND deleted_at IS NULL THEN 1 ELSE NULL END');
-            $table->char('file_hash', 64)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->nullable();
+            $table->unsignedTinyInteger('primary_slot')->nullable()->storedAs('CASE WHEN is_primary = TRUE AND deleted_at IS NULL THEN 1 ELSE NULL END');
+            $table->char('file_hash')->charset('ascii')->collation('ascii_bin')->nullable();
             $table->timestamps();
             $table->softDeletes();
+
+            $table->unique(['model_type', 'model_id', 'collection_name', 'primary_slot'], 'uq_media_ba36efe3ba');
+            $table->index(['created_by_id'], 'ix_media_6fb667974b');
         });
     }
 

@@ -2,14 +2,14 @@
 
 namespace Database\Seeders\Central;
 
+use App\Enums\Central\Tenants\StatusEnum;
 use App\Models\Central\Country;
-use App\Models\Central\TenantStatus;
 use App\Models\Tenant;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Database\Seeders\LocalFixtureSeeder;
 use Database\Seeders\Tenant\LocalDevelopmentSeeder as ShopSeeder;
 use Illuminate\Database\Connection;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -72,8 +72,8 @@ class LocalDevelopmentSeeder extends LocalFixtureSeeder
                 $connection->transaction(fn () => $this->billing($connection, $tenant, $owner, $marker));
             }
 
-            if ($tenant->status !== TenantStatus::Active) {
-                $tenant->status = TenantStatus::Active;
+            if ($tenant->status !== StatusEnum::ACTIVE) {
+                $tenant->status = StatusEnum::ACTIVE;
                 $tenant->is_primary = true;
                 $tenant->activation_priority = 1;
                 $tenant->provisioned_at = now();
@@ -97,7 +97,7 @@ class LocalDevelopmentSeeder extends LocalFixtureSeeder
                 'password' => 'LocalTest!2026-Owner',
             ]);
             $user->country_id = $country->id;
-            $user->email_verified_at = Carbon::now();
+            $user->email_verified_at = CarbonImmutable::now();
             $user->phone = "+21355500000{$number}";
             $user->legal_form = 'FICTIVE_LOCAL_TEST';
             $user->activity_nature = 'Données fictives, commerce de détail';

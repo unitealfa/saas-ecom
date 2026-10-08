@@ -5,13 +5,13 @@ use App\Models\User;
 use App\Services\Tenant\DatabaseDiagnostics;
 use Database\Seeders\Central\LocalDevelopmentSeeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Tests\TestCase;
 
 beforeEach(function (): void {
     isolateLocalFixtureStorage();
-    config(['tenancy.database.suffix' => '.sqlite', 'tenancy.saas_base_domain' => 'aydra.localhost']);
+    config(['tenancy.database.suffix' => '', 'tenancy.saas_base_domain' => 'aydra.localhost']);
     $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
 });
 
@@ -19,10 +19,8 @@ afterEach(function (): void {
     tenancy()->end();
     foreach (Tenant::withTrashed()->get() as $tenant) {
         $name = $tenant->database()->getName();
-        if (! preg_match('/^boutique_boutique[12]\.sqlite$/D', $name)) {
-            throw new LogicException('Refusing to remove an unexpected SQLite fixture database.');
-        }
-        File::delete(database_path($name));
+
+        TestCase::dropIsolatedMysqlDatabase($name);
     }
     cleanLocalFixtureStorage();
 });
@@ -44,6 +42,12 @@ test('local fixtures populate coherent owners shops stock returns and billing wi
             expect($db->table('users')->count())->toBe(2);
             expect($db->table('users')->where('central_user_uuid', $tenant->owner->uuid)->count())->toBe(1);
             expect($db->table('shop')->value('tenant_uuid'))->toBe($tenant->uuid);
+            $this->assertDatabaseCount('shop', 1, 'tenant');
+            $profile = $db->table('shop')->sole();
+            expect($profile->business_type)->toBe('OTHER');
+            expect($profile->theme_code)->toBe('default');
+            expect(json_decode($profile->colors, true, flags: JSON_THROW_ON_ERROR))->toEqual(['primary' => '#2563EB', 'secondary' => '#FFFFFF']);
+            expect($profile->cart_lifetime_days)->toBe(7);
             expect($db->table('products')->count())->toBe(20);
             expect($db->table('orders')->count())->toBe(50);
             expect($db->table('invoices')->count())->toBe(17);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Enums\VerificationStatusEnum;
 use App\Http\Controllers\Controller;
 use App\Models\Central\Domain;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ class StorefrontController extends Controller
     public function __invoke(Request $request): Response
     {
         $domain = DomainTenantResolver::$currentDomain;
-        abort_unless($domain instanceof Domain && $domain->getAttribute('verification_status') === 2, 404);
+        abort_unless($domain instanceof Domain && $domain->getAttribute('verification_status') === VerificationStatusEnum::VERIFIED, 404);
 
         $message = 'Cette boutique est en préparation.';
 

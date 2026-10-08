@@ -10,11 +10,11 @@ return new class extends Migration
     {
         Schema::create('shop_addresses', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
-            $table->unsignedBigInteger('shop_id');
-            $table->unsignedBigInteger('shop_address_id')->nullable();
-            $table->char('province_uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->nullable();
-            $table->char('municipality_uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->nullable();
+            $table->uuid('uuid');
+            $table->foreignId('shop_id')->constrained('shop', indexName: 'fk_shop_addresses_176fd1ac1e')->restrictOnDelete()->restrictOnUpdate();
+            $table->foreignId('shop_address_id')->nullable()->constrained('shop_addresses', indexName: 'fk_shop_addresses_e08e4d9849')->restrictOnDelete()->restrictOnUpdate();
+            $table->uuid('province_uuid')->nullable();
+            $table->uuid('municipality_uuid')->nullable();
             $table->unsignedTinyInteger('record_type')->comment('ShopProfileRecordTypeEnum: 1, 2');
             $table->unsignedTinyInteger('shop_address_type')->nullable()->storedAs('CASE WHEN shop_address_id IS NOT NULL THEN 1 ELSE NULL END')->comment('ShopProfileRecordTypeEnum: 1, 2');
             $table->string('label')->nullable();
@@ -22,9 +22,15 @@ return new class extends Migration
             $table->boolean('is_primary');
             $table->boolean('visible');
             $table->json('payload');
-            $table->unsignedTinyInteger('primary_slot')->nullable()->storedAs('CASE WHEN record_type = 1 AND is_primary = 1 AND deleted_at IS NULL THEN 1 ELSE NULL END');
+            $table->unsignedTinyInteger('primary_slot')->nullable()->storedAs('CASE WHEN record_type = 1 AND is_primary = TRUE AND deleted_at IS NULL THEN 1 ELSE NULL END');
             $table->timestamps();
             $table->softDeletes();
+
+            $table->unique(['id', 'shop_id', 'record_type'], 'uq_shop_addresses_35c9ecc8c2');
+            $table->unique(['shop_id', 'primary_slot'], 'uq_shop_addresses_95137c0c10');
+            $table->index(['shop_id', 'record_type', 'deleted_at', 'visible', 'position', 'id'], 'ix_shop_addresses_458d0048ae');
+            $table->index(['shop_address_id', 'shop_id', 'shop_address_type'], 'ix_shop_addresses_88543b6ab4');
+            $table->foreign(['shop_address_id', 'shop_id', 'shop_address_type'], 'fk_shop_addresses_88543b6ab4')->references(['id', 'shop_id', 'record_type'])->on('shop_addresses')->restrictOnDelete()->restrictOnUpdate();
         });
     }
 

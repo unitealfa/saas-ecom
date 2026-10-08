@@ -3,6 +3,9 @@
 namespace App\Models\Central;
 
 use App\Concerns\HasPublicUuid;
+use App\Enums\Central\Domains\CertificateStatusEnum;
+use App\Enums\Central\Domains\TypeEnum;
+use App\Enums\VerificationStatusEnum;
 use Database\Factories\Central\DomainFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -20,6 +23,13 @@ class Domain extends BaseDomain
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['is_primary' => 'boolean', 'verification_status' => 'integer', 'verified_at' => 'immutable_datetime'];
+        return [
+            'tenant_id' => 'integer',
+            'type' => TypeEnum::class,
+            'is_primary' => 'boolean',
+            'verification_status' => VerificationStatusEnum::class,
+            'verified_at' => 'immutable_datetime',
+            'certificate_status' => CertificateStatusEnum::class,
+        ];
     }
 }

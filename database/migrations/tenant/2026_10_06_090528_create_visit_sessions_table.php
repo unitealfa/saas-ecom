@@ -10,11 +10,11 @@ return new class extends Migration
     {
         Schema::create('visit_sessions', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
-            $table->unsignedBigInteger('visitor_id');
-            $table->dateTime('started_at', 6);
-            $table->dateTime('last_activity_at', 6);
-            $table->dateTime('ended_at', 6)->nullable();
+            $table->uuid('uuid');
+            $table->foreignId('visitor_id')->constrained('visitors', indexName: 'fk_visit_sessions_f4e34ae2ec')->restrictOnDelete()->restrictOnUpdate();
+            $table->dateTime('started_at');
+            $table->dateTime('last_activity_at');
+            $table->dateTime('ended_at')->nullable();
             $table->string('entry_path');
             $table->string('source')->nullable();
             $table->string('medium')->nullable();
@@ -22,6 +22,8 @@ return new class extends Migration
             $table->string('referrer_host')->nullable();
             $table->unsignedTinyInteger('device_type')->nullable()->comment('DeviceTypeEnum: 1, 2, 3, 4');
             $table->timestamps();
+
+            $table->index(['visitor_id', 'started_at'], 'ix_visit_sessions_772cffd42f');
         });
     }
 

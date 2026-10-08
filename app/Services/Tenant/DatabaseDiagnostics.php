@@ -18,7 +18,7 @@ class DatabaseDiagnostics
 
         $db = DB::connection('tenant');
         $tables = [];
-        $schema = $db->getDriverName() === 'sqlite' ? 'main' : $db->getDatabaseName();
+        $schema = $db->getDatabaseName();
         foreach ($db->getSchemaBuilder()->getTableListing($schema, false) as $table) {
             $tables[$table] = $db->table($table)->count();
         }

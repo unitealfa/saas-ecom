@@ -4,11 +4,11 @@ use App\Models\Central\Domain;
 use App\Models\Tenant;
 use App\Tenancy\Bootstrappers\AccountContextBootstrapper;
 use App\Tenancy\Bootstrappers\NamespacedCacheBootstrapper;
+use App\Tenancy\Bootstrappers\SpatieContextBootstrapper;
 use Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper;
 use Stancl\Tenancy\Bootstrappers\FilesystemTenancyBootstrapper;
 use Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper;
 use Stancl\Tenancy\TenantDatabaseManagers\MySQLDatabaseManager;
-use Stancl\Tenancy\TenantDatabaseManagers\SQLiteDatabaseManager;
 
 $appUrl = env('APP_URL', 'http://localhost');
 
@@ -40,6 +40,7 @@ return [
         FilesystemTenancyBootstrapper::class,
         QueueTenancyBootstrapper::class,
         AccountContextBootstrapper::class,
+        SpatieContextBootstrapper::class,
     ],
     'database' => [
         'central_connection' => env('DB_CONNECTION', 'mysql'),
@@ -47,7 +48,6 @@ return [
         'prefix' => 'boutique_',
         'suffix' => '',
         'managers' => [
-            'sqlite' => SQLiteDatabaseManager::class,
             'mysql' => MySQLDatabaseManager::class,
             'mariadb' => MySQLDatabaseManager::class,
         ],

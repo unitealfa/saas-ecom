@@ -161,6 +161,13 @@ function assertDocumentedDatabaseSchema(string $context): void
             expect($field['nullable'])->toBe($main[$table][$column]['nullable']);
             expect($actual[$column]['nullable'])->toBe($field['nullable'], $context.'.'.$table.'.'.$column.' nullable');
 
+            if ($driver === 'mysql' && in_array('FK', $field['keys'], true)) {
+                expect($actual[$column]['auto_increment'])->toBeFalse($context.'.'.$table.'.'.$column.' must reference an existing ID');
+            }
+            if ($driver === 'mysql' && $column === 'id' && in_array('PK', $field['keys'], true)) {
+                expect($actual[$column]['auto_increment'])->toBeTrue($context.'.'.$table.'.id generates the record identity');
+            }
+
             if (in_array('UK', $field['keys'], true) && ! ($table === 'roles' && $column === 'permission_signature')) {
                 expect(collect($indexes)->contains(fn (array $index): bool => $index['unique'] && $index['columns'] === [$column]))->toBeTrue();
             }
@@ -177,7 +184,7 @@ function assertDocumentedDatabaseSchema(string $context): void
                     'u8' => 'tinyint unsigned',
                     'uuid' => 'char(36)',
                     'boolean' => 'tinyint(1)',
-                    'datetime' => 'datetime(6)',
+                    'datetime' => 'datetime',
                     'int' => 'int',
                     'bigint' => 'bigint',
                     'tinyint' => 'tinyint',
@@ -205,7 +212,10 @@ function assertDocumentedDatabaseSchema(string $context): void
     preg_match_all('/^(\w+)\s+\S+\s+(\w+)\s*:\s*"FK (\w+)"/m', file_get_contents(base_path('documentation et recherche/'.$filename)), $relations, PREG_SET_ORDER);
     foreach ($relations as $relation) {
         $foreignKeys = $schema->getForeignKeys($relation[2]);
-        expect(collect($foreignKeys)->contains(fn (array $foreign): bool => $foreign['columns'] === [$relation[3]] && $foreign['foreign_table'] === $relation[1] && $foreign['foreign_columns'] === ['id']))->toBeTrue();
+        $foreign = collect($foreignKeys)->first(fn (array $foreign): bool => $foreign['columns'] === [$relation[3]] && $foreign['foreign_table'] === $relation[1] && $foreign['foreign_columns'] === ['id']);
+        expect($foreign)->not->toBeNull($context.'.'.$relation[2].'.'.$relation[3].' must reference '.$relation[1].'.id');
+        expect($foreign['on_delete'])->toBe('restrict');
+        expect($foreign['on_update'])->toBe('restrict');
     }
 
     $document = file_get_contents(base_path('documentation et recherche/Schema-BDD-SaaS-Ecommerce-UUID.md'));

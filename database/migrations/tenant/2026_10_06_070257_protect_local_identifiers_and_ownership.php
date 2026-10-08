@@ -10,11 +10,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (DB::connection()->getDriverName() === 'sqlite') {
-            DB::unprepared("CREATE TRIGGER users_immutable_identity BEFORE UPDATE ON users WHEN OLD.uuid IS NOT NEW.uuid OR OLD.central_user_uuid IS NOT NEW.central_user_uuid BEGIN SELECT RAISE(ABORT, 'Immutable local identity'); END");
-        } else {
-            DB::unprepared("CREATE TRIGGER users_immutable_identity BEFORE UPDATE ON users FOR EACH ROW BEGIN IF NOT (OLD.uuid <=> NEW.uuid) OR NOT (OLD.central_user_uuid <=> NEW.central_user_uuid) THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Immutable local identity'; END IF; END");
-        }
+        DB::unprepared("CREATE TRIGGER users_immutable_identity BEFORE UPDATE ON users FOR EACH ROW BEGIN IF NOT (OLD.uuid <=> NEW.uuid) OR NOT (OLD.central_user_uuid <=> NEW.central_user_uuid) THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Immutable local identity'; END IF; END");
     }
 
     /**

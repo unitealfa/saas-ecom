@@ -10,13 +10,15 @@ return new class extends Migration
     {
         Schema::create('carts', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
-            $table->unsignedBigInteger('visitor_id');
+            $table->uuid('uuid');
+            $table->foreignId('visitor_id')->constrained('visitors', indexName: 'fk_carts_f4e34ae2ec')->restrictOnDelete()->restrictOnUpdate();
             $table->unsignedTinyInteger('status')->default(1)->comment('CartStatusEnum: 1, 2, 3, 4');
-            $table->dateTime('last_activity_at', 6);
-            $table->dateTime('expires_at', 6);
-            $table->dateTime('converted_at', 6)->nullable();
+            $table->dateTime('last_activity_at');
+            $table->dateTime('expires_at');
+            $table->dateTime('converted_at')->nullable();
             $table->timestamps();
+
+            $table->index(['visitor_id'], 'ix_carts_f4e34ae2ec');
         });
     }
 

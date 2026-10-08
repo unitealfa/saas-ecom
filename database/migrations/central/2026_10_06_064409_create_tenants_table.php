@@ -14,25 +14,28 @@ return new class extends Migration
     {
         Schema::create('tenants', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
-            $table->foreignId('user_id')->constrained('users')->restrictOnDelete();
+            $table->uuid('uuid');
+            $table->foreignId('user_id')->index('tenants_user_id_index')->constrained('users')->restrictOnDelete()->restrictOnUpdate();
             $table->string('slug')->unique();
             $table->string('document_prefix')->unique();
             $table->string('internal_label');
             $table->string('shop_name')->index();
             $table->unsignedBigInteger('profile_version')->default(1);
-            $table->string('creation_key')->unique();
-            $table->char('creation_hash', 64)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin');
-            $table->unsignedTinyInteger('status')->default(StatusEnum::PENDING);
+            $table->string('creation_key');
+            $table->char('creation_hash')->charset('ascii')->collation('ascii_bin');
+            $table->unsignedTinyInteger('status')->default(StatusEnum::PROVISIONING->value)->comment('TenantStatusEnum: 1, 2, 3, 4, 5, 6, 9');
             $table->boolean('is_primary')->default(false);
             $table->integer('activation_priority')->nullable();
-            $table->dateTime('over_quota_since_at', 6)->nullable();
+            $table->dateTime('over_quota_since_at')->nullable();
             $table->json('data');
             $table->string('schema_version')->nullable();
-            $table->dateTime('provisioned_at', 6)->nullable();
+            $table->dateTime('provisioned_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
 
+            $table->unique(['id', 'user_id'], 'tenants_id_user_id_unique');
+            $table->unique(['user_id', 'creation_key'], 'tenants_user_id_creation_key_unique');
+            $table->index(['user_id', 'deleted_at', 'status'], 'ix_tenants_e20f1a9a18');
         });
     }
 

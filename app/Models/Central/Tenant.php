@@ -3,6 +3,8 @@
 namespace App\Models\Central;
 
 use App\Concerns\HasPublicUuid;
+use App\DTOs\Tenant\ShopSettings;
+use App\Enums\Central\Tenants\StatusEnum;
 use Database\Factories\Central\TenantFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -22,7 +24,7 @@ use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
  * @property string $shop_name
  * @property string $slug
  * @property string $creation_hash
- * @property TenantStatus $status
+ * @property StatusEnum $status
  * @property-read User $owner
  */
 #[Fillable(['internal_label', 'shop_name', 'slug'])]
@@ -50,11 +52,28 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         return 'id';
     }
 
+    /** @param array<string, mixed> $settings */
+    public function configureShopForProvisioning(array $settings): static
+    {
+        if ($this->exists) {
+            throw new LogicException('Initial shop settings must be provided before tenant creation.');
+        }
+
+        $this->setInternal('shop_settings', ShopSettings::fromArray($settings)->toArray());
+
+        return $this;
+    }
+
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
-            'status' => TenantStatus::class,
+            'user_id' => 'integer',
+            'profile_version' => 'integer',
+            'status' => StatusEnum::class,
             'is_primary' => 'boolean',
+            'activation_priority' => 'integer',
+            'data' => 'array',
             'over_quota_since_at' => 'immutable_datetime',
             'provisioned_at' => 'immutable_datetime',
         ];

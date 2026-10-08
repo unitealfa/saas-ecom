@@ -2,8 +2,11 @@
 
 namespace App\Services\Central;
 
+use App\DTOs\Tenant\ShopSettings;
+use App\Enums\Central\Tenants\StatusEnum;
+use App\Enums\Tenant\Users\MembershipStatusEnum;
 use App\Models\Central\Tenant;
-use App\Models\Central\TenantStatus;
+use App\Models\Tenant\Shop;
 use App\Models\Tenant\User;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +25,7 @@ class TenantProvisioner
             throw new LogicException('Tenant database DDL must run after the central transaction commits.');
         }
 
-        if (! in_array($tenant->status, [TenantStatus::Provisioning, TenantStatus::ProvisioningFailed], true)) {
+        if (! in_array($tenant->status, [StatusEnum::PROVISIONING, StatusEnum::PROVISIONING_FAILED], true)) {
             throw new LogicException('This foundation provisioner only accepts unfinished tenants.');
         }
 
@@ -47,7 +50,24 @@ class TenantProvisioner
             tenancy()->initialize($tenant);
             $owner = $tenant->owner;
 
-            DB::connection('tenant')->transaction(function () use ($owner): void {
+            DB::connection('tenant')->transaction(function () use ($owner, $tenant): void {
+                $shop = Shop::query()->where('singleton', 1)->lockForUpdate()->first();
+
+                if ($shop === null) {
+                    $settings = ShopSettings::fromArray($tenant->getInternal('shop_settings') ?? []);
+                    $shop = new Shop($settings->toArray());
+                    $shop->tenant_uuid = $tenant->uuid;
+                    $shop->singleton = 1;
+                    $shop->central_profile_version = $tenant->profile_version;
+                    $shop->shop_name = $tenant->shop_name;
+                    $shop->locale = $owner->locale;
+                    $shop->currency = 'DZD';
+                    $shop->timezone = 'Africa/Algiers';
+                    $shop->save();
+                } elseif ($shop->tenant_uuid !== $tenant->uuid) {
+                    throw new LogicException('The shop profile belongs to another tenant.');
+                }
+
                 if (! User::where('central_user_uuid', $owner->uuid)->exists()) {
                     $localOwner = new User([
                         'last_name' => $owner->last_name,
@@ -57,10 +77,10 @@ class TenantProvisioner
                         'locale' => $owner->locale,
                     ]);
                     $localOwner->central_user_uuid = $owner->uuid;
-                    $localOwner->membership_status = 2;
+                    $localOwner->membership_status = MembershipStatusEnum::INVITED;
                     $localOwner->save();
                 }
-            });
+            }, attempts: 3);
 
             $schemaVersion = DB::connection('tenant')->table('migrations')->orderByDesc('id')->value('migration');
 
@@ -69,10 +89,11 @@ class TenantProvisioner
             }
 
             $tenant->schema_version = $schemaVersion;
-            $tenant->status = TenantStatus::Provisioning;
+            $tenant->status = StatusEnum::PROVISIONING;
+            $tenant->setInternal('shop_settings', null);
             $tenant->save();
         } catch (Throwable $exception) {
-            $tenant->status = TenantStatus::ProvisioningFailed;
+            $tenant->status = StatusEnum::PROVISIONING_FAILED;
             $tenant->save();
 
             throw $exception;

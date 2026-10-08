@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -11,12 +10,6 @@ return new class extends Migration
         foreach ($this->protections() as [$table, $event, $name, $condition, $message]) {
             $timing = str_starts_with($event, 'AFTER ') ? 'AFTER' : 'BEFORE';
             $event = str_replace('AFTER ', '', $event);
-            if (Schema::getConnection()->getDriverName() === 'sqlite') {
-                DB::statement("CREATE TRIGGER {$name} {$timing} {$event} ON `{$table}` WHEN {$condition} BEGIN SELECT RAISE(ABORT, '{$message}'); END");
-
-                continue;
-            }
-
             $condition = preg_replace_callback('/OLD\.(\w+) IS NOT NEW\.(\w+)/', fn (array $match): string => "NOT (OLD.`{$match[1]}` <=> NEW.`{$match[2]}`)", $condition);
             DB::statement("CREATE TRIGGER {$name} {$timing} {$event} ON `{$table}` FOR EACH ROW BEGIN IF {$condition} THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '{$message}'; END IF; END");
         }
@@ -153,7 +146,7 @@ return new class extends Migration
             ['carrier_remittance_batches', 'UPDATE', 'guard_carrier_remittance_batches_3747d9d631', 'NEW.reversal_of_id = NEW.id', 'Self reference is forbidden'],
             ['roles', 'UPDATE', 'guard_roles_7ca3d583dc', '(1) AND (OLD.guard_name IS NOT NEW.guard_name OR OLD.is_super_admin IS NOT NEW.is_super_admin)', 'Immutable documented identity'],
             ['permissions', 'UPDATE', 'guard_permissions_1d4f22737e', '(1) AND (OLD.guard_name IS NOT NEW.guard_name)', 'Immutable documented identity'],
-            ['roles', 'DELETE', 'guard_roles_da840ce7c0', 'OLD.is_protected = 1 OR OLD.is_system = 1 OR OLD.is_super_admin = 1', 'Protected role cannot be deleted'],
+            ['roles', 'DELETE', 'guard_roles_da840ce7c0', 'OLD.is_protected = TRUE OR OLD.is_system = TRUE OR OLD.is_super_admin = TRUE', 'Protected role cannot be deleted'],
             ['activity_log', 'UPDATE', 'guard_activity_log_c1a560ca4f', '(1) AND (OLD.id IS NOT NEW.id OR OLD.uuid IS NOT NEW.uuid OR OLD.operation_key IS NOT NEW.operation_key OR OLD.subject_id IS NOT NEW.subject_id OR OLD.causer_id IS NOT NEW.causer_id OR OLD.log_name IS NOT NEW.log_name OR OLD.description IS NOT NEW.description OR OLD.subject_type IS NOT NEW.subject_type OR OLD.event IS NOT NEW.event OR OLD.causer_type IS NOT NEW.causer_type OR OLD.attribute_changes IS NOT NEW.attribute_changes OR OLD.properties IS NOT NEW.properties OR OLD.correlation_id IS NOT NEW.correlation_id OR OLD.origin IS NOT NEW.origin OR OLD.performed_at IS NOT NEW.performed_at OR OLD.created_at IS NOT NEW.created_at)', 'Immutable documented history'],
             ['activity_log', 'DELETE', 'guard_activity_log_9ea3c78d14', '1', 'Documented history cannot be deleted'],
             ['users', 'DELETE', 'guard_users_76c4019a7c', 'OLD.central_user_uuid IS NOT NULL', 'Protected owner cannot be deleted'],

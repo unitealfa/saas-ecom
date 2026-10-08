@@ -2,70 +2,20 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        $columns = [
-            'countries' => ['id', 'uuid', 'code', 'name_fr', 'name_en', 'name_ar', 'is_active', 'created_at', 'updated_at'],
-            'users' => ['id', 'uuid', 'country_id', 'legal_verified_by_id', 'email', 'last_name', 'first_name', 'password', 'phone', 'email_verified_at', 'phone_verified_at', 'whatsapp_verified_at', 'legal_form', 'activity_nature', 'nif', 'nis', 'registration_number', 'artisan_card_number', 'legal_address', 'share_capital', 'legal_profile_version', 'legal_verification_status', 'legal_verified_at', 'locale', 'status', 'last_login_at', 'remember_token', 'created_at', 'updated_at', 'deleted_at'],
-            'tenants' => ['id', 'uuid', 'user_id', 'slug', 'document_prefix', 'internal_label', 'shop_name', 'profile_version', 'creation_key', 'creation_hash', 'status', 'is_primary', 'activation_priority', 'over_quota_since_at', 'data', 'schema_version', 'provisioned_at', 'created_at', 'updated_at', 'deleted_at'],
-            'domains' => ['id', 'uuid', 'tenant_id', 'domain', 'type', 'is_primary', 'verification_status', 'verified_at', 'certificate_status', 'created_at', 'updated_at', 'deleted_at'],
-            'contact_verifications' => ['id', 'uuid', 'user_id', 'channel', 'normalized_destination', 'code_hash', 'expires_at', 'attempts_count', 'consumed_at', 'created_at', 'updated_at'],
-            'features' => ['id', 'uuid', 'code', 'name', 'value_type', 'unit', 'quota_scope', 'period', 'is_active', 'created_at', 'updated_at', 'deleted_at'],
-            'permissions' => ['id', 'uuid', 'name', 'guard_name', 'label', 'feature_code', 'created_at', 'updated_at'],
-            'roles' => ['id', 'uuid', 'super_admin_slot', 'permission_signature', 'name', 'guard_name', 'label', 'is_system', 'is_protected', 'is_super_admin', 'permission_version', 'created_at', 'updated_at'],
-            'role_has_permissions' => ['permission_id', 'role_id', 'duration_days'],
-            'model_has_roles' => ['role_id', 'model_type', 'model_id', 'assigned_at'],
-            'model_has_permissions' => ['permission_id', 'model_type', 'model_id', 'assigned_at', 'expires_at'],
-            'admin_restrictions' => ['id', 'uuid', 'admin_id', 'permission_id', 'target_tenant_id', 'target_user_id', 'target_role_id', 'created_by_id', 'effect', 'status', 'started_at', 'ended_at', 'normalized_target_type', 'normalized_target_id', 'active_slot', 'expires_at', 'created_at', 'updated_at', 'deleted_at'],
-            'plans' => ['id', 'uuid', 'code', 'version', 'name', 'description', 'monthly_price', 'annual_price', 'is_active', 'created_at', 'updated_at', 'deleted_at'],
-            'plan_features' => ['id', 'uuid', 'plan_id', 'feature_id', 'is_active', 'limit', 'created_at', 'updated_at'],
-            'subscriptions' => ['id', 'uuid', 'user_id', 'parent_subscription_id', 'tenant_id', 'plan_id', 'assigned_by_id', 'installment_number', 'operation_key', 'record_type', 'parent_record_type', 'status', 'period', 'agreed_amount', 'started_at', 'period_starts_at', 'period_ends_at', 'trial_ends_at', 'ended_at', 'auto_renew', 'installment_amount', 'due_at', 'installment_status', 'active_owner_slot', 'created_at', 'updated_at'],
-            'feature_usage' => ['id', 'uuid', 'user_id', 'tenant_id', 'feature_id', 'period_starts_at', 'period_ends_at', 'quantity', 'created_at', 'updated_at'],
-            'geographic_areas' => ['id', 'uuid', 'country_id', 'parent_id', 'type', 'parent_type', 'parent_key', 'code', 'name_fr', 'name_ar', 'is_active', 'reference_source', 'effective_at', 'reference_version', 'created_at', 'updated_at', 'deleted_at'],
-            'activity_log' => ['id', 'uuid', 'tenant_id', 'operation_key', 'subject_id', 'causer_id', 'log_name', 'description', 'subject_type', 'event', 'causer_type', 'attribute_changes', 'properties', 'correlation_id', 'origin', 'created_at', 'updated_at'],
-            'tenant_schema_deployments' => ['id', 'uuid', 'tenant_id', 'source_version', 'target_version', 'operation', 'status', 'attempt_number', 'operation_key', 'started_at', 'ended_at', 'error_code', 'sanitized_error', 'correlation_id', 'runtime_versions', 'created_at', 'updated_at'],
-            'saas_invoices' => ['id', 'uuid', 'user_id', 'subscription_id', 'installment_id', 'billing_rule_id', 'original_invoice_id', 'sequence_id', 'document_media_id', 'number', 'operation_key', 'document_type', 'subscription_record_type', 'installment_record_type', 'billing_rule_record_type', 'original_invoice_document_type', 'sequence_record_type', 'billing_rule_snapshot', 'fiscal_year', 'sequence_number', 'net_amount', 'taxes', 'tax_amount', 'total_amount', 'currency', 'status', 'reason', 'period_starts_at', 'period_ends_at', 'due_at', 'saas_identity_snapshot', 'customer_identity_snapshot', 'issued_at', 'cancelled_at', 'cancellation_reason', 'correlation_id', 'created_at', 'updated_at'],
-            'saas_invoice_lines' => ['id', 'uuid', 'document_id', 'user_id', 'original_invoice_id', 'original_invoice_line_id', 'operation_key', 'document_type', 'original_line_document_type', 'line_number', 'description', 'quantity', 'net_unit_price', 'net_discount', 'net_amount', 'taxes', 'tax_amount', 'total_amount', 'reason', 'correlation_id', 'created_at', 'updated_at'],
-            'saas_billing_settings' => ['id', 'uuid', 'created_by_id', 'validated_by_id', 'operation_key', 'record_type', 'document_type', 'fiscal_year', 'prefix', 'next_number', 'sequence_slot', 'code', 'version', 'trigger_event', 'numbering_scope', 'parameters', 'policy_status', 'validation_reference', 'effective_at', 'ends_at', 'validated_at', 'correlation_id', 'created_at', 'updated_at'],
-            'saas_document_deliveries' => ['id', 'uuid', 'user_id', 'document_id', 'created_by_id', 'proof_media_id', 'operation_key', 'document_type', 'channel', 'encrypted_recipient', 'delivery_status', 'attempts_count', 'delivery_attempts', 'next_attempt_at', 'sent_at', 'delivered_at', 'provider_reference', 'error_code', 'sending_started_at', 'correlation_id', 'created_at', 'updated_at'],
-            'saas_transfers' => ['id', 'uuid', 'user_id', 'document_id', 'original_payment_id', 'credit_note_id', 'proof_media_id', 'source_proof_media_id', 'created_by_id', 'validated_by_id', 'performed_by_id', 'reversal_of_id', 'active_transaction_fingerprint', 'operation_key', 'record_type', 'document_type', 'original_payment_record_type', 'credit_note_document_type', 'transfer_method', 'transfer_status', 'refund_reason', 'amount', 'currency', 'reason', 'transfer_reference', 'financial_account_key', 'transaction_fingerprint', 'encrypted_transfer_details', 'occurred_at', 'sending_started_at', 'validated_at', 'error_code', 'correlation_id', 'created_at', 'updated_at'],
-            'media' => ['id', 'uuid', 'created_by_id', 'storage_key', 'model_id', 'model_type', 'collection_name', 'disk', 'mime_type', 'original_name', 'size_bytes', 'width', 'height', 'duration_seconds', 'alt_text', 'visibility', 'position', 'is_primary', 'primary_slot', 'file_hash', 'created_at', 'updated_at', 'deleted_at'],
-            'shipping_carriers' => ['id', 'uuid', 'code', 'name', 'adapter', 'default_api_url', 'is_active', 'reference_source', 'reference_version', 'synced_at', 'created_at', 'updated_at', 'deleted_at'],
-            'carrier_geo_mappings' => ['id', 'uuid', 'carrier_id', 'geographic_area_id', 'zone_type', 'external_code', 'external_name', 'external_province_code', 'verification_source', 'verified_at', 'mapping_version', 'is_active', 'synced_at', 'created_at', 'updated_at'],
-            'pickup_points' => ['id', 'uuid', 'carrier_id', 'province_id', 'municipality_id', 'province_type', 'municipality_type', 'external_code', 'name', 'address', 'phone', 'map_url', 'is_carrier_active', 'reference_source', 'reference_version', 'synced_at', 'created_at', 'updated_at', 'deleted_at'],
-        ];
         foreach ($this->checks() as [$table, $name, $expression]) {
-            if (Schema::getConnection()->getDriverName() !== 'sqlite') {
-                DB::statement("ALTER TABLE `{$table}` ADD CONSTRAINT `{$name}` CHECK ({$expression})");
-
-                continue;
-            }
-
-            $expression = str_replace('CHAR_LENGTH(', 'LENGTH(', $expression);
-            $expression = str_replace("JSON_TYPE(payload) = 'OBJECT'", "json_type(payload) = 'object'", $expression);
-            $expression = str_replace('expires_at <= DATE_ADD(assigned_at, INTERVAL 9999 DAY)', 'julianday(expires_at) - julianday(assigned_at) <= 9999', $expression);
-            $pattern = '/(?<![A-Za-z0-9_])`?('.implode('|', $columns[$table]).')`?(?![A-Za-z0-9_])/';
-            $expression = preg_replace_callback($pattern, fn (array $match): string => 'NEW.`'.$match[1].'`', $expression);
-
-            foreach (['insert' => 'INSERT', 'update' => 'UPDATE'] as $suffix => $event) {
-                DB::statement("CREATE TRIGGER {$name}_{$suffix} BEFORE {$event} ON `{$table}` WHEN NOT ({$expression}) BEGIN SELECT RAISE(ABORT, 'Documented constraint: {$name}'); END");
-            }
+            DB::statement("ALTER TABLE `{$table}` ADD CONSTRAINT `{$name}` CHECK ({$expression})");
         }
     }
 
     public function down(): void
     {
         foreach ($this->checks() as [$table, $name]) {
-            if (Schema::getConnection()->getDriverName() === 'sqlite') {
-                DB::statement("DROP TRIGGER IF EXISTS {$name}_insert");
-                DB::statement("DROP TRIGGER IF EXISTS {$name}_update");
-            } else {
-                DB::statement("ALTER TABLE `{$table}` DROP CHECK `{$name}`");
-            }
+            DB::statement("ALTER TABLE `{$table}` DROP CHECK `{$name}`");
         }
     }
 

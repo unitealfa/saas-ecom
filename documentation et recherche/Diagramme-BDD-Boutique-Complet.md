@@ -1,10 +1,18 @@
 # Diagramme complet de la BDD boutique
 
-Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.10 du 6 octobre 2026. Ce document présente **les 59 tables locales et leurs 1005 champs dans un seul diagramme Mermaid**, puis explique chaque table et chaque champ simplement. Chaque boutique possède cette structure dans sa propre BDD ; rôles et comptes restent indépendants. Aucune migration n’est exécutée.
+**Mise à jour technique du 8 octobre 2026 :** MySQL, Spatie Permission 8.3.0 et Activity Log 5.0.0. `created_at`/`updated_at` proviennent de `timestamps()` et `deleted_at` de `softDeletes()` pour les tables archivables ; ces TIMESTAMP sont nullable. Un journal possédant seulement `created_at` conserve ce timestamp obligatoire. Les dates métier restent des DATETIME. Les migrations de création Permission et Activity Log sont publiées par les commandes officielles Spatie ; deux migrations d'extension locales conservent les UUID, durées et informations d'audit décrits ici. Les FK conservent RESTRICT ; les index natifs ne sont pas recréés en doublon. Permissions, cache et activités restent isolés par boutique. Les 62 relations FK simples centrales et 192 locales utilisent `foreignId()` avec leur vraie contrainte SQL vers la PK du parent ; cette colonne conserve un ID existant, sans AUTO_INCREMENT. Les index ordinaires et UNIQUE sont définis dans les migrations de leurs tables. Les FK simples et composites dont les parents sont disponibles sont définies au même endroit ; les références vers un parent créé ensuite, notamment le cycle commande/révision, sont ajoutées dans `add_documented_foreign_keys`, avec mention dans la migration de création. Les contrats REF/POLY restent distincts.
+
+Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.10 du 6 octobre 2026. Ce document présente **les 59 tables locales et leurs 1005 champs dans un seul diagramme Mermaid**, puis explique chaque table et chaque champ simplement. Chaque boutique possède cette structure dans sa propre BDD ; rôles et comptes restent indépendants. Les migrations correspondantes sont vérifiées sur des bases MySQL de test isolées.
 
 **Identifiants :** chaque `id` métier est un numéro interne auto-incrémenté (1, 2, 3…), propre à sa table et à sa BDD. `uuid` reste un second champ unique pour les liens publics. Les FK locales utilisent les ID numériques ; les références au central, comme `shop.tenant_uuid` et `users.central_user_uuid`, restent des UUID sans FK SQL entre bases. Les trois pivots Spatie gardent leurs PK composites. Le numéro central utilisé par Tenancy ne devient jamais l’identité d’un utilisateur ou d’un produit local.
 
+**Tailles nécessaires seulement :** les montants se déclarent avec `decimal('champ')` ; `SchemaBlueprint` conserve une fois DECIMAL(14,2), pour les centimes et la capacité documentée. Les mesures conservent leurs trois décimales via `places: 3`. Les formats fixes UUID, SHA-256, ISO et couleur sont conservés. Les booléens s'écrivent `true`/`false` en PHP et `TRUE`/`FALSE` en SQL ; les statuts et compteurs restent numériques. `id()` est déjà unique par sa PK ; les unicités composites de relations restent nécessaires.
+
+**Déclarations et casts :** les migrations appellent `$table->uuid('uuid');` et les références UUID utilisent `$table->uuid('champ');`, via `App\Services\SchemaBlueprint` ; seule la colonne publique `uuid` reçoit l'unicité automatique. Les VARCHAR utilisent 255 sans argument de longueur ; `rememberToken()` garde son format Laravel natif. Les dates sont sans microsecondes, sans argument `6`. Les comptes locaux castent `status` et `membership_status` vers leurs enums documentés, avec mot de passe `hashed` ; rôles et activités gardent leurs casts et données Spatie. `shop` est un profil unique : une recherche de boutiques par nom utilise l'index central `tenants.shop_name`.
+
 **Base de la boutique :** le central réserve `boutique_{slug_initial}`, par exemple `boutique_nour`, sans suffixe d’ID, et conserve ce nom dans `tenants.data.tenancy_db_name` avant le provisionnement. Le nom reste stable après renommage. Avec le préfixe `boutique_`, le slug initial est limité à 55 caractères ; les noms trop longs, déjà réservés ou déjà présents sont refusés, sans troncature ni adoption d’une autre base. Les bases déjà présentes ne changent que sur autorisation explicite ; l’utilisateur confirme aussi le retrait du suffixe des deux bases d’essai actuelles. Cette décision ne change aucune table ni relation du diagramme. Les espaces internes de cache, fichiers et jobs sont isolés par la clé Tenancy numérique ; aucun ID interne n’est exposé au client.
+
+**Profil initial `shop` :** `TenantProvisioner` crée automatiquement l'unique profil après les migrations tenant, avec le compte propriétaire local dans une même transaction. Le commerçant peut fournir les quatre réglages via `Tenant::configureShopForProvisioning()` avant la sauvegarde initiale. Sans valeur fournie : `business_type=OTHER`, `theme_code=default`, `colors={"primary":"#2563EB","secondary":"#FFFFFF"}` et `cart_lifetime_days=7`. Ces défauts sont appliqués par l'application ; les protections singleton existantes restent identiques. Les reprises conservent le profil et ses réglages ; le seeder local réutilise cette ligne. Un propriétaire peut posséder plusieurs boutiques, chacune avec son profil dans sa propre BDD. Les codes d'activité sont extensibles et aucun catalogue fermé de thèmes n'est encore implémenté.
 
 ## 1. Les 59 tables expliquées très simplement
 
@@ -108,8 +116,8 @@ shop {
   json colors
   json shipping_tax_configuration "?"
   int cart_lifetime_days
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 shop_addresses {
@@ -127,9 +135,9 @@ shop_addresses {
   boolean visible
   json payload
   u8 primary_slot "?"
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 content_pages {
@@ -148,9 +156,9 @@ content_pages {
   boolean is_published
   datetime published_at "?"
   int version
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 media {
@@ -159,9 +167,9 @@ media {
   u64 created_by_id FK "?"
   varchar storage_key UK
   u64 model_id
-  varchar(64) model_type
-  varchar(64) collection_name
-  varchar(64) disk
+  varchar model_type
+  varchar collection_name
+  varchar disk
   varchar mime_type
   varchar original_name
   u64 size_bytes
@@ -174,9 +182,9 @@ media {
   boolean is_primary
   u8 primary_slot "?"
   char(64) file_hash "?"
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 categories {
@@ -193,9 +201,9 @@ categories {
   boolean is_active
   varchar meta_title "?"
   text meta_description "?"
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 products {
@@ -222,9 +230,9 @@ products {
   varchar meta_title "?"
   text meta_description "?"
   boolean indexable
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 product_variants {
@@ -250,9 +258,9 @@ product_variants {
   decimal height_cm "?"
   boolean is_active
   int position
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 product_options {
@@ -267,9 +275,9 @@ product_options {
   u8 display_type "?"
   char(7) color_hex "?"
   int position
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 variant_option_values {
@@ -281,8 +289,8 @@ variant_option_values {
   u64 value_id FK
   u8 option_record_type
   u8 value_record_type
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 product_tags {
@@ -291,8 +299,8 @@ product_tags {
   u64 product_id FK
   u64 tag_id FK
   u8 tag_record_type
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 product_promotions {
@@ -309,9 +317,9 @@ product_promotions {
   datetime ended_at "?"
   int priority
   boolean is_active
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 product_reviews {
@@ -327,9 +335,9 @@ product_reviews {
   u8 moderation_status
   datetime moderated_at "?"
   datetime published_at "?"
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 visitors {
@@ -339,8 +347,8 @@ visitors {
   datetime first_visited_at
   datetime last_visited_at
   datetime expires_at
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 visit_sessions {
@@ -356,8 +364,8 @@ visit_sessions {
   varchar campaign "?"
   varchar referrer_host "?"
   u8 device_type "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 navigation_events {
@@ -376,7 +384,7 @@ navigation_events {
   int quantity "?"
   datetime occurred_at
   datetime received_at
-  datetime created_at
+  timestamp created_at
 }
 
 carts {
@@ -387,8 +395,8 @@ carts {
   datetime last_activity_at
   datetime expires_at
   datetime converted_at "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 cart_items {
@@ -401,8 +409,8 @@ cart_items {
   int quantity
   text customization_text "?"
   char(64) customization_signature
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 orders {
@@ -438,8 +446,8 @@ orders {
   boolean retention_hold
   text retention_hold_reason "?"
   datetime hold_review_at "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 order_revisions {
@@ -481,7 +489,7 @@ order_revisions {
   text customer_note "?"
   varchar sales_terms_version
   json sales_terms_snapshot
-  datetime created_at
+  timestamp created_at
 }
 
 order_items {
@@ -512,7 +520,7 @@ order_items {
   datetime reservation_released_at "?"
   datetime reservation_created_at "?"
   datetime reservation_updated_at "?"
-  datetime created_at
+  timestamp created_at
 }
 
 order_history {
@@ -531,7 +539,7 @@ order_history {
   text note "?"
   uuid correlation_id
   u8 origin
-  datetime created_at
+  timestamp created_at
 }
 
 stock_movements {
@@ -562,7 +570,7 @@ stock_movements {
   varchar operation_key
   uuid correlation_id
   text note "?"
-  datetime created_at
+  timestamp created_at
 }
 
 order_returns {
@@ -578,8 +586,8 @@ order_returns {
   datetime requested_at "?"
   datetime received_at "?"
   datetime closed_at "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 return_items {
@@ -600,8 +608,8 @@ return_items {
   decimal unit_cost_snapshot
   datetime inspected_at "?"
   text note "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 shipping_providers {
@@ -616,9 +624,9 @@ shipping_providers {
   json reference_configuration "?"
   datetime last_synced_at "?"
   boolean is_active
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 shipping_rates {
@@ -641,9 +649,9 @@ shipping_rates {
   u64 provider_scope_id
   uuid municipality_scope_uuid "?"
   u8 current_slot "?"
-  datetime created_at
-  datetime updated_at "?"
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 free_shipping_rules {
@@ -658,9 +666,9 @@ free_shipping_rules {
   datetime ended_at "?"
   int priority
   boolean is_active
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 shipments {
@@ -686,8 +694,8 @@ shipments {
   datetime carrier_validated_at "?"
   datetime delivered_at "?"
   datetime last_synced_at "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 shipment_events {
@@ -715,7 +723,7 @@ shipment_events {
   datetime observed_at
   u8 source
   varchar deduplication_key
-  datetime created_at
+  timestamp created_at
 }
 
 carrier_operations {
@@ -744,8 +752,8 @@ carrier_operations {
   datetime ended_at "?"
   datetime sending_started_at "?"
   datetime superseded_at "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 carrier_operation_attempts {
@@ -761,7 +769,7 @@ carrier_operation_attempts {
   int duration_ms
   datetime started_at
   datetime ended_at "?"
-  datetime created_at
+  timestamp created_at
 }
 
 collections {
@@ -776,8 +784,8 @@ collections {
   datetime declared_paid_at "?"
   varchar source
   datetime reconciled_at "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 remittance_statements {
@@ -801,8 +809,8 @@ remittance_statements {
   text note "?"
   varchar operation_key
   datetime reconciled_at "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 carrier_settlement_lines {
@@ -826,7 +834,7 @@ carrier_settlement_lines {
   varchar reason "?"
   varchar external_reference "?"
   datetime performed_at "?"
-  datetime created_at
+  timestamp created_at
 }
 
 expenses {
@@ -849,8 +857,8 @@ expenses {
   varchar operation_key
   datetime cancelled_at "?"
   text note "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 customer_adjustments {
@@ -873,8 +881,8 @@ customer_adjustments {
   varchar reference "?"
   text reason
   varchar operation_key
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 order_documents {
@@ -888,27 +896,27 @@ order_documents {
   int document_version
   json issuer_snapshot
   datetime generated_at
-  datetime created_at
+  timestamp created_at
 }
 
 activity_log {
   u64 id PK "AUTO_INCREMENT ; interne"
   uuid uuid UK "UUID v4 ; public"
-  varchar(191) operation_key UK "?"
+  varchar operation_key UK "?"
   u64 subject_id "?"
   u64 causer_id "?"
-  varchar(64) log_name "?"
+  varchar log_name "?"
   text description
-  varchar(64) subject_type "?"
-  varchar(100) event "?"
-  varchar(64) causer_type "?"
+  varchar subject_type "?"
+  varchar event "?"
+  varchar causer_type "?"
   json attribute_changes "?"
   json properties "?"
   uuid correlation_id "?"
   u8 origin
   datetime performed_at "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 carrier_fees {
@@ -934,8 +942,8 @@ carrier_fees {
   datetime recognized_at "?"
   varchar external_reference "?"
   varchar operation_key
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 carrier_receivables {
@@ -953,8 +961,8 @@ carrier_receivables {
   varchar operation_key
   datetime recognized_at
   datetime settled_at "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 collection_entries {
@@ -971,7 +979,7 @@ collection_entries {
   varchar reference
   text reason
   varchar operation_key
-  datetime created_at
+  timestamp created_at
 }
 
 invoices {
@@ -1001,8 +1009,8 @@ invoices {
   text cancellation_reason "?"
   varchar operation_key
   varchar document_reason "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 order_incidents {
@@ -1023,8 +1031,8 @@ order_incidents {
   text reason
   datetime validated_at "?"
   datetime closed_at "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 order_incident_details {
@@ -1035,8 +1043,8 @@ order_incident_details {
   u8 type
   int quantity
   text reason
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 billing_rules {
@@ -1046,10 +1054,10 @@ billing_rules {
   u8 record_type
   u8 document_type "?"
   int fiscal_year "?"
-  varchar(32) shop_prefix "?"
+  varchar shop_prefix "?"
   bigint next_number "?"
   u8 sequence_slot "?"
-  varchar(100) code "?"
+  varchar code "?"
   int version "?"
   u64 seller_profile_version "?"
   varchar trigger_event "?"
@@ -1061,8 +1069,8 @@ billing_rules {
   datetime validated_at "?"
   datetime effective_at "?"
   datetime ends_at "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 sales_terms_acceptances {
@@ -1076,7 +1084,7 @@ sales_terms_acceptances {
   datetime accepted_at
   u8 acceptance_mode
   json sanitized_proof "?"
-  datetime created_at
+  timestamp created_at
 }
 
 billing_obligations {
@@ -1098,8 +1106,8 @@ billing_obligations {
   int attempts_count
   datetime next_attempt_at "?"
   varchar error_code "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 commercial_corrections {
@@ -1118,7 +1126,7 @@ commercial_corrections {
   datetime effective_at
   datetime recorded_at
   text reason
-  datetime created_at
+  timestamp created_at
 }
 
 commercial_correction_lines {
@@ -1132,7 +1140,7 @@ commercial_correction_lines {
   decimal revenue_delta
   decimal sold_cost_delta
   text detailed_reason "?"
-  datetime created_at
+  timestamp created_at
 }
 
 users {
@@ -1145,26 +1153,26 @@ users {
   varchar password
   varchar phone "?"
   datetime email_verified_at "?"
-  varchar(10) locale
+  varchar locale
   u8 status
   u8 membership_status
   datetime joined_at "?"
   datetime last_login_at "?"
   varchar(100) remember_token "?"
-  datetime created_at
-  datetime updated_at
-  datetime deleted_at "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+  timestamp deleted_at "?"
 }
 
 permissions {
   u64 id PK "AUTO_INCREMENT ; interne"
   uuid uuid UK "UUID v4 ; public"
-  varchar(125) name
-  varchar(32) guard_name
+  varchar name
+  varchar guard_name
   varchar label
-  varchar(100) feature_code "?"
-  datetime created_at
-  datetime updated_at
+  varchar feature_code "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 roles {
@@ -1172,15 +1180,15 @@ roles {
   uuid uuid UK "UUID v4 ; public"
   u8 super_admin_slot UK "?"
   char(64) permission_signature UK
-  varchar(125) name
-  varchar(32) guard_name
+  varchar name
+  varchar guard_name
   varchar label
   boolean is_system
   boolean is_protected
   boolean is_super_admin
   u64 permission_version
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 role_has_permissions {
@@ -1191,14 +1199,14 @@ role_has_permissions {
 
 model_has_roles {
   u64 role_id PK,FK
-  varchar(64) model_type PK
+  varchar model_type PK
   u64 model_id PK
   datetime assigned_at
 }
 
 model_has_permissions {
   u64 permission_id PK,FK
-  varchar(64) model_type PK
+  varchar model_type PK
   u64 model_id PK
   datetime assigned_at
   datetime expires_at
@@ -1215,8 +1223,8 @@ team_invitations {
   datetime expires_at
   datetime accepted_at "?"
   datetime revoked_at "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 contact_verifications {
@@ -1229,8 +1237,8 @@ contact_verifications {
   datetime expires_at
   int attempts_count
   datetime consumed_at "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 carrier_accounts {
@@ -1246,8 +1254,8 @@ carrier_accounts {
   varchar encryption_key_version "?"
   boolean is_active
   datetime last_synced_at "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 carrier_remittance_batches {
@@ -1264,8 +1272,8 @@ carrier_remittance_batches {
   decimal verified_net_amount "?"
   u8 status
   datetime received_at "?"
-  datetime created_at
-  datetime updated_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
 }
 
 media |o..o{ shop : "FK logo_media_id"
@@ -1573,17 +1581,17 @@ La fiche publique de la boutique : son nom affiché, son logo, ses contacts et s
 | `shop_name` | Le nom public de cette boutique, projeté depuis tenants.shop_name au central ; il ne contient pas le nom de famille de son propriétaire. |
 | `description` | un texte qui explique l’élément plus en détail. Il peut rester vide si aucune explication supplémentaire n’est nécessaire. |
 | `about` | le texte de présentation de la boutique. Exemple : son histoire ou ce qu’elle vend. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `business_type` | le type d’activité de la boutique. Exemple : vêtements, restaurant ou salon. |
+| `business_type` | le type d'activité, extensible ; `OTHER` est utilisé à la création si le commerçant ne le renseigne pas. |
 | `contact_email` | l’email public que les visiteurs peuvent utiliser pour contacter la boutique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
 | `contact_phone` | le téléphone public de la boutique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
 | `contact_whatsapp` | le numéro WhatsApp public de la boutique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
 | `locale` | la langue préférée pour l’affichage. Exemple : `fr` ou `ar`. |
 | `currency` | la monnaie utilisée. Exemple : `DZD` pour le dinar algérien. |
 | `timezone` | la zone utilisée pour afficher les dates et heures. Exemple : `Africa/Algiers`. |
-| `theme_code` | le modèle visuel choisi pour le site. Exemple : `standard`. |
-| `colors` | les couleurs choisies pour le site, enregistrées ensemble. Exemple : couleur principale et couleur des boutons. |
+| `theme_code` | le code du modèle visuel ; `default` est utilisé à la création si le commerçant ne le renseigne pas. |
+| `colors` | les couleurs choisies pour le site ; par défaut `{"primary":"#2563EB","secondary":"#FFFFFF"}`. |
 | `shipping_tax_configuration` | les réglages qui expliquent comment les frais de livraison doivent être traités dans les calculs fiscaux. Ils doivent être validés avant la vente réelle. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue. |
-| `cart_lifetime_days` | le nombre de jours pendant lesquels un panier invité peut rester conservé avant d’expirer. |
+| `cart_lifetime_days` | la durée de conservation du panier invité ; `7` jours à la création si le commerçant ne la renseigne pas. |
 | `created_at` | la date où cette ligne a été créée dans la base. |
 | `updated_at` | la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui. |
 
@@ -1640,7 +1648,7 @@ Le payload est un objet obligatoire. Son schéma dépend exclusivement du record
 | network | chaîne requise, extensible | Le réseau concerné, par exemple Facebook, Instagram ou TikTok. |
 | url | URL publique requise | La page exacte de cette boutique ou de ce lieu sur ce réseau. |
 
-**Validation des détails :** latitude et longitude sont toutes deux NULL ou toutes deux fournies ; normaliser leurs valeurs décimales sans arrondi au-delà de la précision précédente. map_url reste indépendant de cette paire. Les URL map_url/url acceptent seulement http/https, au maximum les 255 caractères du VARCHAR d’origine, sans identifiants de connexion ni clé API/token secret ; les paramètres publics de carte nécessaires restent possibles. Le serveur ne consulte pas ces URL pour enregistrer le profil. network, postal_code et phone conservent la limite VARCHAR(255) ; address conserve la capacité TEXT initiale, avec limite d’octets contrôlée. Les jours/intervalles d’horaires et leurs traversées de minuit sont validés selon le fuseau shop.timezone, sans code exécutable, HTML arbitraire ni secret. Les limites du formulaire/payload sont bornées et ne suppriment aucune entrée historique pendant une migration. Aucun service Maps, compte social, publication automatisée ou calendrier marketing n’est créé.
+**Validation des détails :** latitude et longitude sont toutes deux NULL ou toutes deux fournies ; normaliser leurs valeurs décimales sans arrondi au-delà de la précision précédente. map_url reste indépendant de cette paire. Les URL map_url/url acceptent seulement http/https, au maximum les 255 caractères du VARCHAR d’origine, sans identifiants de connexion ni clé API/token secret ; les paramètres publics de carte nécessaires restent possibles. Le serveur ne consulte pas ces URL pour enregistrer le profil. network, postal_code et phone conservent la limite varchar ; address conserve la capacité TEXT initiale, avec limite d’octets contrôlée. Les jours/intervalles d’horaires et leurs traversées de minuit sont validés selon le fuseau shop.timezone, sans code exécutable, HTML arbitraire ni secret. Les limites du formulaire/payload sont bornées et ne suppriment aucune entrée historique pendant une migration. Aucun service Maps, compte social, publication automatisée ou calendrier marketing n’est créé.
 
 ### 3. `content_pages` — 18 champs
 
@@ -3152,7 +3160,7 @@ Les autres contraintes locales des sections 6.0–6.6 restent applicables : appa
 
 Si des écritures de l’ancien échange payé existent, archiver/réconcilier leurs avoirs, remboursements, affectations et COD avant retrait ; ne jamais les convertir en impayé ni effacer leurs pièces/audits. Aucun crédit payé n’est simplement réduit à 0 et aucun ancien code d’enum n’est réutilisé. Les caractéristiques/preferences/registres déjà présents exigent une décision explicite de conservation documentaire/export si nécessaire avant une suppression physique future ; ce document ne lance aucune suppression. Les anciennes activités/morphs disposent d’une correspondance historique sans rendre les modèles retirés créables. Vérifier commandes/revisions/colis, unicités, budgets, médias/PDF, réservations et projections de stock après toute migration. Conserver les règles de contrepassation exactes, reçus privés, remboursements réels, manquants et plafonds issus des notes professionnelles.
 
-**Sources de décision :** demandes confirmées dans la conversation, truc.txt, notes du dépôt, recherches Laravel/Spatie et historique complet disponible (37 commits jusqu’à 374bbac). Les notes historiques ne remplacent pas les derniers choix métier explicites. Les diagrammes et glossaires décrivent seulement la version active. Aucune migration/application n’est créée ou exécutée.
+**Sources de décision :** demandes confirmées dans la conversation, truc.txt, notes du dépôt, recherches Laravel/Spatie et historique complet disponible (37 commits jusqu’à 374bbac). Les notes historiques ne remplacent pas les derniers choix métier explicites. Les diagrammes et glossaires décrivent seulement la version active ; les migrations et leurs vérifications MySQL sont détaillées dans la mise à jour technique en tête du document.
 
 Les 37 commits jusqu’à 374bbac et les notes servent à préserver les contraintes déjà identifiées. Ce document décrit la version active ; les anciennes décisions incompatibles restent uniquement dans la traçabilité historique du schéma principal. Aucune donnée ni migration n’est exécutée.
 

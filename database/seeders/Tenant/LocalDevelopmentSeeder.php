@@ -2,6 +2,7 @@
 
 namespace Database\Seeders\Tenant;
 
+use App\Enums\Tenant\Users\MembershipStatusEnum;
 use App\Models\Central\Tenant;
 use App\Models\Tenant\User;
 use Carbon\CarbonImmutable;
@@ -42,8 +43,16 @@ class LocalDevelopmentSeeder extends LocalFixtureSeeder
         if ($this->db->table('activity_log')->where('operation_key', 'local:seed:tenant:v1')->exists()) {
             return;
         }
-        if ($this->db->table('shop')->exists() || $this->db->table('products')->exists() || $this->db->table('orders')->exists()) {
+        if ($this->db->table('products')->exists() || $this->db->table('orders')->exists()
+            || $this->db->table('shop')->count() !== 1
+            || ! $this->db->table('shop')->where('singleton', 1)->where('tenant_uuid', $tenant->uuid)->exists()) {
             throw new LogicException('Refusing to mix local fixtures with existing shop data.');
+        }
+
+        foreach (['logo_media_id', 'favicon_media_id', 'description', 'about', 'contact_email', 'contact_phone', 'contact_whatsapp', 'shipping_tax_configuration'] as $field) {
+            if ($this->db->table('shop')->whereNotNull($field)->exists()) {
+                throw new LogicException('Refusing to overwrite an existing shop profile with local fixtures.');
+            }
         }
 
         $central = DB::connection(config('tenancy.database.central_connection'));
@@ -64,7 +73,7 @@ class LocalDevelopmentSeeder extends LocalFixtureSeeder
         $this->db->transaction(function () use ($tenant, $owner, $carrierUuid): void {
             $localOwner = User::where('central_user_uuid', $owner->uuid)->firstOrFail();
             $localOwner->password = 'LocalTest!2026-Shop';
-            $localOwner->membership_status = 1;
+            $localOwner->membership_status = MembershipStatusEnum::ACTIVE;
             $localOwner->joined_at = now();
             $localOwner->email_verified_at = now();
             $localOwner->save();
@@ -107,7 +116,7 @@ class LocalDevelopmentSeeder extends LocalFixtureSeeder
             'first_name' => 'Employé', 'last_name' => 'Essai', 'email' => 'equipe@'.$tenant->slug.'.example.test',
             'password' => 'LocalTest!2026-Team', 'locale' => 'fr',
         ]);
-        $employee->membership_status = 1;
+        $employee->membership_status = MembershipStatusEnum::ACTIVE;
         $employee->joined_at = now();
         $employee->email_verified_at = now();
         $employee->save();
@@ -147,15 +156,13 @@ class LocalDevelopmentSeeder extends LocalFixtureSeeder
 
     private function profile(Tenant $tenant): void
     {
-        $shop = $this->insert($this->db, 'shop', [
-            'tenant_uuid' => $tenant->uuid, 'singleton' => 1, 'central_profile_version' => $tenant->profile_version,
-            'shop_name' => $tenant->shop_name, 'description' => 'Boutique fictive pour les essais locaux.',
-            'about' => 'Catalogue et commandes de démonstration, aucune activité réelle.', 'business_type' => 'retail',
-            'contact_email' => $tenant->owner->email, 'locale' => 'fr', 'currency' => 'DZD',
-            'timezone' => 'Africa/Algiers', 'theme_code' => 'standard',
-            'colors' => $this->json(['primary' => '#1d4ed8', 'background' => '#ffffff']),
+        $shop = (int) $this->db->table('shop')->where('singleton', 1)->where('tenant_uuid', $tenant->uuid)->soleValue('id');
+        $this->db->table('shop')->where('id', $shop)->update([
+            'description' => 'Boutique fictive pour les essais locaux.',
+            'about' => 'Catalogue et commandes de démonstration, aucune activité réelle.',
+            'contact_email' => $tenant->owner->email,
             'shipping_tax_configuration' => $this->json(['fixture_only' => true, 'taxes' => $this->taxSnapshot(300)['taxes']]),
-            'cart_lifetime_days' => 7,
+            'updated_at' => now(),
         ]);
         $this->insert($this->db, 'shop_addresses', [
             'shop_id' => $shop, 'record_type' => 1, 'label' => 'Magasin fictif', 'position' => 0,

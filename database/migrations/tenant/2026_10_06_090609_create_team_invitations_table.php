@@ -10,16 +10,19 @@ return new class extends Migration
     {
         Schema::create('team_invitations', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
-            $table->unsignedBigInteger('initial_role_id');
-            $table->unsignedBigInteger('invited_by_id');
+            $table->uuid('uuid');
+            $table->foreignId('initial_role_id')->constrained('roles', indexName: 'fk_team_invitations_d5576bc50f')->restrictOnDelete()->restrictOnUpdate();
+            $table->foreignId('invited_by_id')->constrained('users', indexName: 'fk_team_invitations_e3979f2144')->restrictOnDelete()->restrictOnUpdate();
             $table->string('token_hash')->unique();
             $table->string('email');
             $table->unsignedBigInteger('role_permission_version');
-            $table->dateTime('expires_at', 6);
-            $table->dateTime('accepted_at', 6)->nullable();
-            $table->dateTime('revoked_at', 6)->nullable();
+            $table->dateTime('expires_at');
+            $table->dateTime('accepted_at')->nullable();
+            $table->dateTime('revoked_at')->nullable();
             $table->timestamps();
+
+            $table->index(['initial_role_id'], 'ix_team_invitations_d5576bc50f');
+            $table->index(['invited_by_id'], 'ix_team_invitations_e3979f2144');
         });
     }
 

@@ -2,7 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\User;
+use App\Services\SchemaBlueprint;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
@@ -15,7 +19,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(Blueprint::class, SchemaBlueprint::class);
     }
 
     /**
@@ -23,6 +27,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Relation::morphMap([
+            'central_user' => User::class,
+            'shop_user' => \App\Models\Tenant\User::class,
+        ]);
         $this->loadMigrationsFrom(database_path('migrations/central'));
         $this->configureDefaults();
     }

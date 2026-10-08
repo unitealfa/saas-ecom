@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('shipping_carriers', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid');
             $table->string('code')->unique();
             $table->string('name');
             $table->string('adapter');
@@ -18,7 +18,7 @@ return new class extends Migration
             $table->boolean('is_active');
             $table->string('reference_source');
             $table->integer('reference_version');
-            $table->dateTime('synced_at', 6)->nullable();
+            $table->dateTime('synced_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

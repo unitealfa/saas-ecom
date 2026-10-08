@@ -3,12 +3,12 @@
 use App\Models\Tenant;
 use Database\Seeders\Central\LocalDevelopmentSeeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
 
 beforeEach(function (): void {
     isolateLocalFixtureStorage();
-    config(['app.debug' => true, 'tenancy.database.suffix' => '.sqlite', 'tenancy.saas_base_domain' => 'aydra.localhost']);
+    config(['app.debug' => true, 'tenancy.database.suffix' => '', 'tenancy.saas_base_domain' => 'aydra.localhost']);
     $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
 });
 
@@ -16,10 +16,8 @@ afterEach(function (): void {
     tenancy()->end();
     foreach (Tenant::get() as $tenant) {
         $name = $tenant->database()->getName();
-        if (! preg_match('/^boutique_boutique[12]\.sqlite$/D', $name)) {
-            throw new LogicException('Refusing to remove an unexpected fixture database.');
-        }
-        File::delete(database_path($name));
+
+        TestCase::dropIsolatedMysqlDatabase($name);
     }
     cleanLocalFixtureStorage();
 });
@@ -29,7 +27,7 @@ test('local diagnostics show correct domains isolated shop ids and measured quer
     $this->seed(LocalDevelopmentSeeder::class);
     $this->get('http://aydra.localhost/_dev/database')->assertOk()
         ->assertSee('boutique1.aydra.localhost')->assertSee('boutique2.aydra.localhost')
-        ->assertSee('boutique_boutique1.sqlite')->assertSee('boutique_boutique2.sqlite')
+        ->assertSee(config('tenancy.database.prefix').'boutique1')->assertSee(config('tenancy.database.prefix').'boutique2')
         ->assertDontSee('LocalTest!2026-Owner')->assertHeader('Cache-Control', 'no-store, private');
 
     foreach ([1, 2] as $number) {
@@ -40,7 +38,7 @@ test('local diagnostics show correct domains isolated shop ids and measured quer
         $other = $number === 1 ? 2 : 1;
         $this->get('http://boutique'.$number.'.aydra.localhost/_dev/database')->assertOk()
             ->assertSee('The id of the current tenant is '.$tenant->id)
-            ->assertSee('boutique_boutique'.$number.'.sqlite')
+            ->assertSee(config('tenancy.database.prefix').'boutique'.$number)
             ->assertSee('BOUTIQUE'.$number.'-LOCAL-0050')
             ->assertDontSee('BOUTIQUE'.$other.'-LOCAL-')->assertDontSee('boutique'.$other.'@example.test')
             ->assertSee('&lt;script&gt;alert(1)&lt;/script&gt;', false)->assertDontSee('<script>alert(1)</script>', false)

@@ -10,18 +10,20 @@ return new class extends Migration
     {
         Schema::create('carrier_operation_attempts', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
-            $table->unsignedBigInteger('operation_id');
+            $table->uuid('uuid');
+            $table->foreignId('operation_id')->constrained('carrier_operations', indexName: 'fk_carrier_operation_attempts_9a9856b253')->restrictOnDelete()->restrictOnUpdate();
             $table->integer('attempt_number');
             $table->integer('http_status_code')->nullable();
             $table->json('sanitized_response')->nullable();
-            $table->dateTime('payload_expires_at', 6)->nullable();
-            $table->dateTime('payload_purged_at', 6)->nullable();
+            $table->dateTime('payload_expires_at')->nullable();
+            $table->dateTime('payload_purged_at')->nullable();
             $table->string('error_code')->nullable();
             $table->integer('duration_ms');
-            $table->dateTime('started_at', 6);
-            $table->dateTime('ended_at', 6)->nullable();
-            $table->dateTime('created_at', 6);
+            $table->dateTime('started_at');
+            $table->dateTime('ended_at')->nullable();
+            $table->timestamp('created_at');
+
+            $table->unique(['operation_id', 'attempt_number'], 'uq_carrier_operation_attempts_5e2bb8e610');
         });
     }
 

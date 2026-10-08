@@ -13,18 +13,18 @@ return new class extends Migration
     {
         Schema::create('domains', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
-            $table->string('domain', 253)->unique();
+            $table->uuid('uuid');
+            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete()->restrictOnUpdate();
+            $table->string('domain')->unique();
             $table->unsignedTinyInteger('type')->default(1);
             $table->boolean('is_primary')->default(false);
             $table->unsignedTinyInteger('verification_status')->default(1);
-            $table->dateTime('verified_at', 6)->nullable();
+            $table->dateTime('verified_at')->nullable();
             $table->unsignedTinyInteger('certificate_status')->nullable();
             $table->timestamps();
             $table->softDeletes();
             $table->unsignedTinyInteger('primary_slot')->nullable()
-                ->storedAs('CASE WHEN is_primary = 1 AND deleted_at IS NULL THEN 1 ELSE NULL END');
+                ->storedAs('CASE WHEN is_primary = TRUE AND deleted_at IS NULL THEN 1 ELSE NULL END');
             $table->unique(['tenant_id', 'primary_slot']);
         });
     }

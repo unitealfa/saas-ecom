@@ -4,6 +4,8 @@ Version V4.10 — 6 octobre 2026. ID numériques auto-incrémentés, UUID public
 
 Ce document contient **28 tables centrales et 59 tables par boutique**. Les tables techniques Laravel et les passkeys facultatives restent hors décompte. Les cinq tables Spatie Permission et activity_log sont incluses ; les trois pivots gardent leurs clés composites. V4.9 retire feature_overrides au central et permission_overrides dans les deux contextes, puis porte les durées dans leurs attributions existantes. Les règles de rôles sont communes, mais les comptes, rôles, permissions, dates et activités restent indépendants dans chaque BDD.
 
+**Mise à jour technique du 8 octobre 2026 :** le projet utilise MySQL, Spatie Permission 8.3.0 et Activity Log 5.0.0. Les migrations natives des deux packages sont publiées par `php artisan vendor:publish --provider="Spatie\Permission\PermissionServiceProvider" --tag=permission-migrations` et `php artisan vendor:publish --provider="Spatie\Activitylog\ActivitylogServiceProvider" --tag=activitylog-migrations`, puis placées dans les dossiers `central` et `tenant`. Chaque contexte possède une migration de création des cinq tables Permission, une migration de création d'Activity Log et leurs extensions Aydra : UUID, métadonnées, durées, dates d'attribution et contexte d'audit. Les FK Spatie conservent RESTRICT conformément aux règles d'historique ; les index natifs ne sont pas recréés en doublon. Les modèles et le cache Spatie ainsi que le modèle d'activité changent avec le contexte Tenancy. La migration `protect_central_identifiers_and_ownership` supprimée n'est pas rétablie : ses quatre triggers spécifiques ne sont plus créés, tandis que les contrôles d'identité/propriété des modèles et les autres protections documentées restent présents. Les deux index de `tenants` nécessaires aux relations composites et aux créations par propriétaire sont définis dans sa migration de création. Les 62 relations FK simples centrales et 192 locales utilisent `foreignId()` avec leur vraie contrainte SQL vers la PK du parent ; cette colonne conserve un ID existant, sans AUTO_INCREMENT. Les index ordinaires et UNIQUE sont définis dans les migrations de leurs tables. Les FK simples et composites dont les parents sont disponibles sont définies au même endroit ; les références vers un parent créé ensuite, notamment le cycle commande/révision, sont ajoutées dans `add_documented_foreign_keys`, avec mention dans la migration de création. Les contrats REF/POLY restent distincts.
+
 Les diagrammes sont répartis en modules pour rester exploitables. **Les champs, les références et les contraintes écrites font ensemble le schéma** : Mermaid ne peut pas imposer toutes les règles transactionnelles. Ce document n’est pas une migration SQL déjà exécutée.
 
 ## 1. Décisions retenues
@@ -67,13 +69,13 @@ Exemple de migration documentaire, sur la connexion du modèle :
 ```php
 Schema::create('products', function (Blueprint $table) {
     $table->id();
-    $table->uuid('uuid')->unique();
+    $table->uuid('uuid');
     $table->foreignId('category_id')->nullable()
-        ->constrained('categories')->restrictOnDelete();
+        ->constrained('categories')->restrictOnDelete()->restrictOnUpdate();
     $table->string('name');
     $table->unsignedTinyInteger('status')->default(1)->index()
         ->comment('PublicationStatusEnum: 1 Draft, 2 Published, 3 Archived');
-    $table->timestamps(6);
+    $table->timestamps();
 });
 ```
 
@@ -81,11 +83,14 @@ Cet extrait illustre les types ; il ne remplace pas les autres champs/contrainte
 
 ### 3.2 Types, temps et stockage
 
+- Déclaration UUID centralisée : `$table->uuid('uuid');` utilise `App\Services\SchemaBlueprint`, enregistré dans `AppServiceProvider` pour tous les constructeurs de schéma, y compris les connexions boutiques créées ensuite. Cette déclaration produit un CHAR(36) ASCII avec collation `ascii_bin` et index UNIQUE. Seul le champ public nommé `uuid` reçoit cette unicité automatique ; les références UUID distinctes gardent leurs contraintes documentées. La génération UUID v4 et son immuabilité dans les modèles restent assurées par `HasPublicUuid` ; `id` reste la PK auto-incrémentée.
 - `bigint_unsigned` dans Mermaid signifie BIGINT UNSIGNED ; `tinyint_unsigned` signifie TINYINT UNSIGNED, créé par unsignedTinyInteger. Le type bigint signé reste adapté aux quantités/deltas signés décrits ailleurs. Les deux côtés d’une FK ont exactement le même type.
-- `varchar` non dimensionné signifie VARCHAR(255) ; noms Spatie 125 et guards 32 caractères limitent leurs index utf8mb4. Codes/empreintes/UUID ont des tailles et collations cohérentes. Téléphones, codes géographiques, références externes et NIF/NIS/RC sont des chaînes.
+- `varchar` non dimensionné signifie VARCHAR(255) et se déclare avec `$table->string('champ');`, sans longueur explicite, y compris pour les slugs, noms/guards Spatie et codes extensibles. Un index UNIQUE est déjà un index : il ne reçoit pas de second index identique. Les formats fixes des codes ISO, couleurs, empreintes et UUID conservent leurs types et collations ; leurs règles de validation restent applicables. Téléphones, codes géographiques, références externes et NIF/NIS/RC sont des chaînes. Le token de session suit le helper Laravel `rememberToken()` : VARCHAR(100), sans longueur écrite dans la migration.
 - Pays historiques : CHAR(2) ISO ; devise CHAR(3) ISO ; couleur CHAR(7) ; SHA-256 CHAR(64) ASCII. country_code reste conservé dans les snapshots juridiques/commerciaux, indépendamment de users.country_id.
-- Argent : DECIMAL(14,2), aucun flottant ; dimensions/poids selon échelle appropriée ; decimal_geo=DECIMAL(10,7).
-- datetime=DATETIME(6) UTC ; date reste un jour civil ; statistiques calendaires en Africa/Algiers avec bornes converties en UTC. Les instants et jours ne sont pas confondus.
+- Décimaux : `SchemaBlueprint` définit une fois la précision commune DECIMAL(14,2). Les migrations écrivent simplement `$table->decimal('amount');`, sans répéter `14, 2`. Cette précision conserve les centimes et les montants jusqu'à 999 999 999 999,99 ; revenir au défaut Laravel DECIMAL(8,2) réduirait cette capacité. Poids, dimensions et quantités mesurées conservent leurs trois décimales via `places: 3` ; decimal_geo=DECIMAL(10,7) reste le format canonique des coordonnées contenues dans les données structurées. Aucun flottant pour l'argent.
+- Booléens : `true`/`false` dans les valeurs PHP et les valeurs par défaut ; `TRUE`/`FALSE` dans les expressions SQL. MySQL conserve son stockage natif TINYINT(1). Les codes de statuts, types et compteurs restent numériques ; aucune généralisation supplémentaire des enums n'est demandée. `id()` crée déjà une PK unique, sans index UNIQUE supplémentaire ; les unicités composites nécessaires aux FK restent présentes. `features.code` utilise `string('code')->unique()`, sans limite 100 ni second index identique.
+- datetime=DATETIME UTC sans microsecondes : `$table->dateTime('champ');`, sans argument de précision. date reste un jour civil ; statistiques calendaires en Africa/Algiers avec bornes converties en UTC. Les instants et jours ne sont pas confondus. Les calculs d'expiration et l'ordre des événements ne dépendent pas de microsecondes ; utiliser les clés numériques et versions documentées pour départager des événements de la même seconde.
+- timestamp=TIMESTAMP sans microsecondes pour les dates techniques Laravel. `timestamps()` crée `created_at` et `updated_at` nullable ; `softDeletes()` crée `deleted_at` nullable uniquement pour les tables déjà prévues avec archivage. Les journaux qui possèdent seulement `created_at` conservent un timestamp obligatoire, sans ajout d'`updated_at` ni de suppression logique. Les dates métier, notamment `assigned_at`, `expires_at` et les échéances, restent des DATETIME. Les stubs de création courante utilisent `id()`, `uuid('uuid')`, `timestamps()` et `softDeletes()` ; les pivots et journaux suivent leurs exceptions documentées.
 - nullable signifie que NULL est autorisé dans les cas prévus ; cela ne rend pas le champ facultatif dans tous les états ou types de ligne. Un champ nullable peut devenir obligatoire après validation, émission, paiement ou pour une nature précise ; les règles de forme/phase l'imposent. Les autres champs sont requis sauf phase transactionnelle explicitement documentée. PK=clé primaire ; FK=référence locale ; UK=unicité simple ; PK répétée signifie clé composite.
 - Les champs, diagrammes et contraintes forment ensemble la spécification. Les colonnes générées utilisées par les unicités sont définies dans le texte et réalisées dans les migrations. Aucun CHECK ne garantit à lui seul une somme entre tables.
 - Sessions, cache, jobs, migrations, reset de mot de passe et stockage optionnel de passkeys suivent les migrations techniques réellement installées ; leurs tokens opaques ne deviennent pas des UUID métier.
@@ -142,6 +147,8 @@ enum StatusEnum: int
 ```
 
 Dans les diagrammes, UserStatusEnum désigne `App\Enums\Users\StatusEnum`. Les autres enums sont nommés par domaine (App\Enums\Orders\OrderStatusEnum, etc.). Le modèle User caste status vers ce StatusEnum. Pour une API entrante, utiliser une valeur entière validée (Rule::enum sur la version choisie) ; un label traduit est seulement de l’affichage. Les transitions légales restent contrôlées par service sous verrou : un enum valide n’autorise pas une transition arbitraire.
+
+**Enums des modèles actuellement présents :** `TenantStatusEnum` désigne `App\Enums\Central\Tenants\StatusEnum`, `MemberStatusEnum` désigne `App\Enums\Tenant\Users\MembershipStatusEnum`, `DomainTypeEnum` désigne `App\Enums\Central\Domains\TypeEnum` et `CertificateStatusEnum` désigne `App\Enums\Central\Domains\CertificateStatusEnum`. `VerificationStatusEnum` et `ActivityOriginEnum` sont dans `App\Enums`. Les classes partagées décrivent seulement les codes ; les comptes, permissions et activités restent séparés entre bases. Le code 0 est invalide. Les modèles de rôles castent leurs indicateurs en booléens et `permission_version` en entier ; les attributions castent `assigned_at`/`expires_at` en dates immuables. Le mot de passe reste une chaîne avec le cast Laravel `hashed` ; les empreintes SHA-256 conservent leur format fixe et ne sont pas re-hachées par ce cast.
 
 Chaque champ enum est aussi casté par son modèle Eloquent vers **la classe enum exacte du champ**. Exemple pour `users.status` :
 
@@ -397,8 +404,9 @@ erDiagram
         varchar name_en
         varchar name_ar "nullable"
         boolean is_active
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+  timestamp deleted_at "nullable"
     }
     users {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -424,13 +432,13 @@ erDiagram
         tinyint_unsigned legal_verification_status "nullable pour administrateur ; VerificationStatusEnum"
         datetime legal_verified_at "nullable"
         bigint_unsigned legal_verified_by_id FK "nullable ; users.id ; administrateur central habilite"
-        varchar(10) locale
+        varchar locale
         tinyint_unsigned status "UserStatusEnum ; DEFAULT 1"
         datetime last_login_at "nullable"
         varchar(100) remember_token "nullable"
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     tenants {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -438,9 +446,9 @@ erDiagram
         bigint_unsigned user_id FK "users.id ; propriétaire immuable"
         varchar internal_label
         varchar shop_name
-        varchar(63) slug UK
+        varchar slug UK
         bigint_unsigned profile_version
-        varchar(32) document_prefix UK
+        varchar document_prefix UK
         varchar creation_key
         char(64) creation_hash
         tinyint_unsigned status "TenantStatusEnum"
@@ -450,23 +458,23 @@ erDiagram
         json data
         varchar schema_version "nullable"
         datetime provisioned_at "nullable"
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     domains {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned tenant_id FK "tenants.id"
-        varchar(253) domain UK
+        varchar domain UK
         tinyint_unsigned type "DomainTypeEnum"
         boolean is_primary
         tinyint_unsigned verification_status "VerificationStatusEnum"
         datetime verified_at "nullable"
         tinyint_unsigned certificate_status "nullable ; CertificateStatusEnum"
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     contact_verifications {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -478,8 +486,8 @@ erDiagram
         datetime expires_at
         int attempts_count
         datetime consumed_at "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     countries ||--o{ users : country_id
     users ||--o{ tenants : user_id
@@ -528,11 +536,12 @@ erDiagram
 - **`user_id`** : FK du propriétaire central ; son sens reste exclusivement propriétaire. Le renommage facilite les conventions Laravel sans autoriser de transfert.
 - **`internal_label / shop_name`** : libellé d’administration et nom affiché ; shop_name ne sert pas de clé de routage.
 - **`slug`** : identifiant URL lisible unique : karim-shoes. Minuscules ASCII, chiffres et tirets, 1–63 caractères, aucun tiret aux extrémités ; noms réservés refusés.
+- **Stockage et règles distincts :** `slug` est stocké en VARCHAR(255), avec son index UNIQUE. La validation du sous-domaine conserve 63 caractères maximum ; au premier provisionnement, `boutique_{slug_initial}` impose 55 caractères maximum. `shop_name` possède un index non unique au central pour rechercher/trier les boutiques ; deux noms identiques restent possibles. La table locale `shop` est un profil unique dans sa base, sans index de recherche de noms inutile.
 - **`profile_version`** : version de projection du profil central dans shop.
 - **`document_prefix`** : préfixe documentaire unique et stable, indépendant du slug.
 - **`creation_key / creation_hash`** : idempotence et empreinte de la demande ; UNIQUE(user_id,creation_key).
 - **`status / is_primary / activation_priority / over_quota_since_at`** : état de provisioning et choix des boutiques sous quota ; voir enums et §7.
-- **`data / schema_version / provisioned_at`** : données techniques de tenancy, version installée et fin du provisioning.
+- **`data / schema_version / provisioned_at`** : données techniques de tenancy, version installée et fin du provisioning. `data.tenancy_shop_settings` conserve temporairement les quatre réglages initiaux validés, s'ils sont fournis avant la création ; ces paramètres de provisionnement sont libérés après succès. Les réglages courants restent uniquement dans le profil `shop` de la BDD tenant.
 - **`created_at / updated_at / deleted_at`** : dates de suivi ; suppression logique sans DROP DATABASE.
 
 **Slug et domaines :** le sous-domaine initial est `{tenants.slug}.{SAAS_BASE_DOMAIN}`, enregistré dans `domains.domain`. `domains.domain` est l’autorité de résolution pour sous-domaines et domaines personnalisés. `shop_name` peut changer sans modifier le slug ; un changement de slug est une opération centrale distincte qui réserve le nouveau domaine, vérifie certificat/routage, projette le profil et gère l’ancienne adresse avant bascule. L’UUID du tenant, son propriétaire, sa BDD et son préfixe documentaire restent stables. L’unicité des noms d’affichage n’est plus requise : deux boutiques peuvent avoir le même nom et des slugs différents.
@@ -584,32 +593,32 @@ erDiagram
     features {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        varchar(100) code UK
+        varchar code UK
         varchar name
         tinyint_unsigned value_type "FeatureValueTypeEnum"
         varchar unit "nullable"
         tinyint_unsigned quota_scope "QuotaScopeEnum"
         tinyint_unsigned period "QuotaPeriodEnum"
         boolean is_active
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     permissions {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        varchar(125) name "nom technique de capacité"
-        varchar(32) guard_name "central"
+        varchar name "nom technique de capacité"
+        varchar guard_name "central"
         varchar label
-        varchar(100) feature_code "nullable ; code features central"
-        datetime created_at
-        datetime updated_at
+        varchar feature_code "nullable ; code features central"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     roles {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        varchar(125) name
-        varchar(32) guard_name "central"
+        varchar name
+        varchar guard_name "central"
         varchar label
         boolean is_system
         boolean is_protected
@@ -617,8 +626,8 @@ erDiagram
         tinyint_unsigned super_admin_slot UK "generated nullable ; 1 si is_super_admin"
         bigint_unsigned permission_version
         char(64) permission_signature UK "NOT NULL ; SHA-256 permissions+durees ; UNIQUE guard_name+signature"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     role_has_permissions {
         bigint_unsigned permission_id PK,FK "permissions.id"
@@ -627,13 +636,13 @@ erDiagram
     }
     model_has_roles {
         bigint_unsigned role_id PK,FK "roles.id"
-        varchar(64) model_type PK "alias morph local"
+        varchar model_type PK "alias morph local"
         bigint_unsigned model_id PK "users.id pour un utilisateur"
         datetime assigned_at "NOT NULL ; debut des durees pour ce compte ; UTC"
     }
     model_has_permissions {
         bigint_unsigned permission_id PK,FK "permissions.id"
-        varchar(64) model_type PK "alias morph local"
+        varchar model_type PK "alias morph local"
         bigint_unsigned model_id PK "users.id pour un utilisateur"
         datetime assigned_at "NOT NULL ; debut de cette attribution directe ; UTC"
         datetime expires_at "NOT NULL ; apres assigned_at, au plus 9999 jours"
@@ -685,7 +694,9 @@ Ces règles sont appliquées séparément dans la BDD centrale et dans chaque BD
 
 **Caches et audit :** à chaque décision sensible, relire les attributions et leurs dates actuelles ainsi que les versions des rôles, recalculer la validité à l’heure serveur et revalider avant l’effet dans les services concernés. Une version de rôle seule ne détecte pas un retrait de rôle ou un changement de assigned_at ; une relation chargée auparavant n’est pas l’autorité de cette lecture. Les caches ne dépassent jamais la prochaine échéance ; une mutation invalide les relations chargées et les caches concernés après commit, y compris dans les workers. Un cache encore présent ou un cron arrêté ne conserve aucun droit expiré. Les activités d’attribution/révocation/renouvellement/changement de composition ou durée, doublons refusés et délégations refusées ont leurs phases distinctes et propriétés filtrées : utilisateur/rôle/permissions par UUID, anciennes/nouvelles durées et dates, acteur et motif. Les pivots sans id/uuid ne deviennent pas des sujets polymorphes fictifs ; le sujet est le compte ou le rôle et les clés de pivot sont dans les propriétés. Le temps qui passe est contrôlé lors de la décision ; ne pas promettre un événement de révocation ponctuel produit par la seule horloge.
 
-Cette adaptation est un choix du projet, pas une option native de tenancy/teams. Les cinq tables Spatie restent, leurs clés composites restent, et les contrôles temporels et d’unicité sont à implémenter lors du développement. Source technique : [Spatie, contrôle personnalisé](https://github.com/spatie/laravel-permission/blob/main/docs/advanced-usage/custom-permission-check.md), [Spatie, contrôles de permissions](https://github.com/spatie/laravel-permission/blob/main/src/Traits/HasPermissions.php) et [extension des modèles](https://github.com/spatie/laravel-permission/blob/main/docs/advanced-usage/extending.md).
+Cette adaptation est un choix du projet, pas une option native de tenancy/teams. Les cinq tables Spatie et leurs clés composites restent ; les contrôles temporels et d'unicité relèvent des extensions du projet dont le socle implémenté est précisé ci-dessous. Source technique : [Spatie, contrôle personnalisé](https://github.com/spatie/laravel-permission/blob/main/docs/advanced-usage/custom-permission-check.md), [Spatie, contrôles de permissions](https://github.com/spatie/laravel-permission/blob/main/src/Traits/HasPermissions.php) et [extension des modèles](https://github.com/spatie/laravel-permission/blob/main/docs/advanced-usage/extending.md).
+
+**Socle Spatie implémenté :** les modèles des deux contextes vérifient les durées via Laravel Gate, protègent les métadonnées sensibles et refusent les compositions identiques ou les permissions communes lors des attributions. `Role::createWithPermissions($name, ['action' => 9999])` crée un rôle avec sa composition complète dans une transaction, y compris lorsqu'un rôle privilégié vide existe déjà. Les signatures utilisent les paires `[permission_id,duration_days]` triées par ID, comme les seeders. Un `syncRoles` ou `syncPermissions` conserve les dates et durées des attributions maintenues. Les services métier de délégation devront encore appliquer l'habilitation de l'acteur, les restrictions ciblées, les motifs et le protocole de verrous décrit ci-dessus ; installer le package ne réalise pas ces parcours à lui seul.
 
 ### C3 — Restrictions de l’administration centrale
 
@@ -707,14 +718,14 @@ erDiagram
         tinyint_unsigned status "OverrideStatusEnum"
         datetime started_at
         datetime ended_at "nullable"
-        varchar(16) normalized_target_type "generated"
+        varchar normalized_target_type "generated"
         bigint_unsigned normalized_target_id "generated ; 0 si global"
         tinyint_unsigned active_slot "generated nullable"
         datetime expires_at "nullable"
         bigint_unsigned created_by_id FK "users.id"
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     users ||--o{ admin_restrictions : admin_id
     permissions ||--o{ admin_restrictions : permission_id
@@ -745,9 +756,9 @@ erDiagram
         decimal monthly_price
         decimal annual_price
         boolean is_active
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     plan_features {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -756,8 +767,8 @@ erDiagram
         bigint_unsigned feature_id FK "features.id"
         boolean is_active
         bigint limit "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     subscriptions {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -778,14 +789,14 @@ erDiagram
         datetime ended_at "nullable ; abonnement seulement"
         boolean auto_renew "nullable ; abonnement seulement"
         bigint_unsigned assigned_by_id FK "nullable ; users.id ; attribution abonnement"
-        varchar(191) installment_number UK "nullable ; echeance seulement"
+        varchar installment_number UK "nullable ; echeance seulement"
         decimal installment_amount "nullable ; echeance seulement ; DZD"
         datetime due_at "nullable ; echeance seulement"
         tinyint_unsigned installment_status "nullable ; InstallmentStatusEnum ; echeance seulement"
         tinyint_unsigned active_owner_slot "generated STORED ; 1 si record_type=1 et status=3, sinon NULL"
-        varchar(191) operation_key UK
-        datetime created_at
-        datetime updated_at
+        varchar operation_key UK
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
 
     plans ||--o{ plan_features : plan_id
@@ -873,8 +884,8 @@ erDiagram
         datetime period_starts_at
         datetime period_ends_at "nullable"
         bigint quantity
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     geographic_areas {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -884,16 +895,16 @@ erDiagram
         bigint_unsigned parent_id FK "nullable ; geographic_areas.id ; wilaya de la commune"
         tinyint_unsigned parent_type "generated STORED ; 1 pour commune, sinon NULL"
         bigint_unsigned parent_key "generated STORED ; COALESCE(parent_id,0)"
-        varchar(32) code
+        varchar code
         varchar name_fr
         varchar name_ar "nullable"
         boolean is_active
         varchar reference_source
         date effective_at
         varchar reference_version
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     countries ||--o{ geographic_areas : country_id
     geographic_areas |o--o{ geographic_areas : parent_id
@@ -917,20 +928,20 @@ erDiagram
     activity_log {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        varchar(64) log_name "nullable ; catégorie stable"
+        varchar log_name "nullable ; catégorie stable"
         text description
-        varchar(64) subject_type "nullable ; alias morph local"
+        varchar subject_type "nullable ; alias morph local"
         bigint_unsigned subject_id "nullable ; PK du sujet local"
-        varchar(100) event "nullable ; code événement extensible"
-        varchar(64) causer_type "nullable ; alias morph local"
+        varchar event "nullable ; code événement extensible"
+        varchar causer_type "nullable ; alias morph local"
         bigint_unsigned causer_id "nullable ; PK acteur local"
         json attribute_changes "nullable ; attributes et old en v5"
         json properties "nullable ; contexte filtré"
-        varchar(191) operation_key UK "nullable ; deduplication explicite par action et phase"
+        varchar operation_key UK "nullable ; deduplication explicite par action et phase"
         uuid correlation_id "index ; identifiant technique partagé"
         tinyint_unsigned origin "ActivityOriginEnum"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
         bigint_unsigned tenant_id FK "nullable ; tenants.id ; objet central concerné"
     }
 
@@ -977,8 +988,8 @@ erDiagram
         text sanitized_error "nullable"
         uuid correlation_id
         json runtime_versions
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
 ```
 
@@ -1044,7 +1055,7 @@ erDiagram
         json billing_rule_snapshot "regle appliquee figee"
         int fiscal_year "nullable avant reservation"
         bigint sequence_number "nullable avant reservation"
-        varchar(191) number UK "nullable avant reservation ; numero fiscal"
+        varchar number UK "nullable avant reservation ; numero fiscal"
         decimal net_amount "HT document"
         json taxes "ventilation fiscale historique"
         decimal tax_amount
@@ -1060,10 +1071,10 @@ erDiagram
         datetime issued_at "nullable avant emission"
         datetime cancelled_at "nullable ; brouillon annule"
         text cancellation_reason "nullable"
-        varchar(191) operation_key UK "cle stable avec espace de noms serveur"
+        varchar operation_key UK "cle stable avec espace de noms serveur"
         uuid correlation_id "nullable ; contexte stable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
 
     saas_invoice_lines {
@@ -1085,10 +1096,10 @@ erDiagram
         decimal tax_amount
         decimal total_amount
         text reason "nullable ligne facture ; requis ligne avoir"
-        varchar(191) operation_key UK "cle stable avec espace de noms serveur"
+        varchar operation_key UK "cle stable avec espace de noms serveur"
         uuid correlation_id "nullable ; contexte stable de la ligne"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
 
     saas_billing_settings {
@@ -1099,10 +1110,10 @@ erDiagram
         tinyint_unsigned record_type "SaasBillingSettingRecordTypeEnum ; 1 SEQUENCE / 2 RULE"
         tinyint_unsigned document_type "nullable regle ; DocumentTypeEnum ; 1/2 compteur"
         int fiscal_year "nullable regle"
-        varchar(32) prefix "nullable regle"
+        varchar prefix "nullable regle"
         bigint next_number "nullable regle ; compteur strictement croissant"
         tinyint_unsigned sequence_slot "generated STORED ; 1 si record_type=1, sinon NULL"
-        varchar(100) code "nullable compteur ; code stable regle"
+        varchar code "nullable compteur ; code stable regle"
         int version "nullable compteur ; version regle"
         varchar trigger_event "nullable compteur"
         varchar numbering_scope "nullable compteur ; saas_issuer"
@@ -1112,10 +1123,10 @@ erDiagram
         datetime effective_at "nullable compteur/brouillon"
         datetime ends_at "nullable"
         datetime validated_at "nullable avant validation regle"
-        varchar(191) operation_key UK "cle stable avec espace de noms serveur"
+        varchar operation_key UK "cle stable avec espace de noms serveur"
         uuid correlation_id "nullable compteur ; requis regle"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
 
     saas_document_deliveries {
@@ -1137,10 +1148,10 @@ erDiagram
         varchar provider_reference "nullable"
         varchar error_code "nullable"
         datetime sending_started_at "nullable avant envoi"
-        varchar(191) operation_key UK "cle stable avec espace de noms serveur"
+        varchar operation_key UK "cle stable avec espace de noms serveur"
         uuid correlation_id
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
 
     saas_transfers {
@@ -1166,8 +1177,8 @@ erDiagram
         decimal amount "signe ; positif hors inverse comptable"
         char(3) currency "DZD au lancement"
         text reason "nullable declaration paiement ; requis remboursement/refus/correction"
-        varchar(191) transfer_reference "nullable avant verification"
-        varchar(64) financial_account_key "nullable avant verification ; alias compte SaaS"
+        varchar transfer_reference "nullable avant verification"
+        varchar financial_account_key "nullable avant verification ; alias compte SaaS"
         char(64) transaction_fingerprint "nullable avant verification ; transaction normalisee"
         char(64) active_transaction_fingerprint UK "generated STORED ; nullable ; VERIFIED sans reversal_of_id, sinon NULL"
         text encrypted_transfer_details "nullable ; donnees bancaires minimales chiffrees"
@@ -1175,10 +1186,10 @@ erDiagram
         datetime sending_started_at "nullable ; remboursement reel seulement"
         datetime validated_at "nullable avant verification"
         varchar error_code "nullable ; resultat incertain"
-        varchar(191) operation_key UK "cle stable avec espace de noms serveur"
+        varchar operation_key UK "cle stable avec espace de noms serveur"
         uuid correlation_id
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     users ||..o{ saas_invoices : "FK user_id"
     subscriptions ||..o{ saas_invoices : "FK subscription_id"
@@ -1374,10 +1385,10 @@ erDiagram
     media {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        varchar(64) model_type "alias morph ; parent local"
+        varchar model_type "alias morph ; parent local"
         bigint_unsigned model_id "clé du parent local"
-        varchar(64) collection_name "logo, gallery, invoice, proof..."
-        varchar(64) disk
+        varchar collection_name "logo, gallery, invoice, proof..."
+        varchar disk
         varchar storage_key UK
         varchar mime_type
         varchar original_name
@@ -1392,9 +1403,9 @@ erDiagram
         tinyint_unsigned primary_slot "generated nullable ; 1 si principal actif"
         bigint_unsigned created_by_id FK "nullable ; users.id"
         char(64) file_hash "nullable"
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
 
 ```
@@ -1423,9 +1434,9 @@ erDiagram
         varchar reference_source
         int reference_version
         datetime synced_at "nullable"
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     carrier_geo_mappings {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -1441,8 +1452,8 @@ erDiagram
         int mapping_version
         boolean is_active
         datetime synced_at "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     pickup_points {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -1461,9 +1472,9 @@ erDiagram
         varchar reference_source
         int reference_version
         datetime synced_at "nullable"
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     shipping_carriers ||--o{ carrier_geo_mappings : carrier_id
     geographic_areas ||--o{ carrier_geo_mappings : geographic_area_id
@@ -1575,8 +1586,8 @@ erDiagram
         json colors
         json shipping_tax_configuration "nullable before activation vente"
         int cart_lifetime_days
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     shop_addresses {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -1593,9 +1604,9 @@ erDiagram
         boolean visible
         json payload "objet public validé ; schema_version=1 selon record_type"
         tinyint_unsigned primary_slot "generated STORED ; 1 pour ADDRESS principale non archivee, sinon NULL"
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     content_pages {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -1613,9 +1624,9 @@ erDiagram
         boolean is_published
         datetime published_at "nullable"
         int version
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     shop ||--o{ shop_addresses : shop_id
     shop_addresses |o--o{ shop_addresses : shop_address_id
@@ -1634,7 +1645,7 @@ erDiagram
 - **`shop_name`** : le nom affiché à l’utilisateur. Exemple : « Nombre de boutiques » ou « Livraison EcoTrack ».
 - **`description`** : un texte qui explique l’élément plus en détail. Il peut rester vide si aucune explication supplémentaire n’est nécessaire.
 - **`about`** : le texte de présentation de la boutique. Exemple : son histoire ou ce qu’elle vend. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`business_type`** : le type d’activité de la boutique. Exemple : vêtements, restaurant ou salon.
+- **`business_type`** : le type d’activité de la boutique, extensible. Sans valeur fournie à la création, `TenantProvisioner` utilise `OTHER`.
 - **`contact_email`** : l’email public que les visiteurs peuvent utiliser pour contacter la boutique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`contact_phone`** : le téléphone public de la boutique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
 - **`contact_whatsapp`** : le numéro WhatsApp public de la boutique. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
@@ -1643,10 +1654,10 @@ erDiagram
 - **`locale`** : la langue préférée pour l’affichage. Exemple : `fr` ou `ar`.
 - **`currency`** : la monnaie utilisée. Exemple : `DZD` pour le dinar algérien.
 - **`timezone`** : la zone utilisée pour afficher les dates et heures. Exemple : `Africa/Algiers`.
-- **`theme_code`** : le modèle visuel choisi pour le site. Exemple : `standard`.
-- **`colors`** : les couleurs choisies pour le site, enregistrées ensemble. Exemple : couleur principale et couleur des boutons.
+- **`theme_code`** : le code du modèle visuel choisi pour le site ; valeur initiale `default` si le commerçant ne le renseigne pas. Aucun catalogue fermé de thèmes n'est actuellement implémenté.
+- **`colors`** : les couleurs choisies pour le site, enregistrées dans un objet JSON ; valeur initiale `{"primary":"#2563EB","secondary":"#FFFFFF"}` si le commerçant ne les renseigne pas.
 - **`shipping_tax_configuration`** : les réglages qui expliquent comment les frais de livraison doivent être traités dans les calculs fiscaux. Ils doivent être validés avant la vente réelle. Ce champ peut rester vide quand cette information n’est pas nécessaire ou pas encore connue.
-- **`cart_lifetime_days`** : le nombre de jours pendant lesquels un panier invité peut rester conservé avant d’expirer.
+- **`cart_lifetime_days`** : le nombre de jours pendant lesquels un panier invité peut rester conservé avant d’expirer ; valeur initiale `7` si le commerçant ne le renseigne pas.
 - **`created_at`** : la date où cette ligne a été créée dans la base.
 - **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
 
@@ -1699,7 +1710,7 @@ Le payload est un objet obligatoire. Son schéma dépend exclusivement du record
 | network | chaîne requise, extensible | Le réseau concerné, par exemple Facebook, Instagram ou TikTok. |
 | url | URL publique requise | La page exacte de cette boutique ou de ce lieu sur ce réseau. |
 
-**Validation des détails :** latitude et longitude sont toutes deux NULL ou toutes deux fournies ; normaliser leurs valeurs décimales sans arrondi au-delà de la précision précédente. map_url reste indépendant de cette paire. Les URL map_url/url acceptent seulement http/https, au maximum les 255 caractères du VARCHAR d’origine, sans identifiants de connexion ni clé API/token secret ; les paramètres publics de carte nécessaires restent possibles. Le serveur ne consulte pas ces URL pour enregistrer le profil. network, postal_code et phone conservent la limite VARCHAR(255) ; address conserve la capacité TEXT initiale, avec limite d’octets contrôlée. Les jours/intervalles d’horaires et leurs traversées de minuit sont validés selon le fuseau shop.timezone, sans code exécutable, HTML arbitraire ni secret. Les limites du formulaire/payload sont bornées et ne suppriment aucune entrée historique pendant une migration. Aucun service Maps, compte social, publication automatisée ou calendrier marketing n’est créé.
+**Validation des détails :** latitude et longitude sont toutes deux NULL ou toutes deux fournies ; normaliser leurs valeurs décimales sans arrondi au-delà de la précision précédente. map_url reste indépendant de cette paire. Les URL map_url/url acceptent seulement http/https, au maximum les 255 caractères du VARCHAR d’origine, sans identifiants de connexion ni clé API/token secret ; les paramètres publics de carte nécessaires restent possibles. Le serveur ne consulte pas ces URL pour enregistrer le profil. network, postal_code et phone conservent la limite varchar ; address conserve la capacité TEXT initiale, avec limite d’octets contrôlée. Les jours/intervalles d’horaires et leurs traversées de minuit sont validés selon le fuseau shop.timezone, sans code exécutable, HTML arbitraire ni secret. Les limites du formulaire/payload sont bornées et ne suppriment aucune entrée historique pendant une migration. Aucun service Maps, compte social, publication automatisée ou calendrier marketing n’est créé.
 
 **`content_pages` :**
 
@@ -1725,11 +1736,24 @@ Le payload est un objet obligatoire. Son schéma dépend exclusivement du record
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
-- **`shop` :** Il doit exister une seule ligne `shop` dans la BDD de la boutique. Le champ technique `singleton=1` avec `UNIQUE(singleton)` empêche d’en créer une deuxième, même avec un autre `tenant_uuid`. Le provisionnement doit créer cette ligne et un contrôle de santé vérifie qu’elle existe bien. `tenant_uuid` doit correspondre au `central.tenants.uuid` attendu et ne change plus après l’insertion. L’application refuse de supprimer ce profil. Par défaut, la devise est DZD, le fuseau est `Africa/Algiers` et le thème est le template initial. `shop_name` est une copie du nom central `tenants.shop_name` : pour renommer une boutique, on change d’abord le nom au central, puis on réplique la nouvelle version ici. On ne permet jamais un renommage uniquement local. Si la projection locale échoue, le nom courant reste celui du central et la projection sera reprise ; seul le slug/domaine est réservé de manière unique. Le logo, les contacts et les couleurs restent propres à cette BDD boutique. Au MVP, après la première commande, la devise ne peut plus être changée.
+- **`shop` :** Il doit exister une seule ligne `shop` dans la BDD de la boutique. Le champ technique `singleton=1` avec `UNIQUE(singleton)` empêche d’en créer une deuxième, même avec un autre `tenant_uuid`. `TenantProvisioner` crée automatiquement cette ligne après les migrations, dans la même transaction tenant que le compte propriétaire local ; un contrôle de santé vérifie qu’elle existe bien. Les protections existantes UNIQUE, CHECK `singleton=1` et triggers d'identité/suppression sont conservées, sans contrainte supplémentaire. `tenant_uuid` doit correspondre au `central.tenants.uuid` attendu et ne change plus après l’insertion. L’application refuse de supprimer ce profil. Par défaut, la devise est DZD, le fuseau est `Africa/Algiers` et les quatre réglages initiaux sont ceux décrits ci-dessous. `shop_name` est une copie du nom central `tenants.shop_name` : pour renommer une boutique, on change d’abord le nom au central, puis on réplique la nouvelle version ici. On ne permet jamais un renommage uniquement local. Si la projection locale échoue, le nom courant reste celui du central et la projection sera reprise ; seul le slug/domaine est réservé de manière unique. Le logo, les contacts et les couleurs restent propres à cette BDD boutique. Au MVP, après la première commande, la devise ne peut plus être changée.
+
+**Initialisation du profil, décision du 8 octobre 2026 :** un propriétaire peut posséder plusieurs boutiques ; chaque BDD tenant possède son unique profil `shop`. Le provisionneur copie `tenants.uuid`, `tenants.shop_name`, `tenants.profile_version` et la langue du propriétaire dans `tenant_uuid`, `shop_name`, `central_profile_version` et `locale`. Les contacts publics facultatifs restent NULL ; l'e-mail privé du propriétaire n'est pas publié automatiquement.
+
+| Réglage facultatif à la création | Valeur utilisée s'il n'est pas renseigné |
+|---|---|
+| `business_type` | `OTHER` |
+| `theme_code` | `default` |
+| `colors` | `{"primary":"#2563EB","secondary":"#FFFFFF"}` |
+| `cart_lifetime_days` | `7` |
+
+Ces valeurs sont appliquées par `App\DTOs\Tenant\ShopSettings` et le provisionneur, sans ajouter de DEFAULT SQL ni modifier les contraintes de `shop`. Avant de sauvegarder un nouveau tenant, `configureShopForProvisioning($settings)` accepte ces quatre paramètres, complets ou partiels ; une valeur absente, NULL ou chaîne vide prend le défaut correspondant. Les chaînes non vides respectent la capacité VARCHAR(255) ; les couleurs sont un objet de couleurs hexadécimales nommées et la durée un entier positif compatible avec INT. `OTHER` et `default` sont acceptés ; `business_type` reste extensible et aucun catalogue fermé de thèmes n'existe actuellement. Lorsqu'un catalogue de thèmes sera implémenté, les codes devront être validés contre celui-ci avant utilisation.
+
+Les paramètres initiaux sont enregistrés dans les données techniques du tenant central pour survivre à un échec de migration et à une reprise par un autre processus. Après succès, cette intention technique est libérée ; `shop` reste la source des réglages courants. Une reprise réutilise le profil existant sans modifier son ID/UUID, ses dates ni ses réglages ; un profil rattaché à un autre UUID tenant fait échouer le provisionnement. Le seeder local explicite enrichit le profil initial existant sans en créer un second ni remplacer ces quatre réglages ; il refuse un profil public déjà renseigné. Le provisionnement technique conserve le statut de préparation ; la création du profil ne suffit pas à rendre la boutique active.
 
 - **`shop_addresses` :** Le profil reste dans shop, sans gros objet JSON regroupant toute la boutique. Les entrées publiques de 17 champs remplacent les deux anciennes tables d’adresses et de liens. Le modèle ShopAddress impose record_type=1 ADDRESS ; SocialLink impose record_type=2 SOCIAL pour toute requête, route, Policy, média et activité. Plusieurs adresses et plusieurs liens du même réseau restent autorisés ; aucune unicité de network n’est ajoutée. Un lien général a shop_address_id=NULL ; un lien associé vise une adresse ADDRESS du même shop. L’ancienne propriété SocialLink.is_active devient l’alias logique de visible, sans confondre masquage et archivage. Les adresses restent publiques, sans caisse, stock ou entrepôt distinct. Les géographies ADDRESS sont validées au central par UUID/type/appartenance ; une modification du référentiel ne réécrit pas l’histoire.
 
-**Principale, ordre et suppression :** primary_slot=CASE WHEN record_type=1 AND is_primary=1 AND deleted_at IS NULL THEN 1 ELSE NULL END. UNIQUE(shop_id,primary_slot) garde une seule adresse principale non archivée, indépendamment de visible. Changer la principale verrouille shop.singleton=1 et les lignes concernées. position conserve l’ordre social et permet d’ordonner les adresses ; un ordre à égalité est départagé par id en interne. Archiver/masquer une adresse ne supprime, ne déplace et ne réaffecte aucun lien ; les rendus filtrent les éléments publics et n’exposent pas les détails d’une adresse masquée/archivée à travers son association. Les relations historiques restent intactes. Une suppression physique d’adresse référencée est refusée par RESTRICT. Les éventuels quotas d’entrées publiques sont évalués par type selon la règle de fonctionnalité existante sous le même verrou shop.singleton=1, sans inventer un plafond ni compter une adresse comme un lien. L’unique profil shop, sa projection centrale, les contacts généraux, logo/couleurs et réglages de vente sont inchangés.
+**Principale, ordre et suppression :** primary_slot=CASE WHEN record_type=1 AND is_primary=TRUE AND deleted_at IS NULL THEN 1 ELSE NULL END. UNIQUE(shop_id,primary_slot) garde une seule adresse principale non archivée, indépendamment de visible. Changer la principale verrouille shop.singleton=1 et les lignes concernées. position conserve l’ordre social et permet d’ordonner les adresses ; un ordre à égalité est départagé par id en interne. Archiver/masquer une adresse ne supprime, ne déplace et ne réaffecte aucun lien ; les rendus filtrent les éléments publics et n’exposent pas les détails d’une adresse masquée/archivée à travers son association. Les relations historiques restent intactes. Une suppression physique d’adresse référencée est refusée par RESTRICT. Les éventuels quotas d’entrées publiques sont évalués par type selon la règle de fonctionnalité existante sous le même verrou shop.singleton=1, sans inventer un plafond ni compter une adresse comme un lien. L’unique profil shop, sa projection centrale, les contacts généraux, logo/couleurs et réglages de vente sont inchangés.
 
 - **`content_pages` :** Une seule table de 18 champs conserve la publication, les blocs, le SEO et les versions des deux familles de pages. `PageKindEnum` vaut 1 CONTENT ou 2 SALES. Pour CONTENT : product_id=NULL, type non vide et canonical_url=NULL. Pour SALES : product_id obligatoire et type=NULL ; canonical_url est facultative. `page_kind` et le produit d’une page SALES sont immuables. UNIQUE(page_kind,slug) conserve les espaces d’adresses distincts : le même slug peut exister dans les deux familles si leurs routes étaient distinctes. Les modèles ContentPage et SalesPage imposent leur page_kind dans chaque requête, binding, Policy et écriture. Les blocs suivent le schéma versionné du template, sans code arbitraire ; FAQ, menu, header, footer, « À propos » et textes institutionnels restent des blocs. L’archivage ne supprime ni référence commerciale ni attribution historique.
 
@@ -1751,9 +1775,9 @@ erDiagram
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned model_id "clé du parent local"
         bigint_unsigned created_by_id FK "nullable ; users.id"
-        varchar(64) model_type "alias morph ; parent local"
-        varchar(64) collection_name "logo, gallery, invoice, proof..."
-        varchar(64) disk
+        varchar model_type "alias morph ; parent local"
+        varchar collection_name "logo, gallery, invoice, proof..."
+        varchar disk
         varchar storage_key UK
         varchar mime_type
         varchar original_name
@@ -1767,9 +1791,9 @@ erDiagram
         boolean is_primary
         tinyint_unsigned primary_slot "generated nullable ; 1 si principal actif"
         char(64) file_hash "nullable"
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     categories {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -1785,9 +1809,9 @@ erDiagram
         boolean is_active
         varchar meta_title "nullable"
         text meta_description "nullable"
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     products {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -1813,9 +1837,9 @@ erDiagram
         varchar meta_title "nullable"
         text meta_description "nullable"
         boolean indexable
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     product_variants {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -1840,9 +1864,9 @@ erDiagram
         decimal height_cm "nullable"
         boolean is_active
         int position
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     categories |o--o{ categories : parent_id
     media |o--o{ categories : media_id
@@ -1974,9 +1998,9 @@ erDiagram
         tinyint_unsigned display_type "nullable pour VALUE ; OptionDisplayTypeEnum requis AXIS"
         char(7) color_hex "nullable ; VALUE couleur seulement"
         int position
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     variant_option_values {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -1987,8 +2011,8 @@ erDiagram
         bigint_unsigned value_id FK "product_options.id ; record_type=2 VALUE ; parent_id=option_id"
         tinyint_unsigned option_record_type "generated STORED ; constante 1 AXIS"
         tinyint_unsigned value_record_type "generated STORED ; constante 2 VALUE"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     product_options |o--o{ product_options : parent_id
     product_options ||--o{ variant_option_values : option_id
@@ -2052,8 +2076,8 @@ erDiagram
         bigint_unsigned product_id FK "products.id"
         bigint_unsigned tag_id FK "categories.id ; type 2 TAG"
         tinyint_unsigned tag_record_type "generated STORED ; 2"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     products ||--o{ product_tags : product_id
     categories ||--o{ product_tags : tag_id
@@ -2098,9 +2122,9 @@ erDiagram
         datetime ended_at "nullable"
         int priority
         boolean is_active
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     product_reviews {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -2115,9 +2139,9 @@ erDiagram
         tinyint_unsigned moderation_status "ReviewModerationStatusEnum"
         datetime moderated_at "nullable"
         datetime published_at "nullable"
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     content_pages |o--o{ product_promotions : sales_page_id
 ```
@@ -2189,8 +2213,8 @@ erDiagram
         datetime first_visited_at
         datetime last_visited_at
         datetime expires_at
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     visit_sessions {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -2205,8 +2229,8 @@ erDiagram
         varchar campaign "nullable"
         varchar referrer_host "nullable"
         tinyint_unsigned device_type "nullable ; DeviceTypeEnum"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     navigation_events {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -2224,7 +2248,7 @@ erDiagram
         int quantity "nullable"
         datetime occurred_at
         datetime received_at
-        datetime created_at
+        timestamp created_at
     }
     visitors ||--o{ visit_sessions : visitor_id
     visit_sessions ||--o{ navigation_events : session_id
@@ -2305,8 +2329,8 @@ erDiagram
         datetime last_activity_at
         datetime expires_at
         datetime converted_at "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     cart_items {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -2318,8 +2342,8 @@ erDiagram
         int quantity
         text customization_text "nullable ; demande libre du client"
         char(64) customization_signature
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     carts ||--o{ cart_items : cart_id
 ```
@@ -2408,8 +2432,8 @@ erDiagram
         boolean retention_hold
         text retention_hold_reason "nullable"
         datetime hold_review_at "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     order_revisions {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -2450,7 +2474,7 @@ erDiagram
         text customer_note "nullable"
         varchar sales_terms_version
         json sales_terms_snapshot
-        datetime created_at
+        timestamp created_at
     }
     order_items {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -2480,7 +2504,7 @@ erDiagram
         datetime reservation_released_at "nullable ; seulement RELEASED"
         datetime reservation_created_at "nullable ; ancienne date creation reservation"
         datetime reservation_updated_at "nullable ; derniere mutation projection stock"
-        datetime created_at
+        timestamp created_at
     }
     order_history {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -2498,7 +2522,7 @@ erDiagram
         text note "nullable"
         uuid correlation_id
         tinyint_unsigned origin "ActivityOriginEnum"
-        datetime created_at
+        timestamp created_at
     }
     order_revisions |o--o{ orders : current_revision_id
     order_revisions |o--o{ orders : confirmed_revision_id
@@ -2696,7 +2720,7 @@ erDiagram
         varchar operation_key
         uuid correlation_id
         text note "nullable"
-        datetime created_at
+        timestamp created_at
     }
     order_returns {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -2711,8 +2735,8 @@ erDiagram
         datetime requested_at "nullable"
         datetime received_at "nullable"
         datetime closed_at "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     return_items {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -2732,8 +2756,8 @@ erDiagram
         decimal unit_cost_snapshot
         datetime inspected_at "nullable"
         text note "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     return_items |o--o{ stock_movements : return_item_id
     stock_movements |o--o{ stock_movements : reversal_of_id
@@ -2850,9 +2874,9 @@ erDiagram
         json reference_configuration "nullable ; schema_version=1 ; choix boutique et exceptions privees"
         datetime last_synced_at "nullable"
         boolean is_active
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     shipping_rates {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -2874,9 +2898,9 @@ erDiagram
         bigint_unsigned provider_scope_id "generated STORED ; COALESCE(provider_id,0)"
         uuid municipality_scope_uuid "nullable type 3 ; generated STORED ; COALESCE(municipality_uuid,province_uuid)"
         tinyint_unsigned current_slot "nullable ; generated STORED ; occupation du tarif courant type 1/2"
-        datetime created_at
-        datetime updated_at "nullable type 3 ; fermeture auditee"
-        datetime deleted_at "nullable type 1/2 ; NULL type 3"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable type 3 ; fermeture auditee"
+        timestamp deleted_at "nullable type 1/2 ; NULL type 3"
     }
     free_shipping_rules {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -2890,9 +2914,9 @@ erDiagram
         datetime ended_at "nullable"
         int priority
         boolean is_active
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     shipping_providers |o--o{ shipping_rates : provider_id
 ```
@@ -2977,7 +3001,7 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 **Version retour type 3 :** carrier_account_id, created_by_id, amount>=0, source=1 MANUAL ou 2 API, starts_at et is_active requis ; provider_id, province_uuid, municipality_uuid, delivery_mode, service_type, retrieved_at, deleted_at NULL. ends_at NULL ou >starts_at. UNIQUE(record_type,carrier_account_id,starts_at). Sous verrou du compte, les périodes [starts_at,ends_at) des seules versions type 3 ne se chevauchent pas. Pas de SoftDelete type 3 ; version utilisée conservée avec montant/source/début immuables. Nouveau contenu = nouvelle version ; fermeture future auditée. Les retours de livreurs internes restent saisis et figés dans le frais, sans compte API artificiel.
 
-**Unicité courante :** provider_scope_id=COALESCE(provider_id,0) ; municipality_scope_uuid=COALESCE(municipality_uuid,province_uuid), GENERATED ALWAYS AS (...) STORED. current_slot=CASE WHEN record_type=1 AND is_active=1 AND deleted_at IS NULL THEN 1 WHEN record_type=2 AND deleted_at IS NULL THEN 1 ELSE NULL END, GENERATED ALWAYS AS (...) STORED. UNIQUE(record_type,provider_scope_id,province_uuid,municipality_scope_uuid,delivery_mode,service_type,current_slot) protège le prix client actif et le devis courant. Les champs de forme requis empêchent les NULL de contourner l’unicité. Références géographiques centrales validées au serveur, jamais FK SQL entre BDD.
+**Unicité courante :** provider_scope_id=COALESCE(provider_id,0) ; municipality_scope_uuid=COALESCE(municipality_uuid,province_uuid), GENERATED ALWAYS AS (...) STORED. current_slot=CASE WHEN record_type=1 AND is_active=TRUE AND deleted_at IS NULL THEN 1 WHEN record_type=2 AND deleted_at IS NULL THEN 1 ELSE NULL END, GENERATED ALWAYS AS (...) STORED. UNIQUE(record_type,provider_scope_id,province_uuid,municipality_scope_uuid,delivery_mode,service_type,current_slot) protège le prix client actif et le devis courant. Les champs de forme requis empêchent les NULL de contourner l’unicité. Références géographiques centrales validées au serveur, jamais FK SQL entre BDD.
 
 **Application historique :** choisir uniquement type 3 du bon compte à l’acceptation du retour par le transporteur, sinon première observation fiable avec date_source=observation. Figer source_rate_id et rate_snapshot dans carrier_fees. source_rate_record_type=CASE WHEN source_rate_id IS NOT NULL THEN 3 ELSE NULL END, GENERATED ALWAYS AS (...) STORED. FK(source_rate_id,carrier_account_id,source_rate_record_type) → shipping_rates(id,carrier_account_id,record_type), plus FK simple source_rate_id. Le pointeur renseigné exige carrier_account_id renseigné et compte du prestataire du colis ; aucun devis ni prix client ne sert de version de retour. Sans version valable, bloquer la constatation automatique et signaler l’anomalie ; réception physique permise, aucun zéro inventé.
 
@@ -3035,8 +3059,8 @@ erDiagram
         datetime carrier_validated_at "nullable"
         datetime delivered_at "nullable"
         datetime last_synced_at "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     shipment_events {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -3063,7 +3087,7 @@ erDiagram
         datetime observed_at
         tinyint_unsigned source "ShipmentEventSourceEnum"
         varchar deduplication_key
-        datetime created_at
+        timestamp created_at
     }
     shipments ||--o{ shipment_events : shipment_id
 ```
@@ -3168,8 +3192,8 @@ erDiagram
         datetime ended_at "nullable"
         datetime sending_started_at "nullable"
         datetime superseded_at "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     carrier_operation_attempts {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -3184,7 +3208,7 @@ erDiagram
         int duration_ms
         datetime started_at
         datetime ended_at "nullable"
-        datetime created_at
+        timestamp created_at
     }
     carrier_operations ||--o{ carrier_operation_attempts : operation_id
 ```
@@ -3267,8 +3291,8 @@ erDiagram
         datetime declared_paid_at "nullable"
         varchar source
         datetime reconciled_at "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     remittance_statements {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -3291,8 +3315,8 @@ erDiagram
         text note "nullable"
         varchar operation_key
         datetime reconciled_at "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     carrier_settlement_lines {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -3315,7 +3339,7 @@ erDiagram
         varchar external_reference "nullable hors type 3/4 ; reference qualifiee"
         varchar operation_key UK "cle stable par nature et occurrence"
         datetime performed_at "nullable hors type 3 ; requis type 3"
-        datetime created_at
+        timestamp created_at
     }
     remittance_statements ||--o{ carrier_settlement_lines : remittance_statement_id
     collections ||--o{ carrier_settlement_lines : collection_id
@@ -3451,8 +3475,8 @@ erDiagram
         varchar operation_key
         datetime cancelled_at "nullable"
         text note "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     customer_adjustments {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -3474,8 +3498,8 @@ erDiagram
         varchar reference "nullable"
         text reason
         varchar operation_key
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     order_documents {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -3488,7 +3512,7 @@ erDiagram
         int document_version
         json issuer_snapshot
         datetime generated_at
-        datetime created_at
+        timestamp created_at
     }
 ```
 
@@ -3577,19 +3601,19 @@ erDiagram
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned subject_id "nullable ; PK locale"
         bigint_unsigned causer_id "nullable ; PK locale"
-        varchar(64) log_name "nullable ; métier ou privacy"
+        varchar log_name "nullable ; métier ou privacy"
         text description
-        varchar(64) subject_type "nullable ; alias morph local"
-        varchar(100) event "nullable ; code extensible contrôlé"
-        varchar(64) causer_type "nullable ; alias de l'acteur local"
+        varchar subject_type "nullable ; alias morph local"
+        varchar event "nullable ; code extensible contrôlé"
+        varchar causer_type "nullable ; alias de l'acteur local"
         json attribute_changes "nullable ; changements autorisés"
         json properties "nullable ; contrat versionné et filtré"
-        varchar(191) operation_key UK "nullable ; clé idempotente par fait et phase"
+        varchar operation_key UK "nullable ; clé idempotente par fait et phase"
         uuid correlation_id "index applicatif ; nullable pour activités simples"
         tinyint_unsigned origin "ActivityOriginEnum"
         datetime performed_at "nullable hors privacy ; instant réel de la phase privacy"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
 ```
 
@@ -3655,8 +3679,8 @@ erDiagram
         datetime recognized_at "nullable"
         varchar external_reference "nullable"
         varchar operation_key
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     carrier_receivables {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -3673,8 +3697,8 @@ erDiagram
         varchar operation_key
         datetime recognized_at
         datetime settled_at "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     collection_entries {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -3690,7 +3714,7 @@ erDiagram
         varchar reference
         text reason
         varchar operation_key
-        datetime created_at
+        timestamp created_at
     }
     carrier_fees ||--o{ carrier_settlement_lines : carrier_fee_id
     carrier_fees ||--o{ carrier_receivables : carrier_fee_id
@@ -3805,8 +3829,8 @@ erDiagram
         text cancellation_reason "nullable"
         varchar operation_key
         varchar document_reason "nullable sauf avoir"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
 ```
 
@@ -3884,8 +3908,8 @@ erDiagram
         text reason
         datetime validated_at "nullable"
         datetime closed_at "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     order_incident_details {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -3895,8 +3919,8 @@ erDiagram
         tinyint_unsigned type "IncidentTypeEnum"
         int quantity
         text reason
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     order_incidents ||--o{ order_incident_details : incident_id
 ```
@@ -3965,10 +3989,10 @@ erDiagram
         tinyint_unsigned record_type "TenantBillingRecordTypeEnum ; 1 SEQUENCE / 2 RULE ; immuable"
         tinyint_unsigned document_type "nullable hors SEQUENCE ; DocumentTypeEnum 1/2"
         int fiscal_year "nullable hors SEQUENCE"
-        varchar(32) shop_prefix "nullable hors SEQUENCE ; copie du préfixe central au provisionnement"
+        varchar shop_prefix "nullable hors SEQUENCE ; copie du préfixe central au provisionnement"
         bigint next_number "nullable hors SEQUENCE ; strictement positif"
         tinyint_unsigned sequence_slot "generated STORED ; 1 si record_type=1, sinon NULL"
-        varchar(100) code "nullable hors RULE"
+        varchar code "nullable hors RULE"
         int version "nullable hors RULE ; version positive"
         bigint_unsigned seller_profile_version "nullable hors RULE ou avant validation"
         varchar trigger_event "nullable hors RULE"
@@ -3980,8 +4004,8 @@ erDiagram
         datetime validated_at "nullable hors RULE ou avant validation"
         datetime effective_at "nullable hors RULE ou avant activation"
         datetime ends_at "nullable hors RULE ; fin de validité"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     users |o--o{ billing_rules : validated_by_id
 ```
@@ -4044,7 +4068,7 @@ erDiagram
         tinyint_unsigned acceptance_mode "TermsAcceptanceModeEnum"
         json sanitized_proof "nullable"
         varchar operation_key UK
-        datetime created_at
+        timestamp created_at
     }
 ```
 
@@ -4094,8 +4118,8 @@ erDiagram
         int attempts_count
         datetime next_attempt_at "nullable"
         varchar error_code "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
 ```
 
@@ -4186,7 +4210,7 @@ erDiagram
         datetime recorded_at
         text reason
         varchar operation_key UK
-        datetime created_at
+        timestamp created_at
     }
     commercial_correction_lines {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -4199,7 +4223,7 @@ erDiagram
         decimal revenue_delta "signe"
         decimal sold_cost_delta "signe"
         text detailed_reason "nullable"
-        datetime created_at
+        timestamp created_at
     }
     commercial_corrections ||--o{ commercial_correction_lines : correction_id
 ```
@@ -4265,31 +4289,31 @@ erDiagram
         varchar password
         varchar phone "nullable"
         datetime email_verified_at "nullable"
-        varchar(10) locale
+        varchar locale
         tinyint_unsigned status "UserStatusEnum ; DEFAULT 1"
         tinyint_unsigned membership_status "MemberStatusEnum ; NOT NULL"
         datetime joined_at "nullable avant premiere activation"
         datetime last_login_at "nullable"
         varchar(100) remember_token "nullable"
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at "nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+        timestamp deleted_at "nullable"
     }
     permissions {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        varchar(125) name "nom technique de capacité"
-        varchar(32) guard_name "tenant"
+        varchar name "nom technique de capacité"
+        varchar guard_name "tenant"
         varchar label
-        varchar(100) feature_code "nullable ; code features central"
-        datetime created_at
-        datetime updated_at
+        varchar feature_code "nullable ; code features central"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     roles {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        varchar(125) name
-        varchar(32) guard_name "tenant"
+        varchar name
+        varchar guard_name "tenant"
         varchar label
         boolean is_system
         boolean is_protected
@@ -4297,8 +4321,8 @@ erDiagram
         tinyint_unsigned super_admin_slot UK "generated nullable ; 1 si is_super_admin"
         bigint_unsigned permission_version
         char(64) permission_signature UK "NOT NULL ; SHA-256 permissions+durees ; UNIQUE guard_name+signature"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     role_has_permissions {
         bigint_unsigned permission_id PK,FK "permissions.id"
@@ -4307,13 +4331,13 @@ erDiagram
     }
     model_has_roles {
         bigint_unsigned role_id PK,FK "roles.id"
-        varchar(64) model_type PK "alias morph local"
+        varchar model_type PK "alias morph local"
         bigint_unsigned model_id PK "users.id pour un utilisateur"
         datetime assigned_at "NOT NULL ; debut des durees pour ce compte ; UTC"
     }
     model_has_permissions {
         bigint_unsigned permission_id PK,FK "permissions.id"
-        varchar(64) model_type PK "alias morph local"
+        varchar model_type PK "alias morph local"
         bigint_unsigned model_id PK "users.id pour un utilisateur"
         datetime assigned_at "NOT NULL ; debut de cette attribution directe ; UTC"
         datetime expires_at "NOT NULL ; apres assigned_at, au plus 9999 jours"
@@ -4330,8 +4354,8 @@ erDiagram
         datetime expires_at
         datetime accepted_at "nullable"
         datetime revoked_at "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     contact_verifications {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -4343,8 +4367,8 @@ erDiagram
         datetime expires_at
         int attempts_count
         datetime consumed_at "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     roles ||--o{ role_has_permissions : role_id
     permissions ||--o{ role_has_permissions : permission_id
@@ -4427,8 +4451,8 @@ erDiagram
         varchar encryption_key_version "nullable"
         boolean is_active
         datetime last_synced_at "nullable"
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     carrier_remittance_batches {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
@@ -4444,8 +4468,8 @@ erDiagram
         tinyint_unsigned status "RemittanceBatchStatusEnum"
         datetime received_at "nullable"
         varchar operation_key UK
-        datetime created_at
-        datetime updated_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
     }
     carrier_accounts ||--o{ shipping_rates : carrier_account_id
     carrier_accounts ||--o{ carrier_remittance_batches : carrier_account_id
@@ -4488,7 +4512,7 @@ FK typées : carrier_fees(source_rate_id,carrier_account_id,source_rate_record_t
 
 Lignes : remittance_statement_id/provider_id vers bordereau ; shipment_id/provider_id vers colis ; collection_id/shipment_id vers recouvrement ; carrier_fee_id/shipment_id/provider_id vers frais ; receivable_id/provider_id vers créance. Pour reversal_of_id et correction_of_id : FK commune id/record_type/provider_id puis FK renforcée par le parent réel requis de la forme. Les CHECK/triggers rendent ce parent obligatoire et shipment_id obligatoire dès que carrier_fee_id existe ; aucun NULL ne contourne le contrôle de sa forme. Même prestataire, même parent, mêmes modes/pièces, inverse exact et absence auto-référence/inverse d’inverse vérifiés.
 
-Générées : provider_scope_id=COALESCE(provider_id,0) ; municipality_scope_uuid=COALESCE(municipality_uuid,province_uuid) ; current_slot=CASE WHEN record_type=1 AND is_active=1 AND deleted_at IS NULL THEN 1 WHEN record_type=2 AND deleted_at IS NULL THEN 1 ELSE NULL END ; source_rate_record_type=CASE WHEN source_rate_id IS NOT NULL THEN 3 ELSE NULL END ; original_fee_payment_record_type=CASE WHEN original_fee_payment_id IS NOT NULL THEN 2 ELSE NULL END. Ces champs ne sont jamais assignés depuis un formulaire.
+Générées : provider_scope_id=COALESCE(provider_id,0) ; municipality_scope_uuid=COALESCE(municipality_uuid,province_uuid) ; current_slot=CASE WHEN record_type=1 AND is_active=TRUE AND deleted_at IS NULL THEN 1 WHEN record_type=2 AND deleted_at IS NULL THEN 1 ELSE NULL END ; source_rate_record_type=CASE WHEN source_rate_id IS NOT NULL THEN 3 ELSE NULL END ; original_fee_payment_record_type=CASE WHEN original_fee_payment_id IS NOT NULL THEN 2 ELSE NULL END. Ces champs ne sont jamais assignés depuis un formulaire.
 
 Cash, charges, créances, indemnités et produits gardent leurs calculs séparés. Filtrer record_type et effet du parent avant somme ; SUM(amount) toutes formes n’est jamais une recette. Original effectif + inverse effectif comptés chacun une fois ; inverse brouillon ne libère aucun budget. Ordre commun de verrous inchangé. CHECK compatibles, triggers d’immutabilité et contrôles sous verrou respectent les restrictions MySQL déjà documentées sur AUTO_INCREMENT et NEW/OLD des générées.
 
@@ -4567,7 +4591,7 @@ Les autres FK composites du tableau suivent la même traduction. Un CHECK ne peu
 | order_items(id,product_id) | product_reviews(order_item_id,product_id) |
 | shop_addresses(id,shop_id,record_type) | shop_addresses(shop_address_id,shop_id,shop_address_type), seulement liens SOCIAL vers adresses ADDRESS |
 
-**Profil public regroupé :** conserver FK(shop_id) → shop(id) et ajouter UNIQUE(id,shop_id,record_type). shop_address_type=CASE WHEN shop_address_id IS NOT NULL THEN 1 ELSE NULL END, GENERATED STORED. FK(shop_address_id,shop_id,shop_address_type) → shop_addresses(id,shop_id,record_type), ON DELETE/UPDATE RESTRICT, impose une adresse du même shop sans cycle de liens. CHECK(record_type IN (1,2)), CHECK(position>=0), CHECK(JSON_TYPE(payload)='OBJECT') et CHECK((record_type=1 AND shop_address_id IS NULL AND province_uuid IS NOT NULL AND municipality_uuid IS NOT NULL AND label IS NOT NULL AND CHAR_LENGTH(TRIM(label))>0) OR (record_type=2 AND province_uuid IS NULL AND municipality_uuid IS NULL AND is_primary=0)) sont requis. record_type et shop_id sont immuables ; aucune valeur *_type ou primary_slot générée n’est writable. La FK et la forme bloquent auto-rattachement et parent SOCIAL ; une commune ADDRESS appartient à la wilaya choisie selon le contrat REF du §3.1/C5, sans FK inter-BDD. UNIQUE(shop_id,primary_slot) repose sur l’expression donnée en T1 ; visible ne fait jamais partie de cette expression. Le validateur JSON serveur complète les CHECK avant toute mutation, sans remplacer les FK de parent.
+**Profil public regroupé :** conserver FK(shop_id) → shop(id) et ajouter UNIQUE(id,shop_id,record_type). shop_address_type=CASE WHEN shop_address_id IS NOT NULL THEN 1 ELSE NULL END, GENERATED STORED. FK(shop_address_id,shop_id,shop_address_type) → shop_addresses(id,shop_id,record_type), ON DELETE/UPDATE RESTRICT, impose une adresse du même shop sans cycle de liens. CHECK(record_type IN (1,2)), CHECK(position>=0), CHECK(JSON_TYPE(payload)='OBJECT') et CHECK((record_type=1 AND shop_address_id IS NULL AND province_uuid IS NOT NULL AND municipality_uuid IS NOT NULL AND label IS NOT NULL AND CHAR_LENGTH(TRIM(label))>0) OR (record_type=2 AND province_uuid IS NULL AND municipality_uuid IS NULL AND is_primary=FALSE)) sont requis. record_type et shop_id sont immuables ; aucune valeur *_type ou primary_slot générée n’est writable. La FK et la forme bloquent auto-rattachement et parent SOCIAL ; une commune ADDRESS appartient à la wilaya choisie selon le contrat REF du §3.1/C5, sans FK inter-BDD. UNIQUE(shop_id,primary_slot) repose sur l’expression donnée en T1 ; visible ne fait jamais partie de cette expression. Le validateur JSON serveur complète les CHECK avant toute mutation, sans remplacer les FK de parent.
 
 **Options fusionnées :** ProductOptionRecordTypeEnum=1 AXIS/2 VALUE. record_type, product_id et name sont NOT NULL. Ajouter les deux UNIQUE parents du tableau avant les FK. parent_record_type est GENERATED STORED CASE WHEN parent_id IS NOT NULL THEN 1 ELSE NULL END ; les deux discriminants du pivot sont GENERATED STORED constantes 1 et 2, non NULL. CHECK(record_type IN (1,2)) et CHECK((record_type=1 AND parent_id IS NULL AND identity_code IS NULL AND display_type IS NOT NULL AND display_type IN (1,2,3) AND color_hex IS NULL) OR (record_type=2 AND parent_id IS NOT NULL AND identity_code IS NOT NULL AND CHAR_LENGTH(TRIM(identity_code))>0 AND display_type IS NULL)) ; CHECK(CHAR_LENGTH(TRIM(name))>0). La FK self(parent_id,product_id,parent_record_type) réserve le parent à un AXIS du même produit, donc aucun enfant VALUE ne peut devenir parent ni former un cycle. Les FK du pivot imposent un axe type 1 et une valeur type 2 dont parent_id=option_id et product_id est identique à celui de la variante. Tous les composants des deux FK pivot sont non NULL ; conserver aussi les FK simples sur option_id/value_id et product_id. Les index parents sont des UNIQUE ordinaires, distincts des index d’expression de libellés. Les FK impliquant les colonnes générées STORED utilisent ON DELETE RESTRICT / ON UPDATE RESTRICT, sans cascade ou SET NULL. [MySQL 8.4, contraintes FK sur colonnes générées](https://dev.mysql.com/doc/refman/8.4/en/create-table-foreign-keys.html). Aucun discriminant ni produit/parent de ligne n’est mass assignable. L’archivage ne supprime aucune clé ni valeur d’une combinaison utilisée.
 
@@ -4758,6 +4782,7 @@ TRANSACTION sur connexion centrale
   réserver slug/domaine uniques et INSERT intention de déploiement avec creation_key stable
 COMMIT
 provisionner BDD hors transaction longue, de façon idempotente
+créer le singleton shop avec ses réglages initiaux validés ou leurs valeurs par défaut
 créer compte propriétaire local, appartenance et rôle système de façon idempotente
 activer seulement après migrations, seeding et identité locale vérifiés
 ```
@@ -4940,7 +4965,7 @@ activity('orders')
     ])
     ->tap(function ($activity) use ($correlationUuid, $validationKey): void {
         $activity->correlation_id = $correlationUuid;
-        $activity->origin = 1; // ActivityOriginEnum::USER
+        $activity->origin = \App\Enums\ActivityOriginEnum::USER;
         $activity->operation_key = $validationKey; // canonique, bornée par le serveur
     })
     ->log('Order validated after phone call');
@@ -5613,7 +5638,7 @@ Cette révision remplace seulement les prescriptions boutique incompatibles des 
 | billing_obligations | — | billing_rule_record_type |
 | users | — | membership_status, joined_at |
 | shop_members | Table retirée (8 champs), destination et conservation décrites ci-dessus | — |
-| billing_rules | status | record_type, document_type, fiscal_year, shop_prefix, next_number, sequence_slot, policy_status, updated_at, code : varchar → varchar(100) |
+| billing_rules | status | record_type, document_type, fiscal_year, shop_prefix, next_number, sequence_slot, policy_status, updated_at, code : chaînes VARCHAR(255) sans longueur explicite ; codes et formes typés selon T22 |
 
 
 **Vérifications d'acceptation boutique V4.6 :** dernier article confirmé une fois en concurrence ; double clic même révision sans double stock/audit ; nouvelle clé sur révision déjà validée sans nouvelle réservation ; révision attendue périmée refusée ; transfert de réservation en échec conserve l'ancien engagement ; indisponibilité technique bloque remise ; aucun budget SAV libéré par refus d'appel ; livraison déclarée acceptée sans POD mais sans faux paiement ; aucun suivi/envoi acheteur ni import facture externe ; invitations/vérifications/reset des comptes restent disponibles ; compte suspendu/révoqué refuse les droits ; compteur/règle ne se substituent pas par FK ; PDF/reprise garde UUID et numéro ; charge transporteur conservée après paiement et inverse compté une seule fois ; 77 tables et tous champs/relations décrits dans le diagramme séparé ; hashes des fichiers protégés identiques.
@@ -5740,7 +5765,7 @@ Déduire provider_id et shipment_id uniquement des parents métier déjà liés 
 
 Si des écritures de l’ancien échange payé existent, archiver/réconcilier leurs avoirs, remboursements, affectations et COD avant retrait ; ne jamais les convertir en impayé ni effacer leurs pièces/audits. Aucun crédit payé n’est simplement réduit à 0 et aucun ancien code d’enum n’est réutilisé. Les caractéristiques/preferences/registres déjà présents exigent une décision explicite de conservation documentaire/export si nécessaire avant une suppression physique future ; ce document ne lance aucune suppression. Les anciennes activités/morphs disposent d’une correspondance historique sans rendre les modèles retirés créables. Vérifier commandes/revisions/colis, unicités, budgets, médias/PDF, réservations et projections de stock après toute migration. Conserver les règles de contrepassation exactes, reçus privés, remboursements réels, manquants et plafonds issus des notes professionnelles.
 
-**Sources de décision :** demandes confirmées dans la conversation, truc.txt, notes du dépôt, recherches Laravel/Spatie et historique complet disponible (37 commits jusqu’à 374bbac). Les notes historiques ne remplacent pas les derniers choix métier explicites. Les diagrammes et glossaires décrivent seulement la version active. Aucune migration/application n’est créée ou exécutée.
+**Sources de décision :** demandes confirmées dans la conversation, truc.txt, notes du dépôt, recherches Laravel/Spatie et historique complet disponible (37 commits jusqu’à 374bbac). Les notes historiques ne remplacent pas les derniers choix métier explicites. Les diagrammes et glossaires décrivent seulement la version active ; les migrations et leurs vérifications MySQL sont détaillées dans la mise à jour technique en tête du document.
 
 ### Traçabilité V4.9 — identités et permissions dans les deux contextes
 
@@ -5833,7 +5858,7 @@ Les références officielles MySQL S1/S2/S3/S7 ont été relues pour la refonte 
 - [S16 — Permission : migration native](https://github.com/spatie/laravel-permission/blob/main/database/migrations/create_permission_tables.php.stub) et [documentation v8](https://spatie.be/docs/laravel-permission/v8/installation-laravel) : tables, PK composites, models/guards/cache. L’exemple du dépôt main doit être confronté au tag réellement verrouillé.
 - [S17 — Laravel : relations Eloquent](https://laravel.com/framework/docs/13.x/eloquent-relationships#polymorphic-relationships) et [événements](https://laravel.com/framework/docs/13.x/eloquent#events) : morph map, PK/FK et limites des écritures groupées.
 
-Les noms/adaptations et décisions de connexion/quota/délégation, ainsi que les regroupements limités et la séparation documentaire/financière de V4.5, sont des choix de projet appuyés par le corpus, pas des fonctionnalités automatiques de Spatie. Les sections passkeys restent conditionnelles. Aucun accès à un compte transporteur, installation de package ou migration réelle n’a été effectué.
+Les noms/adaptations et décisions de connexion/quota/délégation, ainsi que les regroupements limités et la séparation documentaire/financière de V4.5, sont des choix de projet appuyés par le corpus, pas des fonctionnalités automatiques de Spatie. Les sections passkeys restent conditionnelles. Aucun accès à un compte transporteur n'a été effectué. Les packages indiqués dans la mise à jour technique sont installés ; les migrations sont vérifiées sur des bases MySQL temporaires isolées, séparément des bases de l'application.
 
 ## Annexe Inventaire complet
 

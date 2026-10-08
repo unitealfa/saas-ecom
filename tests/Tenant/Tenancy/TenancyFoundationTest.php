@@ -1,8 +1,10 @@
 <?php
 
+use App\Enums\Central\Tenants\StatusEnum;
+use App\Enums\Tenant\Users\MembershipStatusEnum;
 use App\Models\Central\Country;
-use App\Models\Central\TenantStatus;
 use App\Models\Tenant;
+use App\Models\Tenant\Shop;
 use App\Models\Tenant\User as ShopUser;
 use App\Models\User;
 use App\Services\Central\TenantProvisioner;
@@ -18,13 +20,15 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Stancl\Tenancy\Events\TenancyBootstrapped;
 use Stancl\Tenancy\Events\TenantCreated;
 use Stancl\Tenancy\Jobs\CreateDatabase;
 use Tests\Tenant\Tenancy\TenantTestSeeder;
+use Tests\TestCase;
 
 beforeEach(function (): void {
-    config(['tenancy.database.suffix' => '.sqlite']);
+    config(['tenancy.database.suffix' => '']);
     config(['tenancy.saas_base_domain' => 'aydra.localhost']);
 });
 
@@ -35,17 +39,13 @@ afterEach(function (): void {
         foreach (Tenant::withTrashed()->get() as $tenant) {
             $name = $tenant->database()->getName();
 
-            if (config('tenancy.database.central_connection') !== 'sqlite' || ! preg_match('/^boutique_[a-z0-9-]+\.sqlite$/D', $name)) {
-                throw new LogicException('Refusing to remove a database outside this SQLite test.');
-            }
-
-            File::delete(database_path($name));
+            TestCase::dropIsolatedMysqlDatabase($name);
         }
     }
 });
 
 test('tenant database names use the initial slug without the numeric id within the MySQL limit', function (): void {
-    config(['tenancy.database.suffix' => '']);
+    config(['tenancy.database.prefix' => 'boutique_', 'tenancy.database.suffix' => '']);
     $tenant = Tenant::factory()->make(['id' => 17, 'user_id' => 1, 'slug' => 'nour']);
 
     expect($tenant->database()->getName())->toBe('boutique_nour');
@@ -83,7 +83,7 @@ test('a renamed shop keeps its database name reserved even when soft deleted', f
         ->toThrow(LogicException::class, 'The tenant database name is already reserved or exists.');
 
     expect(Tenant::withTrashed()->count())->toBe(1);
-    expect($tenant->fresh()->database()->getName())->toBe('boutique_nour.sqlite');
+    expect($tenant->fresh()->database()->getName())->toBe(config('tenancy.database.prefix').'nour');
     Event::assertDispatchedTimes(TenantCreated::class, 1);
 })->with(['renamed' => false, 'renamed and soft deleted' => true]);
 
@@ -98,20 +98,20 @@ test('tenant creation refuses to adopt an existing unregistered database', funct
     $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
     $owner = User::factory()->create();
     $slug = 'existing-'.Str::lower(Str::random(16));
-    $path = database_path('boutique_'.$slug.'.sqlite');
-    if (File::exists($path)) {
-        throw new LogicException('The test database path must be unused.');
-    }
-    File::put($path, 'existing database must remain untouched');
+    $name = config('tenancy.database.prefix').$slug;
+    $admin = DB::connection('mysql');
+    $admin->statement('CREATE DATABASE `'.$name.'`');
+    $admin->statement('CREATE TABLE `'.$name.'`.sentinel (id BIGINT PRIMARY KEY)');
+    $admin->statement('INSERT INTO `'.$name.'`.sentinel VALUES (123)');
 
     try {
         expect(fn () => Tenant::factory()->create(['user_id' => $owner->id, 'slug' => $slug]))
             ->toThrow(LogicException::class, 'The tenant database name is already reserved or exists.');
 
         $this->assertDatabaseCount('tenants', 0);
-        expect(File::get($path))->toBe('existing database must remain untouched');
+        expect($admin->selectOne('SELECT id FROM `'.$name.'`.sentinel')->id)->toBe(123);
     } finally {
-        File::delete($path);
+        TestCase::dropIsolatedMysqlDatabase($name);
     }
 });
 
@@ -139,9 +139,9 @@ test('test seeding creates two independently migrated shops with separate owner 
         expect($tenant->id)->toBe($number);
         expect($tenant->getTenantKey())->toBe($number);
         expect($tenant->getIncrementing())->toBeTrue();
-        expect($tenant->database()->getName())->toBe("boutique_boutique{$number}.sqlite");
+        expect($tenant->database()->getName())->toBe(config('tenancy.database.prefix')."boutique{$number}");
         expect(Str::isUuid($tenant->uuid, 4))->toBeTrue();
-        expect($tenant->status)->toBe(TenantStatus::Provisioning);
+        expect($tenant->status)->toBe(StatusEnum::PROVISIONING);
         expect($tenant->provisioned_at)->toBeNull();
         expect($tenant->domains()->firstOrFail()->domain)->toBe("boutique{$number}.aydra.localhost");
 
@@ -157,21 +157,171 @@ test('test seeding creates two independently migrated shops with separate owner 
         expect(DB::connection('tenant')->table('domains')->count())->toBe(0);
         expect(Tenant::count())->toBe(2);
         expect(ShopUser::count())->toBe(1);
+        $this->assertDatabaseCount('shop', 1, 'tenant');
+        $shop = Shop::query()->sole();
+        expect($shop->tenant_uuid)->toBe($tenant->uuid);
+        expect($shop->singleton)->toBe(1);
+        expect($shop->shop_name)->toBe($tenant->shop_name);
+        expect($shop->central_profile_version)->toBe($tenant->profile_version);
+        expect($shop->locale)->toBe($owner->locale);
+        expect($shop->currency)->toBe('DZD');
+        expect($shop->timezone)->toBe('Africa/Algiers');
+        expect($shop->business_type)->toBe('OTHER');
+        expect($shop->theme_code)->toBe('default');
+        expect($shop->colors)->toEqual(['primary' => '#2563EB', 'secondary' => '#FFFFFF']);
+        expect($shop->cart_lifetime_days)->toBe(7);
+        expect($shop->contact_email)->toBeNull();
         expect(User::count())->toBe(2);
         $local = ShopUser::firstOrFail();
         expect($local->central_user_uuid)->toBe($owner->uuid);
         expect($local->uuid)->not->toBe($owner->uuid);
         expect($local->password)->not->toBe($owner->password);
         expect(Hash::check('password', $local->password))->toBeFalse();
-        expect($local->membership_status)->toBe(2);
+        expect($local->membership_status)->toBe(MembershipStatusEnum::INVITED);
         expect($local->joined_at)->toBeNull();
         expect(Auth::getDefaultDriver())->toBe('tenant');
         tenancy()->end();
     }
 
     expect(Auth::getDefaultDriver())->toBe('central');
-    expect(DB::getDefaultConnection())->toBe('sqlite');
+    expect(DB::getDefaultConnection())->toBe('mysql');
 });
+
+test('one owner can create multiple shop profiles with custom and omitted initial settings and retry safely', function (): void {
+    $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
+    $owner = User::factory()->create(['locale' => 'ar']);
+    $custom = Tenant::factory()->make(['user_id' => $owner->id]);
+    $custom->configureShopForProvisioning([
+        'business_type' => 'retail', 'theme_code' => 'standard',
+        'colors' => ['primary' => '#111111', 'secondary' => '#EEEEEE'],
+        'cart_lifetime_days' => 14,
+    ]);
+
+    DB::connection('mysql')->transaction(fn () => $custom->save());
+
+    $custom->run(function () use ($custom): void {
+        $this->assertDatabaseCount('shop', 1, 'tenant');
+        $shop = Shop::query()->sole();
+        expect($shop->tenant_uuid)->toBe($custom->uuid);
+        expect($shop->business_type)->toBe('retail');
+        expect($shop->theme_code)->toBe('standard');
+        expect($shop->colors)->toEqual(['primary' => '#111111', 'secondary' => '#EEEEEE']);
+        expect($shop->cart_lifetime_days)->toBe(14);
+        expect($shop->locale)->toBe('ar');
+    });
+    expect($custom->fresh()->getInternal('shop_settings'))->toBeNull();
+
+    $partial = Tenant::factory()->make(['user_id' => $owner->id]);
+    $partial->configureShopForProvisioning([
+        'business_type' => null, 'theme_code' => '', 'colors' => null, 'cart_lifetime_days' => 2,
+    ])->save();
+    $this->assertDatabaseCount('tenants', 2, 'mysql');
+    expect($partial->user_id)->toBe($custom->user_id);
+    expect($partial->database()->getName())->not->toBe($custom->database()->getName());
+    $partial->run(function () use ($partial): void {
+        $this->assertDatabaseCount('shop', 1, 'tenant');
+        $shop = Shop::query()->sole();
+        expect($shop->tenant_uuid)->toBe($partial->uuid);
+        expect($shop->business_type)->toBe('OTHER');
+        expect($shop->theme_code)->toBe('default');
+        expect($shop->colors)->toEqual(['primary' => '#2563EB', 'secondary' => '#FFFFFF']);
+        expect($shop->cart_lifetime_days)->toBe(2);
+    });
+
+    $snapshot = $custom->run(function (): array {
+        $shop = Shop::query()->sole();
+        $shop->update(['cart_lifetime_days' => 21, 'theme_code' => 'default']);
+
+        return $shop->fresh()->getAttributes();
+    });
+    app(TenantProvisioner::class)->provision($custom->fresh());
+
+    $custom->run(function () use ($snapshot): void {
+        $this->assertDatabaseCount('shop', 1, 'tenant');
+        $this->assertDatabaseCount('users', 1, 'tenant');
+        expect(Shop::query()->sole()->getAttributes())->toBe($snapshot);
+        expect(fn () => Shop::factory()->create(['tenant_uuid' => (string) Str::uuid()]))->toThrow(QueryException::class);
+        expect(fn () => Shop::factory()->create(['singleton' => 2, 'tenant_uuid' => (string) Str::uuid()]))->toThrow(QueryException::class);
+        expect(fn () => Shop::query()->delete())->toThrow(QueryException::class);
+        $this->assertDatabaseCount('shop', 1, 'tenant');
+    });
+    expect(fn () => $custom->configureShopForProvisioning([]))->toThrow(LogicException::class);
+    expect(tenancy()->initialized)->toBeFalse();
+
+    $originalDatabase = $partial->database()->getName();
+    $partial->setInternal('db_name', $custom->database()->getName());
+    $partial->save();
+
+    try {
+        expect(fn () => app(TenantProvisioner::class)->provision($partial))
+            ->toThrow(LogicException::class, 'The shop profile belongs to another tenant.');
+        expect($partial->fresh()->status)->toBe(StatusEnum::PROVISIONING_FAILED);
+        expect(tenancy()->initialized)->toBeFalse();
+        $custom->run(fn () => expect(Shop::query()->sole()->getAttributes())->toBe($snapshot));
+    } finally {
+        $partial->setInternal('db_name', $originalDatabase);
+        $partial->save();
+    }
+});
+
+test('a failed local owner creation rolls back its shop profile and preserves settings for retry', function (): void {
+    $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
+    $owner = User::factory()->create();
+    $tenant = Tenant::factory()->make(['user_id' => $owner->id]);
+    $tenant->configureShopForProvisioning(['cart_lifetime_days' => 19]);
+    $failOnce = true;
+    Event::listen('eloquent.creating: '.ShopUser::class, function () use (&$failOnce): void {
+        if ($failOnce) {
+            $failOnce = false;
+            throw new LogicException('Owner initialization failed.');
+        }
+    });
+
+    expect(fn () => $tenant->save())->toThrow(LogicException::class, 'Owner initialization failed.');
+
+    $reservation = $tenant->fresh();
+    expect($reservation->status)->toBe(StatusEnum::PROVISIONING_FAILED);
+    expect($reservation->getInternal('shop_settings')['cart_lifetime_days'])->toBe(19);
+    $reservation->run(function (): void {
+        $this->assertDatabaseCount('shop', 0, 'tenant');
+        $this->assertDatabaseCount('users', 0, 'tenant');
+    });
+
+    app(TenantProvisioner::class)->provision($reservation);
+
+    $reservation->run(function (): void {
+        $this->assertDatabaseCount('shop', 1, 'tenant');
+        $this->assertDatabaseCount('users', 1, 'tenant');
+        expect(Shop::query()->sole()->cart_lifetime_days)->toBe(19);
+    });
+    expect($reservation->fresh()->getInternal('shop_settings'))->toBeNull();
+    expect(tenancy()->initialized)->toBeFalse();
+});
+
+test('invalid initial shop settings are rejected before creating any tenant database', function (array $settings, string $field): void {
+    $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
+    $owner = User::factory()->create();
+    $tenant = Tenant::factory()->make(['user_id' => $owner->id]);
+    $database = $tenant->database();
+
+    try {
+        $tenant->configureShopForProvisioning($settings)->save();
+        $this->fail('Invalid shop settings were accepted.');
+    } catch (ValidationException $exception) {
+        expect($exception->errors())->toHaveKey($field);
+    }
+
+    $this->assertDatabaseCount('tenants', 0, 'mysql');
+    expect($database->manager()->databaseExists($database->getName()))->toBeFalse();
+})->with([
+    'no identity override' => [['tenant_uuid' => 'forged'], 'settings'],
+    'non-text business code' => [['business_type' => []], 'business_type'],
+    'non-text theme code' => [['theme_code' => []], 'theme_code'],
+    'unnamed colors' => [['colors' => ['#2563EB']], 'colors'],
+    'invalid color' => [['colors' => ['primary' => 'javascript:alert(1)']], 'colors.primary'],
+    'zero cart lifetime' => [['cart_lifetime_days' => 0], 'cart_lifetime_days'],
+    'fractional cart lifetime' => [['cart_lifetime_days' => 1.5], 'cart_lifetime_days'],
+]);
 
 test('retrying test seeding preserves owners passwords tenants domains and local identities', function (): void {
     $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
@@ -189,7 +339,7 @@ test('retrying test seeding preserves owners passwords tenants domains and local
     $local->update(['email' => 'boutique_1@gmail.com']);
     tenancy()->end();
 
-    $tenant->setInternal('db_name', 'tenant_'.$uuid.'.sqlite');
+    $tenant->setInternal('db_name', 'tenant_'.$uuid);
     $tenant->save();
 
     config(['tenancy.saas_base_domain' => 'another-saas.localhost']);
@@ -375,7 +525,7 @@ test('internal tenant identifiers are not exposed in production or for disabled 
     $tenant->owner->forceFill(['status' => 2])->save();
     $this->get('http://boutique1.aydra.localhost/')->assertServiceUnavailable();
     $tenant->owner->forceFill(['status' => 1])->save();
-    $tenant->status = TenantStatus::Suspended;
+    $tenant->status = StatusEnum::SUSPENDED;
     $tenant->save();
     $this->get('http://boutique1.aydra.localhost/')->assertServiceUnavailable();
     expect(tenancy()->initialized)->toBeFalse();
@@ -444,18 +594,24 @@ test('a failed migration remains failed and a retry installs the missing local t
     $paths = config('tenancy.migration_parameters.--path');
     config(['tenancy.migration_parameters.--path' => [base_path('tests/nonexistent-migrations')]]);
 
-    expect(fn () => Tenant::factory()->create(['user_id' => $owner->id]))->toThrow(Exception::class);
+    $reservation = Tenant::factory()->make(['user_id' => $owner->id]);
+    $reservation->configureShopForProvisioning(['cart_lifetime_days' => 15]);
+    expect(fn () => $reservation->save())->toThrow(Exception::class);
     $tenant = Tenant::firstOrFail();
-    expect($tenant->status)->toBe(TenantStatus::ProvisioningFailed);
+    expect($tenant->status)->toBe(StatusEnum::PROVISIONING_FAILED);
     expect($tenant->provisioned_at)->toBeNull();
     expect(tenancy()->initialized)->toBeFalse();
+    expect($tenant->getInternal('shop_settings')['cart_lifetime_days'])->toBe(15);
 
     config(['tenancy.migration_parameters.--path' => $paths]);
     app(TenantProvisioner::class)->provision($tenant);
 
-    expect($tenant->fresh()->status)->toBe(TenantStatus::Provisioning);
+    expect($tenant->fresh()->status)->toBe(StatusEnum::PROVISIONING);
     tenancy()->initialize($tenant);
     expect(ShopUser::count())->toBe(1);
+    $this->assertDatabaseCount('shop', 1, 'tenant');
+    expect(Shop::query()->sole()->cart_lifetime_days)->toBe(15);
+    expect($tenant->fresh()->getInternal('shop_settings'))->toBeNull();
     tenancy()->end();
 });
 
@@ -484,15 +640,11 @@ test('two active primary domains cannot be assigned to the same shop', function 
     expect($tenant->domains()->count())->toBe(1);
 });
 
-test('raw updates cannot transfer a tenant or change the local owner identity', function (): void {
+test('raw updates cannot change the local owner identity', function (): void {
     $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
     $this->seed([DatabaseSeeder::class, TenantTestSeeder::class]);
     $tenant = Tenant::where('slug', 'boutique1')->firstOrFail();
-    $ownerId = $tenant->user_id;
     $otherOwner = User::where('email', 'boutique2@test.com')->firstOrFail();
-
-    expect(fn () => DB::table('tenants')->where('id', $tenant->id)->update(['user_id' => $otherOwner->id]))->toThrow(QueryException::class);
-    expect($tenant->fresh()->user_id)->toBe($ownerId);
 
     tenancy()->initialize($tenant);
     $local = ShopUser::firstOrFail();
@@ -523,7 +675,7 @@ test('cache sessions and private disk paths remain separate across tenant switch
     $firstSession->put('context-test', 'first');
     $firstSession->save();
     expect(DB::connection('tenant')->table('sessions')->count())->toBe(1);
-    expect(DB::connection('sqlite')->table('sessions')->count())->toBe(0);
+    expect(DB::connection('mysql')->table('sessions')->count())->toBe(0);
     tenancy()->end();
 
     tenancy()->initialize($second);
@@ -552,7 +704,7 @@ test('a tenant job is stored centrally and carries its numeric tenant id', funct
 
     Queue::connection('database')->push(new CreateDatabase($tenant));
 
-    $job = DB::connection('sqlite')->table('jobs')->first();
+    $job = DB::connection('mysql')->table('jobs')->first();
     expect($job)->not->toBeNull();
     $payload = json_decode($job->payload, true, flags: JSON_THROW_ON_ERROR);
     expect($payload['tenant_id'])->toBe($tenant->id);

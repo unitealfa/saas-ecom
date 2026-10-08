@@ -13,19 +13,19 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
-            $table->char('central_user_uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->nullable()->unique();
+            $table->uuid('uuid');
+            $table->uuid('central_user_uuid')->nullable()->unique();
             $table->string('last_name');
             $table->string('first_name')->nullable();
             $table->string('email')->unique();
             $table->string('password');
             $table->string('phone')->nullable();
-            $table->dateTime('email_verified_at', 6)->nullable();
-            $table->string('locale', 10)->default('fr');
+            $table->dateTime('email_verified_at')->nullable();
+            $table->string('locale')->default('fr');
             $table->unsignedTinyInteger('status')->default(1);
             $table->unsignedTinyInteger('membership_status')->default(2);
-            $table->dateTime('joined_at', 6)->nullable();
-            $table->dateTime('last_login_at', 6)->nullable();
+            $table->dateTime('joined_at')->nullable();
+            $table->dateTime('last_login_at')->nullable();
             $table->rememberToken();
             $table->timestamps();
             $table->softDeletes();
@@ -33,14 +33,14 @@ return new class extends Migration
 
         Schema::create('contact_verifications', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
-            $table->foreignId('user_id')->constrained('users')->restrictOnDelete();
+            $table->uuid('uuid');
+            $table->foreignId('user_id')->constrained('users')->restrictOnDelete()->restrictOnUpdate();
             $table->unsignedTinyInteger('channel');
             $table->string('normalized_destination');
             $table->string('code_hash');
-            $table->dateTime('expires_at', 6);
+            $table->dateTime('expires_at');
             $table->integer('attempts_count')->default(0);
-            $table->dateTime('consumed_at', 6)->nullable();
+            $table->dateTime('consumed_at')->nullable();
             $table->timestamps();
         });
 
@@ -53,7 +53,7 @@ return new class extends Migration
         Schema::create('sessions', function (Blueprint $table): void {
             $table->string('id')->primary();
             $table->foreignId('user_id')->nullable()->index();
-            $table->string('ip_address', 45)->nullable();
+            $table->string('ip_address')->nullable();
             $table->text('user_agent')->nullable();
             $table->longText('payload');
             $table->integer('last_activity')->index();

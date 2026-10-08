@@ -52,7 +52,7 @@ test('the existing MySQL central and tenant databases match the documented migra
             $expected = array_map(fn (string $file): string => basename($file, '.php'), glob(database_path('migrations/'.$context.'/*.php')));
             sort($expected);
             expect(DB::table('migrations')->orderBy('migration')->pluck('migration')->all())->toBe($expected);
-            expect(DB::table('information_schema.triggers')->where('trigger_schema', $database)->count())->toBe($context === 'central' ? 76 : 205);
+            expect(DB::table('information_schema.triggers')->where('trigger_schema', $database)->count())->toBe($context === 'central' ? 72 : 205);
             expect(DB::table('information_schema.table_constraints')->where('constraint_schema', $database)->where('constraint_type', 'CHECK')->where('enforced', 'YES')->count())->toBe($context === 'central' ? 85 : 151);
         }
     } finally {

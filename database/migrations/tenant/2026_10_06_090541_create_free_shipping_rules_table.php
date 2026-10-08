@@ -10,18 +10,20 @@ return new class extends Migration
     {
         Schema::create('free_shipping_rules', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
-            $table->unsignedBigInteger('product_id')->nullable();
-            $table->char('province_uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->nullable();
+            $table->uuid('uuid');
+            $table->foreignId('product_id')->nullable()->constrained('products', indexName: 'fk_free_shipping_rules_c3adad4f81')->restrictOnDelete()->restrictOnUpdate();
+            $table->uuid('province_uuid')->nullable();
             $table->string('name');
             $table->unsignedTinyInteger('delivery_mode')->nullable()->comment('DeliveryModeEnum: 1, 2');
-            $table->decimal('minimum_cart_amount', 14, 2)->nullable();
-            $table->dateTime('started_at', 6)->nullable();
-            $table->dateTime('ended_at', 6)->nullable();
+            $table->decimal('minimum_cart_amount')->nullable();
+            $table->dateTime('started_at')->nullable();
+            $table->dateTime('ended_at')->nullable();
             $table->integer('priority');
             $table->boolean('is_active');
             $table->timestamps();
             $table->softDeletes();
+
+            $table->index(['product_id'], 'ix_free_shipping_rules_c3adad4f81');
         });
     }
 

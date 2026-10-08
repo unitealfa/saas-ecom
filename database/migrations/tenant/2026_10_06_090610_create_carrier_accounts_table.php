@@ -10,9 +10,9 @@ return new class extends Migration
     {
         Schema::create('carrier_accounts', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
-            $table->unsignedBigInteger('created_by_id');
-            $table->char('carrier_uuid', 36)->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin');
+            $table->uuid('uuid');
+            $table->foreignId('created_by_id')->constrained('users', indexName: 'fk_carrier_accounts_6fb667974b')->restrictOnDelete()->restrictOnUpdate();
+            $table->uuid('carrier_uuid');
             $table->string('label');
             $table->string('adapter');
             $table->string('external_account_id')->nullable();
@@ -20,8 +20,11 @@ return new class extends Migration
             $table->text('encrypted_api_credentials')->nullable();
             $table->string('encryption_key_version')->nullable();
             $table->boolean('is_active');
-            $table->dateTime('last_synced_at', 6)->nullable();
+            $table->dateTime('last_synced_at')->nullable();
             $table->timestamps();
+
+            $table->unique(['carrier_uuid', 'external_account_id'], 'uq_carrier_accounts_573826f6df');
+            $table->index(['created_by_id'], 'ix_carrier_accounts_6fb667974b');
         });
     }
 

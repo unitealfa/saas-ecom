@@ -10,14 +10,19 @@ return new class extends Migration
     {
         Schema::create('feature_usage', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
-            $table->unsignedBigInteger('user_id');
-            $table->unsignedBigInteger('tenant_id')->nullable();
-            $table->unsignedBigInteger('feature_id');
-            $table->dateTime('period_starts_at', 6);
-            $table->dateTime('period_ends_at', 6)->nullable();
+            $table->uuid('uuid');
+            $table->foreignId('user_id')->constrained('users', indexName: 'fk_feature_usage_f89d6b6960')->restrictOnDelete()->restrictOnUpdate();
+            $table->foreignId('tenant_id')->nullable()->constrained('tenants', indexName: 'fk_feature_usage_759b6ffea8')->restrictOnDelete()->restrictOnUpdate();
+            $table->foreignId('feature_id')->constrained('features', indexName: 'fk_feature_usage_3de8f04067')->restrictOnDelete()->restrictOnUpdate();
+            $table->dateTime('period_starts_at');
+            $table->dateTime('period_ends_at')->nullable();
             $table->bigInteger('quantity');
             $table->timestamps();
+
+            $table->index(['tenant_id', 'user_id'], 'ix_feature_usage_1bd81732ff');
+            $table->index(['user_id'], 'ix_feature_usage_f89d6b6960');
+            $table->index(['feature_id'], 'ix_feature_usage_3de8f04067');
+            $table->foreign(['tenant_id', 'user_id'], 'fk_feature_usage_1bd81732ff')->references(['id', 'user_id'])->on('tenants')->restrictOnDelete()->restrictOnUpdate();
         });
     }
 

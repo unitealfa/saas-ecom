@@ -10,12 +10,14 @@ return new class extends Migration
     {
         Schema::create('visitors', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
+            $table->uuid('uuid');
             $table->string('token_hash');
-            $table->dateTime('first_visited_at', 6);
-            $table->dateTime('last_visited_at', 6);
-            $table->dateTime('expires_at', 6);
+            $table->dateTime('first_visited_at');
+            $table->dateTime('last_visited_at');
+            $table->dateTime('expires_at');
             $table->timestamps();
+
+            $table->unique(['token_hash'], 'uq_visitors_e6511e19f6');
         });
     }
 

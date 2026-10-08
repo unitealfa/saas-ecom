@@ -13,14 +13,14 @@ return new class extends Migration
     {
         Schema::create('contact_verifications', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('uuid')->charset('ascii')->collation(Schema::getConnection()->getDriverName() === 'sqlite' ? 'BINARY' : 'ascii_bin')->unique();
-            $table->foreignId('user_id')->constrained('users')->restrictOnDelete();
+            $table->uuid('uuid');
+            $table->foreignId('user_id')->constrained('users')->restrictOnDelete()->restrictOnUpdate();
             $table->unsignedTinyInteger('channel');
             $table->string('normalized_destination');
             $table->string('code_hash');
-            $table->dateTime('expires_at', 6);
+            $table->dateTime('expires_at');
             $table->integer('attempts_count')->default(0);
-            $table->dateTime('consumed_at', 6)->nullable();
+            $table->dateTime('consumed_at')->nullable();
             $table->timestamps();
         });
     }
