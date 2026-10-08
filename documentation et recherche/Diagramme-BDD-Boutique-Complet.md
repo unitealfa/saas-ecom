@@ -2,11 +2,11 @@
 
 **Mise à jour technique du 8 octobre 2026 :** MySQL, Spatie Permission 8.3.0 et Activity Log 5.0.0. `created_at`/`updated_at` proviennent de `timestamps()` et `deleted_at` de `softDeletes()` pour les tables archivables ; ces TIMESTAMP sont nullable. Un journal possédant seulement `created_at` conserve ce timestamp obligatoire. Les dates métier restent des DATETIME. Les migrations de création Permission et Activity Log sont publiées par les commandes officielles Spatie ; deux migrations d'extension locales conservent les UUID, durées et informations d'audit décrits ici. Les FK conservent RESTRICT ; les index natifs ne sont pas recréés en doublon. Permissions, cache et activités restent isolés par boutique. Les 62 relations FK simples centrales et 192 locales utilisent `foreignId()` avec leur vraie contrainte SQL vers la PK du parent ; cette colonne conserve un ID existant, sans AUTO_INCREMENT. Les index ordinaires et UNIQUE sont définis dans les migrations de leurs tables. Les FK simples et composites dont les parents sont disponibles sont définies au même endroit ; les références vers un parent créé ensuite, notamment le cycle commande/révision, sont ajoutées dans `add_documented_foreign_keys`, avec mention dans la migration de création. Les contrats REF/POLY restent distincts.
 
-Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.10 du 6 octobre 2026. Ce document présente **les 59 tables locales et leurs 1005 champs dans un seul diagramme Mermaid**, puis explique chaque table et chaque champ simplement. Chaque boutique possède cette structure dans sa propre BDD ; rôles et comptes restent indépendants. Les migrations correspondantes sont vérifiées sur des bases MySQL de test isolées.
+Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.10 du 6 octobre 2026, synchronisée avec les migrations présentes le 8 octobre 2026. Ce document présente **les 59 tables locales et leurs 1005 champs dans un seul diagramme Mermaid**, puis explique chaque table et chaque champ simplement. Chaque boutique possède cette structure dans sa propre BDD ; rôles et comptes restent indépendants. Les migrations correspondantes sont vérifiées sur des bases MySQL de test isolées.
 
 **Identifiants :** chaque `id` métier est un numéro interne auto-incrémenté (1, 2, 3…), propre à sa table et à sa BDD. `uuid` reste un second champ unique pour les liens publics. Les FK locales utilisent les ID numériques ; les références au central, comme `shop.tenant_uuid` et `users.central_user_uuid`, restent des UUID sans FK SQL entre bases. Les trois pivots Spatie gardent leurs PK composites. Le numéro central utilisé par Tenancy ne devient jamais l’identité d’un utilisateur ou d’un produit local.
 
-**Tailles nécessaires seulement :** les montants se déclarent avec `decimal('champ')` ; `SchemaBlueprint` conserve une fois DECIMAL(14,2), pour les centimes et la capacité documentée. Les mesures conservent leurs trois décimales via `places: 3`. Les formats fixes UUID, SHA-256, ISO et couleur sont conservés. Les booléens s'écrivent `true`/`false` en PHP et `TRUE`/`FALSE` en SQL ; les statuts et compteurs restent numériques. `id()` est déjà unique par sa PK ; les unicités composites de relations restent nécessaires.
+**Types des migrations actuelles :** les montants se déclarent avec `decimal('champ')` ; `SchemaBlueprint` conserve une fois DECIMAL(14,2), pour les centimes et la capacité documentée. `decimal` sans taille signifie DECIMAL(14,2), également pour les poids et dimensions actuels. Seul `products.content_quantity` conserve DECIMAL(14,3) via `places: 3`, indiqué explicitement dans le diagramme. `char` sans taille correspond à `$table->char('champ')`, soit CHAR(255) avec la configuration Laravel actuelle. Les deux tailles CHAR explicitement conservées dans les migrations locales sont `invoices.currency` en CHAR(3) et `roles.permission_signature` en CHAR(64) ; au central, cette dernière est CHAR(255). Les valeurs ISO, couleurs et empreintes gardent leur format métier, distinct de la capacité SQL. Les UUID restent CHAR(36). Les booléens s'écrivent `true`/`false` en PHP et `TRUE`/`FALSE` en SQL ; les statuts et compteurs restent numériques. `id()` est déjà unique par sa PK ; les unicités composites de relations restent nécessaires.
 
 **Déclarations et casts :** les migrations appellent `$table->uuid('uuid');` et les références UUID utilisent `$table->uuid('champ');`, via `App\Services\SchemaBlueprint` ; seule la colonne publique `uuid` reçoit l'unicité automatique. Les VARCHAR utilisent 255 sans argument de longueur ; `rememberToken()` garde son format Laravel natif. Les dates sont sans microsecondes, sans argument `6`. Les comptes locaux castent `status` et `membership_status` vers leurs enums documentés, avec mot de passe `hashed` ; rôles et activités gardent leurs casts et données Spatie. `shop` est un profil unique : une recherche de boutiques par nom utilise l'index central `tenants.shop_name`.
 
@@ -110,7 +110,7 @@ shop {
   varchar contact_phone "?"
   varchar contact_whatsapp "?"
   varchar locale
-  char(3) currency
+  char currency
   varchar timezone
   varchar theme_code
   json colors
@@ -181,7 +181,7 @@ media {
   int position
   boolean is_primary
   u8 primary_slot "?"
-  char(64) file_hash "?"
+  char file_hash "?"
   timestamp created_at "?"
   timestamp updated_at "?"
   timestamp deleted_at "?"
@@ -222,7 +222,7 @@ products {
   boolean allows_customization
   text customization_instructions "?"
   varchar sale_unit
-  decimal content_quantity "?"
+  decimal content_quantity "? ; DECIMAL(14,3)"
   varchar content_unit "?"
   u8 status
   datetime published_at "?"
@@ -242,7 +242,7 @@ product_variants {
   varchar label
   varchar sku
   varchar barcode "?"
-  char(64) combination_signature
+  char combination_signature
   datetime used_at "?"
   decimal sale_price
   decimal unit_cost
@@ -273,7 +273,7 @@ product_options {
   varchar name
   varchar identity_code "?"
   u8 display_type "?"
-  char(7) color_hex "?"
+  char color_hex "?"
   int position
   timestamp created_at "?"
   timestamp updated_at "?"
@@ -408,7 +408,7 @@ cart_items {
   u64 sales_page_id FK "?"
   int quantity
   text customization_text "?"
-  char(64) customization_signature
+  char customization_signature
   timestamp created_at "?"
   timestamp updated_at "?"
 }
@@ -432,7 +432,7 @@ orders {
   varchar number
   varchar data_policy_version
   datetime data_notice_acknowledged_at
-  char(64) notice_text_hash "?"
+  char notice_text_hash "?"
   int original_incident_quantity "?"
   varchar replacement_reason "?"
   u8 order_type
@@ -441,7 +441,7 @@ orders {
   datetime validated_at "?"
   datetime operationally_confirmed_at "?"
   varchar submission_key
-  char(64) submission_hash
+  char submission_hash
   int lock_version
   boolean retention_hold
   text retention_hold_reason "?"
@@ -460,8 +460,8 @@ order_revisions {
   uuid province_uuid "REF central.geographic_areas.uuid"
   uuid municipality_uuid "REF central.geographic_areas.uuid"
   int revision_number
-  char(3) currency
-  char(2) country_code
+  char currency
+  char country_code
   json legal_seller_snapshot
   json shipping_tax_snapshot
   text reason "?"
@@ -711,7 +711,7 @@ shipment_events {
   varchar raw_external_status "?"
   varchar adapter_version
   json sanitized_external_payload "?"
-  char(64) payload_hash
+  char payload_hash
   datetime payload_expires_at "?"
   datetime payload_purged_at "?"
   text reason "?"
@@ -740,7 +740,7 @@ carrier_operations {
   varchar operation_key
   json sanitized_request
   text encrypted_personal_request "?"
-  char(64) request_hash
+  char request_hash
   datetime request_expires_at "?"
   datetime request_purged_at "?"
   varchar merchant_reference "?"
@@ -1080,7 +1080,7 @@ sales_terms_acceptances {
   u64 revision_id FK
   varchar operation_key UK
   varchar sales_terms_version
-  char(64) terms_hash
+  char terms_hash
   datetime accepted_at
   u8 acceptance_mode
   json sanitized_proof "?"
@@ -2890,7 +2890,7 @@ Les groupes d’autorisations de la boutique. Exemple : le rôle de préparateur
 | `id` | Le numéro interne de cette ligne, utilisé par la base de données. |
 | `uuid` | Son identifiant public unique, utilisé dans les écrans autorisés. |
 | `super_admin_slot` | Une valeur calculée qui empêche de créer deux rôles de propriétaire dans cette base. |
-| `permission_signature` | Une empreinte des actions et de leurs durées, pour refuser deux rôles identiques dans cette boutique même avec des noms différents. |
+| `permission_signature` | Une empreinte des actions et de leurs durées, pour refuser deux rôles identiques dans cette boutique même avec des noms différents. Cette colonne locale conserve CHAR(64) dans sa migration ; au central, elle est CHAR(255). |
 | `name` | Le nom technique du rôle, par exemple shop-owner. |
 | `guard_name` | Le contexte de connexion de ces droits ; ici tenant, pour cette boutique. |
 | `label` | Le nom lisible affiché dans les écrans. |

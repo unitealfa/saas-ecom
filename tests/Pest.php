@@ -108,8 +108,12 @@ function documentedDatabaseTables(string $context, bool $mainSchema = false): ar
                 }
 
                 $note = $field[4] ?? '';
+                $type = strtr($field[1], ['bigint_unsigned' => 'u64', 'tinyint_unsigned' => 'u8', 'smallint_unsigned' => 'u16']);
+                if ($type === 'decimal' && preg_match('/\bDECIMAL\(\d+,\d+\)/', $note, $decimalType)) {
+                    $type = strtolower($decimalType[0]);
+                }
                 $columns[$field[2]] = [
-                    'type' => strtr($field[1], ['bigint_unsigned' => 'u64', 'tinyint_unsigned' => 'u8', 'smallint_unsigned' => 'u16']),
+                    'type' => $type,
                     'nullable' => $mainSchema ? str_contains($note, 'nullable') || str_contains($note, 'sinon NULL') : str_contains($note, '?'),
                     'keys' => isset($field[3]) && $field[3] !== '' ? preg_split('/,\s*/', $field[3]) : [],
                     'note' => $note,
@@ -145,11 +149,6 @@ function assertDocumentedDatabaseSchema(string $context): void
         expect($mainColumns)->toBe($expectedColumns);
 
         $actual = array_column($schema->getColumns($table), null, 'name');
-        $extras = $table === 'users' && $context === 'central' ? ['two_factor_secret', 'two_factor_recovery_codes', 'two_factor_confirmed_at'] : [];
-        if ($table === 'domains' && $context === 'central') {
-            $extras[] = 'primary_slot';
-        }
-        $expectedColumns = array_merge($expectedColumns, $extras);
         $actualColumns = array_keys($actual);
         sort($expectedColumns);
         sort($actualColumns);
@@ -189,10 +188,11 @@ function assertDocumentedDatabaseSchema(string $context): void
                     'bigint' => 'bigint',
                     'tinyint' => 'tinyint',
                     'varchar' => 'varchar(255)',
-                    'decimal' => preg_match('/^(weight_kg|length_cm|width_cm|height_cm|content_quantity)$/', $column) ? 'decimal(14,3)' : 'decimal(14,2)',
+                    'char' => 'char(255)',
+                    'decimal' => 'decimal(14,2)',
                     default => $field['type'],
                 };
-                expect($type)->toBe($expectedType);
+                expect($type)->toBe($expectedType, $context.'.'.$table.'.'.$column.' type');
                 if ($field['type'] === 'uuid') {
                     expect($actual[$column]['collation'])->toBe('ascii_bin');
                 }

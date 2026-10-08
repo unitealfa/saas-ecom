@@ -2,11 +2,11 @@
 
 **Mise à jour technique du 8 octobre 2026 :** MySQL, Spatie Permission 8.3.0 et Activity Log 5.0.0. `created_at`/`updated_at` proviennent de `timestamps()` et `deleted_at` de `softDeletes()` pour les tables archivables ; ces TIMESTAMP sont nullable. Les dates métier restent des DATETIME. Les migrations de création Permission et Activity Log sont publiées par les commandes officielles Spatie ; deux migrations d'extension centrales conservent les UUID, durées et informations d'audit décrits ici. Les FK conservent RESTRICT ; les index natifs ne sont pas recréés en doublon. La suppression de `protect_central_identifiers_and_ownership` est conservée ; voir la mise à jour technique du schéma principal pour ses conséquences sur les triggers. Les 62 relations FK simples centrales et 192 locales utilisent `foreignId()` avec leur vraie contrainte SQL vers la PK du parent ; cette colonne conserve un ID existant, sans AUTO_INCREMENT. Les index ordinaires et UNIQUE sont définis dans les migrations de leurs tables. Les FK simples et composites dont les parents sont disponibles sont définies au même endroit ; les références vers un parent créé ensuite, notamment le cycle commande/révision, sont ajoutées dans `add_documented_foreign_keys`, avec mention dans la migration de création. Les contrats REF/POLY restent distincts.
 
-Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.10 du 6 octobre 2026. Ce document présente **les 28 tables centrales et leurs 465 champs dans un seul diagramme Mermaid**, puis explique chaque table et chaque champ simplement. Les permissions SaaS portent leurs durées dans les tables existantes ; les quotas viennent des offres. Les migrations correspondantes sont vérifiées sur des bases MySQL de test isolées.
+Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.10 du 6 octobre 2026, synchronisée avec les migrations présentes le 8 octobre 2026. Ce document présente **les 28 tables centrales et leurs 469 champs dans un seul diagramme Mermaid**, puis explique chaque table et chaque champ simplement. Les permissions SaaS portent leurs durées dans les tables existantes ; les quotas viennent des offres. Les migrations correspondantes sont vérifiées sur des bases MySQL de test isolées.
 
 **Identifiants :** `id` est un numéro interne auto-incrémenté (1, 2, 3…), jamais un UUID. `uuid` est un champ distinct et unique pour les liens publics et les références entre BDD. Les FK locales utilisent les ID numériques ; les trois pivots Spatie gardent leurs PK composites. Le contexte technique Tenancy utilise `tenants.id`, avec `id_generator=null`, tandis que les routes publiques utilisent `tenants.uuid`.
 
-**Tailles nécessaires seulement :** les montants se déclarent avec `decimal('champ')` ; `SchemaBlueprint` conserve une fois DECIMAL(14,2), pour les centimes et la capacité documentée. Les formats fixes UUID, SHA-256, ISO et couleur sont conservés. Les booléens s'écrivent `true`/`false` en PHP et `TRUE`/`FALSE` en SQL ; les statuts et compteurs restent numériques. `id()` est déjà unique par sa PK. `features.code` possède son index UNIQUE avec une chaîne sans longueur explicite ; les unicités composites de relations restent nécessaires.
+**Types des migrations actuelles :** les montants se déclarent avec `decimal('champ')` ; `SchemaBlueprint` conserve une fois DECIMAL(14,2), pour les centimes et la capacité documentée. `char` sans taille dans ce diagramme correspond à `$table->char('champ')`, soit CHAR(255) avec la configuration Laravel actuelle. Cela concerne aussi `roles.permission_signature` au central ; sa colonne locale reste CHAR(64). Les valeurs ISO, couleurs et empreintes gardent leur format métier, distinct de la capacité SQL. Les UUID restent CHAR(36). Les booléens s'écrivent `true`/`false` en PHP et `TRUE`/`FALSE` en SQL ; les statuts et compteurs restent numériques. `id()` est déjà unique par sa PK. `features.code` possède son index UNIQUE avec une chaîne sans longueur explicite ; les unicités composites de relations restent nécessaires.
 
 **Déclarations et casts :** `$table->uuid('uuid');` applique les règles communes de `App\Services\SchemaBlueprint` (CHAR(36), ASCII, collation `ascii_bin`, UNIQUE), sur toutes les connexions. Les VARCHAR utilisent la longueur Laravel de 255 sans argument de longueur dans les migrations ; `rememberToken()` garde son format natif. Les dates sont sans microsecondes, sans argument `6`. `tenants.slug` conserve son index UNIQUE et sa validation technique ; `tenants.shop_name` possède un index non unique. Les modèles existants castent les codes documentés vers leurs enums PHP, les indicateurs en booléens, les versions en entiers, les dates métier en dates immuables et le mot de passe via `hashed` ; voir §3.3 du schéma pour les classes.
 
@@ -66,11 +66,11 @@ erDiagram
 countries {
   u64 id PK "AUTO_INCREMENT ; interne"
   uuid uuid UK "UUID v4 ; public"
-  char(2) code UK
+  char code UK
   varchar name_fr
   varchar name_en
   varchar name_ar "?"
-  boolean is_active
+  boolean is_active "DEFAULT FALSE ; DZ active par le seeder"
   timestamp created_at "?"
   timestamp updated_at "?"
   timestamp deleted_at "?"
@@ -85,6 +85,9 @@ users {
   varchar last_name
   varchar first_name "?"
   varchar password
+  text two_factor_secret "?"
+  text two_factor_recovery_codes "?"
+  timestamp two_factor_confirmed_at "?"
   varchar phone "?"
   datetime email_verified_at "?"
   datetime phone_verified_at "?"
@@ -119,7 +122,7 @@ tenants {
   varchar shop_name
   u64 profile_version
   varchar creation_key
-  char(64) creation_hash
+  char creation_hash
   u8 status
   boolean is_primary
   int activation_priority "?"
@@ -142,6 +145,7 @@ domains {
   u8 verification_status
   datetime verified_at "?"
   u8 certificate_status "?"
+  u8 primary_slot "? ; generated STORED ; 1 si principal non archive, sinon NULL"
   timestamp created_at "?"
   timestamp updated_at "?"
   timestamp deleted_at "?"
@@ -191,7 +195,7 @@ roles {
   u64 id PK "AUTO_INCREMENT ; interne"
   uuid uuid UK "UUID v4 ; public"
   u8 super_admin_slot UK "?"
-  char(64) permission_signature UK
+  char permission_signature UK
   varchar name
   varchar guard_name
   varchar label
@@ -399,7 +403,7 @@ saas_invoices {
   json taxes
   decimal tax_amount
   decimal total_amount
-  char(3) currency
+  char currency
   u8 status
   text reason "?"
   datetime period_starts_at
@@ -505,7 +509,7 @@ saas_transfers {
   u64 validated_by_id FK "?"
   u64 performed_by_id FK "?"
   u64 reversal_of_id FK "?"
-  char(64) active_transaction_fingerprint UK "?"
+  char active_transaction_fingerprint UK "?"
   varchar operation_key UK
   u8 record_type
   u8 document_type
@@ -515,11 +519,11 @@ saas_transfers {
   u8 transfer_status
   u8 refund_reason "?"
   decimal amount
-  char(3) currency
+  char currency
   text reason "?"
   varchar transfer_reference "?"
   varchar financial_account_key "?"
-  char(64) transaction_fingerprint "?"
+  char transaction_fingerprint "?"
   text encrypted_transfer_details "?"
   datetime occurred_at "?"
   datetime sending_started_at "?"
@@ -550,7 +554,7 @@ media {
   int position
   boolean is_primary
   u8 primary_slot "?"
-  char(64) file_hash "?"
+  char file_hash "?"
   timestamp created_at "?"
   timestamp updated_at "?"
   timestamp deleted_at "?"
@@ -725,12 +729,12 @@ La liste des pays : Algérie, France, Arabie saoudite, Soudan et Égypte.
 | `name_fr` | Le nom affiché en français. |
 | `name_en` | Le nom affiché en anglais. |
 | `name_ar` | Le nom affiché en arabe. |
-| `is_active` | Indique si le pays peut être sélectionné au lancement. L’Algérie est active ; les autres pays restent prévus pour plus tard. |
+| `is_active` | Indique si le pays peut être sélectionné. Par défaut : false ; le seeder active l’Algérie au lancement. Les autres pays restent prévus pour plus tard. |
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 | `deleted_at` | La date du retrait du pays, sans effacer sa fiche ; vide tant qu’il n’est pas retiré. |
 
-### 2. `users` — 30 champs
+### 2. `users` — 33 champs
 
 Les comptes des propriétaires de boutiques et des administrateurs du SaaS : nom, e-mail, mot de passe protégé, téléphone, pays… Elle contient aussi les informations professionnelles du propriétaire.
 
@@ -744,6 +748,9 @@ Les comptes des propriétaires de boutiques et des administrateurs du SaaS : nom
 | `last_name` | Le nom de famille du titulaire du compte, par exemple Amrani. |
 | `first_name` | Le prénom du titulaire du compte, par exemple Karim. |
 | `password` | La version protégée, dite hachée, du mot de passe. Elle sert à vérifier la connexion. |
+| `two_factor_secret` | Le secret privé utilisé pour vérifier les codes de double authentification. Vide tant qu’elle n’est pas configurée. |
+| `two_factor_recovery_codes` | Les codes privés de secours pour se connecter si le moyen habituel de double authentification est indisponible. |
+| `two_factor_confirmed_at` | La date où la personne a confirmé sa double authentification. |
 | `phone` | Le numéro de téléphone du compte. |
 | `email_verified_at` | La date où l’adresse e-mail a été confirmée. |
 | `phone_verified_at` | La date où le numéro de téléphone a été confirmé. |
@@ -794,7 +801,7 @@ La liste des boutiques : leur nom, leur propriétaire, leur état et les informa
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 | `deleted_at` | La date où cette ligne a été retirée de l’utilisation courante tout en restant conservée dans la base. |
 
-### 4. `domains` — 12 champs
+### 4. `domains` — 13 champs
 
 Les adresses Internet des boutiques. Elle indique à quelle boutique appartient chaque adresse.
 
@@ -809,6 +816,7 @@ Les adresses Internet des boutiques. Elle indique à quelle boutique appartient 
 | `verification_status` | L’état de vérification permettant de confirmer que cette adresse peut être utilisée. Choix : 1 = en attente ; 2 = vérifié ; 3 = échec ; 4 = expiré ; 5 = incomplet. |
 | `verified_at` | La date où le contrôle de cette adresse a été validé. |
 | `certificate_status` | L’état du certificat de sécurité HTTPS de cette adresse. Choix : 1 = en attente ; 2 = actif ; 3 = erreur ; 4 = expiré. |
+| `primary_slot` | Une valeur calculée par MySQL : 1 pour l’adresse principale non archivée, vide pour les autres. Avec tenant_id, elle empêche deux adresses principales dans la même boutique. |
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 | `deleted_at` | La date où cette ligne a été retirée de l’utilisation courante tout en restant conservée dans la base. |
@@ -874,7 +882,7 @@ Les groupes d’autorisations. Exemple : le rôle « gestionnaire des abonnement
 | `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `super_admin_slot` | Vaut 1 pour le rôle racine et reste vide pour les autres. Cette valeur calculée empêche d’avoir deux rôles racines dans cette base. |
-| `permission_signature` | Une empreinte des actions et de leurs durées, utilisée pour refuser deux rôles identiques même s’ils ont des noms différents. |
+| `permission_signature` | Une empreinte des actions et de leurs durées, utilisée pour refuser deux rôles identiques même s’ils ont des noms différents. La migration centrale la stocke en CHAR(255) ; la migration boutique utilise CHAR(64). |
 | `name` | Le nom technique qui reconnaît ce rôle. |
 | `guard_name` | L’espace d’authentification auquel ce rôle ou cette permission appartient. Ici : central, pour le SaaS. |
 | `label` | Le nom lisible affiché à l’utilisateur, à la place du code technique. |
@@ -1469,7 +1477,7 @@ Les 37 commits jusqu’à 374bbac et les notes servent à préserver les contrai
 
 Décisions confirmées : first_name/last_name pour les personnes centrales et locales, tenants.shop_name pour chaque boutique et shop.shop_name pour sa projection ; retrait de legal_name/tax_regime du profil central courant et des nouveaux formats de snapshot ; retrait de feature_overrides au central et de permission_overrides au central et dans chaque boutique. Les quotas viennent de l’offre et plan_features. Les cinq tables Spatie sont conservées dans chaque BDD ; admin_restrictions reste uniquement centrale. Durées par permission de rôle, 9999 jours par défaut et au maximum ; noms uniques ; compositions identiques en permissions/durées refusées ; plusieurs rôles par compte sans aucune permission commune. La fin est calculée depuis la date d’attribution propre à cette personne. Aucun registre d’exceptions caché ni nouvelle table n’est ajouté.
 
-**Portée et compatibilité :** la dernière instruction étend les règles aux boutiques. La BDD centrale passe de 30 à 28 tables, 465 champs ; chaque boutique passe de 60 à 59 tables, 1005 champs. users, roles et les trois pivots sont adaptés dans chaque contexte ; shop.name devient shop.shop_name sans créer une seconde source publique. Les autres définitions sont conservées. Toutes les boutiques gardent le même schéma, mais leurs rôles/permissions/dates sont indépendants ; les noms/compositions identiques entre BDD sont permis. Les invitations commencent les durées à leur acceptation, conservent un début existant et refusent les recoupements. Identifiants/UUID, guards, audit, propriété, quotas, facturation, stock et référentiels publics gardent leurs protections. PermissionEffectEnum est retiré du catalogue actif ; OverrideStatusEnum reste utilisé par admin_restrictions.
+**Portée et compatibilité :** la dernière instruction étend les règles aux boutiques. La BDD centrale passe de 30 à 28 tables, 465 champs dans cette révision historique (469 avec les quatre colonnes existantes représentées le 8 octobre 2026) ; chaque boutique passe de 60 à 59 tables, 1005 champs. users, roles et les trois pivots sont adaptés dans chaque contexte ; shop.name devient shop.shop_name sans créer une seconde source publique. Les autres définitions sont conservées. Toutes les boutiques gardent le même schéma, mais leurs rôles/permissions/dates sont indépendants ; les noms/compositions identiques entre BDD sont permis. Les invitations commencent les durées à leur acceptation, conservent un début existant et refusent les recoupements. Identifiants/UUID, guards, audit, propriété, quotas, facturation, stock et référentiels publics gardent leurs protections. PermissionEffectEnum est retiré du catalogue actif ; OverrideStatusEnum reste utilisé par admin_restrictions.
 
 **Préparation future, aucune migration exécutée :** si des données existent dans chaque BDD, établir le sens réel de l’ancien users.name avant sa correspondance vers last_name ; ne pas découper arbitrairement un nom complet. Conserver first_name et les noms publics des boutiques ; shop.name est renommé en shop_name sans changer sa valeur. Ne pas réécrire anciens snapshots/PDF/audits. Pour les attributions, récupérer les dates réelles prouvées ; une date inconnue bloque la bascule jusqu’à une décision explicite, sans prolonger un droit par la date d’import. Calculer signatures, contrôler noms/compositions/recoupements et résoudre les conflits avant UNIQUE/CHECK. Ne pas convertir une ancienne permission temporaire en 9999 jours : reconstruire une composition/durée/datation équivalente quand cela est possible, sinon signaler le cas sans élargir le droit. Une ancienne interdiction exige une décision explicite de retrait/remplacement du droit/rôle ; au central seulement, une restriction de cible compatible peut conserver son sens ; elle n’est pas convertie en autorisation. Les exceptions de quota requièrent une offre/version adaptée et une souscription cohérente. Archiver les décisions remplacées et leurs audits ; aucune suppression physique de donnée ne découle de ces documents.
 

@@ -85,9 +85,9 @@ Cet extrait illustre les types ; il ne remplace pas les autres champs/contrainte
 
 - Déclaration UUID centralisée : `$table->uuid('uuid');` utilise `App\Services\SchemaBlueprint`, enregistré dans `AppServiceProvider` pour tous les constructeurs de schéma, y compris les connexions boutiques créées ensuite. Cette déclaration produit un CHAR(36) ASCII avec collation `ascii_bin` et index UNIQUE. Seul le champ public nommé `uuid` reçoit cette unicité automatique ; les références UUID distinctes gardent leurs contraintes documentées. La génération UUID v4 et son immuabilité dans les modèles restent assurées par `HasPublicUuid` ; `id` reste la PK auto-incrémentée.
 - `bigint_unsigned` dans Mermaid signifie BIGINT UNSIGNED ; `tinyint_unsigned` signifie TINYINT UNSIGNED, créé par unsignedTinyInteger. Le type bigint signé reste adapté aux quantités/deltas signés décrits ailleurs. Les deux côtés d’une FK ont exactement le même type.
-- `varchar` non dimensionné signifie VARCHAR(255) et se déclare avec `$table->string('champ');`, sans longueur explicite, y compris pour les slugs, noms/guards Spatie et codes extensibles. Un index UNIQUE est déjà un index : il ne reçoit pas de second index identique. Les formats fixes des codes ISO, couleurs, empreintes et UUID conservent leurs types et collations ; leurs règles de validation restent applicables. Téléphones, codes géographiques, références externes et NIF/NIS/RC sont des chaînes. Le token de session suit le helper Laravel `rememberToken()` : VARCHAR(100), sans longueur écrite dans la migration.
-- Pays historiques : CHAR(2) ISO ; devise CHAR(3) ISO ; couleur CHAR(7) ; SHA-256 CHAR(64) ASCII. country_code reste conservé dans les snapshots juridiques/commerciaux, indépendamment de users.country_id.
-- Décimaux : `SchemaBlueprint` définit une fois la précision commune DECIMAL(14,2). Les migrations écrivent simplement `$table->decimal('amount');`, sans répéter `14, 2`. Cette précision conserve les centimes et les montants jusqu'à 999 999 999 999,99 ; revenir au défaut Laravel DECIMAL(8,2) réduirait cette capacité. Poids, dimensions et quantités mesurées conservent leurs trois décimales via `places: 3` ; decimal_geo=DECIMAL(10,7) reste le format canonique des coordonnées contenues dans les données structurées. Aucun flottant pour l'argent.
+- `varchar` non dimensionné signifie VARCHAR(255) et se déclare avec `$table->string('champ');`, sans longueur explicite, y compris pour les slugs, noms/guards Spatie et codes extensibles. `char` non dimensionné correspond à `$table->char('champ');`, soit CHAR(255) avec la configuration Laravel actuelle. Un index UNIQUE est déjà un index : il ne reçoit pas de second index identique. Téléphones, codes géographiques, références externes et NIF/NIS/RC sont des chaînes. Le token de session suit le helper Laravel `rememberToken()` : VARCHAR(100), sans longueur écrite dans la migration.
+- Synchronisation des types avec les migrations du 8 octobre 2026 : les codes pays/devise, couleurs et empreintes déclarés avec `char('champ')` sont stockés en CHAR(255). Leur format métier reste ISO alpha-2 pour les pays, ISO alpha-3 pour les devises, `#RRGGBB` pour les couleurs et 64 caractères hexadécimaux pour une empreinte SHA-256 ; cette validation ne fixe pas la taille SQL. Les exceptions explicitement conservées sont `tenant.invoices.currency` en CHAR(3) et `tenant.roles.permission_signature` en CHAR(64). `central.roles.permission_signature` est CHAR(255). Les UUID restent CHAR(36) ASCII/`ascii_bin`. `country_code` reste conservé dans les snapshots juridiques/commerciaux, indépendamment de `users.country_id`. Cette mise à jour décrit les migrations existantes, sans modifier les tables Spatie.
+- Décimaux : `SchemaBlueprint` définit une fois la précision commune DECIMAL(14,2). Les migrations écrivent simplement `$table->decimal('amount');`, sans répéter `14, 2`. Cette précision conserve les centimes et les montants jusqu'à 999 999 999 999,99 ; revenir au défaut Laravel DECIMAL(8,2) réduirait cette capacité. Les poids et dimensions des variantes, ainsi que le poids du colis, utilisent désormais aussi DECIMAL(14,2), donc deux décimales. Seul `products.content_quantity` conserve DECIMAL(14,3) via `places: 3` ; ce type est indiqué explicitement dans les diagrammes. `decimal` sans taille y signifie DECIMAL(14,2). `decimal_geo=DECIMAL(10,7)` reste le format canonique des coordonnées contenues dans les données structurées JSON, sans colonne SQL supplémentaire. Aucun flottant pour l'argent.
 - Booléens : `true`/`false` dans les valeurs PHP et les valeurs par défaut ; `TRUE`/`FALSE` dans les expressions SQL. MySQL conserve son stockage natif TINYINT(1). Les codes de statuts, types et compteurs restent numériques ; aucune généralisation supplémentaire des enums n'est demandée. `id()` crée déjà une PK unique, sans index UNIQUE supplémentaire ; les unicités composites nécessaires aux FK restent présentes. `features.code` utilise `string('code')->unique()`, sans limite 100 ni second index identique.
 - datetime=DATETIME UTC sans microsecondes : `$table->dateTime('champ');`, sans argument de précision. date reste un jour civil ; statistiques calendaires en Africa/Algiers avec bornes converties en UTC. Les instants et jours ne sont pas confondus. Les calculs d'expiration et l'ordre des événements ne dépendent pas de microsecondes ; utiliser les clés numériques et versions documentées pour départager des événements de la même seconde.
 - timestamp=TIMESTAMP sans microsecondes pour les dates techniques Laravel. `timestamps()` crée `created_at` et `updated_at` nullable ; `softDeletes()` crée `deleted_at` nullable uniquement pour les tables déjà prévues avec archivage. Les journaux qui possèdent seulement `created_at` conservent un timestamp obligatoire, sans ajout d'`updated_at` ni de suppression logique. Les dates métier, notamment `assigned_at`, `expires_at` et les échéances, restent des DATETIME. Les stubs de création courante utilisent `id()`, `uuid('uuid')`, `timestamps()` et `softDeletes()` ; les pivots et journaux suivent leurs exceptions documentées.
@@ -399,11 +399,11 @@ erDiagram
     countries {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        char(2) code UK "ISO 3166-1 alpha-2"
+        char code UK "ISO 3166-1 alpha-2"
         varchar name_fr
         varchar name_en
         varchar name_ar "nullable"
-        boolean is_active
+        boolean is_active "DEFAULT FALSE ; DZ active par le seeder"
         timestamp created_at "nullable"
         timestamp updated_at "nullable"
   timestamp deleted_at "nullable"
@@ -415,6 +415,9 @@ erDiagram
         varchar first_name "nullable"
         varchar email UK
         varchar password
+        text two_factor_secret "nullable"
+        text two_factor_recovery_codes "nullable"
+        timestamp two_factor_confirmed_at "nullable"
         varchar phone "nullable"
         datetime email_verified_at "nullable"
         datetime phone_verified_at "nullable"
@@ -450,7 +453,7 @@ erDiagram
         bigint_unsigned profile_version
         varchar document_prefix UK
         varchar creation_key
-        char(64) creation_hash
+        char creation_hash
         tinyint_unsigned status "TenantStatusEnum"
         boolean is_primary
         int activation_priority "nullable"
@@ -472,6 +475,7 @@ erDiagram
         tinyint_unsigned verification_status "VerificationStatusEnum"
         datetime verified_at "nullable"
         tinyint_unsigned certificate_status "nullable ; CertificateStatusEnum"
+        tinyint_unsigned primary_slot "nullable ; generated STORED ; 1 si principal non archive, sinon NULL"
         timestamp created_at "nullable"
         timestamp updated_at "nullable"
         timestamp deleted_at "nullable"
@@ -501,7 +505,7 @@ erDiagram
 - **`uuid`** : identifiant public unique et indexé, utilisé dans les routes, formulaires, exports et ressources JSON.
 - **`code`** : code ISO unique ; le nom traduit est séparé du code.
 - **`name_fr / name_en / name_ar`** : noms affichables ; le nom arabe peut être complété ultérieurement.
-- **`is_active`** : pays disponible à la sélection, sans activer automatiquement un nouveau marché ou une devise.
+- **`is_active`** : pays disponible à la sélection, sans activer automatiquement un nouveau marché ou une devise. La colonne a le défaut SQL `FALSE` ; `CountrySeeder` active explicitement DZ au lancement.
 
 **Pays de référence confirmés par le propriétaire du projet :** DZ (Algérie), FR (France), SA (Arabie saoudite), SD (Soudan), EG (Égypte).
 
@@ -522,6 +526,9 @@ erDiagram
 - **`last_name / first_name`** : nom de famille et prénom du titulaire du compte central. Le nom de chaque boutique est `tenants.shop_name`.
 - **`email`** : e-mail normalisé et unique dans cette base ; ne garantit aucune identité dans une boutique.
 - **`password / remember_token`** : hachage du mot de passe et secret de session Laravel ; exclus des activités et du JSON.
+- **`two_factor_secret`** : secret privé utilisé pour les codes de double authentification ; nullable avant configuration.
+- **`two_factor_recovery_codes`** : codes privés de secours pour cette double authentification ; nullable avant configuration.
+- **`two_factor_confirmed_at`** : date technique TIMESTAMP de confirmation de la double authentification ; nullable avant confirmation. Ces trois colonnes proviennent de la migration centrale existante `add_two_factor_columns_to_users_table` ; aucun champ équivalent n'est ajouté à la boutique.
 - **`phone / email_verified_at / phone_verified_at / whatsapp_verified_at`** : contact et dates de vérification.
 - **`country_id`** : FK numérique locale vers countries ; remplace le code pays directement sur users.
 - **`locale`** : langue choisie, conservée comme code de langue extensible.
@@ -554,6 +561,7 @@ erDiagram
 - **`domain`** : hôte normalisé (IDNA si nécessaire), sans protocole, chemin ou port ; UNIQUE global.
 - **`type / verification_status / certificate_status`** : enums séparés pour type d’adresse, preuve de contrôle et état HTTPS.
 - **`is_primary / verified_at`** : un seul domaine principal actif par tenant, date de vérification.
+- **`primary_slot`** : colonne nullable calculée STORED par `CASE WHEN is_primary = TRUE AND deleted_at IS NULL THEN 1 ELSE NULL END`. L'unicité composite `(tenant_id,primary_slot)` garantit au plus un domaine principal non archivé par boutique, tout en autorisant plusieurs autres domaines. La valeur est produite par MySQL, jamais fournie par un formulaire.
 - **`created_at / updated_at / deleted_at`** : historique et retrait logique contrôlé.
 
 **`contact_verifications` :**
@@ -625,7 +633,7 @@ erDiagram
         boolean is_super_admin
         tinyint_unsigned super_admin_slot UK "generated nullable ; 1 si is_super_admin"
         bigint_unsigned permission_version
-        char(64) permission_signature UK "NOT NULL ; SHA-256 permissions+durees ; UNIQUE guard_name+signature"
+        char permission_signature UK "NOT NULL ; SHA-256 permissions+durees ; UNIQUE guard_name+signature"
         timestamp created_at "nullable"
         timestamp updated_at "nullable"
     }
@@ -1060,7 +1068,7 @@ erDiagram
         json taxes "ventilation fiscale historique"
         decimal tax_amount
         decimal total_amount
-        char(3) currency "DZD au lancement"
+        char currency "DZD au lancement"
         tinyint_unsigned status "DocumentStatusEnum"
         text reason "nullable facture ; motif requis avoir"
         datetime period_starts_at
@@ -1175,12 +1183,12 @@ erDiagram
         tinyint_unsigned transfer_status "SaasTransferStatusEnum"
         tinyint_unsigned refund_reason "nullable paiement ; SaasRefundReasonEnum"
         decimal amount "signe ; positif hors inverse comptable"
-        char(3) currency "DZD au lancement"
+        char currency "DZD au lancement"
         text reason "nullable declaration paiement ; requis remboursement/refus/correction"
         varchar transfer_reference "nullable avant verification"
         varchar financial_account_key "nullable avant verification ; alias compte SaaS"
-        char(64) transaction_fingerprint "nullable avant verification ; transaction normalisee"
-        char(64) active_transaction_fingerprint UK "generated STORED ; nullable ; VERIFIED sans reversal_of_id, sinon NULL"
+        char transaction_fingerprint "nullable avant verification ; transaction normalisee"
+        char active_transaction_fingerprint UK "generated STORED ; nullable ; VERIFIED sans reversal_of_id, sinon NULL"
         text encrypted_transfer_details "nullable ; donnees bancaires minimales chiffrees"
         datetime occurred_at "nullable avant preuve ; date du transfert reel"
         datetime sending_started_at "nullable ; remboursement reel seulement"
@@ -1402,7 +1410,7 @@ erDiagram
         boolean is_primary
         tinyint_unsigned primary_slot "generated nullable ; 1 si principal actif"
         bigint_unsigned created_by_id FK "nullable ; users.id"
-        char(64) file_hash "nullable"
+        char file_hash "nullable"
         timestamp created_at "nullable"
         timestamp updated_at "nullable"
         timestamp deleted_at "nullable"
@@ -1580,7 +1588,7 @@ erDiagram
         varchar contact_phone "nullable"
         varchar contact_whatsapp "nullable"
         varchar locale
-        char(3) currency
+        char currency
         varchar timezone
         varchar theme_code
         json colors
@@ -1790,7 +1798,7 @@ erDiagram
         int position
         boolean is_primary
         tinyint_unsigned primary_slot "generated nullable ; 1 si principal actif"
-        char(64) file_hash "nullable"
+        char file_hash "nullable"
         timestamp created_at "nullable"
         timestamp updated_at "nullable"
         timestamp deleted_at "nullable"
@@ -1829,7 +1837,7 @@ erDiagram
         boolean allows_customization
         text customization_instructions "nullable"
         varchar sale_unit
-        decimal content_quantity "nullable"
+        decimal content_quantity "nullable ; DECIMAL(14,3)"
         varchar content_unit "nullable"
         tinyint_unsigned status "PublicationStatusEnum"
         datetime published_at "nullable"
@@ -1848,7 +1856,7 @@ erDiagram
         varchar label
         varchar sku
         varchar barcode "nullable"
-        char(64) combination_signature "SHA-256 canonique ; ASCII"
+        char combination_signature "SHA-256 canonique ; valeur hexadecimale"
         datetime used_at "nullable ; identité physique figée après première utilisation"
         decimal sale_price
         decimal unit_cost
@@ -1996,7 +2004,7 @@ erDiagram
         varchar name "nom de l axe ou libelle de la valeur"
         varchar identity_code "nullable pour AXIS ; identite stable VALUE dans son axe"
         tinyint_unsigned display_type "nullable pour VALUE ; OptionDisplayTypeEnum requis AXIS"
-        char(7) color_hex "nullable ; VALUE couleur seulement"
+        char color_hex "nullable ; VALUE couleur seulement"
         int position
         timestamp created_at "nullable"
         timestamp updated_at "nullable"
@@ -2341,7 +2349,7 @@ erDiagram
         bigint_unsigned sales_page_id FK "nullable ; content_pages.id ; page_kind=2 SALES"
         int quantity
         text customization_text "nullable ; demande libre du client"
-        char(64) customization_signature
+        char customization_signature
         timestamp created_at "nullable"
         timestamp updated_at "nullable"
     }
@@ -2418,7 +2426,7 @@ erDiagram
         varchar number
         varchar data_policy_version
         datetime data_notice_acknowledged_at
-        char(64) notice_text_hash "SHA-256 hex nullable si snapshot/version suffisamment probants"
+        char notice_text_hash "SHA-256 hex nullable si snapshot/version suffisamment probants"
         int original_incident_quantity "nullable"
         varchar replacement_reason "nullable"
         tinyint_unsigned order_type "OrderTypeEnum"
@@ -2427,7 +2435,7 @@ erDiagram
         datetime validated_at "nullable ; date du clic Valider"
         datetime operationally_confirmed_at "nullable"
         varchar submission_key
-        char(64) submission_hash "SHA-256 hex 64"
+        char submission_hash "SHA-256 hex 64"
         int lock_version
         boolean retention_hold
         text retention_hold_reason "nullable"
@@ -2445,8 +2453,8 @@ erDiagram
         uuid province_uuid "REF central.geographic_areas.uuid"
         uuid municipality_uuid "REF central.geographic_areas.uuid"
         int revision_number
-        char(3) currency
-        char(2) country_code
+        char currency
+        char country_code
         json legal_seller_snapshot
         json shipping_tax_snapshot
         text reason "nullable"
@@ -3075,7 +3083,7 @@ erDiagram
         varchar raw_external_status "nullable"
         varchar adapter_version
         json sanitized_external_payload "nullable"
-        char(64) payload_hash
+        char payload_hash
         datetime payload_expires_at "nullable"
         datetime payload_purged_at "nullable"
         text reason "nullable"
@@ -3180,7 +3188,7 @@ erDiagram
         varchar operation_key
         json sanitized_request "metadonnees techniques uniquement"
         text encrypted_personal_request "nullable after purge ou sans donnees personnelles"
-        char(64) request_hash
+        char request_hash
         datetime request_expires_at "nullable si aucun payload personnel"
         datetime request_purged_at "nullable"
         varchar merchant_reference "nullable hors colis"
@@ -3643,7 +3651,7 @@ erDiagram
 
 **Conservation et intégration :** schéma Spatie v5, attribute_changes distinct de properties, morph map explicite, filtres de secrets et journal append-only. La colonne performed_at est une extension locale à migrer/caster explicitement ; la table centrale ne change pas. Le thème standard, logo et couleurs restent dans shop ; la personnalisation avancée du thème est une évolution sans table au lancement.
 
-**Compatibilité Activitylog locale :** les 17 colonnes de T15 conservent les attributs natifs Spatie v5. `performed_at` est une extension de cette BDD tenant ; le modèle Activity local la caste en date UTC à précision microseconde en conservant les casts hérités de `properties` et `attribute_changes`. Le service renseigne cette date par `tap` ou le hook applicatif contrôlé avant insertion, puis la vérifie avec le contrat privacy. Il ne remplace ni `created_at` ni la configuration du journal central. `CHECK(log_name <> 'privacy' OR performed_at IS NOT NULL)` et les contrôles de propriétés sont requis. Les couples `subject_type/subject_id` et `causer_type/causer_id` sont soit complets, soit tous deux NULL ; le sujet et l’acteur sont vérifiés dans cette connexion. Un lot utilise une référence de sélection sécurisée et des catégories/quantités, pas une copie des données de chaque personne. Une transition sensible et sa trace restent dans la même transaction, avec buffering désactivé.
+**Compatibilité Activitylog locale :** les 17 colonnes de T15 conservent les attributs natifs Spatie v5. `performed_at` est une extension de cette BDD tenant, stockée en DATETIME UTC sans microsecondes par la migration actuelle. Les casts hérités de `properties` et `attribute_changes` sont conservés. Le service renseigne cette date par `tap` ou le hook applicatif contrôlé avant insertion, puis la vérifie avec le contrat privacy. Il ne remplace ni `created_at` ni la configuration du journal central. `CHECK(log_name <> 'privacy' OR performed_at IS NOT NULL)` et les contrôles de propriétés sont requis. Les couples `subject_type/subject_id` et `causer_type/causer_id` sont soit complets, soit tous deux NULL ; le sujet et l’acteur sont vérifiés dans cette connexion. Un lot utilise une référence de sélection sécurisée et des catégories/quantités, pas une copie des données de chaque personne. Une transition sensible et sa trace restent dans la même transaction, avec buffering désactivé.
 
 ### T16 — Frais transporteur, créances et preuve d’encaissement
 
@@ -4063,7 +4071,7 @@ erDiagram
         bigint_unsigned order_id FK "orders.id"
         bigint_unsigned revision_id FK "order_revisions.id"
         varchar sales_terms_version
-        char(64) terms_hash
+        char terms_hash
         datetime accepted_at
         tinyint_unsigned acceptance_mode "TermsAcceptanceModeEnum"
         json sanitized_proof "nullable"
@@ -5624,7 +5632,7 @@ Cette révision remplace seulement les prescriptions boutique incompatibles des 
 
 | Table | Champs retirés ou transférés | Champs ajoutés ou types adaptés |
 |---|---|---|
-| cart_items | customization | customization_text, customization_signature : varchar → char(64) |
+| cart_items | customization | customization_text, customization_signature : varchar → char(64) dans cette révision historique ; char sans taille (CHAR(255)) dans les migrations actuelles |
 | orders | customer_confirmed_at, customer_confirmation_mode, cancelled_at | confirmed_revision_id, validated_at |
 | order_items | customization_snapshot | customization_text |
 | shipments | acknowledged_at, acknowledgement_source, delivery_proof_media_id, external_delivery_proof_reference, proof_hash | — |
@@ -5666,7 +5674,7 @@ La boutique passe de 77 à **68 tables**, en gardant les fonctions validées en 
 | shop_addresses | address, postal_code, latitude, longitude, map_url, phone, opening_hours | shop_address_id, record_type, shop_address_type, position, payload, primary_slot |
 | social_links | Table regroupée ; modèle logique conservé lorsque prévu | — |
 | content_pages | — | product_id, page_kind, canonical_url |
-| product_variants | — | combination_signature : varchar → char(64) |
+| product_variants | — | combination_signature : varchar → char(64) dans cette révision historique ; char sans taille (CHAR(255)) dans les migrations actuelles |
 | product_options | — | parent_id, record_type, parent_record_type, identity_code, color_hex |
 | option_values | Table regroupée ; modèle logique conservé lorsque prévu | — |
 | variant_option_values | — | option_record_type, value_record_type |
