@@ -6,6 +6,7 @@ use App\Enums\Central\Tenants\StatusEnum;
 use App\Models\Central\Country;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Central\TenantProvisioner;
 use Carbon\CarbonImmutable;
 use Database\Seeders\LocalFixtureSeeder;
 use Database\Seeders\Tenant\LocalDevelopmentSeeder as ShopSeeder;
@@ -50,6 +51,8 @@ class LocalDevelopmentSeeder extends LocalFixtureSeeder
                 $tenant = $connection->transaction(fn (): Tenant => Tenant::create([
                     ...$attributes, 'creation_hash' => hash('sha256', $this->json($attributes)),
                 ]));
+            } elseif (in_array($tenant->status, [StatusEnum::PROVISIONING, StatusEnum::PROVISIONING_FAILED], true)) {
+                app(TenantProvisioner::class)->provision($tenant);
             }
 
             $tenant = $tenant->fresh() ?? throw new LogicException('Missing tenant after provisioning.');

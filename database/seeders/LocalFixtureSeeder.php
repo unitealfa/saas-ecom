@@ -20,7 +20,7 @@ abstract class LocalFixtureSeeder extends Seeder
     /** @param array<string, mixed> $attributes */
     protected function insert(Connection $connection, string $table, array $attributes, bool $updatedAt = true): int
     {
-        $timestamps = ['created_at' => now()->format('Y-m-d H:i:s.u')];
+        $timestamps = ['created_at' => now()->format('Y-m-d H:i:s')];
 
         if ($updatedAt) {
             $timestamps['updated_at'] = $timestamps['created_at'];

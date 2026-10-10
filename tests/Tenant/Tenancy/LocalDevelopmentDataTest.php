@@ -1,10 +1,13 @@
 <?php
 
 use App\Models\Tenant;
+use App\Models\Tenant\User as ShopUser;
 use App\Models\User;
 use App\Services\Tenant\DatabaseDiagnostics;
+use Carbon\CarbonImmutable;
 use Database\Seeders\Central\LocalDevelopmentSeeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -27,6 +30,7 @@ afterEach(function (): void {
 
 test('local fixtures populate coherent owners shops stock returns and billing without duplicates', function (): void {
     Storage::fake('local');
+    $this->travelTo(CarbonImmutable::parse('2026-10-08 12:00:00.900000', 'UTC'));
     $this->seed(LocalDevelopmentSeeder::class);
     expect(User::count())->toBe(3)->and(Tenant::count())->toBe(2);
     $this->assertDatabaseCount('domains', 2);
@@ -49,6 +53,12 @@ test('local fixtures populate coherent owners shops stock returns and billing wi
             expect(json_decode($profile->colors, true, flags: JSON_THROW_ON_ERROR))->toEqual(['primary' => '#2563EB', 'secondary' => '#FFFFFF']);
             expect($profile->cart_lifetime_days)->toBe(7);
             expect($db->table('products')->count())->toBe(20);
+            expect($db->table('products')->value('created_at'))->toBe('2026-10-08 12:00:00');
+            $address = json_decode($db->table('shop_addresses')->where('record_type', 1)->soleValue('payload'), true, flags: JSON_THROW_ON_ERROR);
+            expect($address['schema_version'])->toBe(1);
+            expect($address['address'])->toBe('Adresse fictive, Alger Centre');
+            $social = json_decode($db->table('shop_addresses')->where('record_type', 2)->soleValue('payload'), true, flags: JSON_THROW_ON_ERROR);
+            expect($social)->toEqual(['schema_version' => 1, 'network' => 'instagram', 'url' => 'https://example.test/local-shop']);
             expect($db->table('orders')->count())->toBe(50);
             expect($db->table('invoices')->count())->toBe(17);
             expect($db->table('order_returns')->count())->toBe(2);
@@ -80,6 +90,37 @@ test('local fixtures populate coherent owners shops stock returns and billing wi
     foreach (Tenant::get() as $tenant) {
         $tenant->run(fn () => expect(DB::connection('tenant')->table('orders')->count())->toBe(50));
     }
+});
+
+test('local seeding resumes failed provisioning without replacing the registered shop', function (): void {
+    Storage::fake('local');
+    $failOnce = true;
+    Event::listen('eloquent.creating: '.ShopUser::class, function () use (&$failOnce): void {
+        if ($failOnce) {
+            $failOnce = false;
+            throw new LogicException('Local owner initialization failed.');
+        }
+    });
+    expect(fn () => $this->seed(LocalDevelopmentSeeder::class))
+        ->toThrow(LogicException::class, 'Local owner initialization failed.');
+    $reservation = Tenant::sole();
+    $identity = [$reservation->id, $reservation->uuid, $reservation->user_id, $reservation->database()->getName()];
+
+    $this->seed(LocalDevelopmentSeeder::class);
+
+    $restored = $reservation->fresh();
+    expect([$restored->id, $restored->uuid, $restored->user_id, $restored->database()->getName()])->toBe($identity);
+    $this->assertDatabaseCount('users', 3);
+    $this->assertDatabaseCount('tenants', 2);
+    $this->assertDatabaseCount('domains', 2);
+    $restored->run(function () use ($restored): void {
+        $this->assertDatabaseCount('shop', 1, 'tenant');
+        $this->assertDatabaseCount('users', 2, 'tenant');
+        $this->assertDatabaseCount('products', 20, 'tenant');
+        $this->assertDatabaseCount('orders', 50, 'tenant');
+        expect(DB::connection('tenant')->table('shop')->soleValue('tenant_uuid'))->toBe($restored->uuid);
+        expect(ShopUser::where('central_user_uuid', $restored->owner->uuid)->count())->toBe(1);
+    });
 });
 
 test('local seeding is refused in production before inserting accounts', function (): void {

@@ -168,12 +168,12 @@ class LocalDevelopmentSeeder extends LocalFixtureSeeder
             'shop_id' => $shop, 'record_type' => 1, 'label' => 'Magasin fictif', 'position' => 0,
             'province_uuid' => $this->province->uuid, 'municipality_uuid' => $this->municipality->uuid,
             'is_primary' => true, 'visible' => true,
-            'payload' => $this->json(['address' => 'Adresse fictive, Alger Centre', 'map_url' => null]),
+            'payload' => $this->json(['schema_version' => 1, 'address' => 'Adresse fictive, Alger Centre', 'map_url' => null]),
         ]);
         $this->insert($this->db, 'shop_addresses', [
             'shop_id' => $shop, 'record_type' => 2, 'label' => 'Instagram — exemple', 'position' => 1,
             'is_primary' => false, 'visible' => false,
-            'payload' => $this->json(['platform' => 'instagram', 'url' => 'https://example.test/local-shop']),
+            'payload' => $this->json(['schema_version' => 1, 'network' => 'instagram', 'url' => 'https://example.test/local-shop']),
         ]);
         $this->insert($this->db, 'content_pages', [
             'page_kind' => 1, 'slug' => 'conditions-essai', 'type' => 'sales_terms', 'title' => 'Conditions fictives locales',
