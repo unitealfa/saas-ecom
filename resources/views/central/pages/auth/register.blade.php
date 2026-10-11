@@ -31,6 +31,13 @@
             />
 
             <!-- Password -->
+            <flux:select name="country_uuid" label="Pays" required>
+                <option value="">Sélectionnez votre pays</option>
+                @foreach ($countries as $country)
+                    <option value="{{ $country->uuid }}" @selected(old('country_uuid') === $country->uuid)>{{ $country->name_fr }}</option>
+                @endforeach
+            </flux:select>
+
             <flux:input
                 name="password"
                 :label="__('Password')"

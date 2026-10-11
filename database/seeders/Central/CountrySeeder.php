@@ -13,15 +13,16 @@ class CountrySeeder extends Seeder
     public function run(): void
     {
         foreach ([
-            ['DZ', 'Algérie', 'Algeria', true],
-            ['FR', 'France', 'France', false],
-            ['SA', 'Arabie saoudite', 'Saudi Arabia', false],
-            ['SD', 'Soudan', 'Sudan', false],
-            ['EG', 'Égypte', 'Egypt', false],
-        ] as [$code, $french, $english, $active]) {
-            Country::firstOrCreate(['code' => $code], [
+            ['DZ', 'Algérie', 'Algeria', 'الجزائر', true],
+            ['FR', 'France', 'France', 'فرنسا', false],
+            ['SA', 'Arabie saoudite', 'Saudi Arabia', 'السعودية', false],
+            ['SD', 'Soudan', 'Sudan', 'السودان', false],
+            ['EG', 'Égypte', 'Egypt', 'مصر', false],
+        ] as [$code, $french, $english, $arabic, $active]) {
+            Country::withTrashed()->firstOrCreate(['code' => $code], [
                 'name_fr' => $french,
                 'name_en' => $english,
+                'name_ar' => $arabic,
                 'is_active' => $active,
             ]);
         }

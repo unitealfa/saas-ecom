@@ -8,6 +8,8 @@ use App\Models\Central\Country;
 use App\Models\User;
 use App\Services\Central\DefaultSubscription;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 
 class CreateNewUser implements CreatesNewUsers
@@ -26,15 +28,20 @@ class CreateNewUser implements CreatesNewUsers
         Validator::make($input, [
             ...$this->profileRules(),
             'password' => $this->passwordRules(),
+            'country_uuid' => ['required', 'uuid', Rule::exists(Country::class, 'uuid')->where('is_active', true)->whereNull('deleted_at')],
         ])->validate();
 
         return (new User)->getConnection()->transaction(function () use ($input): User {
+            $country = Country::where('uuid', $input['country_uuid'])->where('is_active', true)->lockForUpdate()->first();
+            if ($country === null) {
+                throw ValidationException::withMessages(['country_uuid' => 'Ce pays n’est plus disponible.']);
+            }
             $user = new User([
                 'name' => $input['name'],
                 'email' => $input['email'],
                 'password' => $input['password'],
             ]);
-            $user->country_id = Country::where('code', 'DZ')->where('is_active', true)->firstOrFail()->id;
+            $user->country_id = $country->id;
             $user->save();
             $this->subscriptions->ensure($user);
 

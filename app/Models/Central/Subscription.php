@@ -62,7 +62,7 @@ class Subscription extends Model
     /** @return BelongsTo<Plan, $this> */
     public function plan(): BelongsTo
     {
-        return $this->belongsTo(Plan::class, 'plan_id');
+        return $this->belongsTo(Plan::class, 'plan_id')->withTrashed();
     }
 
     /** @return BelongsTo<User, $this> */

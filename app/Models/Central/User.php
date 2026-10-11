@@ -100,6 +100,18 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return $this->hasMany(Tenant::class, 'user_id');
     }
 
+    /** @return HasMany<Subscription, $this> */
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class, 'user_id');
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function legalVerifier(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'legal_verified_by_id')->withTrashed();
+    }
+
     /**
      * Get the attributes that should be cast.
      *

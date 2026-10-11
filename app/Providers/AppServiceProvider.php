@@ -41,6 +41,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(\App\Models\Central\User::class, UserPolicy::class);
         Gate::policy(Role::class, RolePolicy::class);
+        Gate::policy(\App\Models\Central\Country::class, \App\Policies\Central\CountryPolicy::class);
         Gate::policy(Tenant::class, TenantPolicy::class);
         $this->configureDefaults();
     }

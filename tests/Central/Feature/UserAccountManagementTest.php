@@ -149,7 +149,7 @@ test('staff edits require the staff permission and cannot take over a more privi
     $reader->assignRole(Role::findByName('user-reader'));
     $delegator = User::factory()->create();
     $delegator->assignRole(Role::createWithPermissions('limited-staff-editor', [
-        'saas.users.view' => 9999, 'saas.staff.invite' => 9999,
+        'saas.users.view' => 9999, 'saas.staff.update' => 9999,
     ]));
     expect(Gate::forUser($manager)->allows('update', $reader))->toBeFalse();
     expect(Gate::forUser($delegator)->allows('update', $reader))->toBeTrue();

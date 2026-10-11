@@ -20,6 +20,7 @@ test('new users can register', function () {
         'email' => 'test@example.com',
         'password' => 'password',
         'password_confirmation' => 'password',
+        'country_uuid' => \App\Models\Central\Country::where('code', 'DZ')->firstOrFail()->uuid,
     ]);
 
     $response->assertSessionHasNoErrors()

@@ -26,8 +26,20 @@ class CentralUserAccess
     public function allows(User $actor, string $ability, ?User $target = null, bool $listing = false): bool
     {
         $actor = $actor->fresh();
-        if ($actor === null || ! $this->active($actor) || ! $actor->checkPermissionTo($ability, 'central')) {
+        if ($actor === null || ! $this->active($actor)) {
             return false;
+        }
+        if (! $actor->checkPermissionTo($ability, 'central')) {
+            $derived = false;
+            foreach (CentralRoleCatalog::VIEW_ACTIONS[$ability] ?? [] as $action) {
+                if ($this->allows($actor, $action, $target, $listing)) {
+                    $derived = true;
+                    break;
+                }
+            }
+            if (! $derived) {
+                return false;
+            }
         }
         $restrictions = $this->restrictions($actor, $ability);
         if ($restrictions->contains(fn (\stdClass $rule): bool => (int) $rule->effect === 1 && (
@@ -73,7 +85,25 @@ class CentralUserAccess
     /** @param Builder<\App\Models\User> $query */
     public function scopeVisibleUsers(Builder $query, User $actor): void
     {
-        $restrictions = $this->restrictions($actor, 'saas.users.view');
+        $abilities = $actor->checkPermissionTo('saas.users.view', 'central')
+            ? ['saas.users.view']
+            : array_filter(CentralRoleCatalog::VIEW_ACTIONS['saas.users.view'],
+                fn (string $ability): bool => $actor->checkPermissionTo($ability, 'central'));
+        $query->where(function (Builder $visible) use ($abilities, $actor): void {
+            $visible->whereRaw('1 = 0');
+            foreach ($abilities as $ability) {
+                $visible->orWhere(function (Builder $scope) use ($actor, $ability): void {
+                    $scope->whereRaw('1 = 1');
+                    $this->scopeRestrictions($scope, $this->restrictions($actor, $ability));
+                });
+            }
+        });
+        $this->scopeRestrictions($query, $this->restrictions($actor, 'saas.users.view'));
+    }
+
+    /** @param Collection<int, \stdClass> $restrictions */
+    private function scopeRestrictions(Builder $query, Collection $restrictions): void
+    {
         if ($restrictions->contains(fn (\stdClass $rule): bool => (int) $rule->effect === 1 && $rule->normalized_target_type === 'global')) {
             $query->whereRaw('1 = 0');
 

@@ -89,6 +89,7 @@ new #[Title('Utilisateurs')] class extends Component {
                             @can('create', [\App\Models\Central\Tenant::class, $user])
                                 <flux:button :href="route('central.users.tenants.create', $user)">Boutiques</flux:button>
                             @endcan
+                            @include('central.pages.users.lifecycle-actions')
                         </td>
                     </tr>
                 @empty

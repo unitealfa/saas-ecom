@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Central;
 
 use App\Http\Controllers\Controller;
+use App\Enums\Users\StatusEnum;
+use App\Http\Requests\Central\ChangeUserStatusRequest;
 use App\Http\Requests\Central\StoreUserRequest;
 use App\Http\Requests\Central\UpdateUserRequest;
 use App\Models\Central\Country;
@@ -51,7 +53,8 @@ class UserController extends Controller
         Gate::authorize('view', $user);
 
         return view('central.pages.users.show', [
-            'user' => $user->load(['country', 'roles']),
+            'user' => $user->load(['country', 'roles', 'legalVerifier']),
+            'subscriptions' => $user->subscriptions()->with('plan')->orderByDesc('id')->paginate(10),
             'shops' => $user->tenants()->select(['uuid', 'shop_name', 'status'])->orderBy('id')->get(),
         ]);
     }
@@ -61,7 +64,7 @@ class UserController extends Controller
         Gate::authorize('update', $user);
 
         return view('central.pages.users.edit', [
-            'user' => $user->load('country'),
+            'user' => $user->load(['country', 'roles']),
             'countries' => Country::where(fn ($query) => $query->where('is_active', true)->orWhere('id', $user->country_id))
                 ->orderBy('name_fr')->get(),
         ]);
@@ -94,5 +97,25 @@ class UserController extends Controller
         return $result->emailSent === true
             ? $response->with('status', 'L’invitation a été envoyée.')
             : $response->with('warning', 'L’invitation n’a pas pu être envoyée. Vérifiez la configuration SMTP.');
+    }
+
+    public function changeStatus(ChangeUserStatusRequest $request, User $user, UserManager $users): RedirectResponse
+    {
+        $actor = $request->user('central');
+        abort_unless($actor instanceof User, 403);
+        $status = StatusEnum::from((int) $request->validated('status'));
+        $users->changeStatus($actor, $user, $status);
+
+        return redirect()->route('central.users.show', $user)
+            ->with('status', $status === StatusEnum::SUSPENDED ? 'Compte suspendu.' : 'Compte réactivé.');
+    }
+
+    public function destroy(Request $request, User $user, UserManager $users): RedirectResponse
+    {
+        $actor = $request->user('central');
+        abort_unless($actor instanceof User, 403);
+        $users->delete($actor, $user);
+
+        return redirect()->route('central.users.index')->with('status', 'Compte supprimé. Les données historiques et les boutiques sont conservées.');
     }
 }

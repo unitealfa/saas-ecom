@@ -58,6 +58,7 @@ class RoleController extends Controller
     {
         return view('central.pages.roles.form', [
             'role' => $role,
+            'permissionGroups' => CentralRoleCatalog::GROUPS,
             'permissions' => Permission::where('guard_name', 'central')->whereIn('name', array_keys(CentralRoleCatalog::PERMISSIONS))->orderBy('id')->get(),
             'grants' => $role?->permissions()->get()->mapWithKeys(fn ($permission): array => [$permission->getAttribute('uuid') => (int) $permission->getRelation('pivot')->getAttribute('duration_days')])->all() ?? [],
         ]);

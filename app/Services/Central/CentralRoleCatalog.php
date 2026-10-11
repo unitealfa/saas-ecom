@@ -12,8 +12,31 @@ class CentralRoleCatalog
         'saas.users.view' => 'Consulter les utilisateurs',
         'saas.users.create' => 'Créer des comptes commerçants',
         'saas.users.update' => 'Modifier les comptes commerçants',
-        'saas.staff.invite' => 'Inviter et modifier le personnel SaaS',
+        'saas.users.suspend' => 'Suspendre les comptes commerçants',
+        'saas.users.restore' => 'Réactiver les comptes commerçants',
+        'saas.users.delete' => 'Supprimer les comptes commerçants',
+        'saas.staff.invite' => 'Inviter le personnel SaaS',
+        'saas.staff.update' => 'Modifier le personnel SaaS',
+        'saas.staff.suspend' => 'Suspendre le personnel SaaS',
+        'saas.staff.restore' => 'Réactiver le personnel SaaS',
+        'saas.staff.delete' => 'Supprimer le personnel SaaS',
         'saas.users.roles.assign' => 'Attribuer les rôles du personnel SaaS',
+        'saas.countries.view' => 'Consulter les pays',
+        'saas.countries.create' => 'Créer des pays',
+        'saas.countries.update' => 'Modifier les pays',
+        'saas.countries.activate' => 'Activer ou désactiver les pays',
+        'saas.countries.delete' => 'Retirer des pays',
+    ];
+
+    public const GROUPS = [
+        'Comptes commerçants' => ['saas.users.view', 'saas.users.create', 'saas.users.update', 'saas.users.suspend', 'saas.users.restore', 'saas.users.delete'],
+        'Personnel SaaS' => ['saas.staff.invite', 'saas.staff.update', 'saas.staff.suspend', 'saas.staff.restore', 'saas.staff.delete', 'saas.users.roles.assign'],
+        'Pays' => ['saas.countries.view', 'saas.countries.create', 'saas.countries.update', 'saas.countries.activate', 'saas.countries.delete'],
+    ];
+
+    public const VIEW_ACTIONS = [
+        'saas.users.view' => ['saas.users.create', 'saas.users.update', 'saas.users.suspend', 'saas.users.restore', 'saas.users.delete', 'saas.staff.invite', 'saas.staff.update', 'saas.staff.suspend', 'saas.staff.restore', 'saas.staff.delete', 'saas.users.roles.assign'],
+        'saas.countries.view' => ['saas.countries.create', 'saas.countries.update', 'saas.countries.activate', 'saas.countries.delete'],
     ];
 
     public const ROLES = [
@@ -46,7 +69,10 @@ class CentralRoleCatalog
             }
 
             foreach (self::PERMISSIONS as $name => $label) {
-                Permission::firstOrCreate(['name' => $name, 'guard_name' => 'central'], ['label' => $label]);
+                $permission = Permission::firstOrCreate(['name' => $name, 'guard_name' => 'central'], ['label' => $label]);
+                if ($permission->label !== $label) {
+                    $permission->forceFill(['label' => $label])->save();
+                }
             }
 
             foreach (self::ROLES as $name => $definition) {

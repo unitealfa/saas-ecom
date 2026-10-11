@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Central\DatabaseDiagnosticsController;
+use App\Http\Controllers\Central\CountryController;
 use App\Http\Controllers\Central\RoleController;
 use App\Http\Controllers\Central\TenantController;
 use App\Http\Controllers\Central\UserController;
@@ -24,6 +25,8 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
     Route::get('admin/users/{user}', [UserController::class, 'show'])->name('central.users.show');
     Route::get('admin/users/{user}/edit', [UserController::class, 'edit'])->name('central.users.edit');
     Route::put('admin/users/{user}', [UserController::class, 'update'])->name('central.users.update');
+    Route::patch('admin/users/{user}/status', [UserController::class, 'changeStatus'])->name('central.users.status');
+    Route::delete('admin/users/{user}', [UserController::class, 'destroy'])->name('central.users.destroy');
     Route::post('admin/users/{user}/invitation', [UserController::class, 'resendInvitation'])
         ->middleware('throttle:6,1')->name('central.users.invitation');
     Route::get('admin/users/{user}/roles', [UserRoleController::class, 'edit'])->name('central.users.roles.edit');
@@ -35,6 +38,13 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
     Route::post('admin/roles', [RoleController::class, 'store'])->name('central.roles.store');
     Route::get('admin/roles/{role}/edit', [RoleController::class, 'edit'])->name('central.roles.edit');
     Route::put('admin/roles/{role}', [RoleController::class, 'update'])->name('central.roles.update');
+    Route::get('admin/countries', [CountryController::class, 'index'])->name('central.countries.index');
+    Route::get('admin/countries/create', [CountryController::class, 'create'])->name('central.countries.create');
+    Route::post('admin/countries', [CountryController::class, 'store'])->name('central.countries.store');
+    Route::get('admin/countries/{country}/edit', [CountryController::class, 'edit'])->name('central.countries.edit');
+    Route::put('admin/countries/{country}', [CountryController::class, 'update'])->name('central.countries.update');
+    Route::patch('admin/countries/{country}/activation', [CountryController::class, 'activate'])->name('central.countries.activate');
+    Route::delete('admin/countries/{country}', [CountryController::class, 'destroy'])->name('central.countries.destroy');
 });
 
 require __DIR__.'/central/settings.php';
