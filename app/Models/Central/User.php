@@ -33,10 +33,12 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
  * @property string|null $first_name
  * @property string $name
  * @property string $email
+ * @property string|null $phone
  * @property string|null $legal_form
  * @property string|null $activity_nature
  * @property string|null $legal_address
  * @property int|null $legal_profile_version
+ * @property VerificationStatusEnum|null $legal_verification_status
  * @property CarbonImmutable|null $email_verified_at
  * @property string $password
  * @property StatusEnum $status

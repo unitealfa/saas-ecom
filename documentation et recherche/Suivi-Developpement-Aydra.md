@@ -476,3 +476,17 @@ Les classes respectent la chaîne Controller → Form Request → DTO → Servic
 | Compilation des assets et vues Blade | `npm.cmd run build` et `artisan view:cache` réussis |
 
 La suite complète n’est pas présentée comme exécutée par ces contrôles ciblés. Elle peut être lancée avec PHP 8.5 et `artisan test --compact` ; les tests utilisent MySQL et leurs bases isolées, sans remplacer les données existantes.
+
+### 2026-10-11 — Invitations immédiates et fiches des comptes
+
+L’absence d’envoi est vérifiée dans MySQL : deux puis trois jobs AccountInvitation en attente, sans tentative ni worker actif. Le SMTP Gmail est configuré. Le worker temporaire a traité les trois invitations et s’est arrêté une fois la file vide ; le SMTP a accepté les envois, sans prétendre vérifier leur réception dans les boîtes destinataires.
+
+Les nouvelles invitations utilisent maintenant `notifyNow` de Laravel après commit, au moyen de `AccountMailDelivery`, sans worker. Les anciens jobs chiffrés restent compatibles. Un échec de transport conserve le compte et affiche un avertissement explicite ; l’interface permet de renvoyer une invitation avec un nouveau token, sous contrôle d’autorisation et limitation des requêtes. Le job de création d’une BDD boutique conserve sa file dédiée et nécessite toujours son worker.
+
+La liste centrale propose Informations et Modifier selon les Policies. La fiche présente identité, contacts, pays, état, vérification, rôles et, pour un commerçant, boutiques et informations professionnelles. Le formulaire modifie prénom, nom, e-mail, téléphone et pays. Les mots de passe, statut, rôles et preuves de vérification ne sont pas éditables par ce formulaire. Un nouvel e-mail invalide ses anciens tokens et demande sa vérification ; pour un compte encore invité, un nouveau lien de choix du mot de passe part vers la nouvelle adresse. Un téléphone modifié perd ses preuves. Les identités professionnelles déjà versionnées sont revalidées sous verrou.
+
+Spatie fournit toujours les rôles, permissions et relations ; les Policies Laravel protègent les boutons, URL et services. `saas.users.update` autorise la modification d’un commerçant, `saas.staff.invite` celle du personnel, avec contrôle des droits encore possédés et protection du Super Admin. La Policy Tenant refuse la création de boutique pour toute cible possédant un rôle SaaS, même expiré. Aucune base, boutique ou attribution existante n’est supprimée pour réaliser cette correction ; aucune migration n’est modifiée.
+
+Vérifications : les onze nouveaux tests ont chacun réussi sur MySQL isolé. Dix ont réussi lors du passage ciblé ; le dernier contrôle de validation a réussi après correction de sa comparaison avec les valeurs réellement chargées depuis MySQL (un test, 17 assertions). La sortie finale du passage combiné sur trois fichiers n’a pas pu être récupérée : ce passage n’est donc pas présenté comme réussi. Pint, PHPStan, compilation des assets, compilation Blade et contrôle du diff ont réussi. MySQL réel confirme zéro invitation en attente, zéro job en échec et les deux boutiques existantes conservées.
+
+La consigne de limiter les commandes longues et répétitives est enregistrée dans `AGENTS.md` : conserver les résultats encore valables, cibler les changements ou erreurs restantes, sans lancement ni demande systématique de suite complète.

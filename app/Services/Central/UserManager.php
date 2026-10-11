@@ -3,10 +3,12 @@
 namespace App\Services\Central;
 
 use App\DTOs\Central\UserData;
+use App\DTOs\Central\UserProfileData;
+use App\DTOs\Central\UserSaveResult;
+use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Country;
 use App\Models\Central\Role;
 use App\Models\Central\User;
-use App\Notifications\Central\AccountInvitation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Password;
@@ -20,11 +22,13 @@ class UserManager
         private AuthorizationMutation $mutations,
         private DefaultSubscription $subscriptions,
         private CentralUserAccess $access,
+        private AccountMailDelivery $mail,
     ) {}
 
-    public function create(User $actor, UserData $data): User
+    public function create(User $actor, UserData $data): UserSaveResult
     {
-        return $this->mutations->run(function () use ($actor, $data): User {
+        $emailSent = null;
+        $user = $this->mutations->run(function () use ($actor, $data, &$emailSent): User {
             Gate::forUser($actor)->authorize($data->staff ? 'createStaff' : 'create', User::class);
             if (! $data->staff && $data->roleUuids !== []) {
                 throw ValidationException::withMessages(['roles' => 'Un compte commerçant est créé sans rôle SaaS.']);
@@ -43,13 +47,88 @@ class UserManager
             $this->subscriptions->ensure($user, $actor);
             $this->applyRoles($user, $roles);
             $token = Password::broker('central')->createToken($user);
-            $user->notify(new AccountInvitation($token));
+            $user->getConnection()->afterCommit(function () use ($user, $token, &$emailSent): void {
+                $emailSent = $this->mail->invitation($user, $token);
+            });
             activity()->causedBy($actor)->performedOn($user)->event('account_invited')
                 ->withProperties(['staff' => $data->staff, 'role_uuids' => $roles->pluck('uuid')->all()])
                 ->log('Compte central créé et invité à choisir son mot de passe.');
 
             return $user;
         });
+
+        return new UserSaveResult($user, $emailSent);
+    }
+
+    public function update(User $actor, User $target, UserProfileData $data): UserSaveResult
+    {
+        $emailSent = null;
+        $user = $this->mutations->run(function () use ($actor, $target, $data, &$emailSent): User {
+            $target = User::whereKey($target->id)->lockForUpdate()->firstOrFail();
+            Gate::forUser($actor)->authorize('update', $target);
+            $country = Country::where('uuid', $data->countryUuid)
+                ->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $target->country_id))->firstOrFail();
+            $emailChanged = $target->email !== $data->email;
+            $wasVerified = $target->hasVerifiedEmail();
+            if ($emailChanged) {
+                Password::broker('central')->deleteToken($target);
+            }
+            $target->forceFill([
+                'first_name' => $data->firstName, 'last_name' => $data->lastName,
+                'email' => $data->email, 'phone' => $data->phone, 'country_id' => $country->id,
+            ]);
+            if ($emailChanged) {
+                $target->email_verified_at = null;
+            }
+            if ($target->isDirty('phone')) {
+                $target->forceFill(['phone_verified_at' => null, 'whatsapp_verified_at' => null]);
+            }
+            if ($target->isDirty(['first_name', 'last_name', 'email', 'phone', 'country_id'])
+                && $target->legal_profile_version !== null) {
+                $target->forceFill([
+                    'legal_profile_version' => $target->legal_profile_version + 1,
+                    'legal_verification_status' => $target->legal_verification_status === VerificationStatusEnum::INCOMPLETE
+                        ? VerificationStatusEnum::INCOMPLETE : VerificationStatusEnum::PENDING,
+                    'legal_verified_at' => null, 'legal_verified_by_id' => null,
+                ]);
+            }
+            $fields = array_keys($target->getDirty());
+            $target->save();
+            if ($emailChanged) {
+                $token = $wasVerified ? null : Password::broker('central')->createToken($target);
+                $target->getConnection()->afterCommit(function () use ($target, $token, &$emailSent): void {
+                    $emailSent = $token === null ? $this->mail->verification($target) : $this->mail->invitation($target, $token);
+                });
+            }
+            activity()->causedBy($actor)->performedOn($target)->event('central_profile_updated')
+                ->withProperties(['changed_fields' => $fields])->log('Informations du compte central modifiées.');
+
+            return $target;
+        });
+
+        return new UserSaveResult($user, $emailSent);
+    }
+
+    public function resendInvitation(User $actor, User $target): UserSaveResult
+    {
+        $emailSent = null;
+        $user = $this->mutations->run(function () use ($actor, $target, &$emailSent): User {
+            $target = User::whereKey($target->id)->lockForUpdate()->firstOrFail();
+            Gate::forUser($actor)->authorize('update', $target);
+            if ($target->hasVerifiedEmail()) {
+                throw ValidationException::withMessages(['invitation' => 'Ce compte a déjà vérifié son adresse e-mail.']);
+            }
+            $token = Password::broker('central')->createToken($target);
+            $target->getConnection()->afterCommit(function () use ($target, $token, &$emailSent): void {
+                $emailSent = $this->mail->invitation($target, $token);
+            });
+            activity()->causedBy($actor)->performedOn($target)->event('account_invitation_requested')
+                ->log('Renvoi de l’invitation centrale demandé.');
+
+            return $target;
+        });
+
+        return new UserSaveResult($user, $emailSent);
     }
 
     /** @param list<string> $roleUuids */

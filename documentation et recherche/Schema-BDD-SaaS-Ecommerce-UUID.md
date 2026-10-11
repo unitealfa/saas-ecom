@@ -534,6 +534,7 @@ erDiagram
 - **`locale`** : langue choisie, conservée comme code de langue extensible.
 - **`status`** : code entier de l’enum propre à cet objet, défini au §3.3 ; les libellés sont traduits à l’affichage et les transitions contrôlées par le service.
 - **`last_login_at`** : dernière connexion réussie.
+- **Administration centrale, correction du 11 octobre 2026 :** la consultation et la modification d’identité/contact utilisent les permissions Spatie et les Policies Laravel. `saas.users.update` concerne les commerçants ; `saas.staff.invite` contrôle le personnel, avec protection du Super Admin et limitation aux permissions encore possédées pour les délégués. Le personnel SaaS ne reçoit pas l’action de création de boutique. L’invitation Fortify est envoyée directement par Laravel après commit, sans dépendre d’un worker ; un échec SMTP est signalé sans annuler le compte, avec renvoi autorisé. Les anciens jobs d’invitation restent compatibles. Aucun champ ou table n’est ajouté pour ces formulaires.
 - **`created_at / updated_at / deleted_at`** : dates de création, modification et suppression logique ; aucune purge implicite.
 
 **`tenants` :**

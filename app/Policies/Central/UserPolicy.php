@@ -24,6 +24,20 @@ class UserPolicy
         return $this->access->allows($actor, 'saas.users.create');
     }
 
+    public function update(User $actor, User $target): bool
+    {
+        if ($target->roles()->where('guard_name', 'central')->where('is_super_admin', true)->exists()
+            && ! $this->access->isSuperAdmin($actor)) {
+            return false;
+        }
+        if ($this->access->isStaff($target)) {
+            return $this->access->allows($actor, 'saas.staff.invite', $target)
+                && $this->access->mayManageStaff($actor, $target);
+        }
+
+        return $this->access->allows($actor, 'saas.users.update', $target);
+    }
+
     public function createStaff(User $actor): bool
     {
         return $this->access->allows($actor, 'saas.staff.invite')

@@ -12,6 +12,7 @@ class TenantPolicy
     public function create(User $actor, User $owner): bool
     {
         return $this->access->isSuperAdmin($actor)
+            && ! $this->access->isStaff($owner)
             && $this->access->allows($actor, 'saas.users.create', $owner);
     }
 }

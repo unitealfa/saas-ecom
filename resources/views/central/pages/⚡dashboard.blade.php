@@ -20,6 +20,9 @@ new class extends Component {
     @if (session('status'))
         <flux:callout>{{ session('status') }}</flux:callout>
     @endif
+    @if (session('warning'))
+        <flux:callout variant="warning">{{ session('warning') }}</flux:callout>
+    @endif
 
     @if ($this->overview['staff'])
         <flux:text>{{ __('Bienvenue dans l’administration Aydra. Les fonctionnalités disponibles dépendent de vos autorisations.') }}</flux:text>

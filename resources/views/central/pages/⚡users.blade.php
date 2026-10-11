@@ -31,7 +31,7 @@ new #[Title('Utilisateurs')] class extends Component {
         Gate::authorize('viewAny', User::class);
         $this->validate(['search' => ['string', 'max:255']]);
         $query = User::query()->select(['id', 'uuid', 'first_name', 'last_name', 'email', 'status', 'email_verified_at'])
-            ->with('roles:id,uuid,label');
+            ->with('roles:id,uuid,label,guard_name');
         app(CentralUserAccess::class)->scopeVisibleUsers($query, Auth::guard('central')->user());
         if (trim($this->search) !== '') {
             $query->where(function ($query): void {
@@ -47,6 +47,7 @@ new #[Title('Utilisateurs')] class extends Component {
 <section class="flex flex-col gap-6">
     <flux:heading size="xl" level="1">{{ __('Utilisateurs') }}</flux:heading>
     @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
+    @if (session('warning'))<flux:callout variant="warning">{{ session('warning') }}</flux:callout>@endif
     @if (auth('central')->user()->can('create', \App\Models\User::class) || auth('central')->user()->can('createStaff', \App\Models\User::class))
         <flux:button :href="route('central.users.create')" variant="primary">Créer un compte</flux:button>
     @endif
@@ -76,6 +77,12 @@ new #[Title('Utilisateurs')] class extends Component {
                             \App\Enums\Users\StatusEnum::DELETED => __('Supprimé'),
                         } }}</td>
                         <td class="p-4">
+                            @can('view', $user)
+                                <flux:button :href="route('central.users.show', $user)">Informations</flux:button>
+                            @endcan
+                            @can('update', $user)
+                                <flux:button :href="route('central.users.edit', $user)">Modifier</flux:button>
+                            @endcan
                             @can('assignRoles', $user)
                                 <flux:button :href="route('central.users.roles.edit', $user)">Rôles</flux:button>
                             @endcan

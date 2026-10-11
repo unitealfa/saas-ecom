@@ -21,6 +21,11 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
 
     Route::get('admin/users/create', [UserController::class, 'create'])->name('central.users.create');
     Route::post('admin/users', [UserController::class, 'store'])->name('central.users.store');
+    Route::get('admin/users/{user}', [UserController::class, 'show'])->name('central.users.show');
+    Route::get('admin/users/{user}/edit', [UserController::class, 'edit'])->name('central.users.edit');
+    Route::put('admin/users/{user}', [UserController::class, 'update'])->name('central.users.update');
+    Route::post('admin/users/{user}/invitation', [UserController::class, 'resendInvitation'])
+        ->middleware('throttle:6,1')->name('central.users.invitation');
     Route::get('admin/users/{user}/roles', [UserRoleController::class, 'edit'])->name('central.users.roles.edit');
     Route::put('admin/users/{user}/roles', [UserRoleController::class, 'update'])->name('central.users.roles.update');
     Route::get('admin/users/{user}/shops/create', [TenantController::class, 'create'])->name('central.users.tenants.create');

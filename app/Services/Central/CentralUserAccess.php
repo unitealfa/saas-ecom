@@ -55,6 +55,21 @@ class CentralUserAccess
         );
     }
 
+    public function isStaff(User $user): bool
+    {
+        if ($user->relationLoaded('roles')) {
+            return $user->roles->contains(fn ($role): bool => $role->guard_name === 'central');
+        }
+
+        return $user->roles()->where('guard_name', 'central')->exists();
+    }
+
+    public function mayManageStaff(User $actor, User $target): bool
+    {
+        return $this->isSuperAdmin($actor)
+            || $target->getAllPermissions()->every(fn ($permission): bool => $this->allows($actor, $permission->name));
+    }
+
     /** @param Builder<\App\Models\User> $query */
     public function scopeVisibleUsers(Builder $query, User $actor): void
     {
