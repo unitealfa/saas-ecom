@@ -26,7 +26,7 @@ Les diagrammes sont répartis en modules pour rester exploitables. **Les champs,
 | Remplacement et renvoi | Remplacement gratuit après incident avec plafonds SAV ; renvoi après retour impayé par nouvelle commande liée. Prix entier du produit accepté, reprise manuelle facultative des frais de retour ; aucun crédit/portefeuille client. |
 | Stock | Physique vendable, réservé, quarantaine et disponible non négatifs. Pas de survente ni précommande au MVP ; pas de multi-entrepôts. |
 | Argent | Montant COD global par colis, mais prix/coût détaillés par ligne dans ta BDD. Encaissement et reversement distincts. |
-| Abonnement | Rattaché au propriétaire, tenant_id facultatif sur l’abonnement type 1 ; échéances type 2 dans la même table. Paiements et remboursements manuels à distance banque/CCP/BaridiMob, reçus PDF privés et validation centrale ; aucun ordre bancaire automatique. Arrêt = fin du renouvellement avec maintien des droits payés jusqu’au terme ; corrections/remboursements affectant les droits motivés et audités. Expiration → gratuit, une boutique active, autres hors_quota, données conservées. |
+| Abonnement | Rattaché au propriétaire, tenant_id facultatif sur l’abonnement type 1 ; échéances type 2 dans la même table. Paiements et remboursements manuels à distance banque/CCP/BaridiMob, reçus PDF privés et validation centrale ; aucun ordre bancaire automatique. Arrêt = fin du renouvellement avec maintien des droits payés jusqu’au terme ; corrections/remboursements affectant les droits motivés et audités. Expiration → gratuit, deux boutiques actives au maximum, autres hors_quota, données conservées. |
 | Administrateurs | Root complet sur l’administration centrale ; administrateurs délégués limitables par action et cible centrale. Aucun accès d’assistance aux boutiques et aucune usurpation de compte. |
 | Statistiques | Mesure interne des visiteurs et événements ; ventes/retours fondés sur les événements métier. Les corrections commerciales utilisent un événement économique finalisé avec date d’effet explicite. Aucun GA4 requis. |
 | Site | Un template, profil public, plusieurs adresses et liens sociaux. Personnalisation CSS encadrée plus tard. |
@@ -747,7 +747,7 @@ Les invitations d’équipe ont été déplacées intégralement en T24. La raci
 
 **`plans` — Les offres d’abonnement proposées aux commerçants, avec leurs versions. Exemple : Gratuit et Pro. Une ancienne version reste conservée pour comprendre les anciens abonnements.**
 
-**`plan_features` — Indique ce que chaque offre permet et ses limites. Exemple : l’offre Gratuit autorise 1 boutique et l’offre Pro en autorise 3.**
+**`plan_features` — Indique ce que chaque offre permet et ses limites. Exemple : l’offre Gratuit autorise 2 boutiques et l’offre Pro en autorise 3.**
 
 **`subscriptions` — Une seule table contient les abonnements et leurs échéances. Une ligne de type 1 décrit « Karim a le plan Pro ». Ses lignes de type 2 décrivent « Karim doit payer 3 000 DA pour septembre », puis octobre, etc. Les échéances gardent leurs propres UUID, montants, dates et états ; elles ne remplacent pas la ligne d’abonnement. tenant_id reste facultatif sur l’abonnement et désigne une boutique du même propriétaire.**
 
@@ -858,7 +858,7 @@ erDiagram
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
-- **`plans` :** Le couple `code + version` est unique. Les prix sont en DZD dans ce MVP. Dès qu’un plan a été utilisé par un abonnement, on ne modifie plus son ancienne version. Exemple : si `Pro v1` autorisait 3 boutiques et qu’on veut passer à 5, on crée `Pro v2` au lieu de transformer le passé. Le plan gratuit coûte `0` et autorise 1 boutique.
+- **`plans` :** Le couple `code + version` est unique. Les prix sont en DZD dans ce MVP. Dès qu’un plan a été utilisé par un abonnement, on ne modifie plus son ancienne version. Exemple : si `Pro v1` autorisait 3 boutiques et qu’on veut passer à 5, on crée `Pro v2` au lieu de transformer le passé. Le plan gratuit coûte `0` et autorise 2 boutiques.
 
 - **`plan_features` :** Une fonctionnalité ne peut apparaître qu’une seule fois dans un même plan. Pour un quota : `is_active=false` signifie que la fonction est interdite ; `is_active=true` avec `limit=NULL` signifie qu’elle est illimitée ; sinon `limit` contient le maximum autorisé et doit être positif ou nul. Pour une fonctionnalité oui/non, `limit` reste vide. Si une fonctionnalité n’apparaît pas dans le plan, elle est considérée comme désactivée. Quand un plan a déjà été utilisé, ces règles restent figées avec cette version du plan.
 
@@ -873,6 +873,8 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 **Modèles logiques :** Subscription (type 1) et SubscriptionInstallment (type 2) utilisent tous deux subscriptions et la connexion centrale, avec scopes, créations typées et Policies distincts. Une route de plan refuse le UUID d’une échéance. Les Resource publient des UUID ; les lignes de type 2 ne créent pas un deuxième abonnement actif. Paiement client et remboursement admin s’effectuent à distance hors application, puis sont déclarés/vérifiés avec preuve PDF dans C8 ; aucun virement automatique n’est supposé.
 
 - **Droits d’usage par offre :** les possibilités et quotas viennent uniquement du plan applicable et de ses plan_features. Pour accorder une composition particulière, créer/versionner une offre adaptée puis l’attribuer via subscriptions. Aucune exception par propriétaire/boutique ni date parallèle ne passe devant le plan. Les permissions datées d’une personne ne modifient aucun quota commercial.
+
+**Décision confirmée le 11 octobre 2026 :** le plan gratuit par défaut autorise deux boutiques par propriétaire. Son code est `free` ; la fonctionnalité `shops` est une quantité à portée propriétaire et période totale. Les nouveaux comptes reçoivent son attribution type 1. Les plans et abonnements payants existants restent conservés ; toute composition déjà utilisée est versionnée.
 
 ### C5 — Suivi SaaS et référentiel géographique fusionné
 
@@ -4803,7 +4805,7 @@ Renommage : modifier shop_name et incrémenter profile_version sur la connexion 
 
 Le gratuit est le plan de repli obligatoire, même si aucune souscription payante n’est active. Sous verrou users du propriétaire : clôturer le payant type 1 échu, retrouver/créer le gratuit type 1 avec une clé déterministe de transition, résoudre le quota depuis le plan et ses plan_features, puis sélectionner les boutiques éligibles. La date d’expiration est contrôlée à chaque décision sensible ; un cron arrêté ne prolonge pas les droits payants.
 
-Ordre de sélection : choix explicite `activation_priority`, sinon boutique `is_primary`, sinon active la plus ancienne ; UUID départage les égalités. Pour le quota gratuit=1, un seul tenant éligible reste actif. L’éligibilité exclut archive, échec/provisionnement et suspensions administratives ; un recalcul de quota ne les annule pas. Excédentaires → hors_quota et date ; aucune suppression des commandes, médias, catalogue ou BDD. Le choix principal et les priorités appartiennent au propriétaire et restent uniques/cohérents sous son verrou.
+Ordre de sélection : choix explicite `activation_priority`, sinon boutique `is_primary`, sinon active la plus ancienne ; UUID départage les égalités. Pour le quota gratuit=2, au maximum deux tenants éligibles restent actifs. L’éligibilité exclut archive, échec/provisionnement et suspensions administratives ; un recalcul de quota ne les annule pas. Excédentaires → hors_quota et date ; aucune suppression des commandes, médias, catalogue ou BDD. Le choix principal et les priorités appartiennent au propriétaire et restent uniques/cohérents sous son verrou.
 
 Hors quota : propriétaire autorisé à consulter/exporter ses données et gérer son abonnement/choix, catalogue éventuellement public, mais checkout, nouvelles commandes, nouvelles confirmations/expéditions et modifications commerciales importantes refusés côté serveur. Désactiver aussi les jobs commerciaux premium. Les traitements techniques de preuve, sécurité, rapprochement des colis déjà envoyés et clôture d’obligations existantes continuent sous un périmètre système/SAV contrôlé ; une expiration ne doit pas effacer une dette ni faire perdre un remboursement dû. Aucun nouveau commerce n’est autorisé par cette exception de clôture.
 
@@ -5354,7 +5356,7 @@ Confirmer les index avec EXPLAIN sur données représentatives. Pour reconstitue
 | Payload transporteur expiré | Coordonnées chiffrées effacées, références/empreinte/résultat conservés ; pas de retry aveugle |
 | Même nom média dans A et B | Clés physiques distinctes ; accès privé croisé refusé |
 | Ligne de 3 : 1 cassé et 1 manquant | Un dossier, deux détails, quantité affectée=2 ; ajout dépassant 3 refusé |
-| Expiration Pro de trois boutiques, cron arrêté | Droits gratuits immédiats, une éligible, deux hors_quota, aucune suppression |
+| Expiration Pro de trois boutiques, cron arrêté | Droits gratuits immédiats, deux éligibles, une hors_quota, aucune suppression |
 | Changement boutique active puis upgrade | Quota jamais dépassé, suspensions administratives préservées, données intactes |
 | Information données de commande absente | Nouvelle commande refusée tant que `data_policy_version` et `data_notice_acknowledged_at` ne sont pas enregistrés ; aucun consentement marketing n’est déduit |
 | Consultation/export/API/expiration technique | Journal métier minimisé, acteur/date/motif/ressource et destinataire pertinent traçables |

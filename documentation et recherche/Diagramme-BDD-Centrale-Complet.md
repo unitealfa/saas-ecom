@@ -12,6 +12,8 @@ Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md),
 
 **Bases et domaines :** une nouvelle base suit `boutique_{slug_initial}`, par exemple `boutique_nour`, sans suffixe d’ID. Son nom est réservé dans `tenants.data.tenancy_db_name` avant le provisionnement et reste stable après renommage. Avec le préfixe `boutique_`, le slug initial est limité à 55 caractères ; les noms trop longs, déjà réservés ou déjà présents sont refusés, sans troncature ni adoption d’une autre base. Les bases existantes ne changent que sur autorisation explicite ; l’utilisateur confirme aussi le retrait du suffixe des deux bases d’essai actuelles. `APP_URL` vaut ici `http://aydra.localhost` et `central_domains` contient explicitement `127.0.0.1`, `localhost` et `aydra.localhost`. `{tenants.slug}.{SAAS_BASE_DOMAIN}` définit le sous-domaine boutique, avec une base dérivée d’APP_URL sauf configuration explicite. Aucune donnée d’essai n’est créée par le seeder normal.
 
+**Décision du 11 octobre 2026 :** le plan gratuit par défaut, code `free`, autorise deux boutiques par propriétaire avec la fonctionnalité `shops`. Les nouveaux comptes reçoivent cet abonnement type 1. La gestion centrale utilise Spatie Permission, Fortify et les tables existantes pour la réservation/provision des bases boutique ; voir le §20 du document d’architecture. Aucun champ ou lien Mermaid n’est ajouté par ce lot.
+
 ## 1. Les 28 tables expliquées très simplement
 
 **Initialisation des boutiques :** un propriétaire central peut posséder plusieurs lignes `tenants`. Chaque ligne déclenche `TenantProvisioner` après commit : migrations tenant, création de son unique profil `shop` et du compte propriétaire local. Les quatre réglages initiaux peuvent être fournis avant la sauvegarde via `Tenant::configureShopForProvisioning()` ; leurs défauts sont `OTHER`, `default`, `{"primary":"#2563EB","secondary":"#FFFFFF"}` et `7` jours. `tenants.data.tenancy_shop_settings` porte seulement l'intention technique de création jusqu'au succès, puis est libéré ; les réglages courants appartiennent à la BDD tenant. Aucune table centrale supplémentaire ni nouvelle contrainte singleton n'est créée. Le statut de préparation reste distinct de l'activation commerciale.
@@ -33,7 +35,7 @@ Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md),
 | **`model_has_permissions`** | Une autorisation directement attribuée à un compte, si ce chemin natif est utilisé, avec ses dates. Elle ne peut pas doubler une action déjà donnée par un rôle. |
 | **`admin_restrictions`** | Limite les comptes, boutiques ou rôles sur lesquels un administrateur peut agir dans l’administration centrale. |
 | **`plans`** | Les offres d’abonnement proposées aux commerçants, avec leurs versions. Exemple : Gratuit et Pro. Une ancienne version reste conservée pour comprendre les anciens abonnements. |
-| **`plan_features`** | Indique ce que chaque offre permet et ses limites. Exemple : l’offre Gratuit autorise 1 boutique et l’offre Pro en autorise 3. |
+| **`plan_features`** | Indique ce que chaque offre permet et ses limites. Exemple : l’offre Gratuit autorise 2 boutiques et l’offre Pro en autorise 3. |
 | **`subscriptions`** | Une seule table contient les abonnements et leurs échéances. Une ligne de type 1 décrit « Karim a le plan Pro ». Ses lignes de type 2 décrivent « Karim doit payer 3 000 DA pour septembre », puis octobre, etc. Les échéances gardent leurs propres UUID, montants, dates et états ; elles ne remplacent pas la ligne d’abonnement. tenant_id reste facultatif sur l’abonnement et désigne une boutique du même propriétaire. |
 | **`feature_usage`** | Les quantités déjà utilisées pour une fonctionnalité pendant une période. Elle aide à suivre les limites de l’abonnement. |
 | **`geographic_areas`** | Les wilayas et communes dans une seule table. Chaque commune est reliée à sa wilaya, et les zones à leur pays. |
@@ -973,7 +975,7 @@ Les offres d’abonnement proposées aux commerçants, avec leurs versions. Exem
 
 ### 14. `plan_features` — 8 champs
 
-Indique ce que chaque offre permet et ses limites. Exemple : l’offre Gratuit autorise 1 boutique et l’offre Pro en autorise 3.
+Indique ce que chaque offre permet et ses limites. Exemple : l’offre Gratuit autorise 2 boutiques et l’offre Pro en autorise 3.
 
 | Champ | Explication très simple |
 |---|---|

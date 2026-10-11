@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
@@ -462,10 +461,12 @@ test('tenancy rejects an APP_URL without an application host', function (string 
 test('a separate tenant base domain is not reserved for central routes', function (): void {
     $environmentValue = $_ENV['SAAS_BASE_DOMAIN'] ?? null;
     $serverValue = $_SERVER['SAAS_BASE_DOMAIN'] ?? null;
+    $processValue = getenv('SAAS_BASE_DOMAIN');
 
     try {
         $_ENV['SAAS_BASE_DOMAIN'] = 'shops.aydra.localhost';
         $_SERVER['SAAS_BASE_DOMAIN'] = 'shops.aydra.localhost';
+        putenv('SAAS_BASE_DOMAIN=shops.aydra.localhost');
 
         $configuration = require config_path('tenancy.php');
 
@@ -484,6 +485,8 @@ test('a separate tenant base domain is not reserved for central routes', functio
         } else {
             $_SERVER['SAAS_BASE_DOMAIN'] = $serverValue;
         }
+
+        putenv($processValue === false ? 'SAAS_BASE_DOMAIN' : 'SAAS_BASE_DOMAIN='.$processValue);
     }
 });
 
@@ -546,10 +549,10 @@ test('tenant database creation waits for commit and a rollback does not create a
     DB::beginTransaction();
     $tenant = Tenant::factory()->create(['user_id' => $owner->id]);
     $databaseName = $tenant->database()->getName();
-    expect(File::exists(database_path($databaseName)))->toBeFalse();
+    expect($tenant->database()->manager()->databaseExists($databaseName))->toBeFalse();
     DB::rollBack();
 
-    expect(File::exists(database_path($databaseName)))->toBeFalse();
+    expect($tenant->database()->manager()->databaseExists($databaseName))->toBeFalse();
     expect(Tenant::count())->toBe(0);
 
     DB::beginTransaction();
@@ -558,7 +561,7 @@ test('tenant database creation waits for commit and a rollback does not create a
     $tenant->update(['shop_name' => 'Renamed before provisioning', 'slug' => 'renamed-shop']);
     DB::commit();
 
-    expect(File::exists(database_path($databaseName)))->toBeTrue();
+    expect($tenant->database()->manager()->databaseExists($databaseName))->toBeTrue();
     expect($tenant->fresh()->database()->getName())->toBe($databaseName);
     $tenant->update(['shop_name' => 'Renamed after provisioning', 'slug' => 'renamed-again']);
     expect($tenant->fresh()->database()->getName())->toBe($databaseName);

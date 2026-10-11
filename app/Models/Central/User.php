@@ -8,7 +8,7 @@ use App\Concerns\LogsSafeActivity;
 use App\Enums\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
 use Carbon\CarbonImmutable;
-use Database\Factories\UserFactory;
+use Database\Factories\Central\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;

@@ -2,8 +2,9 @@
 
 namespace App\Providers;
 
-use App\Http\Middleware\FinishTenantRequest;
+use App\Http\Middleware\Tenant\FinishTenantRequest;
 use App\Models\Central\Tenant;
+use App\Models\Central\TenantSchemaDeployment;
 use App\Services\Central\TenantDatabaseName;
 use App\Services\Central\TenantProvisioner;
 use Illuminate\Contracts\Http\Kernel;
@@ -52,7 +53,11 @@ class TenancyServiceProvider extends ServiceProvider
             $tenant->setInternal('db_name', $reservation->getInternal('db_name'));
 
             DB::connection(config('tenancy.database.central_connection'))->afterCommit(
-                fn () => $this->app->make(TenantProvisioner::class)->provision(Tenant::query()->findOrFail($tenant->id)),
+                function () use ($tenant): void {
+                    if (! TenantSchemaDeployment::where('tenant_id', $tenant->id)->where('operation', 1)->exists()) {
+                        $this->app->make(TenantProvisioner::class)->provision(Tenant::query()->findOrFail($tenant->id));
+                    }
+                },
             );
         });
 

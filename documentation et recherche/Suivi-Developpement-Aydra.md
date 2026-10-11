@@ -439,3 +439,40 @@ La fondation, la configuration, les migrations et le jeu fonctionnel local sont 
 Avant toute activation commerciale : implémenter Spatie Permission et ses règles datées/signatures/absence de recoupement, le rôle propriétaire protégé, Activity Log transactionnel, les intentions/historiques de déploiement, les plans/features/abonnements et quotas concurrents, le singleton shop, les contrôles complets d'état de compte et d'accès, puis l'activation locale par jeton et le profil professionnel vérifié. Ajouter les services, Requests/DTOs/Controllers dans leurs dossiers de contexte au fur et à mesure des véritables fonctionnalités ; ne pas créer de faux endpoints métier ni de tables d'exemples hors des demandes explicites.
 
 Le provisionneur actuel est un amorçage technique synchronisé après commit pour le développement. Une création commerciale devra réserver domaine/quota/intention durable dans la même transaction centrale et posséder un rattrapage après crash. Les seeders de démonstration ne remplacent pas ce workflow de production. Les formulaires nom/prénom distincts et les règles professionnelles complètes sont aussi à terminer ; `name` est seulement la compatibilité du kit.
+
+### 2026-10-11 — Administration centrale, Spatie et création automatique des bases boutiques
+
+Cette entrée actualise l’état décrit ci-dessus, sans réécrire les résultats historiques. L’utilisateur confirme la gestion centrale des rôles, du personnel SaaS, des comptes commerçants et la création technique des boutiques depuis le compte Super Admin. Les fonctionnalités internes Tenant restent reportées ; leur préparation inactive est décrite au §19 de l’architecture.
+
+Les rôles et permissions utilisent Spatie Laravel Permission et ses cinq tables existantes. Les modèles Aydra héritent des modèles Spatie ; les attributions utilisent ses relations et `syncRoles`, enrichis par les règles datées déjà documentées. Aucun système parallèle ni nouvelle table d’autorisation n’est créé. Le Super Admin crée/modifie des rôles de gestion des utilisateurs avec cases à cocher et durée propre à chaque action, entre 1 et 9 999 jours, 9 999 par défaut. Noms et compositions identiques sont refusés ; plusieurs rôles ne peuvent partager de permission. Conserver une attribution conserve sa date de départ. Les rôles système et Super Admin restent protégés.
+
+Les administrateurs délégués munis des droits d’invitation et d’attribution peuvent gérer le personnel SaaS, sans déléguer de permission qu’ils ne possèdent plus. Les restrictions centrales restent vérifiées côté serveur. Les Policies et middlewares protègent les URL et les écritures, indépendamment de l’affichage des menus. Les droits de consultation, création et attribution restent utilisables indépendamment de leurs dates d’expiration.
+
+Les formulaires centraux séparent prénom/nom, pays, compte commerçant/personnel et rôles. Le destinataire reçoit une invitation mise en file, avec payload chiffré, pour choisir lui-même son mot de passe via le broker central Fortify, puis se connecter et vérifier son e-mail. Aucun mot de passe partagé n’est créé par le formulaire et les tokens d’invitation ne figurent pas dans l’audit. Les entrées malformées sont rejetées par les Form Requests avant écriture. Le lot ne comprend pas encore de formulaire de modification/suspension des comptes.
+
+L’offre gratuite par défaut a le code `free`, prix zéro et fonctionnalité `shops`, à portée propriétaire, période totale, avec deux boutiques maximum. Le seeder normal ajoute ce référentiel aux pays sans créer de comptes d’essai. Les nouveaux comptes et l’inscription publique reçoivent un abonnement type 1 actif, sans facture fictive. Les abonnements payants valides sont préservés ; les versions d’offres déjà utilisées ne sont pas réécrites. Le schéma et le diagramme central reprennent le quota de deux boutiques.
+
+La création d’une boutique réserve atomiquement le tenant, son domaine, son quota et une intention dans `tenant_schema_deployments`, avec les vrais ID parents. Le nom physique reste `boutique_{slug_initial}`, sans ID final. Une clé de création et son empreinte permettent une reprise sans doublon. Un job durable central crée/migre ensuite la BDD tenant par `TenantProvisioner`, initialise son unique profil `shop` et lie le propriétaire local à son UUID central. Les paramètres initiaux acceptent les défauts confirmés `OTHER`, `default`, bleu/blanc et panier de sept jours. Les bases et profils existants sont réutilisés lors d’une reprise. Le statut de préparation est conservé ; ce provisionnement n’active pas l’accès commercial ou l’authentification Tenant.
+
+Pour traiter les créations de bases et les invitations, garder un worker actif avec PHP 8.5 :
+
+```powershell
+& 'C:\Users\habou\.config\herd\bin\php85\php.exe' artisan queue:work central-provisioning --queue="tenant-provisioning,default"
+```
+
+La connexion centrale dédiée possède un délai de réservation de 360 secondes, supérieur au timeout de provisionnement de 300 secondes. La commande `aydra:retry-tenant-provisioning` remet en file les intentions en attente, en échec ou abandonnées. Le diagnostic public d’échec est minimisé ; les détails techniques restent privés.
+
+Les classes respectent la chaîne Controller → Form Request → DTO → Service → Model et les dossiers de contexte. Le fragment partagé `resources/views/partials/head.blade.php` est rétabli pour les layouts Central et Tenant, sans requête ni logique de compte. Aucune migration ou table Spatie n’est modifiée dans ce lot. Les comptes et les deux boutiques réels existants sont conservés.
+
+| Contrôle réellement exécuté | Résultat |
+|---|---|
+| Dernier passage gestion et accès centraux | 29 tests réussis, 188 assertions ; Spatie, durées, délégation, protection Super Admin, invitations, quota, reprise et validation malformée |
+| Création automatique de deux bases et préparation Tenant, sur MySQL isolé | 11 tests réussis, 56 assertions ; création/migrations par le worker, liens UUID, profil unique, défauts et reprise contrôlés |
+| Audit en lecture seule du central et des deux boutiques existantes | 1 test réussi, 12 924 assertions ; structures, relations, contraintes et historique conformes aux références |
+| Seeder `Central\FreePlanSeeder` sur le central existant | Réussi ; plan `free` version 1, prix zéro, quota `shops` de deux ; cinq comptes et deux boutiques conservés |
+| Authentification SMTP réelle | Réussie, sans envoyer de message ; la réception effective d’une invitation n’est pas prétendue vérifiée |
+| Requête HTTP réelle de la page de connexion centrale | HTTP 200 ; ce contrôle ne remplace pas un parcours navigateur connecté |
+| Pint, PHPStan et diff | Réussis ; aucune erreur PHPStan |
+| Compilation des assets et vues Blade | `npm.cmd run build` et `artisan view:cache` réussis |
+
+La suite complète n’est pas présentée comme exécutée par ces contrôles ciblés. Elle peut être lancée avec PHP 8.5 et `artisan test --compact` ; les tests utilisent MySQL et leurs bases isolées, sans remplacer les données existantes.

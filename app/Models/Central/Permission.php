@@ -8,6 +8,10 @@ use App\Concerns\LogsSafeActivity;
 use Spatie\Permission\Models\Permission as PackagePermission;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
+/**
+ * @property int $id
+ * @property string $uuid
+ */
 class Permission extends PackagePermission
 {
     use CentralConnection, HasPermissionMetadata, HasPublicUuid, LogsSafeActivity;

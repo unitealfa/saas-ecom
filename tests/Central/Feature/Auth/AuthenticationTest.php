@@ -1,6 +1,9 @@
 <?php
 
+use App\Enums\Users\StatusEnum;
+use App\Models\Central\Role;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Fortify\Features;
 
 test('login screen can be rendered', function () {
@@ -21,7 +24,119 @@ test('users can authenticate using the login screen', function () {
         ->assertSessionHasNoErrors()
         ->assertRedirect(route('dashboard', absolute: false));
 
-    $this->assertAuthenticated();
+    $this->assertAuthenticatedAs($user, 'central');
+    $this->assertGuest('tenant');
+});
+
+test('the central super admin can log in and open the dashboard', function (): void {
+    $user = User::factory()->create();
+    $role = new Role(['name' => 'root']);
+    $role->forceFill(['is_system' => true, 'is_protected' => true, 'is_super_admin' => true])->save();
+    $user->assignRole($role);
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertSessionHasNoErrors()->assertRedirect(route('dashboard', absolute: false));
+
+    $this->assertAuthenticatedAs($user, 'central');
+    $this->assertGuest('tenant');
+    $this->get(route('dashboard'))->assertOk();
+});
+
+test('login accepts an email with surrounding spaces and uppercase letters', function (): void {
+    $user = User::factory()->create(['email' => 'merchant@example.test']);
+
+    $this->post(route('login.store'), [
+        'email' => '  MERCHANT@EXAMPLE.TEST  ',
+        'password' => 'password',
+    ])->assertSessionHasNoErrors()->assertRedirect(route('dashboard', absolute: false));
+
+    $this->assertAuthenticatedAs($user, 'central');
+});
+
+test('login updates an outdated password hash without changing the password', function (): void {
+    $user = User::factory()->create(['password' => Hash::make('password', ['rounds' => 4])]);
+    $oldHash = $user->password;
+    config(['hashing.bcrypt.rounds' => 5, 'hashing.rehash_on_login' => true]);
+    Hash::forgetDrivers();
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertSessionHasNoErrors()->assertRedirect(route('dashboard', absolute: false));
+
+    $newHash = $user->fresh()->password;
+    expect($newHash)->not->toBe($oldHash);
+    expect(Hash::check('password', $newHash))->toBeTrue();
+    expect(Hash::needsRehash($newHash))->toBeFalse();
+    $this->assertAuthenticatedAs($user, 'central');
+});
+
+test('login rejects an unknown central account with the same credentials error', function (): void {
+    $this->post(route('login.store'), [
+        'email' => 'missing@example.test',
+        'password' => 'password',
+    ])->assertSessionHasErrors(['email' => __('auth.failed')]);
+
+    $this->assertGuest('central');
+});
+
+test('non-active central accounts cannot log in with a valid password', function (StatusEnum $status): void {
+    $user = User::factory()->create(['status' => $status]);
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertSessionHasErrors(['email' => __('auth.failed')]);
+
+    $this->assertGuest('central');
+})->with([
+    'inactive' => [StatusEnum::INACTIVE],
+    'suspended' => [StatusEnum::SUSPENDED],
+    'deleted status' => [StatusEnum::DELETED],
+]);
+
+test('soft deleted central accounts cannot log in with a valid password', function (): void {
+    $user = User::factory()->create();
+    $user->delete();
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertSessionHasErrors(['email' => __('auth.failed')]);
+
+    $this->assertGuest('central');
+});
+
+test('a suspended account cannot start the two factor login challenge', function (): void {
+    $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
+    $user = User::factory()->withTwoFactor()->create(['status' => StatusEnum::SUSPENDED]);
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertSessionHasErrors(['email' => __('auth.failed')])->assertSessionMissing('login.id');
+
+    $this->assertGuest('central');
+});
+
+test('login attempts for the same normalized email are rate limited', function (): void {
+    $user = User::factory()->create(['email' => 'merchant@example.test']);
+
+    foreach (range(1, 5) as $attempt) {
+        $this->post(route('login.store'), [
+            'email' => $attempt % 2 === 0 ? '  MERCHANT@EXAMPLE.TEST  ' : $user->email,
+            'password' => 'wrong-password',
+        ])->assertSessionHasErrors(['email']);
+    }
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertTooManyRequests();
+
+    $this->assertGuest('central');
 });
 
 test('users can not authenticate with invalid password', function () {
@@ -32,9 +147,9 @@ test('users can not authenticate with invalid password', function () {
         'password' => 'wrong-password',
     ]);
 
-    $response->assertSessionHasErrorsIn('email');
+    $response->assertSessionHasErrors(['email' => __('auth.failed')]);
 
-    $this->assertGuest();
+    $this->assertGuest('central');
 });
 
 test('users with two factor enabled are redirected to two factor challenge', function () {

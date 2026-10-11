@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use LogicException;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
@@ -39,6 +40,12 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     protected static function newFactory(): TenantFactory
     {
         return TenantFactory::new();
+    }
+
+    /** @return HasMany<Domain, $this> */
+    public function domains(): HasMany
+    {
+        return $this->hasMany(Domain::class, 'tenant_id');
     }
 
     /** @return list<string> */

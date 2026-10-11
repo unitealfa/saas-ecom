@@ -924,3 +924,84 @@ Seeder
 ```
 
 C'est cette architecture qui permet ensuite de commencer le développement proprement sans mélanger toute la logique du SaaS.
+
+---
+
+# 18. Organisation Aydra confirmée le 10 octobre 2026
+
+Cette décision précise les exemples précédents et prévaut pour les prochaines interventions. Le dossier réel des DTO est `app/DTOs`, au pluriel. La séparation comporte désormais trois contextes fonctionnels, mais toujours deux types de bases de données :
+
+| Contexte | Responsabilité | Base utilisée |
+|---|---|---|
+| Central | Comptes de la plateforme, administration et registre des boutiques | Centrale |
+| Tenant | Gestion interne d'une boutique | Base de cette boutique |
+| Storefront | Pages et accès publics d'une boutique | Base de cette boutique, après initialisation Tenancy |
+
+Les Models restent dans `app/Models/Central` et `app/Models/Tenant`. Storefront réutilise les Models tenant ; il ne crée ni troisième BDD ni copie des données. Les Controllers, Requests, Services, DTOs, Policies et autres composants spécifiques sont rangés dans leur contexte. On ne crée les dossiers et fichiers qu'au moment où ils sont nécessaires.
+
+| Composant existant | Emplacement |
+|---|---|
+| Actions d'authentification Fortify centrales | `app/Actions/Central/Fortify` |
+| Actions Livewire centrales | `app/Livewire/Central/Actions` |
+| Middlewares propres à un contexte | `app/Http/Middleware/Central` ou `app/Http/Middleware/Tenant` |
+| Contrôleur d'accueil public de boutique | `app/Http/Controllers/Storefront/StorefrontController.php` |
+| Pages du starter kit réservées au central | `resources/views/central/pages/auth`, `resources/views/central/pages/settings` |
+| Pages Livewire du dashboard et des utilisateurs centraux | `resources/views/central/pages` |
+| Layouts centraux | `resources/views/central/layouts` |
+| Composants et fragments propres aux comptes centraux | `resources/views/central/components`, `resources/views/central/partials` |
+| Factories | `database/factories/Central`, `database/factories/Tenant` |
+| Tests | `tests/Central`, `tests/Tenant` ; les futurs tests publics spécifiques vont dans `tests/Storefront` |
+| Routes centrales et réglages | `routes/central.php`, `routes/central/settings.php` |
+| Routes internes tenant | `routes/tenant.php` |
+| Routes publiques de boutique | `routes/storefront.php`, inclus dans le groupe de middlewares tenant |
+| Migrations et seeders | `database/migrations/central`, `database/migrations/tenant`, `database/seeders/Central`, `database/seeders/Tenant` |
+
+`config/livewire.php` associe les alias historiques `pages::` et `layouts::` aux dossiers centraux ci-dessus ; ces alias sont réservés au central. Les alias explicites `central::`, `tenant::` et `storefront::` associent les vues à leur contexte et permettent de générer directement les prochains composants à leur emplacement. Une future page Tenant ou Storefront choisit explicitement un layout de son contexte, sans employer par défaut le layout central. Les noms techniques des fichiers Livewire existants et les noms de routes sont conservés ; les références affectées par un déplacement sont mises à jour. Lors de la création d'un nouveau dossier de tests de contexte, sa découverte doit aussi être ajoutée dans `phpunit.xml` et `tests/Pest.php` selon le besoin.
+
+Les classes d'infrastructure communes, les traits partagés, le pivot polymorphe `PermissionAssignment`, `SchemaBlueprint`, les providers, les composants visuels réutilisables et l'orchestration des tests/seeders restent partagés. Les points d'entrée `App\Models\User` et `App\Models\Tenant` conservent la compatibilité avec les implémentations centrales documentées. `app/Models/Test.php` reste un exemple technique sans contexte métier, conformément à la réponse de l'utilisateur.
+
+Avant chaque opération sur un fichier, vérifier cette organisation et l'absence d'un équivalent. Ne pas ajouter d'emojis ; préserver uniquement les caractères techniques des frameworks. Après un déplacement, vérifier les références, la configuration chargée, les routes et les tests concernés sans changer les données existantes.
+
+---
+
+# 19. Préparation Tenant confirmée le 11 octobre 2026
+
+Les dossiers Tenant accompagnent leurs équivalents Central. Les fichiers ci-dessous constituent une base pour la suite ; aucune nouvelle route d'authentification, de dashboard ou de profil boutique n'est enregistrée. Le développement fonctionnel des boutiques reste reporté après celui de la plateforme centrale.
+
+| Élément préparé | Emplacement |
+|---|---|
+| Layout interne et barre latérale | `resources/views/tenant/layouts/app.blade.php`, `resources/views/tenant/layouts/app/sidebar.blade.php` |
+| Layout d'authentification | `resources/views/tenant/layouts/auth.blade.php`, `resources/views/tenant/layouts/auth/simple.blade.php` |
+| Vue de connexion | `resources/views/tenant/pages/auth/login.blade.php` |
+| Vues d'accueil et de profil | `resources/views/tenant/pages/dashboard.blade.php`, `resources/views/tenant/pages/settings/profile.blade.php` |
+| Présentation du compte et message de préparation | `resources/views/tenant/components/account-summary.blade.php`, `resources/views/tenant/partials/preparation-notice.blade.php` |
+| Coordination HTTP du futur accueil | `app/Http/Controllers/Tenant/DashboardController.php` |
+| Lecture des données de l'accueil | `app/Services/Tenant/Dashboard.php` |
+| Données transmises aux vues | `app/DTOs/Tenant/DashboardData.php` |
+| Tests isolés de cette préparation | `tests/Tenant/Feature/DashboardControllerTest.php` |
+
+Le contrôleur préparé utilise exclusivement le compte du guard `tenant`. Le service exige un contexte boutique initialisé, un compte et une appartenance actifs, une invitation acceptée (`joined_at`) et un e-mail vérifié. Il lit le seul profil `shop` local et vérifie sa référence `tenant_uuid`. Le DTO transmet uniquement le nom de la boutique et celui du compte ; les vues n'effectuent aucune requête SQL. Les tests enregistrent leur route uniquement dans l'application de test et utilisent des bases MySQL temporaires isolées.
+
+La vue de connexion reste sans formulaire tant qu'une action tenant explicite n'est pas transmise dans `loginAction`. Son éventuel lien de récupération est fourni séparément dans `passwordRequestUrl` ; elle ne réutilise aucune route Fortify centrale et ne propose pas d'inscription publique boutique. Ces contrats visuels ne configurent ni Fortify tenant, ni un flux d'invitation, ni l'envoi de messages.
+
+Les layouts utilisent explicitement `tenant::`, les composants communs compatibles et le lien relatif existant `tenant.home` vers la vitrine. Les menus d'administration, rôles, passkeys et paramètres centraux ne sont pas copiés. Les dossiers réservés aux futures Actions, Notifications, Requests, Policies, actions Livewire, routes et tests unitaires Tenant restent disponibles avec leurs marqueurs `.gitkeep` lorsqu'aucun fichier utile n'est encore nécessaire. Les modèles, migrations, factories et seeders Tenant existants sont réutilisés.
+
+---
+
+# 20. Administration centrale confirmée le 11 octobre 2026
+
+Le fragment resources/views/partials/head.blade.php reste commun : métadonnées HTML, assets Vite et apparence Flux, sans requête ni compte central. Les layouts Central et Tenant le réutilisent ; les autres fragments propres aux comptes restent dans leur contexte.
+
+Les Controllers et Form Requests Central coordonnent les formulaires de rôles, comptes et boutiques. Les DTOs de app/DTOs/Central transportent les données vers RoleManager, UserManager et TenantCreator ; les vues vont dans resources/views/central/pages/{roles,users,tenants}. Les Policies protègent aussi les URL et les actions serveur.
+
+Les rôles, permissions et attributions utilisent exclusivement Spatie Laravel Permission et ses cinq tables existantes. Role et Permission héritent des modèles Spatie ; les extensions séparées conservent UUID, durées, dates d’attribution, signatures et versions. AuthorizationMutation verrouille le rôle root protégé puis les rôles/comptes concernés, contrôle les noms/compositions identiques, durées de 1 à 9 999 jours et recoupements. UserManager utilise syncRoles de Spatie enrichi par le contrat daté existant ; conserver un rôle conserve sa date. Aucun système d’autorisation parallèle n’est créé.
+
+Le Super Admin crée/modifie les rôles de gestion des utilisateurs ; les rôles système restent protégés. Son rôle n’est pas attribuable depuis ces formulaires. Un administrateur délégué possédant saas.staff.invite et saas.users.roles.assign peut gérer le personnel et déléguer uniquement des droits qu’il possède encore. Dates et admin_restrictions restent contrôlées. Les comptes créés par l’administration sont invités à choisir leur mot de passe par le broker central de Fortify, puis se connecter et vérifier leur e-mail. AccountInvitation est mise en file après commit, avec payload chiffré ; aucun mot de passe partagé ni secret n’est journalisé.
+
+Le plan gratuit par défaut, code free, possède la fonctionnalité shops : quota de quantité à portée propriétaire, période totale, maximum deux boutiques. FreePlanSeeder crée uniquement les référentiels ; DefaultSubscription attribue le type 1 actif sans facture fictive. Les abonnements payants existants sont préservés. Les offres utilisées sont versionnées.
+
+TenantCreator verrouille le propriétaire, vérifie creation_key et creation_hash avant le quota et compte ses boutiques non archivées, préparations/échecs compris. Tenant, domaine et tenant_schema_deployments sont réservés atomiquement avec les vrais ID parents. Le nom reste boutique_{slug_initial}, sans suffixe d’ID. Les réglages initiaux shop acceptent les valeurs validées du formulaire ou les défauts OTHER, default, couleurs bleu/blanc et panier de sept jours.
+
+Le job app/Jobs/Central/ProvisionTenantDatabase est enregistré sur la connexion database dédiée central-provisioning dans la transaction centrale, sur la file tenant-provisioning. Après commit, le worker appelle TenantProvisioner : création/migration de la base, profil shop unique et propriétaire local lié par UUID central. Les relances réutilisent la réservation, la base et le profil. tenant_schema_deployments conserve attente, exécution, réussite ou échec avec un diagnostic public minimisé. La commande aydra:retry-tenant-provisioning remet en file les demandes en attente/échec ou abandonnées. Utiliser PHP 8.5 pour artisan queue:work central-provisioning ; artisan queue:work database traite séparément les invitations de la file default. Un seul worker peut traiter les deux avec artisan queue:work central-provisioning --queue=tenant-provisioning,default. La connexion dédiée réserve les jobs pendant 360 secondes pour un timeout de provisionnement de 300 secondes ; le worker database ordinaire ne consomme pas les jobs de provisionnement. Le lot prépare techniquement les boutiques sans activer leur authentification, dashboard, gestion d’équipe ou accès commercial.
+
+Les droits de consultation, création et attribution restent indépendants, y compris lorsque leurs durées diffèrent. Les liens de création et les redirections après sauvegarde respectent les permissions encore valables ; un créateur sans consultation revient au dashboard. Les Requests normalisent seulement les chaînes et rejettent les données malformées par la validation Laravel avant toute écriture.

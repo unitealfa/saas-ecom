@@ -2,13 +2,17 @@
 
 namespace App\Providers;
 
-use App\Actions\Fortify\CreateNewUser;
-use App\Actions\Fortify\ResetUserPassword;
+use App\Actions\Central\Fortify\CreateNewUser;
+use App\Actions\Central\Fortify\ResetUserPassword;
+use App\Enums\Users\StatusEnum;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Illuminate\Support\Timebox;
 use Laravel\Fortify\Fortify;
 
 class FortifyServiceProvider extends ServiceProvider
@@ -27,6 +31,7 @@ class FortifyServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureActions();
+        $this->configureAuthentication();
         $this->configureViews();
         $this->configureRateLimiting();
     }
@@ -38,6 +43,27 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::createUsersUsing(CreateNewUser::class);
+    }
+
+    private function configureAuthentication(): void
+    {
+        Fortify::authenticateUsing(function (Request $request): ?User {
+            return (new Timebox)->call(function () use ($request): ?User {
+                $email = Str::lower(trim($request->string(Fortify::username())->toString()));
+                $password = $request->string('password')->toString();
+                $user = User::where('email', $email)->first();
+
+                if ($user === null || $user->status !== StatusEnum::ACTIVE || ! Hash::check($password, $user->password)) {
+                    return null;
+                }
+
+                if (config('hashing.rehash_on_login', true) && Hash::needsRehash($user->password)) {
+                    $user->forceFill(['password' => Hash::make($password)])->save();
+                }
+
+                return $user;
+            }, 200000);
+        });
     }
 
     /**
@@ -64,7 +90,8 @@ class FortifyServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('login', function (Request $request) {
-            $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
+            $email = Str::lower(trim($request->string(Fortify::username())->toString()));
+            $throttleKey = Str::transliterate($email.'|'.$request->ip());
 
             return Limit::perMinute(5)->by($throttleKey);
         });

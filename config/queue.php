@@ -31,6 +31,16 @@ return [
 
     'connections' => [
 
+        'central-provisioning' => [
+            'driver' => 'database',
+            'connection' => env('DB_CONNECTION', 'mysql'),
+            'table' => 'jobs',
+            'queue' => 'tenant-provisioning',
+            'retry_after' => 360,
+            'after_commit' => false,
+            'central' => true,
+        ],
+
         'sync' => [
             'driver' => 'sync',
         ],
