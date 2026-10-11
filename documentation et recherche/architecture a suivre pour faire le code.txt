@@ -1009,3 +1009,140 @@ Les droits de consultation, création et attribution restent indépendants, y co
 Les pages users/show et users/edit sont coordonnées par UserController, UpdateUserRequest, UserProfileData et UserManager. UserSaveResult transmet l’état réel de l’envoi, sans token. La consultation exige saas.users.view sur la cible. La modification du prénom, nom, e-mail, téléphone et pays exige saas.users.update pour un commerçant ou saas.staff.invite pour du personnel ; un délégué ne peut modifier un compte possédant des permissions qu’il ne possède plus. Le Super Admin reste protégé. Le formulaire ne modifie ni mot de passe, ni statut, ni rôles. Un nouvel e-mail perd sa vérification et ses anciens tokens ; un téléphone modifié perd ses preuves. Une identité professionnelle modifiée augmente sa version et demande revalidation. Les informations professionnelles sont consultables, sans formulaire de validation professionnelle dans ce lot.
 
 Le bouton Boutiques utilise la Policy Tenant et les permissions Spatie existantes. La cible doit être un commerçant sans rôle central, même si les droits d’un ancien rôle SaaS ont expiré. L’interdiction s’applique également aux routes et au service de création. Aucun nom de rôle n’est codé dans les vues pour contourner ce contrôle. Les boutiques déjà enregistrées ne sont ni supprimées ni transférées.
+
+
+---
+
+# 21. Cadre durable de travail confirmé le 11 octobre 2026
+
+AGENTS.md à la racine contient les instructions opérationnelles. Le présent chapitre conserve les détails utiles sans imposer une relecture intégrale du dépôt à chaque petite tâche. La reconnaissance initiale porte sur les instructions prioritaires, Git, les documents de référence, manifestes, verrouillages, scripts, outils et configurations ; ensuite, limiter la lecture aux sujets et fichiers concernés.
+
+## 21.1 Autorité des sources et décisions
+
+Une décision explicite récente de l'utilisateur remplace une règle ancienne incompatible. Actualiser la règle dans son document plutôt qu'ajouter une exception contradictoire. Distinguer une exception ponctuelle d'une préférence durable ; ne pas enregistrer une proposition ou une supposition comme accord.
+
+Le schéma principal porte le métier ; les diagrammes précisent les structures et relations de chaque BDD. Les migrations et modèles montrent l'implémentation actuelle, sans constituer une preuve que toutes les fonctionnalités documentées sont terminées. Le suivi distingue décisions et vérifications datées. Les §18–20 précisent les exemples génériques des chapitres précédents ; les §21–22 fixent le cadre de travail courant.
+
+Les notes restent des ressources à consulter selon le sujet, pas des consignes à appliquer aveuglément. En particulier, last one notes.md annonce une analyse historique de V3 et renvoie à V4.10. Les anciennes règles UUID-only, modules retirés ou exemples génériques d'organisation ne remplacent pas les décisions validées. Une contradiction non résolue qui change un résultat métier impose une question précise après recherche.
+
+Pour une tâche longue interrompue, compléter Suivi-Developpement-Aydra.md avec un point de reprise court : objectif, décisions confirmées, fichiers concernés, contrôles et résultats, travail restant. Ne pas transformer le suivi en journal de micro-actions ni y inscrire des secrets.
+
+## 21.2 Réalisation, sécurité et performance
+
+Respecter le périmètre : expliquer lorsqu'une explication est demandée, implémenter et raccorder les couches lorsqu'une réalisation est demandée. Les choix techniques courants et réversibles ne nécessitent pas de confirmations répétées. Ne pas ajouter de fonctionnalité, dépendance ou refonte hors nécessité autorisée. Une amélioration voisine peut être signalée sans être appliquée.
+
+Réutiliser les mécanismes Laravel, Fortify, Spatie et les composants présents. Une abstraction doit clarifier une responsabilité ou supprimer une duplication réelle. Préserver les contrats publics et comportements non concernés. Contrôler les points d'entrée : validation, autorisations, données, métier, interface, erreurs. Corriger la cause d'un défaut ; aucune exception masquée ni donnée fictive pour afficher un succès.
+
+Les contrôles d'accès sont côté serveur et portent aussi sur la cible. Valider les entrées, échapper les affichages et contrôler CSRF, fichiers téléversés et accès aux fichiers lorsque concernés. Secrets, mots de passe, tokens et données personnelles inutiles ne doivent apparaître ni dans les réponses, ni les logs, ni les instructions, ni les commits. Lire uniquement les valeurs de configuration utiles et non sensibles.
+
+Vérifier le contexte Central/Tenant, la connexion et la portée des requêtes, jobs, fichiers et caches. Deux boutiques ne partagent pas implicitement leurs données. En cas de concurrence, double soumission ou appel externe, choisir transactions, contraintes, verrouillage, idempotence et exécution après commit selon le besoin du parcours existant.
+
+Optimiser des coûts observables : N+1, volumes chargés, pagination, index, calculs, attentes réseau ou appels redondants. Une tâche de fond réutilise l'infrastructure disponible avec erreurs et reprises explicites. Un cache exige une portée isolée par tenant, une invalidation et un bénéfice identifiés. Un gain annoncé nécessite une mesure reproductible ; sinon indiquer qu'il reste à mesurer. Aucune mesure comparative de performance n'est produite par l'installation de ces instructions.
+
+Préserver les modifications existantes et relire les diffs avant édition et en fin de tâche. Les erreurs introduites doivent être corrigées ; les défauts préexistants et limites de vérification restent distincts. Pour une action irréversible, une publication ou la production, l'autorisation doit couvrir précisément l'action. Ne pas changer les permissions ou la sécurité Windows pour contourner un obstacle.
+
+## 21.3 Persistance et chargement
+
+AGENTS.md était exclu par .gitignore ; l'exclusion est retirée pour permettre son ajout à Git. Le fichier doit rester court, avec ses références relatives vers des fichiers existants. Les détails techniques précédemment placés dans ce fichier sont consolidés au §22 ; les consignes spécifiques de structure restent aux §18–20. Aucun nouveau document complémentaire n'est nécessaire.
+
+Le chargement dépend du client, de la racine Git, du dossier courant et du profil : un AGENTS.override.md remplace AGENTS.md au même niveau, et les règles de sous-dossier peuvent préciser celles de la racine. Codex utilise une limite cumulée de 32 KiB par défaut, configurable par project_doc_max_bytes ; cette valeur par défaut ne prouve pas la limite effective d'une session. Les liens vers les documents n'en chargent pas automatiquement tout le contenu. Source : [documentation officielle OpenAI sur AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
+
+Ne pas modifier la configuration globale pour installer ces règles. Vérifier les fichiers prioritaires lorsqu'une future session paraît ignorer les consignes. Les scripts Composer existants peuvent exécuter boost:update après une mise à jour de dépendances ; contrôler alors le diff des instructions et préserver les décisions locales, sans désactiver ce hook dans le cadre de cette installation.
+
+---
+
+# 22. Conventions techniques et commandes utiles
+
+Ce chapitre consolide les consignes compatibles de l'ancien AGENTS.md ; les préférences récentes de l'utilisateur remplacent les lancements systématiques de contrôles. Les exemples de commandes ci-dessous ne constituent pas une demande de les exécuter à chaque tâche.
+
+## 22.1 Structure et code
+
+- Appliquer les chemins du §18 avant génération. Models et factories : Central/Tenant. Controllers, Requests, DTOs, Services, Policies, middlewares et composants métier : contexte Central, Tenant ou Storefront lorsque prévu. Actions Fortify et notifications SaaS sont centrales.
+- Providers, classes de base, traits partagés, SchemaBlueprint, PermissionAssignment, composants visuels communs et orchestration tests/seeders peuvent rester partagés. App\Models\User et App\Models\Tenant sont des entrées de compatibilité ; app/Models/Test.php est un exemple technique sans table ni fonctionnalité à inventer.
+- Vues : resources/views/{central,tenant,storefront}. Migrations et seeders : database/migrations/{central,tenant} et database/seeders/{Central,Tenant}. Tests : tests/{Central,Tenant,Storefront} ; mettre à jour phpunit.xml et tests/Pest.php seulement si un nouveau contexte de tests le nécessite.
+- Réutiliser les noms techniques, enums et conventions existantes. Accolades pour les structures de contrôle ; types des paramètres et retours ; promotion de constructeur lorsque pertinente ; pas de constructeur vide inutile. Préférer un PHPDoc utile aux commentaires paraphrasant le code, avec formes d'array documentées si nécessaires.
+- Utiliser les relations Eloquent et le route model binding lorsqu'adaptés. Éviter les requêtes dans les vues, les N+1 et les collections entières lorsqu'une pagination suffit. Générer les liens par noms de routes.
+- Conserver les contrats Fortify, les relations Spatie et les contrôles Laravel ; ne pas remplacer leur infrastructure par un système parallèle. Livewire conserve son état serveur et valide/autorise ses actions. Les API introduites utilisent les conventions existantes ; Resources et versionnement doivent répondre à un besoin réel.
+- Aucun emoji ajouté aux textes, interfaces, commentaires ou nouveaux noms. Livewire 4 propose --emoji=false sur make:livewire, vérifié dans le générateur installé ; utiliser cette option sans changer la configuration de l'application durant une tâche limitée à la documentation. Les anciens noms restent en place jusqu'à un renommage demandé, avec contrôle des références. Flux/Lucide restent adaptés aux icônes d'interface.
+
+## 22.2 Migrations et relations
+
+Avant toute migration, comparer schéma, diagramme du contexte, migrations existantes et structure MySQL lorsque l'accès en lecture seule permet sa consultation. Préserver les migrations déployées ; créer une migration d'évolution lorsqu'elle est nécessaire. Une commande de création Artisan doit recevoir son chemin central ou tenant avant exécution.
+
+Une FK locale conserve la vraie PK d'un parent existant : foreignId() ne crée pas seul une FK SQL ; constrained() ou foreign()->references()->on() doit désigner explicitement le parent. Aucune FK ne génère son propre ID. Déclarer les contraintes dans la migration de la table lorsque l'ordre le permet ; isoler et documenter celles visant des parents créés ensuite. Préserver les UK parents et FK composites, nullabilités et actions RESTRICT documentées. Les références UUID inter-BDD et liens polymorphes suivent REF/POLY sans FK SQL fictive.
+
+L'ID est déjà unique par sa PK ; ne pas supprimer pour autant les UK composites nécessaires aux relations. SchemaBlueprint fournit les conventions communes de types/UUID/precision ; les exceptions des packages, sessions et pivots restent documentées. Ne pas appliquer une simplification globale aveuglément. Vérifier les garanties réelles dans MySQL si une migration autorisée a été exécutée, notamment l'absence d'AUTO_INCREMENT sur les FK.
+
+## 22.3 Environnement et outils
+
+Utiliser Windows/PowerShell et cet exécutable PHP, vérifié fonctionnel :
+
+~~~powershell
+$aydraPhp = 'C:\Users\habou\.config\herd\bin\php85\php.exe'
+$aydraComposer = 'C:\Users\habou\.config\herd\bin\composer.phar'
+& $aydraPhp --version
+& $aydraPhp $aydraComposer --version
+& $aydraPhp $aydraComposer show --direct
+~~~
+
+Le wrapper composer trouvé dans le PATH lors de la reconnaissance pointe vers herd-lite ; ne pas l'utiliser. npm.cmd est disponible pour les commandes npm sous PowerShell. Le projet utilise MySQL ; ne pas basculer vers SQLite et ne pas modifier la sécurité Windows.
+
+Vérifier une version avant de dépendre de son API : composer.lock et vendor/composer/installed.json pour PHP, package-lock.json et les packages installés pour JavaScript. Les contraintes de composer.json/package.json ne sont pas les versions effectivement installées. Utiliser la documentation officielle de la version concernée ou le code installé.
+
+Si Boost est réellement exposé, préférer search-docs pour les API, database-query en lecture seule, database-schema, get-absolute-url et browser-logs selon la tâche. Leur absence n'est pas une raison d'inventer un résultat : utiliser des alternatives adaptées. Si .ai/rules existe, lire son index, les règles dont les chemins correspondent et rechercher les mots-clés pertinents avec rg. Les skills locaux sont consultés lorsqu'ils sont présents et pertinents, pas tous à chaque demande.
+
+Sur PowerShell, vérifier l'échappement des arguments : JSON.stringify n'est pas un échappement shell et les guillemets d'un argument natif peuvent être interprétés. Pour une inspection PHP/JSON nécessaire, préférer une entrée standard correctement construite aux chaînes ambiguës ; aucune création de script de vérification si un contrôle existant convient. Ne pas utiliser Tinker pour créer des modèles ou des données sans autorisation.
+
+## 22.4 Commandes disponibles et portée
+
+artisan --version et artisan list --format=json --no-interaction ont été exécutés pendant la reconnaissance. Les commandes de génération ci-dessous sont présentes ; leurs options de contexte, --path, --pest et --emoji ont été vérifiées dans les définitions installées. Les exemples de génération ne sont pas exécutés durant cette installation :
+
+~~~powershell
+& $aydraPhp artisan make:controller Central/UserController --no-interaction
+& $aydraPhp artisan make:request Central/SaveRoleRequest --no-interaction
+& $aydraPhp artisan make:class DTOs/Central/RoleData --no-interaction
+& $aydraPhp artisan make:class Services/Central/RoleManager --no-interaction
+& $aydraPhp artisan make:policy Central/UserPolicy --no-interaction
+& $aydraPhp artisan make:seeder Central/AuthorizationSeeder --no-interaction
+& $aydraPhp artisan make:migration nom_de_levolution --path=database/migrations/central --no-interaction
+& $aydraPhp artisan make:test --pest 'Tests\Central\Feature\SomeFeatureTest' --no-interaction
+& $aydraPhp artisan make:livewire tenant::products.index --emoji=false --no-interaction
+~~~
+
+Ces noms illustrent la destination ; vérifier l'absence d'un équivalent et le périmètre autorisé avant génération. Une page Tenant ainsi générée doit choisir son layout tenant et ne doit pas être activée implicitement. Créer factories/seeders associés à un modèle seulement s'ils sont utiles au besoin autorisé.
+
+Pour une consultation ou un contrôle léger :
+
+~~~powershell
+git status --short
+git diff --check
+& $aydraPhp -l routes/central.php
+& $aydraPhp artisan route:list --name=central.users --no-interaction
+~~~
+
+route:list accepte aussi les filtres --method, --path, --except-vendor et --only-vendor. Lire la configuration ciblée sans exposer ses secrets ; une valeur calculée identique ne prouve pas qu'une forme de code demandée existe littéralement. Un contrôle de route Laravel ne prouve pas une réponse navigateur réelle ni la résolution DNS.
+
+Les commandes migrate et tenants:migrate sont disponibles avec --path et --realpath ; tenants:migrate accepte aussi --tenants. Le provisionnement existant réutilise TenantProvisioner et son job central. Migrer, peupler, créer des boutiques, lancer le worker ou réinitialiser une base a des effets métier : vérifier les cibles et l'autorisation, ne pas lancer ces commandes comme simple reconnaissance.
+
+## 22.5 Vérifications proportionnées et préférences durables
+
+Les contrôles doivent révéler ce qui peut réellement casser. Ajouter/adapter un test de comportement lorsque nécessaire, avec cas attendu et échecs importants ; ne pas tester uniquement la copie d'une implémentation. Authentification, autorisations et données tenant exigent notamment de vérifier refus d'accès et isolation entre deux boutiques lorsque le contrôle autorisé le permet. Pour les interfaces, inspecter rendu et parcours si les outils disponibles le permettent.
+
+L'utilisateur demande de ne pas lancer systématiquement tests longs, Pint ou PHPStan et de ne pas créer des bases à chaque vérification. Utiliser les bases existantes en lecture seule, préserver les résultats encore valables et signaler ce qui reste impossible à prouver sans écritures. Un test nécessitant création de BDD, migration, fixtures ou modification de données exige une nouvelle autorisation explicite ; ne jamais déplacer ses écritures vers une base réelle pour éviter cette demande.
+
+L'implémentation actuelle de tests/TestCase.php crée et supprime des bases MySQL isolées ; tests/Pest.php applique RefreshDatabase aux tests centraux fonctionnels. Un filtre ne rend pas automatiquement ces tests en lecture seule. Les scripts Composer test et ci:check déclenchent aussi formatage/analyse/tests ; setup et les hooks d'installation peuvent migrer ou générer une clé. Ne pas les lancer pour contourner les préférences de l'utilisateur. Les scripts existants sont préservés, pas supprimés.
+
+Quand ces contrôles sont pertinents et autorisés, les outils déjà présents sont :
+
+~~~powershell
+& $aydraPhp vendor/bin/pest chemin_du_test --filter=nom_du_cas
+& $aydraPhp vendor/bin/pint chemin_du_fichier --format agent
+& $aydraPhp vendor/bin/phpstan analyse --no-progress --memory-limit=512M
+npm.cmd run build
+~~~
+
+Il s'agit d'exemples conditionnels, pas de contrôles exécutés pour cette installation. Les tests doivent utiliser des factories adaptées, ne pas dépendre de données privées ou d'un autre test, et isoler les services externes. Ne pas supprimer un test ou son assertion pour obtenir un résultat positif. Une modification de texte/style seule ne nécessite pas une nouvelle suite de tests.
+
+Lorsqu'un test Artisan est réellement autorisé, choisir le fichier ou --filter, sans relancer toute la suite à chaque changement ; --no-interaction destiné aux générateurs ne doit pas être ajouté aveuglément au runner. Pint, s'il est nécessaire, s'applique aux fichiers concernés en mode formatage ; PHPStan reste au niveau configuré par phpstan.neon. Les assets utilisent npm.cmd run build ou npm.cmd run dev, uniquement lorsque le parcours frontend le nécessite. Ne pas annoncer un contrôle comme réussi sans résultat récupéré.
+
+Finir par la relecture du diff et des fichiers réellement écrits. Distinguer vérification du code, état réel de MySQL, réponse HTTP et rendu navigateur. Le compte rendu indique résultat, principaux fichiers, seuls contrôles exécutés et limites ; il ne demande pas une suite complète par défaut.
