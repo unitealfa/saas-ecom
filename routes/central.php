@@ -9,7 +9,7 @@ use App\Http\Middleware\Central\EnsureActiveCentralAccount;
 use App\Http\Middleware\EnsureLocalDiagnostics;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'central.welcome')->name('home');
+Route::redirect('/', '/login')->name('home');
 
 Route::get('/_dev/database', DatabaseDiagnosticsController::class)
     ->middleware(EnsureLocalDiagnostics::class)->name('central.database-diagnostics');
