@@ -941,8 +941,8 @@ Les Models restent dans `app/Models/Central` et `app/Models/Tenant`. Storefront 
 
 | Composant existant | Emplacement |
 |---|---|
-| Actions d'authentification Fortify centrales | `app/Actions/Central/Fortify` |
-| Actions Livewire centrales | `app/Livewire/Central/Actions` |
+| Actions d'authentification Fortify centrales | `app/Actions/Central/Auth/Fortify` |
+| Actions Livewire centrales | `app/Livewire/Central/Auth/Actions` |
 | Middlewares propres à un contexte | `app/Http/Middleware/Central` ou `app/Http/Middleware/Tenant` |
 | Contrôleur d'accueil public de boutique | `app/Http/Controllers/Storefront/StorefrontController.php` |
 | Pages du starter kit réservées au central | `resources/views/central/pages/auth`, `resources/views/central/pages/settings` |
@@ -973,12 +973,12 @@ Les dossiers Tenant accompagnent leurs équivalents Central. Les fichiers ci-des
 | Layout interne et barre latérale | `resources/views/tenant/layouts/app.blade.php`, `resources/views/tenant/layouts/app/sidebar.blade.php` |
 | Layout d'authentification | `resources/views/tenant/layouts/auth.blade.php`, `resources/views/tenant/layouts/auth/simple.blade.php` |
 | Vue de connexion | `resources/views/tenant/pages/auth/login.blade.php` |
-| Vues d'accueil et de profil | `resources/views/tenant/pages/dashboard.blade.php`, `resources/views/tenant/pages/settings/profile.blade.php` |
+| Vues d'accueil et de profil | `resources/views/tenant/pages/admin/dashboard/dashboard.blade.php`, `resources/views/tenant/pages/settings/profile.blade.php` |
 | Présentation du compte et message de préparation | `resources/views/tenant/components/account-summary.blade.php`, `resources/views/tenant/partials/preparation-notice.blade.php` |
-| Coordination HTTP du futur accueil | `app/Http/Controllers/Tenant/DashboardController.php` |
-| Lecture des données de l'accueil | `app/Services/Tenant/Dashboard.php` |
-| Données transmises aux vues | `app/DTOs/Tenant/DashboardData.php` |
-| Tests isolés de cette préparation | `tests/Tenant/Feature/DashboardControllerTest.php` |
+| Coordination HTTP du futur accueil | `app/Http/Controllers/Tenant/Admin/Dashboard/DashboardController.php` |
+| Lecture des données de l'accueil | `app/Services/Tenant/Dashboard/Dashboard.php` |
+| Données transmises aux vues | `app/DTOs/Tenant/Dashboard/DashboardData.php` |
+| Tests isolés de cette préparation | `tests/Tenant/Feature/Dashboard/DashboardControllerTest.php` |
 
 Le contrôleur préparé utilise exclusivement le compte du guard `tenant`. Le service exige un contexte boutique initialisé, un compte et une appartenance actifs, une invitation acceptée (`joined_at`) et un e-mail vérifié. Il lit le seul profil `shop` local et vérifie sa référence `tenant_uuid`. Le DTO transmet uniquement le nom de la boutique et celui du compte ; les vues n'effectuent aucune requête SQL. Les tests enregistrent leur route uniquement dans l'application de test et utilisent des bases MySQL temporaires isolées.
 
@@ -992,11 +992,11 @@ Les layouts utilisent explicitement `tenant::`, les composants communs compatibl
 
 Le fragment resources/views/partials/head.blade.php reste commun : métadonnées HTML, assets Vite et apparence Flux, sans requête ni compte central. Les layouts Central et Tenant le réutilisent ; les autres fragments propres aux comptes restent dans leur contexte.
 
-Les Controllers et Form Requests Central coordonnent les formulaires de rôles, comptes et boutiques. Les DTOs de app/DTOs/Central transportent les données vers RoleManager, UserManager et TenantCreator ; les vues vont dans resources/views/central/pages/{roles,users,tenants}. Les Policies protègent aussi les URL et les actions serveur.
+Les Controllers et Form Requests Central coordonnent les formulaires de rôles, comptes et boutiques. Les DTOs de app/DTOs/Central transportent les données vers RoleManager, UserManagementService et TenantCreator ; les vues vont dans resources/views/central/pages/{roles,tenants} et resources/views/central/pages/admin/users. Les Policies protègent aussi les URL et les actions serveur.
 
-Les rôles, permissions et attributions utilisent exclusivement Spatie Laravel Permission et ses cinq tables existantes. Role et Permission héritent des modèles Spatie ; les extensions séparées conservent UUID, durées, dates d’attribution, signatures et versions. AuthorizationMutation verrouille le rôle root protégé puis les rôles/comptes concernés, contrôle les noms/compositions identiques, durées de 1 à 9 999 jours et recoupements. UserManager utilise syncRoles de Spatie enrichi par le contrat daté existant ; conserver un rôle conserve sa date. Aucun système d’autorisation parallèle n’est créé.
+Les rôles, permissions et attributions utilisent exclusivement Spatie Laravel Permission et ses cinq tables existantes. Role et Permission héritent des modèles Spatie ; les extensions séparées conservent UUID, durées, dates d’attribution, signatures et versions. AuthorizationMutation verrouille le rôle root protégé puis les rôles/comptes concernés, contrôle les noms/compositions identiques, durées de 1 à 9 999 jours et recoupements. UserManagementService utilise syncRoles de Spatie enrichi par le contrat daté existant ; conserver un rôle conserve sa date. Aucun système d’autorisation parallèle n’est créé.
 
-Le Super Admin crée/modifie les rôles de gestion des utilisateurs ; les rôles système restent protégés. Son rôle n’est pas attribuable depuis ces formulaires. Un administrateur délégué possédant saas.staff.invite et saas.users.roles.assign peut gérer le personnel et déléguer uniquement des droits qu’il possède encore. Dates et admin_restrictions restent contrôlées. Les permissions sont regroupées par module (comptes commerçants, personnel SaaS, pays). Un droit de gestion actif permet aussi la consultation du module dans sa portée ; les restrictions et dates restent contrôlées, sans permission ajoutée aux pivots Spatie. Inviter le personnel (saas.staff.invite) et le modifier (saas.staff.update) sont distincts. Les nouvelles actions de suspension, réactivation et suppression sont séparément autorisées. Les comptes créés par l’administration sont invités à choisir leur mot de passe par le broker central de Fortify, puis se connecter et vérifier leur e-mail. Après la correction confirmée le 11 octobre, AccountMailDelivery utilise notifyNow de Laravel après commit : l’invitation part directement, sans worker. AccountInvitation reste compatible avec les anciens jobs chiffrés. Une panne SMTP conserve le compte, affiche un avertissement et permet un renvoi autorisé depuis sa fiche ; aucun mot de passe partagé ni secret n’est journalisé.
+Le Super Admin crée/modifie les rôles de gestion des utilisateurs ; les rôles système restent protégés. Son rôle n’est pas attribuable depuis ces formulaires. Un administrateur délégué possédant saas.staff.invite et saas.users.roles.assign peut gérer le personnel et déléguer uniquement des droits qu’il possède encore. Les dates restent contrôlées ; admin_restrictions est retiré de la cible (instructionn.txt, §24). Les permissions sont regroupées par module (comptes commerçants, personnel SaaS, pays). Un droit de gestion actif permet aussi la consultation du module dans sa portée ; les protections techniques et dates restent contrôlées, sans permission ajoutée aux pivots Spatie. Inviter le personnel (saas.staff.invite) et le modifier (saas.staff.update) sont distincts. Les nouvelles actions de suspension, réactivation et suppression sont séparément autorisées. Les comptes créés par l’administration sont invités à choisir leur mot de passe par le broker central de Fortify, puis se connecter ; le lien valide confirme également leur adresse e-mail. Après la correction confirmée le 11 octobre, AccountMailDelivery utilise notifyNow de Laravel après commit : l’invitation part directement, sans worker. AccountInvitation reste compatible avec les anciens jobs chiffrés. Une panne SMTP conserve le compte, affiche un avertissement et permet un renvoi autorisé depuis sa fiche ; aucun mot de passe partagé ni secret n’est journalisé.
 
 Le plan gratuit par défaut, code free, possède la fonctionnalité shops : quota de quantité à portée propriétaire, période totale, maximum deux boutiques. FreePlanSeeder crée uniquement les référentiels ; DefaultSubscription attribue le type 1 actif sans facture fictive. Les abonnements payants existants sont préservés. Les offres utilisées sont versionnées.
 
@@ -1006,7 +1006,7 @@ Le job app/Jobs/Central/ProvisionTenantDatabase est enregistré sur la connexion
 
 Les droits de consultation, création et attribution restent indépendants, y compris lorsque leurs durées diffèrent. Les liens de création et les redirections après sauvegarde respectent les permissions encore valables ; un créateur sans consultation revient au dashboard. Les Requests normalisent seulement les chaînes et rejettent les données malformées par la validation Laravel avant toute écriture.
 
-Les pages users/show et users/edit sont coordonnées par UserController, UpdateUserRequest, UserProfileData et UserManager. UserSaveResult transmet l’état réel de l’envoi, sans token. La consultation exige saas.users.view sur la cible. La modification du prénom, nom, e-mail, téléphone et pays exige saas.users.update pour un commerçant ou saas.staff.invite pour du personnel ; un délégué ne peut modifier un compte possédant des permissions qu’il ne possède plus. Le Super Admin reste protégé. Le formulaire ne modifie ni mot de passe, ni statut, ni rôles. Un nouvel e-mail perd sa vérification et ses anciens tokens ; un téléphone modifié perd ses preuves. Une identité professionnelle modifiée augmente sa version et demande revalidation. Les informations professionnelles sont consultables, sans formulaire de validation professionnelle dans ce lot.
+Les pages users/show et users/edit sont coordonnées par UserController, UpdateUserRequest, UserProfileData et UserManagementService. UserSaveResult transmet l’état réel de l’envoi, sans token. La consultation exige saas.users.view sur la cible. La modification du prénom, nom, e-mail, téléphone et pays exige saas.users.update globalement, ou la permission historique saas.staff.update pour le personnel ; un délégué ne peut modifier un compte possédant des permissions qu’il ne possède plus. Le Super Admin reste protégé. Le formulaire ne modifie ni mot de passe, ni statut, ni rôles. Un nouvel e-mail perd sa vérification et ses anciens tokens ; un téléphone modifié perd ses preuves. Une identité professionnelle modifiée augmente sa version et demande revalidation. Les informations professionnelles sont consultables avec viewLegal et validées/rejetées par LegalVerificationService avec leur version courante, selon le §24.
 
 Le bouton Boutiques utilise la Policy Tenant et les permissions Spatie existantes. La cible doit être un commerçant sans rôle central, même si les droits d’un ancien rôle SaaS ont expiré. L’interdiction s’applique également aux routes et au service de création. Aucun nom de rôle n’est codé dans les vues pour contourner ce contrôle. Les boutiques déjà enregistrées ne sont ni supprimées ni transférées.
 
@@ -1098,10 +1098,10 @@ Sur PowerShell, vérifier l'échappement des arguments : JSON.stringify n'est pa
 artisan --version et artisan list --format=json --no-interaction ont été exécutés pendant la reconnaissance. Les commandes de génération ci-dessous sont présentes ; leurs options de contexte, --path, --pest et --emoji ont été vérifiées dans les définitions installées. Les exemples de génération ne sont pas exécutés durant cette installation :
 
 ~~~powershell
-& $aydraPhp artisan make:controller Central/UserController --no-interaction
-& $aydraPhp artisan make:request Central/SaveRoleRequest --no-interaction
-& $aydraPhp artisan make:class DTOs/Central/RoleData --no-interaction
-& $aydraPhp artisan make:class Services/Central/RoleManager --no-interaction
+& $aydraPhp artisan make:controller Central/Admin/Users/UserController --no-interaction
+& $aydraPhp artisan make:request Central/Roles/SaveRoleRequest --no-interaction
+& $aydraPhp artisan make:class DTOs/Central/Roles/RoleData --no-interaction
+& $aydraPhp artisan make:class Services/Central/Roles/RoleManager --no-interaction
 & $aydraPhp artisan make:policy Central/UserPolicy --no-interaction
 & $aydraPhp artisan make:seeder Central/AuthorizationSeeder --no-interaction
 & $aydraPhp artisan make:migration nom_de_levolution --path=database/migrations/central --no-interaction
@@ -1149,14 +1149,563 @@ Finir par la relecture du diff et des fichiers réellement écrits. Distinguer v
 
 # 23. Gestion centrale des pays et des comptes — 11 octobre 2026
 
-Le catalogue des permissions est dans app/Services/Central/CentralRoleCatalog.php. GROUPS organise le formulaire de rôles et VIEW_ACTIONS décrit les accès de consultation dérivés. CentralUserAccess applique cette dépendance avec les permissions Spatie réellement valides et les restrictions, aussi pour la requête paginée de liste. Les compositions, signatures, durées, attributions sans recoupement et protections des rôles existantes restent en place. Aucun booléen d’autorisation parallèle ni nouvelle table n’est introduit.
+Le catalogue des permissions est dans app/Services/Central/Roles/CentralRoleCatalog.php. GROUPS organise le formulaire de rôles et VIEW_ACTIONS décrit les accès de consultation dérivés. CentralUserAccess applique cette dépendance avec les permissions Spatie réellement valides, globales par action, aussi pour la liste paginée. Les compositions, signatures, durées, attributions sans recoupement et protections des rôles existantes restent en place. Aucun booléen d’autorisation parallèle ni nouvelle table n’est introduit.
 
-Pays : app/Models/Central/Country.php ; app/Http/Controllers/Central/CountryController.php ; app/Http/Requests/Central/{StoreCountryRequest,ChangeCountryStatusRequest}.php ; app/Services/Central/CountryService.php ; app/Policies/Central/CountryPolicy.php ; resources/views/central/pages/countries/{index,create,edit,form}.blade.php. Les routes sont dans routes/central.php et la Policy est enregistrée dans AppServiceProvider. L’activation utilise un formulaire distinct pour son autorisation indépendante. La migration existante et les relations SQL countries/users/geographic_areas ne changent pas. CountrySeeder amorce les cinq pays, avec les noms arabe facultatifs, sans écraser les décisions d’activation ni recréer un pays archivé. Un pays référencé reste conservé et son code stable.
+Pays : app/Models/Central/Country.php ; app/Http/Controllers/Central/Admin/Countries/CountryController.php ; app/Http/Requests/Central/{StoreCountryRequest,ChangeCountryStatusRequest}.php ; app/Services/Central/Countries/CountryService.php ; app/Policies/Central/CountryPolicy.php ; resources/views/central/pages/countries/{index,create,edit,form}.blade.php. Les routes sont dans routes/central.php et la Policy est enregistrée dans AppServiceProvider. L’activation utilise un formulaire distinct pour son autorisation indépendante. La migration existante et les relations SQL countries/users/geographic_areas ne changent pas. CountrySeeder amorce les cinq pays, avec les noms arabe facultatifs, sans écraser les décisions d’activation ni recréer un pays archivé. Un pays référencé reste conservé et son code stable.
 
 Inscription : FortifyServiceProvider fournit les pays actifs au formulaire central. CreateNewUser valide country_uuid puis relit le pays actif sous verrou dans la transaction ; pas de pays DZ imposé ni d’ID codé en dur. Les formulaires administratifs suivent le même contrôle. Le pays déjà rattaché à un compte peut être conservé après désactivation.
 
-Comptes : UserController, UpdateUserRequest, UserProfileData et UserManager étendent la modification aux huit champs professionnels existants et à locale. Ces champs ne s’appliquent pas au personnel SaaS. Les changements matériels du dossier vendeur sont versionnés et demandent une nouvelle validation ; les preuves et dates techniques restent protégées. La fiche affiche les abonnements paginés avec leur offre, y compris une offre archivée, sans permettre une modification financière par le profil. L’ID interne et les secrets ne sont pas affichés.
+Comptes : UserController, UpdateUserRequest, UserProfileData et UserManagementService étendent la modification aux huit champs professionnels existants et à locale. Ces champs ne s’appliquent pas au personnel SaaS. Les changements matériels du dossier vendeur sont versionnés et demandent une nouvelle validation ; les preuves et dates techniques restent protégées. La fiche affiche les abonnements paginés avec leur offre, y compris une offre archivée, sans permettre une modification financière par le profil. L’ID interne et les secrets ne sont pas affichés.
 
-Cycle du compte : ChangeUserStatusRequest et UserManager autorisent séparément suspendre et réactiver ; UserPolicy contrôle aussi la suppression. UserManager verrouille le compte dans AuthorizationMutation avant de revérifier la Policy. Super Admin et compte de l’acteur sont protégés contre ces actions. Suspension/suppression invalident les sessions centrales, le jeton remember et le lien de réinitialisation. Suppression logique uniquement : ni suppression de base boutique ni effacement des pièces, abonnements ou références. Ces actions portent sur le compte central ; l’authentification et les dashboards Tenant restent volontairement reportés.
+Cycle du compte : ChangeUserStatusRequest et UserManagementService autorisent séparément suspendre et réactiver ; UserPolicy contrôle aussi la suppression. UserManagementService verrouille le compte dans AuthorizationMutation avant de revérifier la Policy. Super Admin et compte de l’acteur sont protégés contre ces actions. Suspension/suppression invalident les sessions centrales, le jeton remember et le lien de réinitialisation. Suppression logique uniquement : ni suppression de base boutique ni effacement des pièces, abonnements ou références. Ces actions portent sur le compte central ; l’authentification et les dashboards Tenant restent volontairement reportés.
 
 Déploiement des permissions : lancer le seeder ciblé Database\Seeders\Central\AuthorizationSeeder pour enregistrer le catalogue ajouté. Aucun rôle existant ne reçoit automatiquement les nouvelles actions ; le Super Admin configure les rôles personnalisables. Le droit de modification du personnel se coche désormais séparément de son invitation.
+
+---
+
+# 24. Module 01 — utilisateurs centraux (instructionn.txt, 11 octobre 2026)
+
+Le périmètre autorisé est uniquement le Module 01 et les règles des sections 1 et 2 d'instructionn.txt. Les autres modules ne sont pas à développer. Les cinq permissions existantes restent les mêmes enregistrements Spatie, avec leurs ID, UUID et attributions. Leurs libellés sont actualisés ; les nouvelles actions du Module 01 utilisent le guard central.
+
+L'organisation de ce module précise le §20 : UserController, UserApprovalController et LegalVerificationController vont dans app/Http/Controllers/Central/Admin/Users ; UserManagementService, UserApprovalService et LegalVerificationService dans app/Services/Central/Users. Réutiliser et déplacer UserController et UserManagementService, sans copies. Les vues existantes des utilisateurs vont dans resources/views/central/pages/admin/users ; la liste Livewire garde son format SFC et utilise central::pages.admin.users.index. Les noms de routes existants restent compatibles. Les autres modules gardent leur organisation actuelle.
+
+Les permissions sont globales par action. admin_restrictions est retiré de l'architecture cible et n'intervient plus dans les autorisations ; les durées Spatie et les contrôles techniques de délégation/protection du Super Admin restent obligatoires. Les migrations historiques déployées ne sont pas réécrites. Aucun effacement de données ni lancement de migration n'est réalisé pendant les contrôles en lecture seule.
+
+Le dossier professionnel et l'historique possèdent leurs permissions de consultation distinctes. La validation/rejet professionnel nécessite la version courante du dossier, contrôlée sous verrou ; modifier le dossier invalide toujours son ancienne validation. L'historique reste fourni par Spatie Activitylog, sans nouveau journal maison et sans exposition brute des propriétés sensibles.
+
+Décision confirmée le 12 octobre 2026 : les comptes centraux ajoutent les statuts 5 PENDING (attente d'approbation administrative) et 6 REJECTED (refus). App\Enums\Central\Users\StatusEnum porte ces six codes ; App\Enums\Tenant\Users\StatusEnum conserve les quatre codes des comptes Tenant. Une migration centrale d'évolution étend le CHECK existant, sans modifier les comptes déjà présents. Les inscriptions publiques commencent à 5 ; les comptes créés par un administrateur conservent le parcours d'invitation existant. Seules les actions approve/reject décident une inscription en attente ; activate ne contourne pas cette décision.
+
+La réponse RegistrationResponse va dans app/Http/Responses/Central/Auth et implémente le contrat RegisterResponse de Fortify. Elle retire la connexion automatique après inscription et affiche l'attente sur la page de connexion. EnsureActiveCentralAccount protège les routes centrales et les réglages ; son mode optional sur les routes Fortify accepte les visiteurs mais refuse un compte non actif avant et après l'authentification, y compris 2FA/passkey. AppServiceProvider inscrit ce contrôle parmi les middlewares persistants Livewire pour les actions suivantes de la page. Le callback natif Passkeys::authorizeLoginUsing contrôle également le statut avant la connexion par passkey. UserApprovalRequest est dans app/Http/Requests/Central/Users, les décisions sous verrou dans UserApprovalService et leur audit dans Spatie Activitylog. La liste paginée pending.blade.php ne montre que les coordonnées des demandes ; la preuve d'e-mail reste indépendante de leur approbation.
+
+
+# 25. Organisation par module — décision du 12 octobre 2026
+
+La demande de refactorisation précise les §18–24 : responsabilité technique → contexte Central/Tenant/Storefront → module métier, pour les classes nécessitant un regroupement. Aucun changement métier, d’URL publique, de schéma, de migration ou de données existantes. La préparation Tenant reste inactive. Cette section fait autorité pour les chemins actuels ; les exemples antérieurs et les entrées datées du suivi ne sont pas de nouvelles créations à reproduire.
+
+## 25.1 Audit et décisions de classement
+
+Les DTOs, Requests et Services centraux plats mélangent identité, pays, rôles, abonnements et provisionnement. Les Controllers administratifs sont regroupés dans Central/Admin/{Users,Roles,Countries,Tenants}. Les Services Users déjà organisés ne bougent pas. Auth regroupe les Actions Fortify, invitations, réponse d’inscription, middleware et action Livewire de déconnexion. Authorization porte les contrôles communs aux modules ; Roles porte le catalogue et la gestion des rôles. Plans et Subscriptions restent séparés. Tenant conserve ses seuls modules réellement préparés : Shop, Dashboard, Users et Diagnostics. Les enums tenant d’utilisateur rejoignent Tenant/Users, sans changer leurs valeurs.
+
+Les Models/Policies et factories sont conservés dans les dossiers Central/Tenant déjà documentés, comme dans la structure cible demandée. Les Models sont aussi des contrats de morph map, d’authentification et de sérialisation ; aucun déplacement artificiel n’est nécessaire. Les seeders conservent leurs chemins de contexte et commandes existantes ; les seeders de jeux d’essai orchestrent plusieurs modules. Les jobs sérialisables, Providers, bootstrappers Tenancy, traits partagés, SchemaBlueprint, PermissionAssignment et modèles de compatibilité restent à leur emplacement documenté. Les enums réellement partagés ActivityOriginEnum/VerificationStatusEnum ne sont pas dupliqués. Le modèle Test reste un exemple technique sans table métier.
+
+Les layouts, composants communs et alias Livewire existants restent compatibles. Les pages d’authentification et de réglages sont déjà groupées ; settings reste le module du profil et des réglages personnels, sans nouvelle copie Owner/Profile. Storefront reste un contexte distinct sous app/Http/Controllers/Storefront et routes/storefront.php, inclus dans la protection Tenant. Les tests gardent tests/{Central,Tenant}/{Feature,Unit,...}, leur découverte Pest/PHPUnit et leurs classes de base ; les tests transversaux restent transversaux.
+
+## 25.2 Correspondance présentée avant déplacement
+
+La liste suivante porte sur les fichiers présents sur disque après le Module 01, y compris les changements non commités. Les noms de classes et responsabilités restent identiques.
+
+| Module | Ancien chemin | Nouveau chemin |
+|---|---|---|
+| Auth | `app/Actions/Central/Fortify/CreateNewUser.php` | `app/Actions/Central/Auth/Fortify/CreateNewUser.php` |
+| Auth | `app/Actions/Central/Fortify/PasswordValidationRules.php` | `app/Actions/Central/Auth/Fortify/PasswordValidationRules.php` |
+| Auth | `app/Actions/Central/Fortify/ResetUserPassword.php` | `app/Actions/Central/Auth/Fortify/ResetUserPassword.php` |
+| Auth | `app/Actions/Central/Fortify/UpdateUserPassword.php` | `app/Actions/Central/Auth/Fortify/UpdateUserPassword.php` |
+| Auth | `app/Actions/Central/Fortify/UpdateUserProfileInformation.php` | `app/Actions/Central/Auth/Fortify/UpdateUserProfileInformation.php` |
+| Auth | `app/Livewire/Central/Actions/Logout.php` | `app/Livewire/Central/Auth/Actions/Logout.php` |
+| Auth | `app/Http/Middleware/Central/EnsureActiveCentralAccount.php` | `app/Http/Middleware/Central/Auth/EnsureActiveCentralAccount.php` |
+| Auth | `app/Http/Responses/Central/RegistrationResponse.php` | `app/Http/Responses/Central/Auth/RegistrationResponse.php` |
+| Auth | `app/Notifications/Central/AccountInvitation.php` | `app/Notifications/Central/Auth/AccountInvitation.php` |
+| Auth | `app/Services/Central/AccountMailDelivery.php` | `app/Services/Central/Auth/AccountMailDelivery.php` |
+| Auth | `resources/views/central/components/passkey-verify.blade.php` | `resources/views/central/components/auth/passkey-verify.blade.php` |
+| Auth | `resources/views/central/components/passkey-registration.blade.php` | `resources/views/central/components/auth/passkey-registration.blade.php` |
+| Users | `app/DTOs/Central/UserData.php` | `app/DTOs/Central/Users/UserData.php` |
+| Users | `app/DTOs/Central/UserProfileData.php` | `app/DTOs/Central/Users/UserProfileData.php` |
+| Users | `app/DTOs/Central/UserSaveResult.php` | `app/DTOs/Central/Users/UserSaveResult.php` |
+| Users | `app/Http/Controllers/Central/Admin/UserController.php` | `app/Http/Controllers/Central/Admin/Users/UserController.php` |
+| Users | `app/Http/Controllers/Central/Admin/UserApprovalController.php` | `app/Http/Controllers/Central/Admin/Users/UserApprovalController.php` |
+| Users | `app/Http/Controllers/Central/Admin/LegalVerificationController.php` | `app/Http/Controllers/Central/Admin/Users/LegalVerificationController.php` |
+| Users | `app/Http/Controllers/Central/UserRoleController.php` | `app/Http/Controllers/Central/Admin/Users/UserRoleController.php` |
+| Users | `app/Http/Requests/Central/AssignRolesRequest.php` | `app/Http/Requests/Central/Users/AssignRolesRequest.php` |
+| Users | `app/Http/Requests/Central/ChangeUserStatusRequest.php` | `app/Http/Requests/Central/Users/ChangeUserStatusRequest.php` |
+| Users | `app/Http/Requests/Central/LegalVerificationRequest.php` | `app/Http/Requests/Central/Users/LegalVerificationRequest.php` |
+| Users | `app/Http/Requests/Central/StoreUserRequest.php` | `app/Http/Requests/Central/Users/StoreUserRequest.php` |
+| Users | `app/Http/Requests/Central/UpdateUserRequest.php` | `app/Http/Requests/Central/Users/UpdateUserRequest.php` |
+| Users | `app/Http/Requests/Central/UserApprovalRequest.php` | `app/Http/Requests/Central/Users/UserApprovalRequest.php` |
+| Users | `tests/Central/Feature/CentralUserModuleTest.php` | `tests/Central/Feature/Admin/Users/CentralUserModuleTest.php` |
+| Users | `tests/Central/Feature/UserAccountManagementTest.php` | `tests/Central/Feature/Admin/Users/UserAccountManagementTest.php` |
+| Users | `tests/Central/Feature/UserLifecycleTest.php` | `tests/Central/Feature/Admin/Users/UserLifecycleTest.php` |
+| Authorization | `app/Services/Central/AuthorizationMutation.php` | `app/Services/Central/Authorization/AuthorizationMutation.php` |
+| Authorization | `app/Services/Central/CentralUserAccess.php` | `app/Services/Central/Authorization/CentralUserAccess.php` |
+| Authorization | `tests/Central/Feature/CentralUserAccessTest.php` | `tests/Central/Feature/Authorization/CentralUserAccessTest.php` |
+| Roles | `app/DTOs/Central/RoleData.php` | `app/DTOs/Central/Roles/RoleData.php` |
+| Roles | `app/Http/Controllers/Central/RoleController.php` | `app/Http/Controllers/Central/Admin/Roles/RoleController.php` |
+| Roles | `app/Http/Requests/Central/SaveRoleRequest.php` | `app/Http/Requests/Central/Roles/SaveRoleRequest.php` |
+| Roles | `app/Services/Central/CentralRoleCatalog.php` | `app/Services/Central/Roles/CentralRoleCatalog.php` |
+| Roles | `app/Services/Central/RoleManager.php` | `app/Services/Central/Roles/RoleManager.php` |
+| Roles | `resources/views/central/pages/roles/index.blade.php` | `resources/views/central/pages/admin/roles/index.blade.php` |
+| Roles | `resources/views/central/pages/roles/form.blade.php` | `resources/views/central/pages/admin/roles/form.blade.php` |
+| Countries | `app/Http/Controllers/Central/CountryController.php` | `app/Http/Controllers/Central/Admin/Countries/CountryController.php` |
+| Countries | `app/Http/Requests/Central/StoreCountryRequest.php` | `app/Http/Requests/Central/Countries/StoreCountryRequest.php` |
+| Countries | `app/Http/Requests/Central/ChangeCountryStatusRequest.php` | `app/Http/Requests/Central/Countries/ChangeCountryStatusRequest.php` |
+| Countries | `app/Services/Central/CountryService.php` | `app/Services/Central/Countries/CountryService.php` |
+| Countries | `resources/views/central/pages/countries/index.blade.php` | `resources/views/central/pages/admin/countries/index.blade.php` |
+| Countries | `resources/views/central/pages/countries/create.blade.php` | `resources/views/central/pages/admin/countries/create.blade.php` |
+| Countries | `resources/views/central/pages/countries/edit.blade.php` | `resources/views/central/pages/admin/countries/edit.blade.php` |
+| Countries | `resources/views/central/pages/countries/form.blade.php` | `resources/views/central/pages/admin/countries/form.blade.php` |
+| Countries | `tests/Central/Feature/CountryManagementTest.php` | `tests/Central/Feature/Admin/Countries/CountryManagementTest.php` |
+| Plans | `app/Services/Central/FreePlanCatalog.php` | `app/Services/Central/Plans/FreePlanCatalog.php` |
+| Subscriptions | `app/Services/Central/DefaultSubscription.php` | `app/Services/Central/Subscriptions/DefaultSubscription.php` |
+| Tenants | `app/DTOs/Central/TenantData.php` | `app/DTOs/Central/Tenants/TenantData.php` |
+| Tenants | `app/Http/Controllers/Central/TenantController.php` | `app/Http/Controllers/Central/Admin/Tenants/TenantController.php` |
+| Tenants | `app/Http/Requests/Central/StoreTenantRequest.php` | `app/Http/Requests/Central/Tenants/StoreTenantRequest.php` |
+| Tenants | `app/Services/Central/TenantCreator.php` | `app/Services/Central/Tenants/TenantCreator.php` |
+| Tenants | `app/Services/Central/TenantDatabaseName.php` | `app/Services/Central/Tenants/TenantDatabaseName.php` |
+| Tenants | `app/Services/Central/TenantProvisioner.php` | `app/Services/Central/Tenants/TenantProvisioner.php` |
+| Tenants | `resources/views/central/pages/tenants/create.blade.php` | `resources/views/central/pages/admin/tenants/create.blade.php` |
+| Dashboard | `app/Services/Central/Dashboard.php` | `app/Services/Central/Dashboard/Dashboard.php` |
+| Diagnostics | `app/Http/Controllers/Central/DatabaseDiagnosticsController.php` | `app/Http/Controllers/Central/Diagnostics/DatabaseDiagnosticsController.php` |
+| Diagnostics | `app/Services/Central/DatabaseDiagnostics.php` | `app/Services/Central/Diagnostics/DatabaseDiagnostics.php` |
+| Diagnostics | `resources/views/central/database-diagnostics.blade.php` | `resources/views/central/pages/diagnostics/database-diagnostics.blade.php` |
+| Tenant | `app/Enums/Users/StatusEnum.php` | `app/Enums/Tenant/Users/StatusEnum.php` |
+| Tenant | `app/DTOs/Tenant/ShopSettings.php` | `app/DTOs/Tenant/Shop/ShopSettings.php` |
+| Tenant | `app/DTOs/Tenant/DashboardData.php` | `app/DTOs/Tenant/Dashboard/DashboardData.php` |
+| Tenant | `app/Services/Tenant/Dashboard.php` | `app/Services/Tenant/Dashboard/Dashboard.php` |
+| Tenant | `app/Services/Tenant/DatabaseDiagnostics.php` | `app/Services/Tenant/Diagnostics/DatabaseDiagnostics.php` |
+| Tenant | `app/Http/Controllers/Tenant/DashboardController.php` | `app/Http/Controllers/Tenant/Admin/Dashboard/DashboardController.php` |
+| Tenant | `app/Http/Controllers/Tenant/DatabaseDiagnosticsController.php` | `app/Http/Controllers/Tenant/Diagnostics/DatabaseDiagnosticsController.php` |
+| Tenant | `resources/views/tenant/pages/dashboard.blade.php` | `resources/views/tenant/pages/admin/dashboard/dashboard.blade.php` |
+| Tenant | `resources/views/tenant/database-diagnostics.blade.php` | `resources/views/tenant/pages/diagnostics/database-diagnostics.blade.php` |
+| Tenant | `tests/Tenant/Feature/DashboardControllerTest.php` | `tests/Tenant/Feature/Dashboard/DashboardControllerTest.php` |
+
+## 25.3 Routes et références
+
+routes/central.php reste le point d’entrée chargé par routes/web.php sur les domaines centraux. Les routes d’administration vont dans routes/central/admin.php puis ses fichiers admin/{users,roles,countries,tenants}.php, inclus à l’intérieur du même groupe auth:central, verified et compte actif. Les routes de diagnostic centrales vont dans routes/central/diagnostics.php avec la protection locale existante. Les routes Fortify restent fournies par le package : ne pas créer de routes/auth.php concurrentes. settings.php et les groupes Tenant/Storefront conservent leurs contrats, URL, noms, middlewares et ordre relatif. Seules les références de classes et vues déplacées changent.
+
+Mettre à jour namespaces, imports, références pleinement qualifiées, vues/composants, tests, Providers et configurations concernés. Préserver les alias morph et les classes des jobs déjà sérialisés. Régénérer l’autoload Composer sans scripts ; effacer seulement les vues compilées si nécessaire, sans optimize:clear ni effacement du cache de BDD. Les migrations et fichiers de verrouillage doivent être identiques aux empreintes prises avant cette refactorisation.
+
+## 25.4 Contrôles autorisés
+
+L’utilisateur autorise pour cette tâche les tests ciblés créant/migrant/supprimant des bases MySQL temporaires isolées. Cette exception ne permet aucune écriture dans les bases existantes et ne devient pas une autorisation permanente. Lire tests/TestCase.php avant lancement ; vérifier le préfixe isolé et les connexions. Utiliser exclusivement PHP 8.5. Comparer les routes avant/après, les références PSR-4 et les fichiers protégés, puis consigner les résultats réels dans le suivi.
+
+
+## 25.5 Arborescence finale vérifiée
+
+Les fichiers cachés de maintien de dossiers ne sont pas détaillés. Les migrations restent exactement dans database/migrations/{central,tenant}, avec leurs noms et contenus initiaux ; aucune liste SQL n’est réécrite par cette réorganisation.
+
+Quelques anciens dossiers désormais vides restent visibles dans cette arborescence. Leur suppression facultative a été refusée par le contrôle automatique (« blocked by policy ») ; aucun contournement ni suppression n’a été effectué. Ils ne contiennent plus les classes déplacées.
+
+~~~text
+app/
+|-- Actions/
+|   |-- Central/
+|   |   |-- Auth/
+|   |   |   \-- Fortify/
+|   |   |       |-- CreateNewUser.php
+|   |   |       |-- PasswordValidationRules.php
+|   |   |       |-- ResetUserPassword.php
+|   |   |       |-- UpdateUserPassword.php
+|   |   |       \-- UpdateUserProfileInformation.php
+|   |   \-- Fortify/
+|   \-- Tenant/
+|       \-- Fortify/
+|-- Concerns/
+|   |-- HasActivityMetadata.php
+|   |-- HasPermissionMetadata.php
+|   |-- HasPublicUuid.php
+|   |-- HasRoleMetadata.php
+|   |-- HasTimedPermissions.php
+|   |-- LogsSafeActivity.php
+|   |-- PasswordValidationRules.php
+|   \-- ProfileValidationRules.php
+|-- Console/
+|   \-- Commands/
+|       \-- Central/
+|           \-- RetryPendingTenantProvisioning.php
+|-- DTOs/
+|   |-- Central/
+|   |   |-- Roles/
+|   |   |   \-- RoleData.php
+|   |   |-- Tenants/
+|   |   |   \-- TenantData.php
+|   |   \-- Users/
+|   |       |-- UserData.php
+|   |       |-- UserProfileData.php
+|   |       \-- UserSaveResult.php
+|   \-- Tenant/
+|       |-- Dashboard/
+|       |   \-- DashboardData.php
+|       \-- Shop/
+|           \-- ShopSettings.php
+|-- Enums/
+|   |-- Central/
+|   |   |-- Deployments/
+|   |   |   |-- OperationEnum.php
+|   |   |   \-- StatusEnum.php
+|   |   |-- Domains/
+|   |   |   |-- CertificateStatusEnum.php
+|   |   |   \-- TypeEnum.php
+|   |   |-- Features/
+|   |   |   |-- PeriodEnum.php
+|   |   |   |-- QuotaScopeEnum.php
+|   |   |   \-- ValueTypeEnum.php
+|   |   |-- Subscriptions/
+|   |   |   |-- PeriodEnum.php
+|   |   |   \-- StatusEnum.php
+|   |   |-- Tenants/
+|   |   |   \-- StatusEnum.php
+|   |   \-- Users/
+|   |       \-- StatusEnum.php
+|   |-- Enums/
+|   |   \-- Central/
+|   |       |-- Deployments/
+|   |       |-- Features/
+|   |       \-- Subscriptions/
+|   |-- Tenant/
+|   |   \-- Users/
+|   |       |-- MembershipStatusEnum.php
+|   |       \-- StatusEnum.php
+|   |-- Users/
+|   |-- ActivityOriginEnum.php
+|   \-- VerificationStatusEnum.php
+|-- Http/
+|   |-- Controllers/
+|   |   |-- Central/
+|   |   |   |-- Admin/
+|   |   |   |   |-- Countries/
+|   |   |   |   |   \-- CountryController.php
+|   |   |   |   |-- Roles/
+|   |   |   |   |   \-- RoleController.php
+|   |   |   |   |-- Tenants/
+|   |   |   |   |   \-- TenantController.php
+|   |   |   |   \-- Users/
+|   |   |   |       |-- LegalVerificationController.php
+|   |   |   |       |-- UserApprovalController.php
+|   |   |   |       |-- UserController.php
+|   |   |   |       \-- UserRoleController.php
+|   |   |   \-- Diagnostics/
+|   |   |       \-- DatabaseDiagnosticsController.php
+|   |   |-- Storefront/
+|   |   |   \-- StorefrontController.php
+|   |   |-- Tenant/
+|   |   |   |-- Admin/
+|   |   |   |   \-- Dashboard/
+|   |   |   |       \-- DashboardController.php
+|   |   |   \-- Diagnostics/
+|   |   |       \-- DatabaseDiagnosticsController.php
+|   |   \-- Controller.php
+|   |-- Middleware/
+|   |   |-- Central/
+|   |   |   \-- Auth/
+|   |   |       \-- EnsureActiveCentralAccount.php
+|   |   |-- Tenant/
+|   |   |   \-- FinishTenantRequest.php
+|   |   |-- EnsureApplicationDomain.php
+|   |   \-- EnsureLocalDiagnostics.php
+|   |-- Requests/
+|   |   |-- Central/
+|   |   |   |-- Countries/
+|   |   |   |   |-- ChangeCountryStatusRequest.php
+|   |   |   |   \-- StoreCountryRequest.php
+|   |   |   |-- Roles/
+|   |   |   |   \-- SaveRoleRequest.php
+|   |   |   |-- Tenants/
+|   |   |   |   \-- StoreTenantRequest.php
+|   |   |   \-- Users/
+|   |   |       |-- AssignRolesRequest.php
+|   |   |       |-- ChangeUserStatusRequest.php
+|   |   |       |-- LegalVerificationRequest.php
+|   |   |       |-- StoreUserRequest.php
+|   |   |       |-- UpdateUserRequest.php
+|   |   |       \-- UserApprovalRequest.php
+|   |   \-- Tenant/
+|   \-- Responses/
+|       \-- Central/
+|           \-- Auth/
+|               \-- RegistrationResponse.php
+|-- Jobs/
+|   \-- Central/
+|       \-- ProvisionTenantDatabase.php
+|-- Livewire/
+|   |-- Actions/
+|   |-- Central/
+|   |   |-- Actions/
+|   |   \-- Auth/
+|   |       \-- Actions/
+|   |           \-- Logout.php
+|   \-- Tenant/
+|       \-- Actions/
+|-- Models/
+|   |-- Central/
+|   |   |-- Activity.php
+|   |   |-- Country.php
+|   |   |-- Domain.php
+|   |   |-- Feature.php
+|   |   |-- Permission.php
+|   |   |-- Plan.php
+|   |   |-- PlanFeature.php
+|   |   |-- Role.php
+|   |   |-- Subscription.php
+|   |   |-- Tenant.php
+|   |   |-- TenantSchemaDeployment.php
+|   |   \-- User.php
+|   |-- Tenant/
+|   |   |-- Activity.php
+|   |   |-- Permission.php
+|   |   |-- Role.php
+|   |   |-- Shop.php
+|   |   \-- User.php
+|   |-- PermissionAssignment.php
+|   |-- Tenant.php
+|   |-- Test.php
+|   \-- User.php
+|-- Notifications/
+|   |-- Central/
+|   |   \-- Auth/
+|   |       \-- AccountInvitation.php
+|   \-- Tenant/
+|-- Policies/
+|   |-- Central/
+|   |   |-- CountryPolicy.php
+|   |   |-- RolePolicy.php
+|   |   |-- TenantPolicy.php
+|   |   \-- UserPolicy.php
+|   \-- Tenant/
+|-- Providers/
+|   |-- AppServiceProvider.php
+|   |-- FortifyServiceProvider.php
+|   \-- TenancyServiceProvider.php
+|-- Services/
+|   |-- Central/
+|   |   |-- Auth/
+|   |   |   \-- AccountMailDelivery.php
+|   |   |-- Authorization/
+|   |   |   |-- AuthorizationMutation.php
+|   |   |   \-- CentralUserAccess.php
+|   |   |-- Countries/
+|   |   |   \-- CountryService.php
+|   |   |-- Dashboard/
+|   |   |   \-- Dashboard.php
+|   |   |-- Diagnostics/
+|   |   |   \-- DatabaseDiagnostics.php
+|   |   |-- Plans/
+|   |   |   \-- FreePlanCatalog.php
+|   |   |-- Roles/
+|   |   |   |-- CentralRoleCatalog.php
+|   |   |   \-- RoleManager.php
+|   |   |-- Subscriptions/
+|   |   |   \-- DefaultSubscription.php
+|   |   |-- Tenants/
+|   |   |   |-- TenantCreator.php
+|   |   |   |-- TenantDatabaseName.php
+|   |   |   \-- TenantProvisioner.php
+|   |   \-- Users/
+|   |       |-- LegalVerificationService.php
+|   |       |-- UserApprovalService.php
+|   |       \-- UserManagementService.php
+|   |-- Tenant/
+|   |   |-- Dashboard/
+|   |   |   \-- Dashboard.php
+|   |   \-- Diagnostics/
+|   |       \-- DatabaseDiagnostics.php
+|   \-- SchemaBlueprint.php
+\-- Tenancy/
+    \-- Bootstrappers/
+        |-- AccountContextBootstrapper.php
+        |-- NamespacedCacheBootstrapper.php
+        \-- SpatieContextBootstrapper.php
+
+routes/
+|-- central/
+|   |-- admin/
+|   |   |-- countries.php
+|   |   |-- roles.php
+|   |   |-- tenants.php
+|   |   \-- users.php
+|   |-- admin.php
+|   |-- diagnostics.php
+|   \-- settings.php
+|-- tenant/
+|-- central.php
+|-- console.php
+|-- storefront.php
+|-- tenant.php
+\-- web.php
+
+resources/views/
+|-- central/
+|   |-- components/
+|   |   |-- auth/
+|   |   |   |-- passkey-registration.blade.php
+|   |   |   \-- passkey-verify.blade.php
+|   |   \-- desktop-user-menu.blade.php
+|   |-- layouts/
+|   |   |-- app/
+|   |   |   |-- header.blade.php
+|   |   |   \-- sidebar.blade.php
+|   |   |-- auth/
+|   |   |   |-- card.blade.php
+|   |   |   |-- simple.blade.php
+|   |   |   \-- split.blade.php
+|   |   |-- app.blade.php
+|   |   \-- auth.blade.php
+|   |-- pages/
+|   |   |-- admin/
+|   |   |   |-- countries/
+|   |   |   |   |-- create.blade.php
+|   |   |   |   |-- edit.blade.php
+|   |   |   |   |-- form.blade.php
+|   |   |   |   \-- index.blade.php
+|   |   |   |-- roles/
+|   |   |   |   |-- form.blade.php
+|   |   |   |   \-- index.blade.php
+|   |   |   |-- tenants/
+|   |   |   |   \-- create.blade.php
+|   |   |   \-- users/
+|   |   |       |-- create.blade.php
+|   |   |       |-- edit.blade.php
+|   |   |       |-- history.blade.php
+|   |   |       |-- index.blade.php
+|   |   |       |-- lifecycle-actions.blade.php
+|   |   |       |-- pending.blade.php
+|   |   |       |-- roles.blade.php
+|   |   |       \-- show.blade.php
+|   |   |-- auth/
+|   |   |   |-- confirm-password.blade.php
+|   |   |   |-- forgot-password.blade.php
+|   |   |   |-- login.blade.php
+|   |   |   |-- register.blade.php
+|   |   |   |-- reset-password.blade.php
+|   |   |   |-- two-factor-challenge.blade.php
+|   |   |   \-- verify-email.blade.php
+|   |   |-- countries/
+|   |   |-- diagnostics/
+|   |   |   \-- database-diagnostics.blade.php
+|   |   |-- roles/
+|   |   |-- settings/
+|   |   |   |-- two-factor/
+|   |   |   |   \-- ⚡recovery-codes.blade.php
+|   |   |   |-- ⚡appearance.blade.php
+|   |   |   |-- ⚡delete-user-form.blade.php
+|   |   |   |-- ⚡delete-user-modal.blade.php
+|   |   |   |-- ⚡profile.blade.php
+|   |   |   |-- ⚡security.blade.php
+|   |   |   |-- ⚡two-factor-setup-modal.blade.php
+|   |   |   \-- layout.blade.php
+|   |   |-- tenants/
+|   |   |-- users/
+|   |   \-- ⚡dashboard.blade.php
+|   |-- partials/
+|   |   \-- settings-heading.blade.php
+|   |-- dashboard.blade.php
+|   \-- welcome.blade.php
+|-- components/
+|   |-- app-logo-icon.blade.php
+|   |-- app-logo.blade.php
+|   |-- auth-header.blade.php
+|   |-- auth-session-status.blade.php
+|   \-- placeholder-pattern.blade.php
+|-- flux/
+|   |-- icon/
+|   |   |-- book-open-text.blade.php
+|   |   |-- chevrons-up-down.blade.php
+|   |   |-- folder-git-2.blade.php
+|   |   \-- layout-grid.blade.php
+|   \-- navlist/
+|       \-- group.blade.php
+|-- partials/
+|   \-- head.blade.php
+\-- tenant/
+    |-- components/
+    |   \-- account-summary.blade.php
+    |-- layouts/
+    |   |-- app/
+    |   |   \-- sidebar.blade.php
+    |   |-- auth/
+    |   |   \-- simple.blade.php
+    |   |-- app.blade.php
+    |   \-- auth.blade.php
+    |-- pages/
+    |   |-- admin/
+    |   |   \-- dashboard/
+    |   |       \-- dashboard.blade.php
+    |   |-- auth/
+    |   |   \-- login.blade.php
+    |   |-- diagnostics/
+    |   |   \-- database-diagnostics.blade.php
+    |   \-- settings/
+    |       \-- profile.blade.php
+    \-- partials/
+        \-- preparation-notice.blade.php
+
+tests/
+|-- Central/
+|   |-- Feature/
+|   |   |-- Admin/
+|   |   |   |-- Countries/
+|   |   |   |   \-- CountryManagementTest.php
+|   |   |   \-- Users/
+|   |   |       |-- CentralUserModuleTest.php
+|   |   |       |-- UserAccountManagementTest.php
+|   |   |       \-- UserLifecycleTest.php
+|   |   |-- Auth/
+|   |   |   |-- AuthenticationTest.php
+|   |   |   |-- EmailVerificationTest.php
+|   |   |   |-- PasswordConfirmationTest.php
+|   |   |   |-- PasswordResetTest.php
+|   |   |   |-- RegistrationTest.php
+|   |   |   \-- TwoFactorChallengeTest.php
+|   |   |-- Authorization/
+|   |   |   \-- CentralUserAccessTest.php
+|   |   |-- Database/
+|   |   |   \-- DocumentedCentralSchemaTest.php
+|   |   |-- Settings/
+|   |   |   |-- ProfileUpdateTest.php
+|   |   |   \-- SecurityTest.php
+|   |   |-- CentralAdministrationTest.php
+|   |   |-- CentralManagementTest.php
+|   |   |-- DashboardTest.php
+|   |   \-- ExampleTest.php
+|   \-- Unit/
+|       |-- ExampleTest.php
+|       \-- ModelCastsTest.php
+|-- Feature/
+|-- Tenant/
+|   |-- Database/
+|   |   |-- DocumentedMysqlSchemaTest.php
+|   |   |-- DocumentedTenantSchemaTest.php
+|   |   \-- LiveMysqlSchemaAuditTest.php
+|   |-- Feature/
+|   |   |-- Dashboard/
+|   |   |   \-- DashboardControllerTest.php
+|   |   \-- CentralShopProvisioningTest.php
+|   |-- Tenancy/
+|   |   |-- DatabaseDiagnosticsTest.php
+|   |   |-- LocalDevelopmentDataTest.php
+|   |   |-- SpatieIntegrationTest.php
+|   |   |-- TenancyFoundationTest.php
+|   |   \-- TenantTestSeeder.php
+|   \-- Unit/
+|-- DocumentedConstraintAssertions.php
+|-- Pest.php
+\-- TestCase.php
+
+database/factories/
+|-- Central/
+|   |-- CountryFactory.php
+|   |-- DomainFactory.php
+|   |-- FeatureFactory.php
+|   |-- PlanFactory.php
+|   |-- PlanFeatureFactory.php
+|   |-- SubscriptionFactory.php
+|   |-- TenantFactory.php
+|   |-- TenantSchemaDeploymentFactory.php
+|   \-- UserFactory.php
+\-- Tenant/
+    |-- ShopFactory.php
+    \-- UserFactory.php
+
+database/seeders/
+|-- Central/
+|   |-- AuthorizationSeeder.php
+|   |-- CountrySeeder.php
+|   |-- FreePlanSeeder.php
+|   |-- LocalAuthenticationSeeder.php
+|   \-- LocalDevelopmentSeeder.php
+|-- Tenant/
+|   \-- LocalDevelopmentSeeder.php
+|-- DatabaseSeeder.php
+\-- LocalFixtureSeeder.php
+
+~~~
+
+Références corrigées : namespaces PSR-4, imports explicites et anciennes dépendances implicites entre Services voisins, usages de classes pleinement qualifiées, callbacks et bindings des Providers, middleware Fortify/Livewire, templates/composants Blade, contrôleurs et fichiers de routes, modèles utilisant ShopSettings/StatusEnum, seeders, factories et tests concernés. Les classes de Models/Policies, les morph maps, guards, classes de jobs et commandes de seeders existantes restent compatibles. Résultats des contrôles et limites dans Suivi-Developpement-Aydra.md, entrée du 12 octobre 2026 consacrée à cette refactorisation.

@@ -1,6 +1,6 @@
 <?php
 
-use App\Services\Central\Dashboard;
+use App\Services\Central\Dashboard\Dashboard;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -33,8 +33,8 @@ new class extends Component {
         @endcan
     @else
         <flux:callout>
-            <flux:callout.heading>{{ __('Votre accès n’est pas encore validé.') }}</flux:callout.heading>
-            <flux:callout.text>{{ __('La création et la gestion des boutiques seront disponibles après validation de votre accès.') }}</flux:callout.text>
+            <flux:callout.heading>{{ __('La gestion des boutiques est en préparation.') }}</flux:callout.heading>
+            <flux:callout.text>{{ __('Votre compte est actif. La création et la gestion des boutiques ne sont pas encore disponibles depuis cet espace.') }}</flux:callout.text>
         </flux:callout>
         @if ($this->overview['shops']->isNotEmpty())
             <div class="space-y-3">

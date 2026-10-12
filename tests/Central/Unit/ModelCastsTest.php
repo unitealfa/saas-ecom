@@ -4,8 +4,9 @@ use App\Enums\ActivityOriginEnum;
 use App\Enums\Central\Domains\CertificateStatusEnum;
 use App\Enums\Central\Domains\TypeEnum;
 use App\Enums\Central\Tenants\StatusEnum as TenantStatusEnum;
+use App\Enums\Central\Users\StatusEnum;
 use App\Enums\Tenant\Users\MembershipStatusEnum;
-use App\Enums\Users\StatusEnum;
+use App\Enums\Tenant\Users\StatusEnum as TenantUserStatus;
 use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Activity as CentralActivity;
 use App\Models\Central\Domain;
@@ -34,7 +35,9 @@ test('documented statuses hydrate as enums and serialize as stable numeric codes
     expect(fn () => $model->setAttribute($field, 0))->toThrow(ValueError::class);
 })->with([
     'central account' => [CentralUser::class, 'status', 3, StatusEnum::SUSPENDED],
-    'shop account' => [TenantUser::class, 'status', 2, StatusEnum::INACTIVE],
+    'pending central account' => [CentralUser::class, 'status', 5, StatusEnum::PENDING],
+    'rejected central account' => [CentralUser::class, 'status', 6, StatusEnum::REJECTED],
+    'shop account' => [TenantUser::class, 'status', 2, TenantUserStatus::INACTIVE],
     'shop membership' => [TenantUser::class, 'membership_status', 4, MembershipStatusEnum::REVOKED],
     'tenant provisioning' => [Tenant::class, 'status', 6, TenantStatusEnum::PROVISIONING_FAILED],
 ]);

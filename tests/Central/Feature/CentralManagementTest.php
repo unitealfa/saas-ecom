@@ -13,12 +13,11 @@ use App\Models\Central\Subscription;
 use App\Models\Central\Tenant;
 use App\Models\Central\TenantSchemaDeployment;
 use App\Models\User;
-use App\Notifications\Central\AccountInvitation;
-use App\Services\Central\DefaultSubscription;
-use App\Services\Central\FreePlanCatalog;
-use App\Services\Central\TenantProvisioner;
+use App\Notifications\Central\Auth\AccountInvitation;
+use App\Services\Central\Plans\FreePlanCatalog;
+use App\Services\Central\Subscriptions\DefaultSubscription;
+use App\Services\Central\Tenants\TenantProvisioner;
 use Database\Seeders\Central\AuthorizationSeeder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -279,19 +278,12 @@ test('expired subscriptions fall back to the new free version without rewriting 
     expect($old->features()->firstOrFail()->limit)->toBe(1);
 });
 
-test('a role target restriction also blocks delegation on the server', function (): void {
+test('an administrator can delegate an owned role globally without target lists', function (): void {
     $role = Role::findByName('user-reader');
     $target = User::factory()->create();
-    DB::table('admin_restrictions')->insert([
-        'uuid' => (string) Str::uuid(), 'admin_id' => $this->admin->id,
-        'permission_id' => Permission::where('name', 'saas.users.roles.assign')->firstOrFail()->id,
-        'target_role_id' => $role->id, 'effect' => 1, 'status' => 1,
-        'started_at' => now(), 'created_by_id' => $this->admin->id,
-    ]);
-    $this->actingAs($this->admin, 'central')->put(route('central.users.roles.update', $target), ['roles' => [$role->uuid]])->assertForbidden();
-    expect($target->roles()->exists())->toBeFalse();
+    $this->actingAs($this->admin, 'central')->put(route('central.users.roles.update', $target), ['roles' => [$role->uuid]])->assertSessionHasNoErrors();
+    expect($target->fresh()->hasRole($role))->toBeTrue();
 });
-
 test('provisioning failures retain the reservation and expose only a sanitized error for recovery', function (): void {
     Event::fake([TenantCreated::class]);
     $tenant = Tenant::factory()->create(['user_id' => $this->admin->id]);

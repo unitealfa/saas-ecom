@@ -1,10 +1,13 @@
 <?php
 
-use App\Enums\Users\StatusEnum;
+use App\Enums\Central\Users\StatusEnum;
 use App\Models\Central\Role;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Fortify\Features;
+use Laravel\Passkeys\Passkey;
+use Laravel\Passkeys\Passkeys;
 
 test('login screen can be rendered', function () {
     $response = $this->get(route('login'));
@@ -95,6 +98,8 @@ test('non-active central accounts cannot log in with a valid password', function
     'inactive' => [StatusEnum::INACTIVE],
     'suspended' => [StatusEnum::SUSPENDED],
     'deleted status' => [StatusEnum::DELETED],
+    'awaiting approval' => [StatusEnum::PENDING],
+    'refused registration' => [StatusEnum::REJECTED],
 ]);
 
 test('soft deleted central accounts cannot log in with a valid password', function (): void {
@@ -180,3 +185,29 @@ test('users can logout', function () {
 
     $this->assertGuest();
 });
+
+test('a stale pending session cannot access protected settings or Fortify account endpoints', function (string $routeName): void {
+    $user = User::factory()->create(['status' => StatusEnum::PENDING]);
+    $this->actingAs($user, 'central')->get(route($routeName))->assertForbidden();
+    $this->assertGuest('central');
+})->with(['profile.edit', 'password.confirm', 'verification.notice', 'dashboard']);
+
+test('an account disabled during its two factor challenge does not remain authenticated', function (): void {
+    $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
+    $user = User::factory()->withTwoFactor()->create(['status' => StatusEnum::REJECTED]);
+    $this->withSession(['login.id' => $user->id, 'login.remember' => true])
+        ->post(route('two-factor.login.store'), ['recovery_code' => 'recovery-code-1'])->assertForbidden();
+    $this->assertGuest('central');
+});
+
+test('passkey authorization requires a currently active central account', function (StatusEnum $status, bool $allowed): void {
+    $user = User::factory()->create(['status' => $status]);
+    $passkey = new Passkey;
+    $passkey->setRelation('user', $user);
+    expect(Passkeys::allowsLogin(Request::create('/passkeys/login', 'POST'), $passkey))->toBe($allowed);
+})->with([
+    'active' => [StatusEnum::ACTIVE, true],
+    'pending' => [StatusEnum::PENDING, false],
+    'refused' => [StatusEnum::REJECTED, false],
+    'suspended' => [StatusEnum::SUSPENDED, false],
+]);

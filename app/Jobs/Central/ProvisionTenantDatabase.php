@@ -4,7 +4,7 @@ namespace App\Jobs\Central;
 
 use App\Enums\Central\Deployments\StatusEnum;
 use App\Models\Central\TenantSchemaDeployment;
-use App\Services\Central\TenantProvisioner;
+use App\Services\Central\Tenants\TenantProvisioner;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Throwable;

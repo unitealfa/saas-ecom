@@ -3,7 +3,7 @@
 use App\Models\Tenant;
 use App\Models\Tenant\User as ShopUser;
 use App\Models\User;
-use App\Services\Tenant\DatabaseDiagnostics;
+use App\Services\Tenant\Diagnostics\DatabaseDiagnostics;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Central\LocalDevelopmentSeeder;
 use Illuminate\Support\Facades\DB;

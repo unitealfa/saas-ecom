@@ -4,7 +4,7 @@ namespace App\Policies\Central;
 
 use App\Models\Central\Role;
 use App\Models\Central\User;
-use App\Services\Central\CentralUserAccess;
+use App\Services\Central\Authorization\CentralUserAccess;
 
 class RolePolicy
 {

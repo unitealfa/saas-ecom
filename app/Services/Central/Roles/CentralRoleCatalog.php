@@ -1,0 +1,116 @@
+<?php
+
+namespace App\Services\Central\Roles;
+
+use App\Models\Central\Permission;
+use App\Models\Central\Role;
+use LogicException;
+
+class CentralRoleCatalog
+{
+    public const PERMISSIONS = [
+        'saas.users.view' => 'Consulter les utilisateurs',
+        'saas.users.create' => 'Créer des utilisateurs',
+        'saas.users.update' => 'Modifier les utilisateurs',
+        'saas.users.approve' => 'Approuver les comptes en attente',
+        'saas.users.reject' => 'Refuser les demandes d’accès',
+        'saas.users.suspend' => 'Suspendre les utilisateurs',
+        'saas.users.activate' => 'Réactiver les utilisateurs',
+        'saas.users.archive' => 'Archiver les utilisateurs',
+        'saas.users.legal.view' => 'Consulter les dossiers professionnels',
+        'saas.users.legal.validate' => 'Valider les dossiers professionnels',
+        'saas.users.legal.reject' => 'Rejeter les vérifications professionnelles',
+        'saas.users.history.view' => 'Consulter l’historique administratif des utilisateurs',
+        'saas.staff.invite' => 'Inviter du personnel SaaS',
+        'saas.staff.update' => 'Modifier le personnel SaaS',
+        'saas.staff.suspend' => 'Suspendre le personnel SaaS',
+        'saas.staff.restore' => 'Réactiver le personnel SaaS',
+        'saas.staff.delete' => 'Supprimer le personnel SaaS',
+        'saas.users.roles.assign' => 'Attribuer les rôles du personnel SaaS',
+        'saas.countries.view' => 'Consulter les pays',
+        'saas.countries.create' => 'Créer des pays',
+        'saas.countries.update' => 'Modifier les pays',
+        'saas.countries.activate' => 'Activer ou désactiver les pays',
+        'saas.countries.delete' => 'Retirer des pays',
+    ];
+
+    public const GROUPS = [
+        'Utilisateurs centraux' => ['saas.users.view', 'saas.users.create', 'saas.users.update', 'saas.users.approve', 'saas.users.reject', 'saas.users.suspend', 'saas.users.activate', 'saas.users.archive'],
+        'Dossiers professionnels' => ['saas.users.legal.view', 'saas.users.legal.validate', 'saas.users.legal.reject'],
+        'Historique des utilisateurs' => ['saas.users.history.view'],
+        'Personnel SaaS' => ['saas.staff.invite', 'saas.staff.update', 'saas.staff.suspend', 'saas.staff.restore', 'saas.staff.delete', 'saas.users.roles.assign'],
+        'Pays' => ['saas.countries.view', 'saas.countries.create', 'saas.countries.update', 'saas.countries.activate', 'saas.countries.delete'],
+    ];
+
+    public const VIEW_ACTIONS = [
+        'saas.users.view' => ['saas.users.create', 'saas.users.update', 'saas.users.approve', 'saas.users.reject', 'saas.users.suspend', 'saas.users.activate', 'saas.users.archive', 'saas.users.legal.view', 'saas.users.legal.validate', 'saas.users.legal.reject', 'saas.users.history.view', 'saas.staff.invite', 'saas.staff.update', 'saas.staff.suspend', 'saas.staff.restore', 'saas.staff.delete', 'saas.users.roles.assign'],
+        'saas.users.legal.view' => ['saas.users.legal.validate', 'saas.users.legal.reject'],
+        'saas.countries.view' => ['saas.countries.create', 'saas.countries.update', 'saas.countries.activate', 'saas.countries.delete'],
+    ];
+
+    public const ROLES = [
+        'user-manager' => [
+            'label' => 'Gestionnaire des utilisateurs',
+            'permissions' => ['saas.users.view', 'saas.users.create', 'saas.users.update'],
+        ],
+        'user-reader' => [
+            'label' => 'Lecteur',
+            'permissions' => ['saas.users.view'],
+        ],
+    ];
+
+    public function seed(): void
+    {
+        if (tenancy()->initialized) {
+            throw new LogicException('The central role catalogue requires the central context.');
+        }
+
+        $connection = (new Role)->getConnection();
+        $connection->transaction(function (): void {
+            $root = Role::where('guard_name', 'central')->where('is_super_admin', true)->first();
+            if ($root === null) {
+                $root = new Role(['name' => 'root', 'label' => 'Super Admin']);
+                $root->forceFill(['is_system' => true, 'is_protected' => true, 'is_super_admin' => true])->save();
+            }
+            $root = Role::whereKey($root->id)->lockForUpdate()->firstOrFail();
+            if (! $root->getAttribute('is_system') || ! $root->getAttribute('is_protected') || $root->guard_name !== 'central') {
+                throw new LogicException('The existing root role must remain protected.');
+            }
+
+            foreach (['saas.users.restore' => 'saas.users.activate', 'saas.users.delete' => 'saas.users.archive'] as $old => $new) {
+                $legacy = Permission::where('guard_name', 'central')->where('name', $old)->first();
+                if ($legacy !== null) {
+                    if (Permission::where('guard_name', 'central')->where('name', $new)->exists()) {
+                        throw new LogicException('Conflicting permission names require an explicit migration: '.$old.' / '.$new);
+                    }
+                    $legacy->forceFill(['name' => $new])->save();
+                }
+            }
+
+            foreach (self::PERMISSIONS as $name => $label) {
+                $permission = Permission::firstOrCreate(['name' => $name, 'guard_name' => 'central'], ['label' => $label]);
+                if ($permission->label !== $label) {
+                    $permission->forceFill(['label' => $label])->save();
+                }
+            }
+
+            foreach (self::ROLES as $name => $definition) {
+                $expected = array_fill_keys($definition['permissions'], 9999);
+                $role = Role::where('name', $name)->where('guard_name', 'central')->lockForUpdate()->first();
+                if ($role === null) {
+                    $role = Role::createWithPermissions($name, $expected);
+                    $role->forceFill(['label' => $definition['label'], 'is_system' => true, 'is_protected' => true])->save();
+                } else {
+                    $actual = $role->permissions()->get()->mapWithKeys(fn (\Spatie\Permission\Models\Permission $permission): array => [
+                        $permission->name => (int) $permission->getRelation('pivot')->getAttribute('duration_days'),
+                    ])->all();
+                    ksort($expected);
+                    ksort($actual);
+                    if ($actual !== $expected || ! $role->getAttribute('is_system') || ! $role->getAttribute('is_protected') || $role->getAttribute('is_super_admin')) {
+                        throw new LogicException('Refusing to overwrite an existing role with a different definition: '.$name);
+                    }
+                }
+            }
+        });
+    }
+}

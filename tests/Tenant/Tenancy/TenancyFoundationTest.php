@@ -7,7 +7,7 @@ use App\Models\Tenant;
 use App\Models\Tenant\Shop;
 use App\Models\Tenant\User as ShopUser;
 use App\Models\User;
-use App\Services\Central\TenantProvisioner;
+use App\Services\Central\Tenants\TenantProvisioner;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;

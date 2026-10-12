@@ -3,7 +3,7 @@
 namespace App\Models\Central;
 
 use App\Concerns\HasPublicUuid;
-use App\DTOs\Tenant\ShopSettings;
+use App\DTOs\Tenant\Shop\ShopSettings;
 use App\Enums\Central\Tenants\StatusEnum;
 use Database\Factories\Central\TenantFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;

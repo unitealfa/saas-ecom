@@ -2,9 +2,12 @@
 
 namespace App\Providers;
 
+use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
+use App\Models\Central\Country;
 use App\Models\Central\Role;
 use App\Models\Central\Tenant;
 use App\Models\User;
+use App\Policies\Central\CountryPolicy;
 use App\Policies\Central\RolePolicy;
 use App\Policies\Central\TenantPolicy;
 use App\Policies\Central\UserPolicy;
@@ -17,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -41,8 +45,9 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(\App\Models\Central\User::class, UserPolicy::class);
         Gate::policy(Role::class, RolePolicy::class);
-        Gate::policy(\App\Models\Central\Country::class, \App\Policies\Central\CountryPolicy::class);
+        Gate::policy(Country::class, CountryPolicy::class);
         Gate::policy(Tenant::class, TenantPolicy::class);
+        Livewire::addPersistentMiddleware([EnsureActiveCentralAccount::class]);
         $this->configureDefaults();
     }
 

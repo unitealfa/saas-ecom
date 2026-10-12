@@ -6,7 +6,7 @@ use App\Models\Central\Country;
 use App\Models\Tenant;
 use App\Models\Tenant\User as ShopUser;
 use App\Models\User;
-use App\Services\Central\TenantProvisioner;
+use App\Services\Central\Tenants\TenantProvisioner;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use LogicException;

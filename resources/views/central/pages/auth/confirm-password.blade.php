@@ -7,7 +7,7 @@
 
         <x-auth-session-status class="text-center" :status="session('status')" />
 
-        <x-central::components.passkey-verify
+        <x-central::components.auth.passkey-verify
             options-route="passkey.confirm-options"
             submit-route="passkey.confirm"
             :label="__('Confirm with passkey')"

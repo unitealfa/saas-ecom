@@ -6,7 +6,7 @@ use App\Concerns\HasPublicUuid;
 use App\Concerns\HasTimedPermissions;
 use App\Concerns\LogsSafeActivity;
 use App\Enums\Tenant\Users\MembershipStatusEnum;
-use App\Enums\Users\StatusEnum;
+use App\Enums\Tenant\Users\StatusEnum;
 use Database\Factories\Tenant\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;

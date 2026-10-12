@@ -2,11 +2,12 @@
 
 namespace App\Providers;
 
-use App\Actions\Central\Fortify\CreateNewUser;
-use App\Actions\Central\Fortify\ResetUserPassword;
-use App\Enums\Users\StatusEnum;
-use App\Models\User;
+use App\Actions\Central\Auth\Fortify\CreateNewUser;
+use App\Actions\Central\Auth\Fortify\ResetUserPassword;
+use App\Enums\Central\Users\StatusEnum;
+use App\Http\Responses\Central\Auth\RegistrationResponse;
 use App\Models\Central\Country;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -14,7 +15,10 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Support\Timebox;
+use Laravel\Fortify\Contracts\RegisterResponse;
 use Laravel\Fortify\Fortify;
+use Laravel\Passkeys\Contracts\PasskeyUser;
+use Laravel\Passkeys\Passkeys;
 
 class FortifyServiceProvider extends ServiceProvider
 {
@@ -23,7 +27,7 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(RegisterResponse::class, RegistrationResponse::class);
     }
 
     /**
@@ -48,6 +52,9 @@ class FortifyServiceProvider extends ServiceProvider
 
     private function configureAuthentication(): void
     {
+        Passkeys::authorizeLoginUsing(fn (Request $request, PasskeyUser $user): bool => ! tenancy()->initialized && $user instanceof \App\Models\Central\User
+            && $user->fresh()?->status === StatusEnum::ACTIVE
+        );
         Fortify::authenticateUsing(function (Request $request): ?User {
             return (new Timebox)->call(function () use ($request): ?User {
                 $email = Str::lower(trim($request->string(Fortify::username())->toString()));

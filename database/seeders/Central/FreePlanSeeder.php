@@ -2,7 +2,7 @@
 
 namespace Database\Seeders\Central;
 
-use App\Services\Central\FreePlanCatalog;
+use App\Services\Central\Plans\FreePlanCatalog;
 use Illuminate\Database\Seeder;
 
 class FreePlanSeeder extends Seeder

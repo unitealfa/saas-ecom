@@ -530,3 +530,119 @@ Vérifications réellement exécutées :
 - Tests préparés : CountryManagementTest et UserLifecycleTest ; adaptations RegistrationTest et UserAccountManagementTest pour les nouvelles règles. Non exécutés : l’utilisateur a explicitement choisi les contrôles sans écriture en BDD. Aucun test créant une base, seeding, migration, worker, Pint, PHPStan ou build exécuté.
 
 Action restante pour utiliser les nouveaux droits : lancer Database\Seeders\Central\AuthorizationSeeder sur la base centrale depuis PHP 8.5. Il enregistre les permissions sans créer de comptes ni modifier les compositions de rôles existantes. Affecter ensuite les nouvelles actions aux rôles personnalisables voulus ; la modification du personnel est séparée de son invitation. Les parcours HTTP avec écritures et le rendu navigateur n’ont pas été vérifiés.
+
+## 11 octobre 2026 — Module 01, travail en cours (instructionn.txt)
+
+Périmètre : sections 1–2 et Module 01 seulement. Modules 02 et suivants non développés ; boutiques, bases, migrations déployées et configuration globale inchangées.
+
+Réalisé dans les fichiers :
+- Les cinq permissions existantes sont conservées par le catalogue Spatie (mêmes lignes/UUID). Libellés demandés ; nouvelles actions du Module 01 et groupes correspondants. Le seeder peut renommer les anciens droits restore/delete en activate/archive en conservant ID/UUID, pivots et signatures ; une collision est refusée sans écrasement. Aucun seeding exécuté.
+- Retrait des listes de cibles et des lectures d’admin_restrictions dans CentralUserAccess ; contrôles Spatie datés, guard central, protection du Super Admin et délégation restent en place. Schéma/diagramme cible : 27 tables centrales, 450 champs dans le diagramme ; table historique MySQL conservée et inutilisée par les autorisations. Aucun DROP exécuté.
+- UserController déplacé dans Central/Admin ; UserManager déplacé/renommé Users/UserManagementService ; vues regroupées dans central/pages/admin/users, liste SFC central::pages.admin.users.index. Routes existantes conservées, références et tests adaptés. Archive logique consultable ; réactivation distincte ; protection des comptes archivés contre les mutations.
+- Dossier professionnel : permissions propres de consultation/validation/rejet, service et Form Request, vérification sous verrou de legal_profile_version et complétude déjà appliquée par le profil, identité du validateur et audit Spatie. Historique administratif paginé par sujet, sans propriétés brutes ou secrets.
+- Invitation Fortify : jeton du broker central lié à l’e-mail courant, vérifié/consommé sous verrou. Une invitation confirmée renseigne email_verified_at et émet Verified sans seconde notification ; un reset ordinaire d’un compte public n’est pas transformé en vérification d’e-mail. Une ancienne adresse ne valide pas la nouvelle. Aucun mail réel envoyé pour vérifier.
+- Inscription : champs first_name/last_name et téléphone reliés aux colonnes existantes ; création administrative peut renseigner le téléphone.
+
+Clarification résolue le 12 octobre 2026 : l’utilisateur confirme 5 PENDING et 6 REJECTED au central uniquement. Le parcours est désormais raccordé dans les fichiers ; voir la suite ci-dessous. Les comptes existants et les statuts Tenant ne sont pas convertis.
+
+Contrôles effectués à ce stade :
+- Syntaxe PHP des 23 fichiers créés/modifiés et compilation en mémoire des huit vues : réussies avant la dernière relecture ; contrôles de syntaxe renouvelés à la fin.
+- Routes des utilisateurs, historique et dossier professionnel chargées avec les nouveaux Controllers ; chemins d’AGENTS.md présents. Diagramme cible compté : 27 tables / 450 champs.
+- MySQL READ ONLY avec ROLLBACK : sept comptes existants actifs, les cinq permissions présentes, admin_restrictions vide, CHECK de statut 1–4 ; consultation/modification existantes autorisées, actions sensibles refusées sur le Super Admin et pagination réellement exécutée. Cache de ce contrôle limité au processus avec le store array, sans changement de configuration persistante.
+- Tests de régression ajoutés/adaptés mais NON exécutés : ils créent/modifient des bases MySQL, ce que l’utilisateur n’autorise pas pour les vérifications actuelles.
+- Un passage Pint demandé par les consignes a corrigé le format des fichiers et signalé une ligne syntaxiquement invalide dans LegalVerificationService ; cette ligne a été retirée, puis contrôle ciblé Pint et syntaxe réussis. Aucun PHPStan/build/migration/seeder/worker exécuté.
+
+État historique de cette première étape : seuls les fichiers indépendants de la clarification étaient terminés. La suite du 12 octobre résout ce point ; migration et seeding restent à appliquer séparément.
+
+
+### 12 octobre 2026 — Module 01, parcours d’approbation raccordé
+
+- Décision validée : comptes centraux 1 ACTIVE, 2 INACTIVE, 3 SUSPENDED, 4 DELETED, 5 PENDING, 6 REJECTED dans app/Enums/Central/Users/StatusEnum.php. Les comptes Tenant conservent leur enum 1–4 ; HasTimedPermissions distingue les deux guards sans modifier les durées Spatie.
+- Inscription publique : CreateNewUser choisit 5 et trace la demande. RegistrationResponse implémente le contrat Fortify et retire sa connexion automatique, avec retour au login et message d’attente ; JSON retourne 201 et le statut 5, sans identité interne. L’e-mail de vérification natif reste indépendant.
+- Administration : UserApprovalController, UserApprovalRequest, UserApprovalService et pending.blade.php sont raccordés. Coordonnées et pays paginés, actions Approuver/Refuser autorisées par leurs permissions Spatie ; contrôle de la demande courante sous verrou et audit central. Une décision déjà prise ne peut être écrasée par une seconde décision.
+- Protection : seuls les comptes actifs accèdent aux routes et réglages centraux. Middleware de statut persistant Livewire et callback natif Passkeys vérifiés dans les versions installées. Réactivation ordinaire, attribution de rôles et création de boutique ne contournent pas l’approbation. Le dashboard commerçant approuvé indique désormais que la gestion boutique est en préparation, sans prétendre attendre encore son approbation.
+- Dossier/historique/invitation de la première étape conservés ; import CentralRoleCatalog corrigé dans le service déplacé et seconde requête incorrecte après le verrou du dossier retirée.
+- Migration d’évolution préparée : database/migrations/central/2026_10_12_050215_extend_central_user_statuses_for_approval.php. Elle remplace atomiquement le CHECK central 1–4 par 1–6, sans conversion de données. Le rollback refuse des comptes à 5/6. Aucune migration historique modifiée.
+- Schéma, diagramme central, architecture et AGENTS.md actualisés ; diagramme Tenant et fonctionnalités des autres modules préservés.
+
+Contrôles effectivement réalisés :
+- Syntaxe PHP : 39 fichiers contrôlés, aucune erreur ; les trois fichiers ensuite ajustés pour le contrôle Livewire/passkey ont été contrôlés à nouveau.
+- Compilation Blade en mémoire puis syntaxe PHP : 10 vues, aucune erreur. Ce contrôle ne prouve pas un rendu navigateur complet.
+- Routes chargées et route pending prioritaire au binding utilisateur ; contrat RegisterResponse résolu vers la classe Aydra ; middleware Livewire persistant chargé. Casts central 5 et tenant 1 vérifiés ; le modèle tenant refuse 5.
+- Syntaxe du remplacement de CHECK relue dans le [manuel officiel MySQL](https://dev.mysql.com/doc/refman/8.4/en/alter-table.html) et son [test officiel de remplacement d’une contrainte portant le même nom](https://github.com/mysql/mysql-server/blob/8.4/mysql-test/t/constraints.test). Cela ne remplace pas l’exécution de la migration sur Aydra, volontairement non réalisée ici.
+- MySQL transaction READ ONLY puis ROLLBACK : sept comptes existants, cinq permissions requises présentes, aucun approve/reject déployé et CHECK toujours 1–4. Consultation paginée, liste pending vide, rôles délégables et protections du Super Admin vérifiés sur ces données existantes. Le callback passkey autorise un compte actif existant. Cache limité au processus (array).
+- Pint exécuté sur les fichiers PHP concernés puis uniquement sur les trois fichiers ajustés ; relecture du diff et git diff --check. Aucun PHPStan, build, mail réel, migration, seeder, worker ou test écrivant en BDD exécuté.
+- Tests préparés pour inscription pending/JSON, champs privilégiés ignorés, refus de login, approbation distincte de la preuve d’e-mail, permissions indépendantes/expirées, double décision, absence de contournement, sessions anciennes et 2FA/passkey. Ils restent NON exécutés selon la préférence de contrôles sans écriture en BDD ; leur réussite n’est pas affirmée.
+
+État final : réalisation du Module 01 terminée dans les fichiers ; activation dans MySQL et validation fonctionnelle de bout en bout restent à faire. Lancer depuis Aydra avec le PHP 8.5 autorisé :
+
+~~~powershell
+$aydraPhp = 'C:\Users\habou\.config\herd\bin\php85\php.exe'
+& $aydraPhp artisan migrate --path=database/migrations/central --no-interaction
+& $aydraPhp artisan db:seed --class='Database\Seeders\Central\AuthorizationSeeder' --no-interaction
+~~~
+
+Ces commandes écrivent dans la base centrale configurée. Elles ne réinitialisent pas les données et ne migrent pas les boutiques. Les rôles existants ne reçoivent pas automatiquement les nouvelles actions ; les attribuer ensuite depuis le formulaire des rôles, en conservant les durées et règles de délégation. La table historique admin_restrictions est physiquement conservée et inutilisée ; aucun DROP de données n’est autorisé par cette tâche de vérification.
+
+## 12 octobre 2026 — Refactorisation de l’architecture par module
+
+Périmètre : responsabilité technique, puis contexte Central/Tenant/Storefront, puis module métier. Les changements du Module 01 déjà présents avant cette demande sont conservés. Aucun changement métier supplémentaire, aucune nouvelle fonctionnalité Tenant, aucune écriture dans les bases existantes, aucun changement de dépendance, de configuration globale ou de sécurité Windows. L’utilisateur autorise pour cette refactorisation les tests sur des bases MySQL temporaires isolées ; cette exception ne devient pas une règle permanente.
+
+### Organisation réalisée
+
+- Audit des fichiers, dépendances, namespaces, routes, vues, configurations et tests ; lecture des références et versions installées. La correspondance ancien chemin / nouveau chemin des 70 fichiers a été inscrite au §25.2 de l’architecture avant leurs déplacements. Les 70 destinations existent et les anciennes sources sont absentes.
+- Regroupement des 52 classes déplacées dans Auth, Users, Authorization, Roles, Countries, Plans, Subscriptions, Tenants, Dashboard et Diagnostics, selon leur contexte. Déplacement des vues et tests concernés ; les Services Users déjà correctement rangés restent en place. L’enum de statut des comptes Tenant rejoint Enums/Tenant/Users sans changement de valeurs.
+- Six fichiers de routes centrales ajoutés : central/admin.php, central/admin/{users,tenants,roles,countries}.php et central/diagnostics.php. central.php reste le point d’entrée ; les groupes et protections existants entourent les inclusions. Fortify continue de fournir les routes d’authentification. settings.php, Tenant et Storefront gardent leurs contrats publics.
+- Références corrigées dans les imports, dépendances auparavant implicites entre Services voisins, Providers, bindings, callbacks, middleware, configuration Fortify, composants Blade/Livewire, routes, modèles, factories, seeders et tests. Les Models/Policies et factories déjà classés par contexte, les jobs sérialisables, morph maps, classes de compatibilité et infrastructure partagée ne sont pas déplacés.
+- AGENTS.md indique le classement durable et les exceptions ; l’architecture §25 décrit les raisons, les déplacements et l’arborescence finale (§25.5). Les références de classes affectées dans le schéma et le diagramme central sont actualisées, sans changement de structure SQL dû à cette refactorisation. Les entrées historiques du suivi sont conservées ; leurs anciens chemins ne sont pas les chemins courants.
+
+### Tests réellement exécutés
+
+Avant déplacement : 41 tests d’authentification réussis. Après déplacement, les cas ciblés des différents lots donnent 84 réussites et 2 échecs, sans prétendre avoir exécuté toute la suite :
+
+| Lot | Réussites | Échecs |
+|---|---:|---:|
+| Authentification ciblée | 5 | 0 |
+| Utilisateurs centraux | 31 | 2 |
+| Autorisations centrales | 10 | 0 |
+| Rôles | 6 | 0 |
+| Pays | 5 | 0 |
+| Plan gratuit | 1 | 0 |
+| Abonnements | 1 | 0 |
+| Création/provisionnement de boutiques | 2 | 0 |
+| Dashboard central | 2 | 0 |
+| Diagnostics Central/Tenant | 5 | 0 |
+| Dashboard Tenant préparé et profils shop | 11 | 0 |
+| Écrans et formulaires après réorganisation | 5 | 0 |
+
+Les deux échecs sont dans tests/Central/Feature/Admin/Users/UserAccountManagementTest.php :
+
+- Le test « readers can inspect escaped account information but cannot edit or resend invitations » attend l’affichage du UUID du compte ciblé (assertion ligne 103), absent de la fiche actuelle.
+- Le test « staff edits require the staff permission and cannot take over a more privileged account » attend le refus d’édition d’un compte personnel au gestionnaire (assertion ligne 154). La règle globale du Module 01 autorise actuellement cette édition lorsqu’il possède les droits nécessaires et ceux du compte ciblé.
+
+Ces deux échecs ont été reproduits après retour temporaire aux chemins et imports antérieurs des lots Auth/Users, puis les déplacements ont été rétablis. Ils existaient donc avant cette refactorisation. Aucune assertion supprimée, aucun changement de règle métier pour masquer ces divergences. Leur résolution relève d’une demande fonctionnelle distincte.
+
+Deux erreurs introduites pendant les déplacements ont été corrigées avant la fin : namespace du Service Dashboard, puis nom de route du diagnostic central confondu avec le nouveau nom de vue. Les tests concernés et la comparaison des routes réussissent après correction.
+
+### Vérifications finales et limites
+
+- Comparaison des 172 routes avant/après, en normalisant uniquement les nouveaux noms de classes : méthodes HTTP, URL, domaines, noms, actions et middlewares identiques.
+- Les 116 fichiers PHP de app respectent leurs chemins PSR-4. Comparaison syntaxique des corps de classes après normalisation des namespaces, imports et références de vues : identiques à l’état initial de cette tâche.
+- Syntaxe de 195 fichiers PHP dans app, routes, config, factories, seeders et tests : aucun échec. Recherche des anciennes références de classes : aucun usage restant hors déclarations de namespace et historique documenté.
+- Empreintes des 107 fichiers protégés, incluant toutes les migrations, manifestes/verrouillages, .env, phpunit.xml et tests/TestCase.php : inchangées après le formatage final. Les dix liens locaux d’AGENTS.md existent. Relecture des fichiers écrits et git diff --check réussis.
+- Un passage final Pint, régénération Composer de l’autoload avec --no-scripts --no-interaction et artisan view:clear --no-interaction exécutés avec PHP 8.5. Les contrôles de routes et de structure des classes réussissent après ces commandes. Aucun PHPStan, build, suite complète, mail réel ou worker lancé. Les migrations/seeders des tests ne concernent que leurs bases temporaires ; aucun migrate/db:seed lancé contre les bases existantes.
+- MySQL existant contrôlé en lecture seule : sept comptes, deux boutiques, aucune tâche en attente. Les classes de jobs et leurs contrats sérialisables sont préservés. Aucun contrôle DNS ou rendu de navigateur réel n’est présenté comme réalisé.
+
+La suppression facultative des anciens dossiers vides a été refusée par le contrôle automatique avec le motif « blocked by policy ». Ils restent sur disque ; aucune suppression ni tentative de contournement n’a été effectuée. Ce refus n’empêche pas l’utilisation des fichiers déplacés.
+
+État final : réorganisation effectuée et vérifiée dans le périmètre autorisé. Les deux divergences de tests préexistantes restent signalées. Aucune migration n’est nécessaire pour ces seuls déplacements ; les actions de déploiement du Module 01 mentionnées dans l’entrée précédente ne sont pas exécutées par cette tâche.
+
+## 12 octobre 2026 — Validation du Module 01 avant le Module 02, en cours
+
+Demande : valider entièrement le Module 01 avant de développer le Module 02 d’instructionn.txt. Lecture renouvelée d’AGENTS.md, des sections 1–2 et Modules 01–02, des passages d’architecture/schéma/diagramme concernés et du code réel ; skills Laravel, Fortify et tests consultés. Les changements non commités précédents sont conservés.
+
+Deux attentes historiques dans tests/Central/Feature/Admin/Users/UserAccountManagementTest.php sont adaptées à la règle globale du Module 01, sans changement applicatif : absence de UUID dans le texte visible de la fiche, même si les liens utilisent le UUID public ; saas.users.update permet la modification d’un personnel moins privilégié. Le test conserve les contrôles d’échappement, de protection des secrets et d’accès interdit ; il vérifie aussi l’édition HTTP, la persistance des informations, la conservation du rôle et le refus d’édition du Super Admin par le gestionnaire. Cela corrige des attentes obsolètes identifiées au lot précédent ; la réussite des tests n’est pas encore affirmée.
+
+Contrôles exécutés : syntaxe PHP du test adaptée, formatage Pint ciblé sur ce seul fichier, git diff --check. MySQL existant consulté via Boost en lecture seule : la migration centrale d’extension des statuts d’approbation n’est pas enregistrée ; le catalogue effectif ne contient pas encore toutes les permissions du Module 01. Aucun test MySQL, migration, seeder ou envoi réel de mail lancé pour cette nouvelle tâche.
+
+Point de reprise : trois questions sont en attente. L’autorisation précédente des tests MySQL temporaires était limitée à la refactorisation ; une autorisation est demandée pour valider ces deux modules. L’application à la base centrale existante est proposée uniquement pour 2026_10_12_050215_extend_central_user_statuses_for_approval.php et Database\\Seeders\\Central\\AuthorizationSeeder, après validation des tests, sans réinitialisation. Pour le Module 02, préciser si l’interface autorise les permissions directes natives Spatie, sans recoupement avec les rôles, ou si tous les droits restent attribués uniquement via les rôles : instructionn.txt emploie les deux formulations. Ne pas commencer l’implémentation du Module 02 avant validation du Module 01 ; ne pas exécuter les opérations soumises à confirmation sans réponse.

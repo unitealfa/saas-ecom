@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\Tenant\Users\MembershipStatusEnum;
-use App\Enums\Users\StatusEnum;
+use App\Enums\Tenant\Users\StatusEnum;
 use App\Models\Central\Activity as CentralActivity;
 use App\Models\Central\Permission as CentralPermission;
 use App\Models\Central\Role as CentralRole;

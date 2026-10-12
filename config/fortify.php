@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
 use Laravel\Fortify\Features;
 
 return [
@@ -101,7 +102,7 @@ return [
     |
     */
 
-    'middleware' => ['web'],
+    'middleware' => ['web', EnsureActiveCentralAccount::class.':optional'],
 
     /*
     |--------------------------------------------------------------------------

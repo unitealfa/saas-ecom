@@ -2,7 +2,7 @@
 
 namespace Database\Factories\Tenant;
 
-use App\DTOs\Tenant\ShopSettings;
+use App\DTOs\Tenant\Shop\ShopSettings;
 use App\Models\Central\Tenant;
 use App\Models\Tenant\Shop;
 use Illuminate\Database\Eloquent\Factories\Factory;

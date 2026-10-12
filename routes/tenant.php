@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\Tenant\DatabaseDiagnosticsController;
+use App\Http\Controllers\Tenant\Diagnostics\DatabaseDiagnosticsController;
 use App\Http\Middleware\EnsureLocalDiagnostics;
 use App\Http\Middleware\Tenant\FinishTenantRequest;
 use Illuminate\Support\Facades\Route;

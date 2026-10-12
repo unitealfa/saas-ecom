@@ -321,7 +321,7 @@ new #[Title('Security settings')] class extends Component {
                         @endforelse
                     </div>
 
-                    <x-central::components.passkey-registration />
+                    <x-central::components.auth.passkey-registration />
                 </div>
             </section>
         @endif

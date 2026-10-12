@@ -5,7 +5,7 @@ namespace App\Models\Central;
 use App\Concerns\HasPublicUuid;
 use App\Concerns\HasTimedPermissions;
 use App\Concerns\LogsSafeActivity;
-use App\Enums\Users\StatusEnum;
+use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
 use Carbon\CarbonImmutable;
 use Database\Factories\Central\UserFactory;

@@ -2,7 +2,7 @@
 
 Version V4.10 — 6 octobre 2026. ID numériques auto-incrémentés, UUID publics/inter-BDD et nommage stable des bases boutiques synchronisés avec le code ; fonctionnalités et tables de V4.9 conservées.
 
-Ce document contient **28 tables centrales et 59 tables par boutique**. Les tables techniques Laravel et les passkeys facultatives restent hors décompte. Les cinq tables Spatie Permission et activity_log sont incluses ; les trois pivots gardent leurs clés composites. V4.9 retire feature_overrides au central et permission_overrides dans les deux contextes, puis porte les durées dans leurs attributions existantes. Les règles de rôles sont communes, mais les comptes, rôles, permissions, dates et activités restent indépendants dans chaque BDD.
+Ce document contient **27 tables centrales cibles et 59 tables par boutique**. Les tables techniques Laravel et les passkeys facultatives restent hors décompte. Les cinq tables Spatie Permission et activity_log sont incluses ; les trois pivots gardent leurs clés composites. V4.9 retire feature_overrides au central et permission_overrides dans les deux contextes, puis porte les durées dans leurs attributions existantes. Les règles de rôles sont communes, mais les comptes, rôles, permissions, dates et activités restent indépendants dans chaque BDD.
 
 **Mise à jour technique du 8 octobre 2026 :** le projet utilise MySQL, Spatie Permission 8.3.0 et Activity Log 5.0.0. Les migrations natives des deux packages sont publiées par `php artisan vendor:publish --provider="Spatie\Permission\PermissionServiceProvider" --tag=permission-migrations` et `php artisan vendor:publish --provider="Spatie\Activitylog\ActivitylogServiceProvider" --tag=activitylog-migrations`, puis placées dans les dossiers `central` et `tenant`. Chaque contexte possède une migration de création des cinq tables Permission, une migration de création d'Activity Log et leurs extensions Aydra : UUID, métadonnées, durées, dates d'attribution et contexte d'audit. Les FK Spatie conservent RESTRICT conformément aux règles d'historique ; les index natifs ne sont pas recréés en doublon. Les modèles et le cache Spatie ainsi que le modèle d'activité changent avec le contexte Tenancy. La migration `protect_central_identifiers_and_ownership` supprimée n'est pas rétablie : ses quatre triggers spécifiques ne sont plus créés, tandis que les contrôles d'identité/propriété des modèles et les autres protections documentées restent présents. Les deux index de `tenants` nécessaires aux relations composites et aux créations par propriétaire sont définis dans sa migration de création. Les 62 relations FK simples centrales et 192 locales utilisent `foreignId()` avec leur vraie contrainte SQL vers la PK du parent ; cette colonne conserve un ID existant, sans AUTO_INCREMENT. Les index ordinaires et UNIQUE sont définis dans les migrations de leurs tables. Les FK simples et composites dont les parents sont disponibles sont définies au même endroit ; les références vers un parent créé ensuite, notamment le cycle commande/révision, sont ajoutées dans `add_documented_foreign_keys`, avec mention dans la migration de création. Les contrats REF/POLY restent distincts.
 
@@ -102,7 +102,7 @@ Tous les états internes bornés sont des entiers non signés castés vers un en
 Les descriptions historiques en français (`a_confirmer`, `emise`, `incertain`...) expliquent le métier ; leur représentation physique est le code de l’enum correspondant. Aucune migration ou requête ne compare une colonne tinyint à ces mots. Une valeur externe inconnue reste dans raw_external_status/raw_external_activity et déclenche rapprochement sans attribuer un état interne arbitraire.
 
 ```php
-namespace App\Enums\Users;
+namespace App\Enums\Tenant\Users;
 
 enum StatusEnum: int
 {
@@ -146,17 +146,17 @@ enum StatusEnum: int
 }
 ```
 
-Dans les diagrammes, UserStatusEnum désigne `App\Enums\Users\StatusEnum`. Les autres enums sont nommés par domaine (App\Enums\Orders\OrderStatusEnum, etc.). Le modèle User caste status vers ce StatusEnum. Pour une API entrante, utiliser une valeur entière validée (Rule::enum sur la version choisie) ; un label traduit est seulement de l’affichage. Les transitions légales restent contrôlées par service sous verrou : un enum valide n’autorise pas une transition arbitraire.
+Dans les diagrammes, UserStatusEnum désigne `App\Enums\Tenant\Users\StatusEnum` pour les comptes boutique (codes 1–4). CentralUserStatusEnum désigne `App\Enums\Central\Users\StatusEnum` pour les comptes centraux (1 ACTIVE, 2 INACTIVE, 3 SUSPENDED, 4 DELETED, 5 PENDING, 6 REJECTED), selon la décision confirmée le 12 octobre 2026. Les autres enums sont nommés par domaine (App\Enums\Orders\OrderStatusEnum, etc.). Le modèle User caste status vers ce StatusEnum. Pour une API entrante, utiliser une valeur entière validée (Rule::enum sur la version choisie) ; un label traduit est seulement de l’affichage. Les transitions légales restent contrôlées par service sous verrou : un enum valide n’autorise pas une transition arbitraire.
 
 **Enums des modèles actuellement présents :** `TenantStatusEnum` désigne `App\Enums\Central\Tenants\StatusEnum`, `MemberStatusEnum` désigne `App\Enums\Tenant\Users\MembershipStatusEnum`, `DomainTypeEnum` désigne `App\Enums\Central\Domains\TypeEnum` et `CertificateStatusEnum` désigne `App\Enums\Central\Domains\CertificateStatusEnum`. `VerificationStatusEnum` et `ActivityOriginEnum` sont dans `App\Enums`. Les classes partagées décrivent seulement les codes ; les comptes, permissions et activités restent séparés entre bases. Le code 0 est invalide. Les modèles de rôles castent leurs indicateurs en booléens et `permission_version` en entier ; les attributions castent `assigned_at`/`expires_at` en dates immuables. Le mot de passe reste une chaîne avec le cast Laravel `hashed` ; les empreintes SHA-256 conservent leur format fixe et ne sont pas re-hachées par ce cast.
 
-Chaque champ enum est aussi casté par son modèle Eloquent vers **la classe enum exacte du champ**. Exemple pour `users.status` :
+Chaque champ enum est aussi casté par son modèle Eloquent vers **la classe enum exacte du champ**. Exemple pour `users.status` au central (les comptes Tenant gardent leur enum à quatre codes) :
 
 ```php
 protected function casts(): array
 {
     return [
-        'status' => \App\Enums\Users\StatusEnum::class,
+        'status' => \App\Enums\Central\Users\StatusEnum::class,
     ];
 }
 ```
@@ -165,7 +165,8 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 
 | Enum | Codes stables (TINYINT UNSIGNED) |
 |---|---|
-| `UserStatusEnum` | 1 ACTIVE ; 2 INACTIVE ; 3 SUSPENDED ; 4 DELETED |
+| `UserStatusEnum` | Boutique uniquement : 1 ACTIVE ; 2 INACTIVE ; 3 SUSPENDED ; 4 DELETED |
+| `CentralUserStatusEnum` | Central uniquement : 1 ACTIVE ; 2 INACTIVE ; 3 SUSPENDED ; 4 DELETED ; 5 PENDING ; 6 REJECTED |
 | `TenantStatusEnum` | 1 PROVISIONING ; 2 ACTIVE ; 3 INACTIVE ; 4 SUSPENDED ; 5 OVER_QUOTA ; 6 PROVISIONING_FAILED ; 9 DELETED |
 | `MemberStatusEnum` | 1 ACTIVE ; 2 INVITED ; 3 SUSPENDED ; 4 REVOKED |
 | `DomainTypeEnum` | 1 SUBDOMAIN ; 2 CUSTOM |
@@ -176,8 +177,6 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `QuotaScopeEnum` | 1 OWNER ; 2 TENANT |
 | `QuotaPeriodEnum` | 1 LIFETIME ; 2 DAILY ; 3 MONTHLY ; 4 YEARLY |
 | `BillingPeriodEnum` | 1 MONTHLY ; 2 YEARLY |
-| `RestrictionEffectEnum` | 1 DENY ; 2 ALLOW_ONLY |
-| `OverrideStatusEnum` | 1 ACTIVE ; 2 REVOKED ; 3 EXPIRED ; 4 CLOSED |
 | `SubscriptionStatusEnum` | 1 SCHEDULED ; 2 TRIAL ; 3 ACTIVE ; 4 EXPIRED ; 5 CANCELLED |
 | `InstallmentStatusEnum` | 1 PENDING ; 2 PARTIALLY_PAID ; 3 PAID ; 4 CANCELLED |
 | `SubscriptionRecordTypeEnum` | 1 SUBSCRIPTION ; 2 INSTALLMENT |
@@ -252,7 +251,8 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 
 | Table.champ | Enum | Null permis |
 |---|---|---|
-| `users.status` | `UserStatusEnum` | non |
+| `users.status` (central) | `CentralUserStatusEnum` | non |
+| `users.status` (boutique) | `UserStatusEnum` | non |
 | `tenants.status` | `TenantStatusEnum` | non |
 | `domains.type` | `DomainTypeEnum` | non |
 | `domains.verification_status` | `VerificationStatusEnum` | non |
@@ -261,8 +261,6 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `features.value_type` | `FeatureValueTypeEnum` | non |
 | `features.quota_scope` | `QuotaScopeEnum` | non |
 | `features.period` | `QuotaPeriodEnum` | non |
-| `admin_restrictions.effect` | `RestrictionEffectEnum` | non |
-| `admin_restrictions.status` | `OverrideStatusEnum` | non |
 | `subscriptions.record_type` | `SubscriptionRecordTypeEnum` | non |
 | `subscriptions.status` | `SubscriptionStatusEnum` | oui hors type 1 |
 | `subscriptions.installment_status` | `InstallmentStatusEnum` | oui hors type 2 |
@@ -391,6 +389,8 @@ Les identités SaaS des propriétaires et administrateurs restent centrales. Les
 
 ### C1 — Identités centrales, pays et boutiques
 
+**Module 01 — approbation confirmée le 12 octobre 2026 :** `users.status` central accepte 1 ACTIVE, 2 INACTIVE, 3 SUSPENDED, 4 DELETED, 5 PENDING et 6 REJECTED. L’inscription publique choisit explicitement 5 ; les comptes créés par un administrateur gardent l’invitation et le défaut 1. Fortify conserve ses routes/actions et son contrat RegisterResponse est adapté pour laisser le demandeur déconnecté. La page administrative des demandes montre ses coordonnées et permet, selon Spatie, `saas.users.approve` (5 → 1) ou `saas.users.reject` (5 → 6), sous verrou avec audit Activitylog. Seul un compte actif peut se connecter ; réactivation, attribution de rôles ou création d’une boutique ne contournent pas l’approbation. La vérification de l’e-mail et du dossier professionnel restent indépendantes. Une nouvelle migration centrale étend le CHECK existant à 1–6 sans réécrire les migrations déployées ni changer les comptes existants ; les statuts Tenant restent 1–4. Le retour à l’ancienne contrainte est refusé si des comptes sont à 5 ou 6.
+
 La BDD centrale contient les comptes SaaS des propriétaires et les comptes des administrateurs de plateforme (root, IT, gestionnaire des plans...). Les collaborateurs de boutique possèdent leurs comptes indépendants dans la BDD de leur boutique, décrits en T24. Un même e-mail central et local ne représente pas une session ou un mot de passe commun.
 
 ```mermaid
@@ -436,7 +436,7 @@ erDiagram
         datetime legal_verified_at "nullable"
         bigint_unsigned legal_verified_by_id FK "nullable ; users.id ; administrateur central habilite"
         varchar locale
-        tinyint_unsigned status "UserStatusEnum ; DEFAULT 1"
+        tinyint_unsigned status "CentralUserStatusEnum ; DEFAULT 1 ; inscription publique 5"
         datetime last_login_at "nullable"
         varchar(100) remember_token "nullable"
         timestamp created_at "nullable"
@@ -534,10 +534,10 @@ erDiagram
 - **`locale`** : langue choisie, conservée comme code de langue extensible.
 - **`status`** : code entier de l’enum propre à cet objet, défini au §3.3 ; les libellés sont traduits à l’affichage et les transitions contrôlées par le service.
 - **`last_login_at`** : dernière connexion réussie.
-- **Administration centrale, correction du 11 octobre 2026 :** Spatie conserve les permissions et leurs attributions ; les Policies Laravel contrôlent les actions. Les groupes Commerçants, Personnel SaaS et Pays organisent le catalogue et les formulaires de rôles, sans nouvelle table ni ajout automatique de permissions aux pivots. Un droit de gestion encore valide donne accès à la consultation de son module dans sa portée ; son expiration retire cet accès dérivé. Les restrictions de consultation et celles de l’action source restent appliquées. saas.users.update concerne les commerçants ; le personnel utilise saas.staff.update, distinct de saas.staff.invite. Suspendre, réactiver et supprimer sont des permissions distinctes pour chaque type de compte. Aucun compte ne peut se suspendre/supprimer par ces actions ; le Super Admin ne peut être suspendu, réactivé ou supprimé par ces formulaires. Les délégués restent limités aux droits encore possédés et ne prennent pas le contrôle d’un personnel plus privilégié.
+- **Module 01, instructionn.txt :** les cinq permissions existantes sont conservées avec leurs ID/UUID. Consulter, créer, modifier, approuver, refuser, suspendre, réactiver et archiver sont des actions Spatie centrales. Le dossier professionnel et l’historique administratif ont leurs droits de consultation distincts ; valider/rejeter le dossier exige sa version courante et une autorisation serveur. Les permissions sont globales ; les durées et protections du Super Admin restent contrôlées. Un droit de gestion donne accès à la consultation nécessaire, sans ajouter artificiellement un droit aux pivots. Archiver conserve les boutiques et l’historique. Les Modules 02 et suivants ne sont pas développés dans ce lot.
 - **Fiche et modification des comptes :** afficher identité, contacts, pays, langue, état, vérifications, dates disponibles, rôles, boutiques et abonnements paginés, sans ID interne, secrets, jetons ou mots de passe. Modifier identité/contact/langue et les huit champs professionnels documentés du commerçant. Les dates techniques et preuves de vérification sont calculées, pas saisies ; rôles et état passent par leurs actions séparées. Les abonnements sont consultables, sans édition financière depuis le profil. Une modification matérielle professionnelle incrémente legal_profile_version et retire l’ancienne validation ; un brouillon incomplet est conservé comme INCOMPLETE. Suspendre invalide sessions, remember_token et lien de réinitialisation ; réactiver rend le compte accessible après les contrôles usuels. Supprimer utilise deleted_at et status=DELETED : conservation des boutiques, bases, pièces et abonnements, sans purge ni DROP DATABASE.
 - **Pays dans l’administration et l’inscription :** permissions distinctes saas.countries.view/create/update/activate/delete. Créer un pays désactivé, modifier ses noms français/anglais et arabe facultatif, activer/désactiver séparément, retirer logiquement seulement un pays sans compte ni zone rattachée. Le code ISO d’un pays déjà utilisé reste stable ; les références à des utilisateurs archivés comptent également. L’inscription publique et la création administrative choisissent un UUID de pays actif, résolu vers son vrai countries.id sous verrou. Un compte existant peut conserver son pays désactivé ; aucun nouveau choix désactivé n’est accepté. Les FK vers users et geographic_areas sont conservées, sans migration supplémentaire.
-- **Invitations :** Fortify et le broker central restent utilisés. L’invitation part directement après commit, sans worker ; un échec SMTP est signalé sans annuler le compte, avec renvoi autorisé. Les anciens jobs d’invitation restent compatibles. Le personnel SaaS ne reçoit pas l’action de création de boutique. Aucun champ ou table n’est ajouté pour ces formulaires.
+- **Invitations :** Fortify et le broker central restent utilisés. Un jeton valide d’invitation confirme le mot de passe et l’adresse courante sans second e-mail de vérification ; une adresse modifiée doit être confirmée à nouveau. Le jeton est vérifié/consommé sous verrou, sans prolonger les permissions. L’invitation part directement après commit, sans worker ; un échec SMTP est signalé sans annuler le compte, avec renvoi autorisé. Les anciens jobs d’invitation restent compatibles. Le personnel SaaS ne reçoit pas l’action de création de boutique. Aucun champ ou table n’est ajouté pour ces formulaires.
 - **`created_at / updated_at / deleted_at`** : dates de création, modification et suppression logique ; aucune purge implicite.
 
 **`tenants` :**
@@ -702,50 +702,19 @@ Ces règles sont appliquées séparément dans la BDD centrale et dans chaque BD
 
 **Écriture atomique :** création/modification de rôle, changement de durée, attribution/retrait/remplacement et droit direct passent par le même service sur la connexion centrale. Le rôle root protégé et non supprimable sert de ligne stable de sérialisation des mutations d’autorisation, sans table supplémentaire : verrouiller sa ligne FOR UPDATE, puis les autres rôles et comptes concernés dans l’ordre croissant de leurs id. Après les verrous, relire compositions et attributions en lecture courante, vérifier guard, acteur habilité, nom/signature, durées et absence de recoupement, puis écrire pivots/signature/permission_version et activité dans une transaction. Les UNIQUE SQL ferment les courses de noms/signatures ; les PK ferment les doubles attributions. Un conflit annule toute la mutation. Le rôle root est amorcé une seule fois par le bootstrap protégé avant ce service ; il ne peut être supprimé ou remplacé comme ligne de catalogue. Toutes les voies (UI, API, imports, jobs, seeders ordinaires) respectent ce protocole. Les contrôles inter-lignes exigent le service et une protection dédiée pour tout écrivain SQL de maintenance ; ils ne sont pas prétendus couverts par un simple CHECK. Les imports ne fabriquent pas un début d’attribution depuis la date d’import si la date réelle est inconnue.
 
-**Lecture effective :** le résolveur central vérifie compte actif, bon guard, attribution unique de chaque capacité, date actuelle, restrictions de cible C3 et protections système. Les relations/méthodes d’autorisation Spatie de chaque contexte sont adaptées pour lire dates de pivots et durées ; l’union native non datée ne suffit pas. Configurer register_permission_check_method=false et enregistrer le contrôle personnalisé pour éviter que le Gate::before natif autorise avant le contrôle temporel ; ne jamais combiner un chemin natif non daté et un chemin daté pour la même capacité. Pour une capacité connue saas.*, le hook central rend false en cas d’expiration/absence/blocage et true seulement pour un droit effectif ou root protégé ; ne pas retourner null après un refus temporel. Les actions d’objet des Policies restent évaluées séparément : le hook retourne null pour leurs noms génériques. Les vérifications brutes de présence de rôle/permission ne sécurisent pas une opération datée. Utiliser un catalogue de capacités concrètes, sans permissions wildcard attribuables qui contourneraient les ensembles disjoints. Les invariants métier et l’isolation des boutiques restent obligatoires même pour root. Le contrôle local est décrit en T24.1.
+**Lecture effective :** le résolveur central vérifie compte actif, bon guard, attribution unique de chaque capacité, date actuelle et protections système. Les relations/méthodes d’autorisation Spatie de chaque contexte sont adaptées pour lire dates de pivots et durées ; l’union native non datée ne suffit pas. Configurer register_permission_check_method=false et enregistrer le contrôle personnalisé pour éviter que le Gate::before natif autorise avant le contrôle temporel ; ne jamais combiner un chemin natif non daté et un chemin daté pour la même capacité. Pour une capacité connue saas.*, le hook central rend false en cas d’expiration/absence/blocage et true seulement pour un droit effectif ou root protégé ; ne pas retourner null après un refus temporel. Les actions d’objet des Policies restent évaluées séparément : le hook retourne null pour leurs noms génériques. Les vérifications brutes de présence de rôle/permission ne sécurisent pas une opération datée. Utiliser un catalogue de capacités concrètes, sans permissions wildcard attribuables qui contourneraient les ensembles disjoints. Les invariants métier et l’isolation des boutiques restent obligatoires même pour root. Le contrôle local est décrit en T24.1.
 
 **Caches et audit :** à chaque décision sensible, relire les attributions et leurs dates actuelles ainsi que les versions des rôles, recalculer la validité à l’heure serveur et revalider avant l’effet dans les services concernés. Une version de rôle seule ne détecte pas un retrait de rôle ou un changement de assigned_at ; une relation chargée auparavant n’est pas l’autorité de cette lecture. Les caches ne dépassent jamais la prochaine échéance ; une mutation invalide les relations chargées et les caches concernés après commit, y compris dans les workers. Un cache encore présent ou un cron arrêté ne conserve aucun droit expiré. Les activités d’attribution/révocation/renouvellement/changement de composition ou durée, doublons refusés et délégations refusées ont leurs phases distinctes et propriétés filtrées : utilisateur/rôle/permissions par UUID, anciennes/nouvelles durées et dates, acteur et motif. Les pivots sans id/uuid ne deviennent pas des sujets polymorphes fictifs ; le sujet est le compte ou le rôle et les clés de pivot sont dans les propriétés. Le temps qui passe est contrôlé lors de la décision ; ne pas promettre un événement de révocation ponctuel produit par la seule horloge.
 
 Cette adaptation est un choix du projet, pas une option native de tenancy/teams. Les cinq tables Spatie et leurs clés composites restent ; les contrôles temporels et d'unicité relèvent des extensions du projet dont le socle implémenté est précisé ci-dessous. Source technique : [Spatie, contrôle personnalisé](https://github.com/spatie/laravel-permission/blob/main/docs/advanced-usage/custom-permission-check.md), [Spatie, contrôles de permissions](https://github.com/spatie/laravel-permission/blob/main/src/Traits/HasPermissions.php) et [extension des modèles](https://github.com/spatie/laravel-permission/blob/main/docs/advanced-usage/extending.md).
 
-**Socle Spatie implémenté :** les modèles des deux contextes vérifient les durées via Laravel Gate, protègent les métadonnées sensibles et refusent les compositions identiques ou les permissions communes lors des attributions. `Role::createWithPermissions($name, ['action' => 9999])` crée un rôle avec sa composition complète dans une transaction, y compris lorsqu'un rôle privilégié vide existe déjà. Les signatures utilisent les paires `[permission_id,duration_days]` triées par ID, comme les seeders. Un `syncRoles` ou `syncPermissions` conserve les dates et durées des attributions maintenues. Les services métier de délégation devront encore appliquer l'habilitation de l'acteur, les restrictions ciblées, les motifs et le protocole de verrous décrit ci-dessus ; installer le package ne réalise pas ces parcours à lui seul.
+**Socle Spatie implémenté :** les modèles des deux contextes vérifient les durées via Laravel Gate, protègent les métadonnées sensibles et refusent les compositions identiques ou les permissions communes lors des attributions. `Role::createWithPermissions($name, ['action' => 9999])` crée un rôle avec sa composition complète dans une transaction, y compris lorsqu'un rôle privilégié vide existe déjà. Les signatures utilisent les paires `[permission_id,duration_days]` triées par ID, comme les seeders. Un `syncRoles` ou `syncPermissions` conserve les dates et durées des attributions maintenues. Les services métier de délégation devront encore appliquer l'habilitation de l'acteur, les protections contre l’élévation de privilèges, les motifs et le protocole de verrous décrit ci-dessus ; installer le package ne réalise pas ces parcours à lui seul.
 
-### C3 — Restrictions de l’administration centrale
+### C3 — Ancien module de restrictions retiré
 
-Les permissions centrales sont attribuées dans les cinq tables Spatie avec les durées de C2.1 ; aucune table permission_overrides n’est conservée, au central ou en boutique. admin_restrictions reste exclusivement au central pour contrôler les cibles sur lesquelles un administrateur délégué peut agir ; ses dates et interdictions de cible sont indépendantes de la durée d’une attribution et restent évaluées dans les Policies.
+Décision de la section 1 d’instructionn.txt : les permissions centrales sont globales par action, sans liste blanche/noire d’utilisateurs, boutiques ou rôles. Le module admin_restrictions ne fait plus partie du schéma cible et n’intervient plus dans les Policies ou les services. Les cinq tables Spatie et leurs durées restent conservées ; les contrôles techniques de délégation, de protection du Super Admin et de contexte restent obligatoires.
 
-```mermaid
-erDiagram
-    direction TB
-
-    admin_restrictions {
-        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
-        uuid uuid UK "UUID v4 ; public"
-        bigint_unsigned admin_id FK "users.id"
-        bigint_unsigned permission_id FK "permissions.id"
-        bigint_unsigned target_tenant_id FK "nullable ; tenants.id"
-        bigint_unsigned target_user_id FK "nullable ; users.id"
-        bigint_unsigned target_role_id FK "nullable ; roles.id"
-        tinyint_unsigned effect "RestrictionEffectEnum"
-        tinyint_unsigned status "OverrideStatusEnum"
-        datetime started_at
-        datetime ended_at "nullable"
-        varchar normalized_target_type "generated"
-        bigint_unsigned normalized_target_id "generated ; 0 si global"
-        tinyint_unsigned active_slot "generated nullable"
-        datetime expires_at "nullable"
-        bigint_unsigned created_by_id FK "users.id"
-        timestamp created_at "nullable"
-        timestamp updated_at "nullable"
-        timestamp deleted_at "nullable"
-    }
-    users ||--o{ admin_restrictions : admin_id
-    permissions ||--o{ admin_restrictions : permission_id
-```
-
-admin_restrictions : admin_id désigne l’administrateur délégué. permission_id décrit son action centrale ; exactement une cible parmi target_tenant_id, target_user_id, target_role_id peut être renseignée, ou aucune pour une règle globale. effect=1 DENY ou 2 ALLOW_ONLY ; une règle ALLOW_ONLY introduit une liste fermée de cibles, les DENY priment. Normaliser le type et la PK de cible dans des colonnes générées `normalized_target_type` et `normalized_target_id` (sentinelle numérique 0 uniquement pour absence de cible ; aucun parent réel n’a id=0), avec UNIQUE(admin_id,permission_id,normalized_target_type,normalized_target_id,effect,active_slot). Les règles ne peuvent pas ouvrir l’intérieur d’une boutique. Leur créateur, état et validité sont contrôlés à l’écriture et à la lecture.
-
-Les invitations d’équipe ont été déplacées intégralement en T24. La racine centrale n’est ni un rôle assignable par un IT délégué ni une exception temporaire ordinaire. Les services de délégation interdisent élévation indirecte, auto-attribution et modification des rôles protégés.
+Les migrations historiques déployées et les données existantes ne sont pas effacées pendant cette intervention. La table historique peut encore être présente dans MySQL ; elle n’est plus une source d’autorisation. Aucun DROP ni migration n’est exécuté pour les vérifications.
 
 ### C4 — Plans et abonnements
 
@@ -1761,7 +1730,7 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 | `colors` | `{"primary":"#2563EB","secondary":"#FFFFFF"}` |
 | `cart_lifetime_days` | `7` |
 
-Ces valeurs sont appliquées par `App\DTOs\Tenant\ShopSettings` et le provisionneur, sans ajouter de DEFAULT SQL ni modifier les contraintes de `shop`. Avant de sauvegarder un nouveau tenant, `configureShopForProvisioning($settings)` accepte ces quatre paramètres, complets ou partiels ; une valeur absente, NULL ou chaîne vide prend le défaut correspondant. Les chaînes non vides respectent la capacité VARCHAR(255) ; les couleurs sont un objet de couleurs hexadécimales nommées et la durée un entier positif compatible avec INT. `OTHER` et `default` sont acceptés ; `business_type` reste extensible et aucun catalogue fermé de thèmes n'existe actuellement. Lorsqu'un catalogue de thèmes sera implémenté, les codes devront être validés contre celui-ci avant utilisation.
+Ces valeurs sont appliquées par `App\DTOs\Tenant\Shop\ShopSettings` et le provisionneur, sans ajouter de DEFAULT SQL ni modifier les contraintes de `shop`. Avant de sauvegarder un nouveau tenant, `configureShopForProvisioning($settings)` accepte ces quatre paramètres, complets ou partiels ; une valeur absente, NULL ou chaîne vide prend le défaut correspondant. Les chaînes non vides respectent la capacité VARCHAR(255) ; les couleurs sont un objet de couleurs hexadécimales nommées et la durée un entier positif compatible avec INT. `OTHER` et `default` sont acceptés ; `business_type` reste extensible et aucun catalogue fermé de thèmes n'existe actuellement. Lorsqu'un catalogue de thèmes sera implémenté, les codes devront être validés contre celui-ci avant utilisation.
 
 Les paramètres initiaux sont enregistrés dans les données techniques du tenant central pour survivre à un échec de migration et à une reprise par un autre processus. Après succès, cette intention technique est libérée ; `shop` reste la source des réglages courants. Une reprise réutilise le profil existant sans modifier son ID/UUID, ses dates ni ses réglages ; un profil rattaché à un autre UUID tenant fait échouer le provisionnement. Le seeder local explicite enrichit le profil initial existant sans en créer un second ni remplacer ces quatre réglages ; il refuse un profil public déjà renseigné. Le provisionnement technique conserve le statut de préparation ; la création du profil ne suffit pas à rendre la boutique active.
 
@@ -4632,7 +4601,7 @@ Les FK d’appartenance/rôle/tenant de l’ancienne organisation centrale sont 
 
 tenants.user_id est le propriétaire central immuable. tenant users.central_user_uuid, uniquement pour le propriétaire local, correspond à ce propriétaire par UUID ; vérifier via la connexion centrale au provisioning et à la reprise. Tout transfert de propriétaire, modification de cette liaison, suppression du propriétaire protégé ou attribution de shop-owner à un collaborateur est refusé. Le rôle système ne crée pas une deuxième source de propriété.
 
-**AUD-05 adapté :** la validité temporelle est portée par les attributions C2.1/T24.1 dans chaque BDD et son guard, sans permission_overrides centrale ou locale. Les rôles d’un compte n’ont pas de permission commune ; les droits directs ne les doublent pas. Noms/signatures et dates restent locaux. admin_restrictions reste exclusivement au central et ses cibles ne désignent que des objets centraux ; aucune attribution tenant_id ni FK inter-BDD n’est ajoutée.
+**AUD-05 adapté :** la validité temporelle est portée par les attributions C2.1/T24.1 dans chaque BDD et son guard, sans permission_overrides centrale ou locale. Les rôles d’un compte n’ont pas de permission commune ; les droits directs ne les doublent pas. Noms/signatures et dates restent locaux. Les permissions centrales sont globales par action ; aucune attribution tenant_id ni FK inter-BDD n’est ajoutée.
 
 Unicités conditionnelles : domaine principal actif, abonnement actif type 1 du propriétaire, panier actif, adresse principale, média principal par parent/collection, déploiement en cours et restriction administrative centrale active. Les expressions utilisent un état explicite, jamais NOW(). Les cibles facultatives et quotas sont normalisés avec une sentinelle numérique interdite comme PK réelle (0), et non un UUID fictif. Le rôle racine unique est porté par roles.super_admin_slot ; la gestion de son attribution verrouille ce rôle et préserve un administrateur valide dans sa BDD. Le central n’entretient aucune unicité sur les collaborateurs de boutique.
 
@@ -4777,7 +4746,7 @@ Les restrictions MySQL 8.4 sur les FK de colonnes générées STORED, les action
 
 **Propriétaire :** propriété centrale définie uniquement par tenants.user_id et protégée contre toute modification. L’accès au back-office de chaque boutique exige son compte local distinct, lié par central_user_uuid au propriétaire central, et son appartenance active. Son rôle système local shop-owner donne les capacités de cette boutique sous réserve du compte/appartenance/tenant accessibles, du plan, des quotas et de l’état métier. Aucun transfert n’est offert.
 
-**Administrateur central délégué :** compte users central, permission saas.* et cibles autorisées par admin_restrictions. Un IT peut créer des comptes centraux si cette capacité lui est attribuée ; un gestionnaire peut attribuer des plans sans disposer des autres droits root. Ils n’administrent aucun compte d’équipe local, ne lisent pas les données internes des boutiques et ne se connectent à leur place.
+**Administrateur central délégué :** compte users central, permission saas.* globale par action et contrôles techniques de délégation. Un IT peut créer des comptes centraux si cette capacité lui est attribuée ; un gestionnaire peut attribuer des plans sans disposer des autres droits root. Ils n’administrent aucun compte d’équipe local, ne lisent pas les données internes des boutiques et ne se connectent à leur place.
 
 **Root central :** rôle central is_super_admin=true, droits complets d’administration centrale. Cette exception ne s’applique jamais à un utilisateur tenant ou à une Policy/ressource de boutique. Les invariants de propriété, d’intégrité, de paiement, de conservation et d’effets externes restent dans les services et la BDD. Le même nom de rôle ou le même id numérique dans deux bases ne crée aucun lien de privilège.
 
@@ -4839,7 +4808,7 @@ Les références externes sont validées dans le contexte attendu avant usage. L
 
 ### 7.4 Middleware, Gates, Policies et quotas d’équipe
 
-**Ordre central :** route centrale → provider/guard central → compte actif → permission saas.* → Policy de cible et restrictions → validation → transaction centrale → activité. **Ordre boutique :** domaine validé → contexte tenant (BDD, cache, session, droits, fichiers et activité) → auth:tenant → users.status=1, users.membership_status=1, users.deleted_at NULL et tenant accessible → binding UUID dans cette BDD → can/Policy → fonctionnalité/quota → validation → transaction tenant → activité. L’initialisation tenant précède l’authentification locale et le binding ; reproduire ce pipeline pour chaque action Livewire, API ou job.
+**Ordre central :** route centrale → provider/guard central → compte actif → permission saas.* → Policy de cible et protections techniques → validation → transaction centrale → activité. **Ordre boutique :** domaine validé → contexte tenant (BDD, cache, session, droits, fichiers et activité) → auth:tenant → users.status=1, users.membership_status=1, users.deleted_at NULL et tenant accessible → binding UUID dans cette BDD → can/Policy → fonctionnalité/quota → validation → transaction tenant → activité. L’initialisation tenant précède l’authentification locale et le binding ; reproduire ce pipeline pour chaque action Livewire, API ou job.
 
 Le middleware auth reconnaît une identité ; can contrôle une capacité Laravel ; les middleware Spatie role/permission/role_or_permission sont utilisables avec le guard approprié, mais leurs vérifications directes ne représentent pas tout le contrat d’interdictions et de quotas du projet. Préférer can/Gate::authorize et une Policy pour les opérations métier. Cacher un bouton avec @can ou Inertia ne protège pas le serveur. Chaque mutation et lecture sensible est réautorisée.
 
@@ -5783,9 +5752,9 @@ Si des écritures de l’ancien échange payé existent, archiver/réconcilier l
 
 ### Traçabilité V4.9 — identités et permissions dans les deux contextes
 
-Décisions confirmées : first_name/last_name pour les personnes centrales et locales, tenants.shop_name pour chaque boutique et shop.shop_name pour sa projection ; retrait de legal_name/tax_regime du profil central courant et des nouveaux formats de snapshot ; retrait de feature_overrides au central et de permission_overrides au central et dans chaque boutique. Les quotas viennent de l’offre et plan_features. Les cinq tables Spatie sont conservées dans chaque BDD ; admin_restrictions reste uniquement centrale. Durées par permission de rôle, 9999 jours par défaut et au maximum ; noms uniques ; compositions identiques en permissions/durées refusées ; plusieurs rôles par compte sans aucune permission commune. La fin est calculée depuis la date d’attribution propre à cette personne. Aucun registre d’exceptions caché ni nouvelle table n’est ajouté.
+Décisions confirmées : first_name/last_name pour les personnes centrales et locales, tenants.shop_name pour chaque boutique et shop.shop_name pour sa projection ; retrait de legal_name/tax_regime du profil central courant et des nouveaux formats de snapshot ; retrait de feature_overrides au central et de permission_overrides au central et dans chaque boutique. Les quotas viennent de l’offre et plan_features. Les cinq tables Spatie sont conservées dans chaque BDD ; Dans cette décision historique, admin_restrictions restait centrale ; elle est retirée de la cible par instructionn.txt du 11 octobre. Durées par permission de rôle, 9999 jours par défaut et au maximum ; noms uniques ; compositions identiques en permissions/durées refusées ; plusieurs rôles par compte sans aucune permission commune. La fin est calculée depuis la date d’attribution propre à cette personne. Aucun registre d’exceptions caché ni nouvelle table n’est ajouté.
 
-**Portée et compatibilité :** la dernière instruction étend les règles aux boutiques. La BDD centrale passe de 30 à 28 tables, 464 champs ; chaque boutique passe de 60 à 59 tables, 1005 champs. users, roles et les trois pivots sont adaptés dans chaque contexte ; shop.name devient shop.shop_name sans créer une seconde source publique. Les autres définitions sont conservées. Toutes les boutiques gardent le même schéma, mais leurs rôles/permissions/dates sont indépendants ; les noms/compositions identiques entre BDD sont permis. Les invitations commencent les durées à leur acceptation, conservent un début existant et refusent les recoupements. Identifiants/UUID, guards, audit, propriété, quotas, facturation, stock et référentiels publics gardent leurs protections. PermissionEffectEnum est retiré du catalogue actif ; OverrideStatusEnum reste utilisé par admin_restrictions.
+**Portée et compatibilité :** la dernière instruction étend les règles aux boutiques. La BDD centrale passe de 30 à 28 tables, 464 champs ; chaque boutique passe de 60 à 59 tables, 1005 champs. users, roles et les trois pivots sont adaptés dans chaque contexte ; shop.name devient shop.shop_name sans créer une seconde source publique. Les autres définitions sont conservées. Toutes les boutiques gardent le même schéma, mais leurs rôles/permissions/dates sont indépendants ; les noms/compositions identiques entre BDD sont permis. Les invitations commencent les durées à leur acceptation, conservent un début existant et refusent les recoupements. Identifiants/UUID, guards, audit, propriété, quotas, facturation, stock et référentiels publics gardent leurs protections. PermissionEffectEnum est retiré du catalogue actif ; Les enums de l’ancien module admin_restrictions sont conservés seulement dans l’historique des migrations, pas dans la cible active.
 
 **Préparation future, aucune migration exécutée :** si des données existent dans chaque BDD, établir le sens réel de l’ancien users.name avant sa correspondance vers last_name ; ne pas découper arbitrairement un nom complet. Conserver first_name et les noms publics des boutiques ; shop.name est renommé en shop_name sans changer sa valeur. Ne pas réécrire anciens snapshots/PDF/audits. Pour les attributions, récupérer les dates réelles prouvées ; une date inconnue bloque la bascule jusqu’à une décision explicite, sans prolonger un droit par la date d’import. Calculer signatures, contrôler noms/compositions/recoupements et résoudre les conflits avant UNIQUE/CHECK. Ne pas convertir une ancienne permission temporaire en 9999 jours : reconstruire une composition/durée/datation équivalente quand cela est possible, sinon signaler le cas sans élargir le droit. Une ancienne interdiction exige une décision explicite de retrait/remplacement du droit/rôle ; au central seulement, une restriction de cible compatible peut conserver son sens ; elle n’est pas convertie en autorisation. Les exceptions de quota requièrent une offre/version adaptée et une souscription cohérente. Archiver les décisions remplacées et leurs audits ; aucune suppression physique de donnée ne découle de ces documents.
 
@@ -5876,7 +5845,7 @@ Les noms/adaptations et décisions de connexion/quota/délégation, ainsi que le
 
 ## Annexe Inventaire complet
 
-### BDD centrale — 28 tables
+### BDD centrale — 27 tables cibles
 
 1. `countries`
 2. `users`
@@ -5889,23 +5858,22 @@ Les noms/adaptations et décisions de connexion/quota/délégation, ainsi que le
 9. `role_has_permissions`
 10. `model_has_roles`
 11. `model_has_permissions`
-12. `admin_restrictions`
-13. `plans`
-14. `plan_features`
-15. `subscriptions`
-16. `feature_usage`
-17. `geographic_areas`
-18. `activity_log`
-19. `tenant_schema_deployments`
-20. `saas_invoices`
-21. `saas_invoice_lines`
-22. `saas_billing_settings`
-23. `saas_document_deliveries`
-24. `saas_transfers`
-25. `media`
-26. `shipping_carriers`
-27. `carrier_geo_mappings`
-28. `pickup_points`
+12. `plans`
+13. `plan_features`
+14. `subscriptions`
+15. `feature_usage`
+16. `geographic_areas`
+17. `activity_log`
+18. `tenant_schema_deployments`
+19. `saas_invoices`
+20. `saas_invoice_lines`
+21. `saas_billing_settings`
+22. `saas_document_deliveries`
+23. `saas_transfers`
+24. `media`
+25. `shipping_carriers`
+26. `carrier_geo_mappings`
+27. `pickup_points`
 
 ### BDD boutique — 59 tables
 

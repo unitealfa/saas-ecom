@@ -6,7 +6,7 @@ use App\Enums\Central\Tenants\StatusEnum;
 use App\Models\Central\Country;
 use App\Models\Tenant;
 use App\Models\User;
-use App\Services\Central\TenantProvisioner;
+use App\Services\Central\Tenants\TenantProvisioner;
 use Carbon\CarbonImmutable;
 use Database\Seeders\LocalFixtureSeeder;
 use Database\Seeders\Tenant\LocalDevelopmentSeeder as ShopSeeder;

@@ -2,8 +2,9 @@
 
 namespace App\Concerns;
 
+use App\Enums\Central\Users\StatusEnum as CentralUserStatus;
 use App\Enums\Tenant\Users\MembershipStatusEnum;
-use App\Enums\Users\StatusEnum;
+use App\Enums\Tenant\Users\StatusEnum;
 use App\Models\PermissionAssignment;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -133,7 +134,8 @@ trait HasTimedPermissions
 
     public function hasPermissionTo(mixed $permission, ?string $guardName = null): bool
     {
-        if ($this->getAttribute('status') !== StatusEnum::ACTIVE || $this->getAttribute('deleted_at') !== null) {
+        $activeStatus = $this->guard_name === 'central' ? CentralUserStatus::ACTIVE : StatusEnum::ACTIVE;
+        if ($this->getAttribute('status') !== $activeStatus || $this->getAttribute('deleted_at') !== null) {
             return false;
         }
         if ($this->getMorphClass() === 'shop_user' && $this->getAttribute('membership_status') !== MembershipStatusEnum::ACTIVE) {

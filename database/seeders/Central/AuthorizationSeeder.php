@@ -2,7 +2,7 @@
 
 namespace Database\Seeders\Central;
 
-use App\Services\Central\CentralRoleCatalog;
+use App\Services\Central\Roles\CentralRoleCatalog;
 use Illuminate\Database\Seeder;
 
 class AuthorizationSeeder extends Seeder
