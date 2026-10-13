@@ -685,3 +685,328 @@ Après les tests, AuthorizationSeeder est relancé sur la base centrale pour enr
 ### Point restant
 
 Le Module 02 n’est pas déclaré entièrement terminé : les actions saas.staff.permissions.grant/revoke et le renouvellement d’une attribution directe dépendraient du choix encore attendu. Aucune interface d’attribution directe ni permission sans fonctionnalité correspondante n’est ajoutée pour combler cette ambiguïté. Les attributions directes existantes peuvent être consultées avec les rôles, sans écrire dans model_has_permissions. À la reprise, lire la réponse explicite, mettre à jour le §26 et les documents concernés, puis terminer uniquement ce chemin selon la décision. Les fonctionnalités via rôles déjà livrées restent utilisables et validées ; ne pas recommencer la migration ni les tests inchangés inutilement.
+
+## 13 octobre 2026 — Audit des Modules 01 et 02 et corrections
+
+Demande : vérifier les deux modules et corriger les problèmes constatés. Consignes, instructionn.txt, références métier et architecture consultées ; code des Controllers, Requests, services, Policies, modèles, routes et vues concernés relu. PHP 8.5 de Herd utilisé. L’autorisation des tests MySQL temporaires couvre toujours ces deux modules ; les bases existantes sont uniquement consultées. Les modifications utilisateur d’instructionn.txt et de LegalVerificationService ainsi que le commit 6955822 apparu pendant le travail sont préservés.
+
+Deux défauts reproduits puis corrigés :
+
+- Sur l’ancienne route Utilisateurs, renvoyer une invitation au personnel exigeait seulement le droit de modification, contournant saas.staff.invite.resend. À l’inverse, son détenteur sans droit de modification ne voyait pas le bouton. Des destinataires suspendus/inactifs pouvaient aussi être réinvités. UserPolicy.resendInvitation applique désormais resendStaffInvitation au personnel ; Controller, service sous verrou et bouton utilisent cette capacité. Les règles du renvoi au commerçant, y compris l’erreur de validation d’un compte déjà vérifié, sont conservées.
+- Une permission expirée sans rapport avec l’édition empêchait un personnel encore autorisé de modifier sa propre identité : mayManageStaff comparait tous ses droits à ses propres droits valides. La comparaison hiérarchique reste obligatoire pour les autres comptes ; pour soi, l’état actif est relu et la Policy exige toujours le droit de modification. L’auto-attribution des rôles et la modification de son propre état restent interdites. Mot de passe, rôles et échéances sont préservés.
+
+Fichiers applicatifs modifiés : app/Policies/Central/UserPolicy.php, app/Services/Central/Authorization/CentralUserAccess.php, app/Services/Central/Users/UserManagementService.php, app/Http/Controllers/Central/Admin/Users/UserController.php et resources/views/central/pages/admin/users/show.blade.php. Six cas de régression ajoutés à tests/Central/Feature/Admin/Staff/StaffManagementTest.php, dont trois états de destinataire ; le refus dans le service est également vérifié indépendamment du Controller. AGENTS.md, le §26 et les notes d’invitation du schéma sont actualisés ; aucune migration ou structure Mermaid modifiée.
+
+Contrôles réellement exécutés :
+
+- État initial : 100 cas Users/Staff/Auth/Authorization réussis, 566 assertions. Les six nouveaux cas ont ensuite échoué en reproduisant les défauts, puis réussi après correction, avec 34 assertions avant ajout du contrôle de service.
+- Passe finale après corrections et formatage : 55 cas Users/Staff réussis, 417 assertions ; trois cas supplémentaires de CentralManagementTest réussis, 19 assertions, sur l’invitation Fortify, la délégation limitée et Root protégé avant sa date de début. Ces contrôles couvrent 109 cas distincts au total ; les relances ne sont pas comptées comme des cas supplémentaires. La passe finale porte sur 58 cas, sans répéter toute l’application.
+- Routes chargées : 19 routes canoniques central.users.* (y compris les routes boutique historiques) et 13 central.staff.*, toutes sous auth:central, vérification d’e-mail et EnsureActiveCentralAccount. Les capacités propres aux mutations restent contrôlées dans leurs Requests/services/Policies.
+- MySQL existant en lecture seule : sept comptes actifs, deux boutiques, migration d’approbation enregistrée, catalogue Users/Staff sous guard central. Aucun pays parent, utilisateur de pivot central, rôle ou permission orphelin dans les contrôles exécutés ; aucun chevauchement entre rôles ni entre rôle et attribution directe ; toutes les durées de rôle sont entre 1 et 9 999 jours. Les FK locales des utilisateurs et des tables Spatie sont présentes ; model_id conserve le contrat polymorphe sans FK fictive.
+- Un passage Pint ciblé sur les cinq fichiers PHP concernés, syntaxe PHP et git diff --check réussis. Aucun PHPStan, build, reset, migration/seeder réel, worker, mail réel ou changement système lancé dans cet audit. Les tests utilisent des notifications simulées et des bases MySQL temporaires isolées.
+
+Limites : les parcours implémentés sont validés par les contrôles ci-dessus, sans promettre l’absence de tout défaut. Livraison réelle SMTP, DNS et parcours dans un navigateur réel non testés. Le point restant de l’attribution directe Spatie dans l’interface du Module 02 demeure ouvert ; aucune décision n’est déduite de la demande de vérification. L’inspection des droits et leur gestion via rôles sont opérationnelles ; le Module 02 complet d’instructionn.txt n’est pas déclaré terminé tant que ce choix n’est pas confirmé et traité.
+
+## 13 octobre 2026 — Contrôle individuel de $this et des dépendances
+
+Demande : vérifier toutes les classes une par une, expliquer l’usage de $this et conserver la convention pour les prochaines interventions. Lecture des instructions, de l’architecture et du suivi ; skills Laravel, Fortify et Livewire consultés. Versions relues dans les packages installés : Laravel 13.34.0, Livewire 4.4.7, Fortify 1.41.0, Spatie Permission 8.3.0 et Tenancy 3.10.1.
+
+Contrôle structurel du code PHP propre au projet : 385 fichiers analysés avec PHP 8.5, sans erreur de syntaxe ; 259 déclarations de classes, traits et enums examinées individuellement par analyse syntaxique, dont 128 dans app, 119 dans database, 10 composants anonymes dans les vues et deux déclarations dans tests. Les modèles, leurs parents et leurs traits sont également confrontés par réflexion pour les références directes à $this. Les accès des traits HasRoleMetadata/HasTimedPermissions proviennent de leurs modèles hôtes Eloquent/Spatie ; guard_name est déclaré dans les modèles utilisateurs des deux contextes. Le nom du modèle User utilise son attribut Eloquent. Aucun accès à $this dans une méthode/fermeture statique trouvé dans ce contrôle.
+
+Le seul cumul trouvé entre dépendance au constructeur et dépendance de méthode concerne UserController : history, update, resendInvitation, changeStatus et destroy réinjectaient UserManagementService. Ces cinq méthodes réutilisent désormais $this->userServices, déjà utilisé par create et store. Aucun appel direct à ces anciennes signatures trouvé dans le projet ; les routes conservent leurs noms et paramètres. Le contrôle final ne trouve plus ce cumul dans les 259 déclarations. Aucun changement de données, schema SQL, permission, package, URL ou architecture des contextes.
+
+Contrôles après correction : cinq tests existants ciblés réussissent, 51 assertions, sur édition, renvoi d’invitation, suspension/réactivation, archivage et historique administratif. Un passage Pint sur le seul Controller concerné réussit. Les deux fichiers JS existants sont de simples points d’entrée/imports, sans classe JavaScript utilisant this. Les stubs sont des modèles de génération, conservés ; vendor, node_modules, caches et vues compilées ne constituent pas des classes métier à refactoriser.
+
+Relecture finale : les 259 chemins de l’inventaire existent, les sept appels réutilisent effectivement la propriété injectée du Controller, sa syntaxe est valide et les 19 routes canoniques central.users.* se chargent. Le diff est contrôlé sans modifier les autres changements déjà présents. Aucune base existante, donnée ou configuration système n’est modifiée.
+
+Convention durable ajoutée dans AGENTS.md et au §27 de l’architecture : utiliser $this pour les membres d’instance et réutiliser les services injectés ; injection de méthode, DTOs, enums, facades, Providers, jobs et cycle Livewire conservent leurs contrats. Aucun singleton ou cache métier ajouté. Aucun gain de performance mesuré ni annoncé. Cet inventaire vérifie la structure et l’accès aux instances ; il ne constitue pas une nouvelle validation fonctionnelle de toutes les fonctionnalités du SaaS.
+
+### Inventaire individuel
+
+Chaque ligne correspond à une déclaration réellement analysée, identifiée par son fichier. Le nombre d’accès à $this est un relevé syntaxique du corps de la déclaration, sans les méthodes héritées et sans l’affectation implicite des propriétés promues. Zéro accès n’est pas une anomalie : le corps peut ne manipuler que des paramètres, des données statiques ou les mécanismes du framework.
+
+| Fichier | Déclaration | Accès à $this | Contrôle structurel |
+|---|---|---:|---|
+| `app/Actions/Central/Auth/Fortify/CreateNewUser.php` | Classe | 2 | Accès d’instance |
+| `app/Actions/Central/Auth/Fortify/PasswordValidationRules.php` | Trait | 0 | Trait sans accès direct à l’instance |
+| `app/Actions/Central/Auth/Fortify/ResetUserPassword.php` | Classe | 1 | Accès d’instance |
+| `app/Actions/Central/Auth/Fortify/UpdateUserPassword.php` | Classe | 1 | Accès d’instance |
+| `app/Actions/Central/Auth/Fortify/UpdateUserProfileInformation.php` | Classe | 1 | Accès d’instance |
+| `app/Concerns/HasActivityMetadata.php` | Trait | 0 | Trait sans accès direct à l’instance |
+| `app/Concerns/HasPermissionMetadata.php` | Trait | 0 | Trait sans accès direct à l’instance |
+| `app/Concerns/HasPublicUuid.php` | Trait | 0 | Trait sans accès direct à l’instance |
+| `app/Concerns/HasRoleMetadata.php` | Trait | 33 | Accès du trait dans sa classe hôte |
+| `app/Concerns/HasTimedPermissions.php` | Trait | 47 | Accès du trait dans sa classe hôte |
+| `app/Concerns/LogsSafeActivity.php` | Trait | 0 | Trait sans accès direct à l’instance |
+| `app/Concerns/PasswordValidationRules.php` | Trait | 0 | Trait sans accès direct à l’instance |
+| `app/Concerns/ProfileValidationRules.php` | Trait | 2 | Accès du trait dans sa classe hôte |
+| `app/Console/Commands/Central/RetryPendingTenantProvisioning.php` | Classe | 2 | Accès d’instance |
+| `app/DTOs/Central/Roles/RoleData.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/DTOs/Central/Tenants/TenantData.php` | Classe | 3 | Accès d’instance |
+| `app/DTOs/Central/Users/UserData.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/DTOs/Central/Users/UserProfileData.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/DTOs/Central/Users/UserSaveResult.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/DTOs/Tenant/Dashboard/DashboardData.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/DTOs/Tenant/Shop/ShopSettings.php` | Classe | 4 | Accès d’instance |
+| `app/Enums/ActivityOriginEnum.php` | Enum | 0 | Valeurs/cas sans accès à l’instance |
+| `app/Enums/Central/Deployments/OperationEnum.php` | Enum | 0 | Valeurs/cas sans accès à l’instance |
+| `app/Enums/Central/Deployments/StatusEnum.php` | Enum | 0 | Valeurs/cas sans accès à l’instance |
+| `app/Enums/Central/Domains/CertificateStatusEnum.php` | Enum | 0 | Valeurs/cas sans accès à l’instance |
+| `app/Enums/Central/Domains/TypeEnum.php` | Enum | 0 | Valeurs/cas sans accès à l’instance |
+| `app/Enums/Central/Features/PeriodEnum.php` | Enum | 0 | Valeurs/cas sans accès à l’instance |
+| `app/Enums/Central/Features/QuotaScopeEnum.php` | Enum | 0 | Valeurs/cas sans accès à l’instance |
+| `app/Enums/Central/Features/ValueTypeEnum.php` | Enum | 0 | Valeurs/cas sans accès à l’instance |
+| `app/Enums/Central/Subscriptions/PeriodEnum.php` | Enum | 0 | Valeurs/cas sans accès à l’instance |
+| `app/Enums/Central/Subscriptions/StatusEnum.php` | Enum | 0 | Valeurs/cas sans accès à l’instance |
+| `app/Enums/Central/Tenants/StatusEnum.php` | Enum | 0 | Valeurs/cas sans accès à l’instance |
+| `app/Enums/Central/Users/StatusEnum.php` | Enum | 1 | Lecture de la valeur de l’enum |
+| `app/Enums/Tenant/Users/MembershipStatusEnum.php` | Enum | 0 | Valeurs/cas sans accès à l’instance |
+| `app/Enums/Tenant/Users/StatusEnum.php` | Enum | 0 | Valeurs/cas sans accès à l’instance |
+| `app/Enums/VerificationStatusEnum.php` | Enum | 0 | Valeurs/cas sans accès à l’instance |
+| `app/Http/Controllers/Central/Admin/Countries/CountryController.php` | Classe | 4 | Accès d’instance |
+| `app/Http/Controllers/Central/Admin/Roles/RoleController.php` | Classe | 2 | Accès d’instance |
+| `app/Http/Controllers/Central/Admin/Staff/StaffController.php` | Classe | 6 | Accès d’instance |
+| `app/Http/Controllers/Central/Admin/Staff/StaffPermissionController.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Http/Controllers/Central/Admin/Staff/StaffRoleController.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Http/Controllers/Central/Admin/Tenants/TenantController.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Http/Controllers/Central/Admin/Users/LegalVerificationController.php` | Classe | 2 | Accès d’instance |
+| `app/Http/Controllers/Central/Admin/Users/UserApprovalController.php` | Classe | 2 | Accès d’instance |
+| `app/Http/Controllers/Central/Admin/Users/UserController.php` | Classe | 7 | Service du constructeur réutilisé ; cinq réinjections retirées |
+| `app/Http/Controllers/Central/Admin/Users/UserRoleController.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Http/Controllers/Central/Diagnostics/DatabaseDiagnosticsController.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Http/Controllers/Controller.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Http/Controllers/Storefront/StorefrontController.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Http/Controllers/Tenant/Admin/Dashboard/DashboardController.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Http/Controllers/Tenant/Diagnostics/DatabaseDiagnosticsController.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Http/Middleware/Central/Auth/EnsureActiveCentralAccount.php` | Classe | 2 | Accès d’instance |
+| `app/Http/Middleware/EnsureApplicationDomain.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Http/Middleware/EnsureLocalDiagnostics.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Http/Middleware/Tenant/FinishTenantRequest.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Http/Requests/Central/Countries/ChangeCountryStatusRequest.php` | Classe | 2 | Accès d’instance |
+| `app/Http/Requests/Central/Countries/StoreCountryRequest.php` | Classe | 5 | Accès d’instance |
+| `app/Http/Requests/Central/Roles/SaveRoleRequest.php` | Classe | 6 | Accès d’instance |
+| `app/Http/Requests/Central/Tenants/StoreTenantRequest.php` | Classe | 6 | Accès d’instance |
+| `app/Http/Requests/Central/Users/AssignRolesRequest.php` | Classe | 2 | Accès d’instance |
+| `app/Http/Requests/Central/Users/AssignStaffRolesRequest.php` | Classe | 2 | Accès d’instance |
+| `app/Http/Requests/Central/Users/ChangeStaffStatusRequest.php` | Classe | 3 | Accès d’instance |
+| `app/Http/Requests/Central/Users/ChangeUserStatusRequest.php` | Classe | 3 | Accès d’instance |
+| `app/Http/Requests/Central/Users/LegalVerificationRequest.php` | Classe | 3 | Accès d’instance |
+| `app/Http/Requests/Central/Users/RenewStaffAssignmentRequest.php` | Classe | 2 | Accès d’instance |
+| `app/Http/Requests/Central/Users/StoreStaffRequest.php` | Classe | 1 | Accès d’instance |
+| `app/Http/Requests/Central/Users/StoreUserRequest.php` | Classe | 8 | Accès d’instance |
+| `app/Http/Requests/Central/Users/UpdateStaffRequest.php` | Classe | 2 | Accès d’instance |
+| `app/Http/Requests/Central/Users/UpdateUserRequest.php` | Classe | 7 | Accès d’instance |
+| `app/Http/Requests/Central/Users/UserApprovalRequest.php` | Classe | 3 | Accès d’instance |
+| `app/Http/Responses/Central/Auth/RegistrationResponse.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Jobs/Central/ProvisionTenantDatabase.php` | Classe | 4 | Accès d’instance |
+| `app/Livewire/Central/Auth/Actions/Logout.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Models/Central/Activity.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Models/Central/Country.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Models/Central/Domain.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Models/Central/Feature.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Models/Central/Permission.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Models/Central/Plan.php` | Classe | 1 | Accès d’instance |
+| `app/Models/Central/PlanFeature.php` | Classe | 2 | Accès d’instance |
+| `app/Models/Central/Role.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Models/Central/Subscription.php` | Classe | 2 | Accès d’instance |
+| `app/Models/Central/Tenant.php` | Classe | 5 | Accès d’instance |
+| `app/Models/Central/TenantSchemaDeployment.php` | Classe | 1 | Accès d’instance |
+| `app/Models/Central/User.php` | Classe | 5 | Accès d’instance |
+| `app/Models/PermissionAssignment.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Models/Tenant.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Models/Tenant/Activity.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Models/Tenant/Permission.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Models/Tenant/Role.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Models/Tenant/Shop.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Models/Tenant/User.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Models/Test.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Models/User.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Notifications/Central/Auth/AccountInvitation.php` | Classe | 2 | Accès d’instance |
+| `app/Policies/Central/CountryPolicy.php` | Classe | 5 | Accès d’instance |
+| `app/Policies/Central/RolePolicy.php` | Classe | 3 | Accès d’instance |
+| `app/Policies/Central/TenantPolicy.php` | Classe | 3 | Accès d’instance |
+| `app/Policies/Central/UserPolicy.php` | Classe | 58 | Accès d’instance |
+| `app/Providers/AppServiceProvider.php` | Classe | 3 | Accès d’instance |
+| `app/Providers/FortifyServiceProvider.php` | Classe | 5 | Accès d’instance |
+| `app/Providers/TenancyServiceProvider.php` | Classe | 4 | Accès d’instance |
+| `app/Services/Central/Auth/AccountMailDelivery.php` | Classe | 2 | Accès d’instance |
+| `app/Services/Central/Authorization/AuthorizationMutation.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Services/Central/Authorization/CentralPermissionResolver.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Services/Central/Authorization/CentralRoleAssignmentService.php` | Classe | 4 | Accès d’instance |
+| `app/Services/Central/Authorization/CentralUserAccess.php` | Classe | 10 | Accès d’instance |
+| `app/Services/Central/Countries/CountryService.php` | Classe | 5 | Accès d’instance |
+| `app/Services/Central/Dashboard/Dashboard.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Services/Central/Diagnostics/DatabaseDiagnostics.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Services/Central/Plans/FreePlanCatalog.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Services/Central/Roles/CentralRoleCatalog.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Services/Central/Roles/RoleManager.php` | Classe | 2 | Accès d’instance |
+| `app/Services/Central/Subscriptions/DefaultSubscription.php` | Classe | 1 | Accès d’instance |
+| `app/Services/Central/Tenants/TenantCreator.php` | Classe | 2 | Accès d’instance |
+| `app/Services/Central/Tenants/TenantDatabaseName.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Services/Central/Tenants/TenantProvisioner.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Services/Central/Users/LegalVerificationService.php` | Classe | 1 | Accès d’instance |
+| `app/Services/Central/Users/StaffInvitationService.php` | Classe | 2 | Accès d’instance |
+| `app/Services/Central/Users/StaffManagementService.php` | Classe | 6 | Accès d’instance |
+| `app/Services/Central/Users/UserApprovalService.php` | Classe | 1 | Accès d’instance |
+| `app/Services/Central/Users/UserManagementService.php` | Classe | 22 | Accès d’instance |
+| `app/Services/SchemaBlueprint.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `app/Services/Tenant/Dashboard/Dashboard.php` | Classe | 2 | Accès d’instance |
+| `app/Services/Tenant/Diagnostics/DatabaseDiagnostics.php` | Classe | 3 | Accès d’instance |
+| `app/Tenancy/Bootstrappers/AccountContextBootstrapper.php` | Classe | 12 | Accès d’instance |
+| `app/Tenancy/Bootstrappers/NamespacedCacheBootstrapper.php` | Classe | 10 | Accès d’instance |
+| `app/Tenancy/Bootstrappers/SpatieContextBootstrapper.php` | Classe | 4 | Accès d’instance |
+| `database/factories/Central/CountryFactory.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `database/factories/Central/DomainFactory.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `database/factories/Central/FeatureFactory.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `database/factories/Central/PlanFactory.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `database/factories/Central/PlanFeatureFactory.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `database/factories/Central/SubscriptionFactory.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `database/factories/Central/TenantFactory.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `database/factories/Central/TenantSchemaDeploymentFactory.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `database/factories/Central/UserFactory.php` | Classe | 2 | Accès d’instance |
+| `database/factories/Tenant/ShopFactory.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `database/factories/Tenant/UserFactory.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/0000_01_01_000000_create_countries_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/0001_01_01_000000_create_users_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/0001_01_01_000001_create_cache_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/0001_01_01_000002_create_jobs_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2024_01_01_000000_create_passkeys_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2025_08_14_170933_add_two_factor_columns_to_users_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_064409_create_tenants_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_064410_create_domains_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_064411_create_contact_verifications_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090509_create_features_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090510_create_permission_tables.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090511_extend_permission_tables_with_aydra_metadata.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090515_create_admin_restrictions_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090516_create_plans_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090517_create_plan_features_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090518_create_subscriptions_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090519_create_feature_usage_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090520_create_geographic_areas_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090521_create_activity_log_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090521_extend_activity_log_with_aydra_metadata.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090522_create_tenant_schema_deployments_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090523_create_saas_invoices_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090524_create_saas_invoice_lines_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090525_create_saas_billing_settings_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090526_create_saas_document_deliveries_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090527_create_saas_transfers_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090528_create_media_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090529_create_shipping_carriers_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090530_create_carrier_geo_mappings_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_090531_create_pickup_points_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_091357_add_documented_foreign_keys.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_06_091358_add_documented_row_constraints.php` | Classe anonyme | 2 | Accès d’instance |
+| `database/migrations/central/2026_10_06_093039_protect_documented_identities_and_history.php` | Classe anonyme | 2 | Accès d’instance |
+| `database/migrations/central/2026_10_06_093555_add_documented_conditional_indexes.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/central/2026_10_12_050215_extend_central_user_statuses_for_approval.php` | Classe anonyme | 5 | Accès d’instance |
+| `database/migrations/tenant/2026_10_06_064410_create_local_accounts_tables.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_070257_protect_local_identifiers_and_ownership.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_074030_create_cache_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_074031_create_jobs_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_074032_create_tenants_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_074033_create_domains_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090515_create_shop_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090516_create_shop_addresses_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090517_create_content_pages_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090518_create_media_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090519_create_categories_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090520_create_products_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090521_create_product_variants_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090522_create_product_options_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090523_create_variant_option_values_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090524_create_product_tags_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090525_create_product_promotions_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090526_create_product_reviews_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090527_create_visitors_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090528_create_visit_sessions_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090529_create_navigation_events_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090530_create_carts_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090531_create_cart_items_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090532_create_orders_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090533_create_order_revisions_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090534_create_order_items_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090535_create_order_history_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090536_create_stock_movements_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090537_create_order_returns_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090538_create_return_items_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090539_create_shipping_providers_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090540_create_shipping_rates_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090541_create_free_shipping_rules_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090542_create_shipments_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090543_create_shipment_events_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090544_create_carrier_operations_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090545_create_carrier_operation_attempts_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090546_create_collections_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090547_create_remittance_statements_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090548_create_carrier_settlement_lines_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090549_create_expenses_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090550_create_customer_adjustments_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090551_create_order_documents_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090552_create_activity_log_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090552_extend_activity_log_with_aydra_metadata.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090553_create_carrier_fees_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090554_create_carrier_receivables_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090555_create_collection_entries_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090556_create_invoices_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090557_create_order_incidents_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090558_create_order_incident_details_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090559_create_billing_rules_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090600_create_sales_terms_acceptances_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090601_create_billing_obligations_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090602_create_commercial_corrections_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090603_create_commercial_correction_lines_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090604_create_permission_tables.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090605_extend_permission_tables_with_aydra_metadata.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090609_create_team_invitations_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090610_create_carrier_accounts_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_090611_create_carrier_remittance_batches_table.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_091358_add_documented_foreign_keys.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/migrations/tenant/2026_10_06_091359_add_documented_row_constraints.php` | Classe anonyme | 2 | Accès d’instance |
+| `database/migrations/tenant/2026_10_06_093039_protect_documented_identities_and_history.php` | Classe anonyme | 2 | Accès d’instance |
+| `database/migrations/tenant/2026_10_06_093556_add_documented_conditional_indexes.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `database/seeders/Central/AuthorizationSeeder.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `database/seeders/Central/CountrySeeder.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `database/seeders/Central/FreePlanSeeder.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `database/seeders/Central/LocalAuthenticationSeeder.php` | Classe | 3 | Accès d’instance |
+| `database/seeders/Central/LocalDevelopmentSeeder.php` | Classe | 42 | Accès d’instance |
+| `database/seeders/DatabaseSeeder.php` | Classe | 2 | Accès d’instance |
+| `database/seeders/LocalFixtureSeeder.php` | Classe | 1 | Accès d’instance |
+| `database/seeders/Tenant/LocalDevelopmentSeeder.php` | Classe | 265 | Accès d’instance |
+| `resources/views/central/pages/admin/staff/index.blade.php` | Classe anonyme | 6 | Accès d’instance |
+| `resources/views/central/pages/admin/users/index.blade.php` | Classe anonyme | 6 | Accès d’instance |
+| `resources/views/central/pages/settings/two-factor/⚡recovery-codes.blade.php` | Classe anonyme | 5 | Accès d’instance |
+| `resources/views/central/pages/settings/⚡appearance.blade.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `resources/views/central/pages/settings/⚡delete-user-form.blade.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `resources/views/central/pages/settings/⚡delete-user-modal.blade.php` | Classe anonyme | 3 | Accès d’instance |
+| `resources/views/central/pages/settings/⚡profile.blade.php` | Classe anonyme | 5 | Accès d’instance |
+| `resources/views/central/pages/settings/⚡security.blade.php` | Classe anonyme | 25 | Accès d’instance |
+| `resources/views/central/pages/settings/⚡two-factor-setup-modal.blade.php` | Classe anonyme | 22 | Accès d’instance |
+| `resources/views/central/pages/⚡dashboard.blade.php` | Classe anonyme | 0 | Aucun accès direct requis par le corps existant |
+| `tests/Tenant/Tenancy/TenantTestSeeder.php` | Classe | 0 | Aucun accès direct requis par le corps existant |
+| `tests/TestCase.php` | Classe | 1 | Accès d’instance |
+
+## 13 octobre 2026 — Photos de profil avec avatar commun par défaut
+
+Demande : permettre une photo facultative pour tous les utilisateurs et afficher un avatar par défaut si elle n’est pas choisie ou est retirée. Périmètre explicitement confirmé : central fonctionnel, boutique préparée sans activer sa connexion/dashboard. Tests MySQL temporaires ciblés autorisés ; les bases existantes restent en lecture seule. La conception, les tables media et leurs contraintes, les interfaces et versions installées ont été vérifiées avant création ; Laravel/Fortify/Livewire/Flux/tests et la documentation officielle du stockage, de la validation et des signatures sont consultés.
+
+### Réalisation
+
+- Modèles Media Central/Tenant avec leur connexion explicite ; HasProfilePhoto partagé sur les deux modèles User. La relation profilePhoto utilise model_type/model_id, collection profile_photo et principal actif dans media de la même BDD. Le modèle ne crée pas un nouvel ID parent. Le getter profile_photo_url fournit l’image personnelle au central ou public/default-avatar.svg en son absence. Aucun champ, migration, table, ligne par défaut ou compte de démonstration ajouté.
+- Profil central : formulaire facultatif d’image, remplacement et retrait via Controller Central/Settings, Form Request Central/Users, service Central/Users et routes du fichier settings existant. Formats JPG/PNG/WebP, MIME réel, 2 Mo et 4096 pixels par côté ; SVG et contenu invalide refusés. Les propriétés du parent, le disque et la collection proviennent du serveur.
+- Avatar dans les menus mobile/desktop, les listes et fiches Utilisateurs/Personnel. Les listes préchargent la relation minimale pour éviter une requête de photo par ligne. Aucune mesure globale de performance n’est annoncée.
+- Un compte actif modifie uniquement sa propre photo ; consulter celle d’un autre compte exige l’autorisation existante Users ou Staff. Fichiers sur le disque local privé, URL Laravel signée relative conservant l’hôte/port courant, auth:central/compte actif, signature et Policy lors de la lecture ; réponse privée sans cache avec MIME maîtrisé. Aucun storage:link, nouveau package ou configuration Windows nécessaire.
+- Remplacement/retrait sous verrou utilisateur et transaction ; ancien média archivé, octets supprimés après commit. Une erreur de sauvegarde restaure l’ancien état et supprime le nouveau fichier. Nettoyage impossible signalé dans les logs avec le UUID du média et sans chemin/contenu privé. Activitylog trace profile_photo_updated/removed ; identité, statut, contacts, mot de passe, rôles et leurs dates ne changent pas.
+- Tenant : modèle, relation et getter préparés ; composant account-summary affiche l’avatar commun. Aucune route d’authentification, dashboard ou mutation de photo Tenant activée. Même si un média de test existe localement, le getter renvoie le défaut tant que la route Tenant est absente ; aucune photo centrale n’est copiée en boutique.
+- Schéma principal, diagrammes central/boutique, §28 de l’architecture et AGENTS.md actualisés. Nouvelle relation POLY Users/media par contexte, sans FK SQL universelle ; tous les blocs de champs existants restent identiques. Le comptage réel donne 29/73 relations POLY au central/en boutique. Le texte central annonçait déjà 29 avant cet ajout, alors que le Mermaid en contenait 28 ; le comptage final est vérifié contre les relations dessinées. Les modifications préexistantes des autres tâches sont conservées.
+
+### Vérifications et limites
+
+- Première passe : 16 cas, 13 réussis ; trois assertions comparaient les attributs partiels d’une factory au modèle complet relu en BDD. La référence est relue avant modification, puis les trois cas et l’isolation Tenant réussissent : quatre cas, 100 assertions. Aucun comportement ni assertion retiré pour masquer un défaut.
+- Passe centrale après correction : 24 cas réussis, 199 assertions, incluant les photos, les cinq tests du profil existant et trois parcours d’affichage Users/Staff. Après raccordement de la signature obligatoire, six cas de lecture/upload/accès/signature réussissent, 91 assertions. Après renforcement du cas parent réel (users.id=2 et media.id=1), les trois formats réussissent, 78 assertions.
+- Au total, 26 cas distincts ont été validés, sans compter les relances : 18 dédiés à la photo/préparation Tenant et huit parcours existants. Ajout/remplacement/retrait, état du compte, accès refusé, injection d’un autre parent ignorée, formats/poids/dimensions, panne disque, rollback SQL, fichier absent, signature modifiée et réelle isolation de deux BDD boutiques avec mêmes IDs locaux sont couverts. Le test Tenant utilise le stockage de fixtures isolé et nettoie ses deux bases via le contrôle de préfixe existant.
+- PHP 8.5 exclusivement. Pint ciblé, syntaxe de 14 fichiers PHP, SVG vérifié comme XML, routes chargées avec leurs protections et diff relu. Comparaison des champs des trois documents avec Git : identiques ; relation photo présente une fois par document, migrations inchangées. Les générateurs Artisan ont créé les fichiers aux chemins documentés.
+- MySQL réel consulté en lecture seule : sept comptes, deux boutiques, aucune ligne profile_photo ni parent de photo orphelin. Les comptes existants ont donc automatiquement l’avatar commun via le code, sans écriture SQL. Aucun reset, migrate/db:seed réel, SMTP, worker, build, PHPStan ou modification système exécuté.
+
+Fonctionnalité centrale raccordée et vérifiée par tests HTTP/Laravel ; aucun navigateur réel ni résolution DNS n’est présenté comme testé. Aucun déploiement ou commit créé. La future interface Tenant reste à développer uniquement lorsqu’elle sera demandée. Aucune migration à lancer pour utiliser la photo centrale puisque media existe déjà.

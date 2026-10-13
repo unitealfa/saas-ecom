@@ -72,6 +72,12 @@ class CentralUserAccess
 
     public function mayManageStaff(User $actor, User $target): bool
     {
+        if ($actor->id === $target->id) {
+            $actor = $actor->fresh();
+
+            return $actor !== null && $this->active($actor);
+        }
+
         return $this->isSuperAdmin($actor)
             || $target->getAllPermissions()->every(fn ($permission): bool => $this->ownsPermission($actor, $permission->name));
     }

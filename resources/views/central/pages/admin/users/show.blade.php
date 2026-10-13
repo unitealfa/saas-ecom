@@ -1,6 +1,6 @@
 <x-layouts::app :title="__('Informations du compte')">
     <section class="mx-auto flex max-w-3xl flex-col gap-6">
-        <flux:heading size="xl" level="1">{{ $user->name }}</flux:heading>
+        <div class="flex items-center gap-3"><flux:avatar :src="$user->profile_photo_url" :name="$user->name" size="lg" /><flux:heading size="xl" level="1">{{ $user->name }}</flux:heading></div>
         @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
         @if (session('warning'))<flux:callout variant="warning">{{ session('warning') }}</flux:callout>@endif
         @if ($errors->any())
@@ -119,6 +119,8 @@
             @endcan
             @can('update', $user)
                 <flux:button :href="route('central.users.edit', $user)" variant="primary">Modifier</flux:button>
+            @endcan
+            @can('resendInvitation', $user)
                 @unless ($user->hasVerifiedEmail())
                     <form method="POST" action="{{ route('central.users.invitation', $user) }}">
                         @csrf

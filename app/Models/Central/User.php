@@ -2,6 +2,7 @@
 
 namespace App\Models\Central;
 
+use App\Concerns\HasProfilePhoto;
 use App\Concerns\HasPublicUuid;
 use App\Concerns\HasTimedPermissions;
 use App\Concerns\LogsSafeActivity;
@@ -58,7 +59,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     /** @use HasFactory<UserFactory> */
     use CentralConnection, HasFactory, HasPublicUuid, Notifiable, PasskeyAuthenticatable, SoftDeletes, TwoFactorAuthenticatable;
 
-    use HasTimedPermissions, LogsSafeActivity;
+    use HasProfilePhoto, HasTimedPermissions, LogsSafeActivity;
 
     protected string $guard_name = 'central';
 

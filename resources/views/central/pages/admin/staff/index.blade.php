@@ -71,7 +71,7 @@ new #[Layout('layouts::app'), Title('Personnel SaaS')] class extends Component
             <tbody>
                 @forelse ($this->staff as $user)
                     <tr wire:key="staff-{{ $user->uuid }}">
-                        <td class="p-4">{{ $user->name }}</td><td class="p-4">{{ $user->email }}</td>
+                        <td class="p-4"><div class="flex items-center gap-2"><flux:avatar :src="$user->profile_photo_url" :name="$user->name" size="sm" />{{ $user->name }}</div></td><td class="p-4">{{ $user->email }}</td>
                         <td class="p-4">{{ $user->roles->pluck('label')->join(', ') }}</td><td class="p-4">{{ $user->status->label() }}</td>
                         <td class="p-4">
                             <flux:button :href="route('central.staff.show', $user)">Informations</flux:button>

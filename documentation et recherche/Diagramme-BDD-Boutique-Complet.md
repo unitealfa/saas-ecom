@@ -1,5 +1,7 @@
 # Diagramme complet de la BDD boutique
 
+**Photos de profil, 13 octobre 2026 :** les modèles de chaque boutique préparent une photo facultative via media.model_type=shop_user, media.model_id=users.id et collection_name=profile_photo. L’avatar public/default-avatar.svg est commun par défaut. La connexion et la modification du profil Tenant restent inactives conformément au périmètre confirmé ; aucune photo centrale n’est copiée dans une boutique et les références/fichiers locaux restent isolés.
+
 **Mise à jour technique du 8 octobre 2026 :** MySQL, Spatie Permission 8.3.0 et Activity Log 5.0.0. `created_at`/`updated_at` proviennent de `timestamps()` et `deleted_at` de `softDeletes()` pour les tables archivables ; ces TIMESTAMP sont nullable. Un journal possédant seulement `created_at` conserve ce timestamp obligatoire. Les dates métier restent des DATETIME. Les migrations de création Permission et Activity Log sont publiées par les commandes officielles Spatie ; deux migrations d'extension locales conservent les UUID, durées et informations d'audit décrits ici. Les FK conservent RESTRICT ; les index natifs ne sont pas recréés en doublon. Permissions, cache et activités restent isolés par boutique. Les 62 relations FK simples centrales et 192 locales utilisent `foreignId()` avec leur vraie contrainte SQL vers la PK du parent ; cette colonne conserve un ID existant, sans AUTO_INCREMENT. Les index ordinaires et UNIQUE sont définis dans les migrations de leurs tables. Les FK simples et composites dont les parents sont disponibles sont définies au même endroit ; les références vers un parent créé ensuite, notamment le cycle commande/révision, sont ajoutées dans `add_documented_foreign_keys`, avec mention dans la migration de création. Les contrats REF/POLY restent distincts.
 
 Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.10 du 6 octobre 2026, synchronisée avec les migrations présentes le 8 octobre 2026. Ce document présente **les 59 tables locales et leurs 1005 champs dans un seul diagramme Mermaid**, puis explique chaque table et chaque champ simplement. Chaque boutique possède cette structure dans sa propre BDD ; rôles et comptes restent indépendants. Les migrations correspondantes sont vérifiées sur des bases MySQL de test isolées.
@@ -86,7 +88,7 @@ Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md),
 
 **Un « ? » ne signifie pas « toujours facultatif » :** la date et la révision de confirmation sont obligatoires après le clic Valider ; un bureau de retrait et son snapshot sont obligatoires en stop desk ; le PDF et la date d'émission sont obligatoires pour une facture émise. Les règles du schéma imposent ces obligations. Les colonnes calculées sont remplies par la BDD, sans saisie utilisateur.
 
-Les 192 liens FK couvrent toutes les colonnes marquées FK. Les 72 liens POLY sont conditionnels : subject_type, causer_type ou model_type choisissent un modèle explicitement autorisé ; aucune FK SQL universelle n’est créée. Les traits pleins participent à la PK ; les autres sont pointillés. Les FK composites, types, phases, plafonds et transactions restent obligatoires selon le schéma principal, même si le dessin montre chaque colonne séparément.
+Les 192 liens FK couvrent toutes les colonnes marquées FK. Les 73 liens POLY sont conditionnels : subject_type, causer_type ou model_type choisissent un modèle explicitement autorisé ; aucune FK SQL universelle n’est créée. Les traits pleins participent à la PK ; les autres sont pointillés. Les FK composites, types, phases, plafonds et transactions restent obligatoires selon le schéma principal, même si le dessin montre chaque colonne séparément.
 
 Les comptes, pivots, médias et audits utilisent seulement les modèles de cette boutique. Les alias des tables typées imposent leur rôle : catégorie/étiquette, adresse/lien social, contenu/page de vente, axe/valeur, type de tarif ou règlement. Les UUID centraux visibles ne recopient pas les tables centrales et ne donnent aucun accès à leurs comptes. Le stop desk garde l’UUID et le snapshot du bureau accepté.
 
@@ -1282,6 +1284,7 @@ shop ||..o{ shop_addresses : "FK shop_id"
 shop_addresses |o..o{ shop_addresses : "FK shop_address_id"
 products |o..o{ content_pages : "FK product_id"
 users |o..o{ media : "FK created_by_id"
+users ||..o{ media : "POLY model_id ; shop_user ; collection profile_photo"
 categories |o..o{ categories : "FK parent_id"
 media |o..o{ categories : "FK media_id"
 categories |o..o{ products : "FK category_id"

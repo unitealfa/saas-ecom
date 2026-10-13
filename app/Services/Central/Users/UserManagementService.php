@@ -38,7 +38,7 @@ class UserManagementService
     {
         Gate::forUser($actor)->authorize('viewAny', User::class);
         $query = \App\Models\User::query()->select(['id', 'uuid', 'first_name', 'last_name', 'email', 'status', 'email_verified_at'])
-            ->with('roles:id,uuid,label,guard_name');
+            ->with(['roles:id,uuid,label,guard_name', 'profilePhoto:id,uuid,model_type,model_id']);
         if ($status === StatusEnum::DELETED) {
             $query->onlyTrashed();
         }
@@ -167,7 +167,7 @@ class UserManagementService
         $emailSent = null;
         $user = $this->mutations->run(function () use ($actor, $target, &$emailSent): User {
             $target = User::whereKey($target->id)->lockForUpdate()->firstOrFail();
-            Gate::forUser($actor)->authorize('update', $target);
+            Gate::forUser($actor)->authorize('resendInvitation', $target);
             if ($target->hasVerifiedEmail()) {
                 throw ValidationException::withMessages(['invitation' => 'Ce compte a déjà vérifié son adresse e-mail.']);
             }

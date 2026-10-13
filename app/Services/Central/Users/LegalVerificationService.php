@@ -16,7 +16,6 @@ class LegalVerificationService
     {
         $this->mutations->run(function () use ($actor, $target, $version, $validated, $reason): void {
             $target = User::whereKey($target->id)->lockForUpdate()->firstOrFail();
-            // $target = User::findOrFail($target->id)->lockForUpdate();
             Gate::forUser($actor)->authorize($validated ? 'validateLegal' : 'rejectLegal', $target);
             if ($version < 1 || $target->legal_profile_version !== $version) {
                 throw ValidationException::withMessages(['legal_profile_version' => 'Le dossier a changé. Rechargez sa fiche avant de décider.']);

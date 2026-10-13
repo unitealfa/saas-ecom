@@ -1,5 +1,7 @@
 # Diagramme complet de la BDD centrale
 
+**Photos de profil, 13 octobre 2026 :** chaque compte possède une photo facultative et affiche public/default-avatar.svg en son absence. La photo personnelle est liée à users par media.model_type=central_user, media.model_id=users.id et collection_name=profile_photo ; au maximum un principal actif grâce à l’index existant. Ajout/remplacement/retrait dans le profil central, fichiers privés, URL signée et Policy Laravel, audit Activitylog. Aucun champ ajouté à users ni nouvelle table ; le fichier est séparé de la BDD.
+
 **Approbation confirmée le 12 octobre 2026 :** `App\Enums\Central\Users\StatusEnum` ajoute 5 PENDING et 6 REJECTED au central uniquement. Inscription publique : 5 ; approbation : 5 → 1 ; refus : 5 → 6. Les comptes existants restent inchangés ; l’invitation administrative garde le défaut 1. La migration centrale d’évolution est appliquée le 12 octobre après autorisation et tests sur MySQL temporaire. La vérification de l’e-mail et du dossier professionnel ne remplacent pas cette décision.
 
 **Module 02, personnel SaaS :** les pages centrales de liste, invitation, modification, rôles, permissions effectives, renouvellement de rôle, suspension, réactivation et archivage utilisent les tables présentes, sans modification de ce diagramme. Spatie garde ses rôles/pivots et Fortify son broker d’invitation. Les droits expirés ne permettent pas de déléguer, même si une autre action donne la consultation nécessaire à une liste. L’ouverture de l’attribution directe depuis l’interface reste à clarifier ; aucune table maison n’est introduite.
@@ -655,6 +657,7 @@ users |o..o{ saas_transfers : "FK validated_by_id"
 users |o..o{ saas_transfers : "FK performed_by_id"
 saas_transfers |o..o{ saas_transfers : "FK reversal_of_id"
 users |o..o{ media : "FK created_by_id"
+users ||..o{ media : "POLY model_id ; central_user ; collection profile_photo"
 shipping_carriers ||..o{ carrier_geo_mappings : "FK carrier_id"
 geographic_areas ||..o{ carrier_geo_mappings : "FK geographic_area_id"
 shipping_carriers ||..o{ pickup_points : "FK carrier_id"

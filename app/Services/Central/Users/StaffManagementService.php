@@ -24,7 +24,7 @@ class StaffManagementService
         Gate::forUser($actor)->authorize('viewAnyStaff', User::class);
         $query = User::query()->whereHas('roles', fn ($query) => $query->where('guard_name', 'central'))
             ->select(['id', 'uuid', 'first_name', 'last_name', 'email', 'status', 'email_verified_at'])
-            ->with('roles:id,uuid,label,guard_name');
+            ->with(['roles:id,uuid,label,guard_name', 'profilePhoto:id,uuid,model_type,model_id']);
         if ($status === StatusEnum::DELETED) {
             $query->onlyTrashed();
         }

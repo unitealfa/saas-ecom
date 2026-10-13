@@ -78,7 +78,7 @@ new #[Title('Utilisateurs')] class extends Component {
             <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
                 @forelse ($this->users as $user)
                     <tr wire:key="user-{{ $user->uuid }}">
-                        <td class="p-4">{{ $user->name }}</td>
+                        <td class="p-4"><div class="flex items-center gap-2"><flux:avatar :src="$user->profile_photo_url" :name="$user->name" size="sm" />{{ $user->name }}</div></td>
                         <td class="p-4">{{ $user->email }}</td>
                         <td class="p-4">{{ $user->roles->pluck('label')->join(', ') ?: __('Commerçant') }}</td>
                         <td class="p-4">{{ $user->status->label() }}</td>

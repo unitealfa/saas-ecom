@@ -7,7 +7,9 @@ use App\Models\User;
 use App\Notifications\Central\Auth\AccountInvitation;
 use App\Services\Central\Auth\AccountMailDelivery;
 use App\Services\Central\Authorization\CentralPermissionResolver;
+use App\Services\Central\Users\UserManagementService;
 use Database\Seeders\Central\AuthorizationSeeder;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
@@ -269,4 +271,70 @@ test('renewing an existing role needs renewal permission rather than permission 
     ])->assertSessionHasNoErrors()->assertRedirect(route('central.staff.show', $staff));
     expect($staff->roles()->firstOrFail()->pivot->assigned_at)->toEqual(now());
     expect(Activity::forSubject($staff)->where('event', 'central_role_assignment_renewed')->count())->toBe(1);
+});
+
+test('legacy users invitation cannot bypass the separate staff resend permission', function (): void {
+    $actor = User::factory()->create();
+    $actor->assignRole(Role::createWithPermissions('staff-editor-without-resend', [
+        'saas.staff.update' => 9999, 'saas.users.view' => 9999,
+    ]));
+    $staff = staffTestAccount(false);
+    $token = Password::broker('central')->createToken($staff);
+
+    expect(Gate::forUser($actor)->allows('updateStaff', $staff))->toBeTrue();
+    expect(Gate::forUser($actor)->allows('resendStaffInvitation', $staff))->toBeFalse();
+    $this->actingAs($actor, 'central')->post(route('central.users.invitation', $staff))->assertForbidden();
+    expect(fn () => app(UserManagementService::class)->resendInvitation($actor, $staff))
+        ->toThrow(AuthorizationException::class);
+    $this->get(route('central.users.show', $staff))->assertOk()->assertDontSee('Renvoyer l’invitation');
+    expect(Password::broker('central')->tokenExists($staff, $token))->toBeTrue();
+    expect(Activity::forSubject($staff)->where('event', 'account_invitation_requested')->count())->toBe(0);
+    Notification::assertNothingSent();
+});
+
+test('legacy users invitation accepts the staff resend permission without granting profile editing', function (): void {
+    $actor = User::factory()->create();
+    $actor->assignRole(Role::createWithPermissions('staff-resender-without-edit', [
+        'saas.staff.invite.resend' => 9999, 'saas.users.view' => 9999,
+    ]));
+    $staff = staffTestAccount(false);
+
+    expect(Gate::forUser($actor)->allows('update', $staff))->toBeFalse();
+    $this->actingAs($actor, 'central')->get(route('central.users.show', $staff))->assertOk()->assertSee('Renvoyer l’invitation');
+    $this->post(route('central.users.invitation', $staff))->assertSessionHasNoErrors()
+        ->assertRedirect(route('central.users.show', $staff));
+    Notification::assertSentTo(App\Models\Central\User::findOrFail($staff->id), AccountInvitation::class);
+    expect(Activity::forSubject($staff)->where('event', 'account_invitation_requested')->count())->toBe(1);
+});
+
+test('legacy users invitation refuses staff recipients whose account is not active', function (StatusEnum $status): void {
+    $staff = staffTestAccount(false);
+    $staff->forceFill(['status' => $status])->save();
+    $token = Password::broker('central')->createToken($staff);
+
+    $this->actingAs($this->admin, 'central')->post(route('central.users.invitation', $staff))->assertForbidden();
+    expect(Password::broker('central')->tokenExists($staff, $token))->toBeTrue();
+    Notification::assertNothingSent();
+})->with([StatusEnum::INACTIVE, StatusEnum::SUSPENDED, StatusEnum::REJECTED]);
+
+test('an expired unrelated permission does not prevent a still authorized staff member editing their own profile', function (): void {
+    $this->freezeTime();
+    $actor = User::factory()->create();
+    $actor->assignRole(Role::createWithPermissions('self-editor-with-expiring-read', [
+        'saas.staff.update' => 9999, 'saas.users.view' => 1,
+    ]));
+    $password = $actor->password;
+    $this->travel(2)->days();
+
+    expect($actor->checkPermissionTo('saas.users.view', 'central'))->toBeFalse();
+    expect($actor->checkPermissionTo('saas.staff.update', 'central'))->toBeTrue();
+    $this->actingAs($actor, 'central')->get(route('central.staff.edit', $actor))->assertOk();
+    $this->put(route('central.staff.update', $actor), [
+        ...staffTestProfile($actor), 'last_name' => 'Self-edited',
+    ])->assertSessionHasNoErrors();
+    expect($actor->fresh()->last_name)->toBe('Self-edited');
+    expect($actor->fresh()->password)->toBe($password);
+    expect($actor->fresh()->checkPermissionTo('saas.users.view', 'central'))->toBeFalse();
+    $this->put(route('central.staff.roles.update', $actor), ['roles' => []])->assertForbidden();
+    expect($actor->fresh()->roles()->count())->toBe(1);
 });

@@ -2,6 +2,7 @@
 
 namespace App\Models\Tenant;
 
+use App\Concerns\HasProfilePhoto;
 use App\Concerns\HasPublicUuid;
 use App\Concerns\HasTimedPermissions;
 use App\Concerns\LogsSafeActivity;
@@ -32,7 +33,7 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasPublicUuid, Notifiable, SoftDeletes, TenantConnection;
 
-    use HasTimedPermissions, LogsSafeActivity;
+    use HasProfilePhoto, HasTimedPermissions, LogsSafeActivity;
 
     protected string $guard_name = 'tenant';
 

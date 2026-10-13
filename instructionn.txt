@@ -1,0 +1,964 @@
+1. Règles à respecter
+Ce qui constitue une permission : une action concrète disponible dans l'administration, par exemple consulter, créer, modifier, supprimer, suspendre, approuver, attribuer, importer, exporter ou relancer.
+Ce qui ne constitue pas une permission : les validations et protections techniques, comme empêcher un administrateur de s'attribuer des droits supérieurs, vérifier l'unicité d'un UUID, contrôler une clé étrangère ou empêcher une double validation de paiement. Ces contrôles sont obligatoires dans les services et Policies, mais ils ne doivent pas devenir des cases à cocher dans la création d'un rôle.
+Autres décisions à appliquer :
+- Le commerçant n'a pas de fonctionnalités de gestion pour l'instant. On conserve uniquement sa connexion et le parcours de création de compte soumis à approbation administrative.
+- Les rôles définissent des permissions globales par action, sans liste blanche ou noire de boutiques et d'utilisateurs.
+- Le module admin_restrictions doit être retiré de l'architecture cible, conformément à ta nouvelle décision.
+- Les permissions concernent uniquement la BDD centrale et utilisent le guard central.
+- Le rôle Super Admin reste protégé et ne peut pas être attribué librement par un administrateur délégué.
+
+2. Les 5 permissions existantes à conserver
+D'après le résultat SQL que tu as envoyé, ces permissions existent déjà.
+Permission existante	Libellé à utiliser
+saas.users.view	Consulter les utilisateurs
+saas.users.create	Créer des utilisateurs
+saas.users.update	Modifier les utilisateurs
+saas.staff.invite	Inviter du personnel SaaS
+saas.users.roles.assign	Attribuer les rôles du personnel SaaS
+Codex ne doit pas recréer ces lignes ni remplacer leurs UUID.
+
+Module 01 — Gestion des utilisateurs centraux
+Table : users
+Interface : Administration → Utilisateurs
+Permission	Fonctionnalité
+saas.users.view	Consulter et rechercher les utilisateurs
+saas.users.create	Créer un compte utilisateur
+saas.users.update	Modifier un compte utilisateur
+saas.users.approve	Approuver un compte en attente d'accès
+saas.users.reject	Refuser une demande d'accès
+saas.users.suspend	Suspendre un utilisateur
+saas.users.activate	Réactiver un utilisateur
+saas.users.archive	Archiver un utilisateur
+saas.users.legal.view	Consulter son dossier professionnel
+saas.users.legal.validate	Valider son dossier professionnel
+saas.users.legal.reject	Rejeter la vérification professionnelle
+saas.users.history.view	Consulter l'historique administratif d'un utilisateur
+Fichiers principaux :
+app/Models/Central/User.php
+
+app/Http/Controllers/Central/Admin/
+    UserController.php
+    UserApprovalController.php
+    LegalVerificationController.php
+
+app/Services/Central/Users/
+    UserManagementService.php
+    UserApprovalService.php
+    LegalVerificationService.php
+
+app/Policies/Central/UserPolicy.php
+
+resources/views/central/pages/admin/users/
+    index.blade.php
+    create.blade.php
+    edit.blade.php
+    show.blade.php
+    pending.blade.php
+
+
+Fonctionnalité supplémentaire : validation des inscriptions
+Tu as également demandé dans ton fichier de notes une page permettant aux administrateurs de valider les comptes créés depuis « Create an account ».
+Le fonctionnement souhaité est le suivant :
+Formulaire Create an account
+Nom, prénom, e-mail, téléphone, pays et mot de passe selon le parcours retenu
+Compte créé en attente d'approbation
+Pas d'accès aux fonctionnalités protégées tant que l'administrateur n'a pas accepté
+Administrateur SaaS
+Consulte les coordonnées et choisit Approuver ou Refuser
+Approuvé
+Compte autorisé à se connecter
+
+Refusé
+Compte sans accès
+
+
+
+
+Les deux permissions à ajouter sont donc saas.users.approve et saas.users.reject.
+Attention : il faut distinguer l'approbation administrative de la vérification de l'adresse e-mail. Le schéma existant possède users.status et email_verified_at ; Codex doit vérifier comment représenter une inscription en attente et un refus sans inventer arbitrairement des valeurs d'enum ou une nouvelle table.
+Correction du double contrôle de l'adresse e-mail
+Tu as signalé qu'un utilisateur qui reçoit un lien pour choisir son mot de passe doit ensuite vérifier une deuxième fois son adresse e-mail.
+Comportement à implémenter : si le lien d'invitation reçu à cette adresse est un jeton sécurisé, à usage unique, lié à l'utilisateur et à son e-mail, sa validation peut aussi confirmer la possession de cette adresse. Lorsque le mot de passe est défini avec ce lien valide, email_verified_at doit être renseigné de manière sûre, sans envoyer une deuxième demande de vérification. Une adresse modifiée par la suite devra être vérifiée à nouveau.
+Cette correction relève de Fortify, des services d'invitation et des tests, pas d'une permission supplémentaire.
+
+
+Module 02 — Gestion du personnel administrateur SaaS
+Tables : users, model_has_roles, model_has_permissions
+Interface : Administration → Personnel SaaS
+Permission	Fonctionnalité
+saas.staff.view	Consulter les administrateurs du SaaS
+saas.staff.invite	Créer et inviter un administrateur
+saas.staff.invite.resend	Renvoyer une invitation
+saas.staff.update	Modifier les informations d'un administrateur
+saas.users.roles.assign	Attribuer, retirer ou remplacer ses rôles
+saas.staff.permissions.view	Consulter ses permissions effectives
+saas.staff.permissions.grant	Attribuer une permission directe (avec la fonctionaliter déjà existante de atribution et creation de role)
+saas.staff.permissions.revoke	Retirer une permission directe(avec la fonctionaliter déjà existante de atribution et creation de role)
+saas.staff.assignments.renew	Renouveler explicitement une attribution de rôle ou de permission (avec la fonctionaliter déjà existante de atribution et creation de role)
+saas.staff.suspend	Suspendre un administrateur
+saas.staff.activate	Réactiver un administrateur
+saas.staff.archive	Archiver un administrateur
+
+
+
+Fichiers :
+app/Http/Controllers/Central/Admin/
+    StaffController.php
+    StaffRoleController.php
+    StaffPermissionController.php
+
+app/Services/Central/Users/
+    StaffManagementService.php
+    StaffInvitationService.php
+
+app/Services/Central/Authorization/
+    CentralRoleAssignmentService.php
+    CentralPermissionResolver.php
+
+app/Policies/Central/UserPolicy.php
+
+resources/views/central/pages/admin/staff/
+    index.blade.php
+    create.blade.php
+    edit.blade.php
+    show.blade.php
+    permissions.blade.php
+
+
+La durée de chaque attribution doit être appliquée conformément à ta documentation Spatie. Un droit expiré ne doit plus donner accès, même si son attribution est encore présente en BDD.
+
+
+
+Module 03 — Gestion des rôles SaaS
+Tables : roles, role_has_permissions
+Interface : Administration → Rôles
+Permission	Fonctionnalité
+saas.roles.view	Consulter les rôles SaaS
+saas.roles.create	Créer un rôle SaaS
+saas.roles.update	Modifier le nom et les informations d'un rôle
+saas.roles.delete	Supprimer un rôle personnalisable inutilisé
+saas.roles.permissions.view	Consulter les permissions associées à un rôle
+saas.roles.permissions.update	Ajouter ou retirer des permissions d'un rôle
+saas.roles.durations.update	Définir ou modifier la durée de chaque permission du rôle
+saas.roles.assignments.view	Consulter les administrateurs possédant un rôle
+Cela couvre précisément tes ajouts : définir une durée par permission et supprimer un rôle personnalisable inutilisé.
+Fichiers :
+app/Models/Central/
+    Role.php
+    Permission.php
+
+app/Http/Controllers/Central/Admin/
+    RoleController.php
+
+app/Http/Requests/Central/Admin/
+    StoreRoleRequest.php
+    UpdateRoleRequest.php
+
+app/Services/Central/Authorization/
+    RoleManagementService.php
+    CentralPermissionResolver.php
+
+app/Policies/Central/RolePolicy.php
+
+resources/views/central/pages/admin/roles/
+    index.blade.php
+    create.blade.php
+    edit.blade.php
+    show.blade.php
+
+tests/Feature/Central/Admin/
+    RoleManagementTest.php
+
+
+Un rôle système ne doit pas pouvoir être supprimé. La suppression d'un rôle personnalisé doit vérifier et traiter les attributions et références existantes.
+Module 04 — Catalogue des permissions
+Table : permissions
+Interface : Administration → Permissions
+Permission	Fonctionnalité
+saas.permissions.view	Consulter et rechercher le catalogue des permissions
+saas.permissions.update	Modifier les libellés descriptifs autorisés des permissions
+Je recommande que la création des codes techniques de permissions se fasse dans les seeders Laravel, plutôt que de permettre à un administrateur d'inventer une permission sans contrôle dans un formulaire.
+L'ajout d'une fonctionnalité dans le code doit créer sa permission par seeder. Le panneau admin permet ensuite de la sélectionner lors de la création d'un rôle.
+Fichiers :
+app/Models/Central/Permission.php
+
+app/Http/Controllers/Central/Admin/
+    PermissionController.php
+
+app/Services/Central/Authorization/
+    PermissionCatalogService.php
+
+database/seeders/Central/
+    CentralPermissionSeeder.php
+
+resources/views/central/pages/admin/permissions/
+    index.blade.php
+    show.blade.php
+
+
+Module 05 — Administration des boutiques
+Table : tenants
+Interface : Administration → Boutiques
+Permission	Fonctionnalité
+saas.tenants.view	Consulter et rechercher toutes les boutiques
+saas.tenants.create	Créer une boutique depuis l'administration
+saas.tenants.update	Modifier les informations centrales d'une boutique
+saas.tenants.suspend	Suspendre une boutique
+saas.tenants.activate	Réactiver une boutique éligible
+saas.tenants.archive	Archiver une boutique
+saas.tenants.history.view	Consulter l'historique administratif d'une boutique
+saas.tenants.priority.update	Modifier la priorité d'activation des boutiques d'un propriétaire
+saas.tenants.view permet notamment d'afficher le nom, le slug, le propriétaire, les domaines, l'état, l'abonnement et la BDD associée.
+Cas particulier : saas.tenants.create représente une nouvelle possibilité demandée pour les administrateurs. La documentation du 11 octobre interdit actuellement au personnel SaaS de créer des boutiques. Il faudra mettre à jour cette décision avant d'activer la permission ; l'ajouter au seeder seul ne doit pas contourner cette interdiction.
+Fichiers :
+app/Models/Central/Tenant.php
+
+app/Http/Controllers/Central/Admin/
+    TenantController.php
+
+app/Services/Central/Tenants/
+    TenantManagementService.php
+    TenantStatusService.php
+
+app/Policies/Central/TenantPolicy.php
+
+resources/views/central/pages/admin/tenants/
+    index.blade.php
+    create.blade.php
+    edit.blade.php
+    show.blade.php
+
+
+Module 06 — Gestion des domaines
+Tables : domains, tenants
+Interface : Administration → Domaines
+Permission	Fonctionnalité
+saas.domains.view	Consulter les domaines des boutiques
+saas.domains.create	Ajouter un domaine à une boutique
+saas.domains.update	Modifier les informations d'un domaine
+saas.domains.verify	Lancer la vérification d'un domaine
+saas.domains.primary.update	Définir le domaine principal
+saas.domains.archive	Retirer ou archiver un domaine
+Fichiers :
+app/Models/Central/Domain.php
+
+app/Http/Controllers/Central/Admin/
+    DomainController.php
+
+app/Services/Central/Domains/
+    DomainService.php
+    DomainVerificationService.php
+
+app/Policies/Central/DomainPolicy.php
+
+resources/views/central/pages/admin/domains/
+    index.blade.php
+    create.blade.php
+    edit.blade.php
+
+
+Module 07 — Administration des bases de données boutiques
+Table : tenant_schema_deployments
+Interface : Administration → Déploiements
+Permission	Fonctionnalité
+saas.deployments.view	Consulter les déploiements des BDD boutiques
+saas.deployments.provision	Lancer un provisionnement autorisé
+saas.deployments.migrate	Lancer une migration vers une version prévue
+saas.deployments.retry	Relancer un déploiement en échec
+saas.deployments.errors.view	Consulter les erreurs techniques nettoyées
+Fichiers :
+app/Models/Central/TenantSchemaDeployment.php
+
+app/Http/Controllers/Central/Admin/
+    TenantDeploymentController.php
+
+app/Services/Central/Tenants/
+    TenantProvisioner.php
+    TenantDeploymentService.php
+
+app/Jobs/Central/
+    ProvisionTenantJob.php
+    MigrateTenantJob.php
+
+resources/views/central/pages/admin/deployments/
+    index.blade.php
+    show.blade.php
+
+
+Module 08 — Gestion des fonctionnalités commerciales du SaaS
+Table : features
+Interface : Administration → Fonctionnalités
+Permission	Fonctionnalité
+saas.features.view	Consulter les fonctionnalités commerciales
+saas.features.create	Créer une fonctionnalité
+saas.features.update	Modifier les paramètres d'une fonctionnalité
+saas.features.activate	Activer ou désactiver une fonctionnalité
+saas.features.archive	Archiver une fonctionnalité inutilisée
+Par exemple, shops est une fonctionnalité commerciale correspondant au nombre de boutiques autorisées.
+Elle est différente de saas.tenants.create, qui est une permission d'administration.
+Fichiers :
+app/Models/Central/Feature.php
+
+app/Http/Controllers/Central/Admin/
+    FeatureController.php
+
+app/Services/Central/Plans/
+    FeatureCatalogService.php
+
+app/Policies/Central/FeaturePolicy.php
+
+resources/views/central/pages/admin/features/
+    index.blade.php
+    create.blade.php
+    edit.blade.php
+    show.blade.php
+
+
+Module 09 — Gestion des plans et offres
+Tables : plans, plan_features
+Interface : Administration → Plans
+Permission	Fonctionnalité
+saas.plans.view	Consulter les plans et leurs versions
+saas.plans.create	Créer un nouveau plan
+saas.plans.update	Modifier les informations modifiables d'un plan
+saas.plans.features.update	Définir les fonctionnalités et quotas d'un plan
+saas.plans.versions.create	Créer une nouvelle version d'un plan
+saas.plans.activate	Activer ou désactiver la commercialisation d'un plan
+saas.plans.archive	Archiver une offre autorisée
+Fichiers :
+app/Models/Central/
+    Plan.php
+    PlanFeature.php
+
+app/Http/Controllers/Central/Admin/
+    PlanController.php
+
+app/Services/Central/Plans/
+    PlanService.php
+    PlanVersionService.php
+
+app/Policies/Central/PlanPolicy.php
+
+resources/views/central/pages/admin/plans/
+    index.blade.php
+    create.blade.php
+    edit.blade.php
+    show.blade.php
+
+
+Une ancienne version déjà utilisée doit rester conservée pour les abonnements historiques.
+Module 10 — Gestion des abonnements
+Table : subscriptions
+Interface : Administration → Abonnements
+Permission	Fonctionnalité
+saas.subscriptions.view	Consulter et rechercher les abonnements
+saas.subscriptions.assign	Attribuer un abonnement à un utilisateur
+saas.subscriptions.change	Changer le plan d'un abonnement
+saas.subscriptions.period.update	Modifier les dates de période selon les transitions autorisées
+saas.subscriptions.renewal.update	Modifier le renouvellement futur
+saas.subscriptions.close	Mettre fin à un abonnement selon sa date d'effet
+saas.subscriptions.installments.view	Consulter les échéances de paiement
+saas.subscriptions.installments.create	Créer une échéance autorisée
+saas.subscriptions.history.view	Consulter l'historique des abonnements
+Permission existante à conserver pendant la transition :
+saas.subscriptions.manage
+Cette permission doit être recensée dans Codex afin de retrouver tous ses usages actuels. Une fois les actions détaillées intégrées aux Policies et les rôles existants migrés correctement, elle pourra être retirée de l'utilisation active.
+Fichiers :
+app/Models/Central/
+    Subscription.php
+    SubscriptionInstallment.php
+
+app/Http/Controllers/Central/Admin/
+    SubscriptionController.php
+
+app/Services/Central/Subscriptions/
+    SubscriptionService.php
+    InstallmentService.php
+
+app/Policies/Central/SubscriptionPolicy.php
+
+resources/views/central/pages/admin/subscriptions/
+    index.blade.php
+    create.blade.php
+    edit.blade.php
+    show.blade.php
+
+
+Module 11 — Consultation et gestion des quotas
+Tables : feature_usage, subscriptions, tenants, plan_features
+Interface : Administration → Quotas
+Permission	Fonctionnalité
+saas.quotas.view	Consulter les quotas et leur consommation
+saas.quotas.reconcile	Lancer un recalcul contrôlé des quotas et états des boutiques
+saas.quotas.history.view	Consulter les décisions et changements de quotas
+Ces permissions ne permettent pas de modifier arbitrairement les plafonds d'un utilisateur. Pour changer son quota commercial, il faut modifier/versionner un plan puis lui attribuer l'offre correspondante.
+Fichiers :
+app/Models/Central/FeatureUsage.php
+
+app/Http/Controllers/Central/Admin/
+    QuotaController.php
+
+app/Services/Central/Subscriptions/
+    QuotaService.php
+    SubscriptionExpirationService.php
+
+app/Services/Central/Tenants/
+    TenantQuotaReconciliationService.php
+
+resources/views/central/pages/admin/quotas/
+    index.blade.php
+    show.blade.php
+
+
+Module 12 — Gestion des pays
+Table : countries
+Interface : Administration → Pays
+Permission	Fonctionnalité
+saas.countries.view	Consulter les pays
+saas.countries.create	Ajouter un pays
+saas.countries.update	Modifier les informations d'un pays
+saas.countries.activate	Activer ou désactiver un pays
+saas.countries.archive	Archiver un pays non utilisé
+Fichiers :
+app/Models/Central/Country.php
+
+app/Http/Controllers/Central/Admin/
+    CountryController.php
+
+app/Services/Central/Geography/
+    CountryService.php
+
+resources/views/central/pages/admin/geography/countries/
+    index.blade.php
+    create.blade.php
+    edit.blade.php
+
+
+Module 13 — Gestion des wilayas et communes
+Table : geographic_areas
+Interface : Administration → Wilayas et communes
+Permission	Fonctionnalité
+saas.geography.view	Consulter les wilayas et communes
+saas.geography.create	Ajouter une zone géographique
+saas.geography.update	Modifier une zone géographique
+saas.geography.import	Importer des wilayas et communes
+saas.geography.activate	Activer ou désactiver une zone
+saas.geography.archive	Archiver une zone autorisée
+Fichiers :
+app/Models/Central/GeographicArea.php
+
+app/Http/Controllers/Central/Admin/
+    GeographicAreaController.php
+
+app/Services/Central/Geography/
+    GeographicAreaService.php
+    GeographicImportService.php
+
+resources/views/central/pages/admin/geography/areas/
+    index.blade.php
+    create.blade.php
+    edit.blade.php
+    import.blade.php
+
+
+Module 14 — Gestion des transporteurs communs
+Table : shipping_carriers
+Interface : Administration → Transporteurs
+Permission	Fonctionnalité
+saas.carriers.view	Consulter les transporteurs
+saas.carriers.create	Ajouter un transporteur
+saas.carriers.update	Modifier les informations d'un transporteur
+saas.carriers.activate	Activer ou désactiver un transporteur
+saas.carriers.archive	Archiver un transporteur autorisé
+Fichiers :
+app/Models/Central/ShippingCarrier.php
+
+app/Http/Controllers/Central/Admin/
+    ShippingCarrierController.php
+
+app/Services/Central/Shipping/
+    ShippingCarrierService.php
+
+resources/views/central/pages/admin/shipping/carriers/
+    index.blade.php
+    create.blade.php
+    edit.blade.php
+    show.blade.php
+
+
+Module 15 — Gestion des codes géographiques des transporteurs
+Table : carrier_geo_mappings
+Interface : Administration → Transporteurs → Correspondances géographiques
+Permission	Fonctionnalité
+saas.carrier-mappings.view	Consulter les correspondances géographiques
+saas.carrier-mappings.create	Créer une correspondance
+saas.carrier-mappings.update	Modifier une correspondance
+saas.carrier-mappings.import	Importer les codes des transporteurs
+saas.carrier-mappings.archive	Archiver une correspondance
+Fichiers :
+app/Models/Central/CarrierGeoMapping.php
+
+app/Http/Controllers/Central/Admin/
+    CarrierGeoMappingController.php
+
+app/Services/Central/Shipping/
+    CarrierGeoMappingService.php
+    CarrierGeoImportService.php
+
+resources/views/central/pages/admin/shipping/geo-mappings/
+    index.blade.php
+    create.blade.php
+    edit.blade.php
+    import.blade.php
+
+
+Module 16 — Gestion des bureaux de retrait
+Table : pickup_points
+Interface : Administration → Bureaux de retrait
+Permission	Fonctionnalité
+saas.pickup-points.view	Consulter les bureaux de retrait
+saas.pickup-points.create	Ajouter un bureau
+saas.pickup-points.update	Modifier un bureau
+saas.pickup-points.import	Importer les bureaux officiels
+saas.pickup-points.activate	Activer ou désactiver un bureau
+saas.pickup-points.archive	Archiver un bureau
+Fichiers :
+app/Models/Central/PickupPoint.php
+
+app/Http/Controllers/Central/Admin/
+    PickupPointController.php
+
+app/Services/Central/Shipping/
+    PickupPointService.php
+    PickupPointImportService.php
+
+resources/views/central/pages/admin/shipping/pickup-points/
+    index.blade.php
+    create.blade.php
+    edit.blade.php
+    import.blade.php
+
+
+Module 17 — Gestion des fichiers centraux
+Table : media
+Interface : Administration → Fichiers centraux
+Permission	Fonctionnalité
+saas.media.view	Consulter les fichiers centraux
+saas.media.upload	Importer un fichier autorisé
+saas.media.download	Télécharger un fichier privé autorisé
+saas.media.archive	Archiver un fichier dont le retrait est permis
+Fichiers :
+app/Models/Central/Media.php
+
+app/Http/Controllers/Central/Admin/
+    CentralMediaController.php
+
+app/Services/Central/Media/
+    CentralMediaService.php
+    PrivateMediaAccessService.php
+
+app/Policies/Central/MediaPolicy.php
+
+resources/views/central/pages/admin/media/
+    index.blade.php
+    show.blade.php
+
+
+Module 18 — Gestion des règles de facturation
+Table : saas_billing_settings
+Interface : Administration → Facturation → Configuration
+Permission	Fonctionnalité
+saas.billing-rules.view	Consulter les règles de facturation
+saas.billing-rules.create	Créer une règle de facturation
+saas.billing-rules.update	Modifier une règle encore modifiable
+saas.billing-rules.activate	Activer ou désactiver une règle
+saas.billing-rules.versions.create	Créer une nouvelle version de règle
+saas.billing-sequences.view	Consulter les compteurs et numérotations
+Fichiers :
+app/Models/Central/
+    SaasBillingRule.php
+    SaasSequence.php
+
+app/Http/Controllers/Central/Admin/
+    SaasBillingRuleController.php
+
+app/Services/Central/Billing/
+    SaasBillingRuleService.php
+    SaasNumberingService.php
+
+resources/views/central/pages/admin/billing/rules/
+    index.blade.php
+    create.blade.php
+    edit.blade.php
+
+
+Il n'y a pas de permission permettant de changer directement le prochain numéro d'une facture déjà réservée. Le service de numérotation gère cela de manière contrôlée.
+Module 19 — Gestion des factures SaaS
+Tables : saas_invoices, saas_invoice_lines, media
+Interface : Administration → Facturation → Factures
+Permission	Fonctionnalité
+saas.invoices.view	Consulter et rechercher les factures
+saas.invoices.create	Préparer une facture
+saas.invoices.issue	Émettre définitivement une facture
+saas.invoices.download	Télécharger le PDF d'une facture
+Fichiers :
+app/Models/Central/
+    SaasInvoice.php
+    SaasInvoiceLine.php
+
+app/Http/Controllers/Central/Admin/
+    SaasInvoiceController.php
+
+app/Services/Central/Billing/
+    SaasInvoiceService.php
+    SaasInvoicePdfService.php
+
+app/Policies/Central/SaasInvoicePolicy.php
+
+resources/views/central/pages/admin/billing/invoices/
+    index.blade.php
+    create.blade.php
+    show.blade.php
+
+resources/views/central/documents/
+    saas-invoice.blade.php
+
+
+La facture émise est un document historique. Elle ne doit pas être librement modifiable ou supprimable.
+Module 20 — Gestion des avoirs SaaS
+Tables : saas_invoices, saas_invoice_lines
+Interface : Administration → Facturation → Avoirs
+Permission	Fonctionnalité
+saas.credit-notes.view	Consulter les avoirs
+saas.credit-notes.create	Préparer un avoir
+saas.credit-notes.issue	Émettre un avoir
+Fichiers :
+app/Http/Controllers/Central/Admin/
+    SaasCreditNoteController.php
+
+app/Services/Central/Billing/
+    SaasCreditNoteService.php
+
+resources/views/central/pages/admin/billing/credit-notes/
+    index.blade.php
+    create.blade.php
+    show.blade.php
+
+resources/views/central/documents/
+    saas-credit-note.blade.php
+
+
+Les avoirs ne nécessitent pas une nouvelle table. Ils utilisent les tables existantes des documents SaaS avec leur propre type.
+Module 21 — Vérification des paiements SaaS
+Tables : saas_transfers, saas_invoices, media
+Interface : Administration → Facturation → Paiements
+Permission	Fonctionnalité
+saas.payments.view	Consulter les paiements déclarés
+saas.payments.validate	Valider un paiement après vérification
+saas.payments.reject	Rejeter une déclaration de paiement
+saas.payments.reconcile	Rapprocher un paiement avec les fonds et documents correspondants
+saas.payments.validate existe déjà dans ta BDD. Il faut conserver son code et son UUID.
+Fichiers :
+app/Models/Central/SaasTransfer.php
+
+app/Http/Controllers/Central/Admin/
+    SaasPaymentController.php
+
+app/Services/Central/Billing/
+    SaasPaymentService.php
+    SaasPaymentVerificationService.php
+    SaasBalanceService.php
+
+app/Policies/Central/SaasTransferPolicy.php
+
+resources/views/central/pages/admin/billing/payments/
+    index.blade.php
+    show.blade.php
+
+
+Module 22 — Gestion des remboursements SaaS
+Table : saas_transfers
+Interface : Administration → Facturation → Remboursements
+Permission	Fonctionnalité
+saas.refunds.view	Consulter les remboursements
+saas.refunds.create	Préparer un remboursement
+saas.refunds.approve	Approuver un remboursement
+saas.refunds.reject	Rejeter un remboursement
+saas.refunds.execute.record	Enregistrer un remboursement réellement exécuté
+saas.refunds.reconcile	Vérifier et rapprocher un remboursement
+Fichiers :
+app/Http/Controllers/Central/Admin/
+    SaasRefundController.php
+
+app/Services/Central/Billing/
+    SaasRefundService.php
+    SaasRefundApprovalService.php
+    SaasTransferReversalService.php
+
+resources/views/central/pages/admin/billing/refunds/
+    index.blade.php
+    create.blade.php
+    show.blade.php
+
+
+Le remboursement bancaire est exécuté en dehors d'Aydra. La plateforme conserve la décision, le montant, l'exécution déclarée et les preuves nécessaires.
+Module 23 — Gestion des envois de documents SaaS
+Table : saas_document_deliveries
+Interface : Administration → Facturation → Envois
+Permission	Fonctionnalité
+saas.deliveries.view	Consulter les envois des documents
+saas.deliveries.send	Demander l'envoi d'un document
+saas.deliveries.retry	Relancer un envoi échoué autorisé
+Fichiers :
+app/Models/Central/SaasDocumentDelivery.php
+
+app/Http/Controllers/Central/Admin/
+    SaasDocumentDeliveryController.php
+
+app/Services/Central/Billing/
+    SaasDocumentDeliveryService.php
+
+app/Jobs/Central/
+    SendSaasDocumentJob.php
+
+resources/views/central/pages/admin/billing/deliveries/
+    index.blade.php
+    show.blade.php
+
+
+Module 24 — Journal d'activité central
+Table : activity_log
+Interface : Administration → Journal d'activité
+Permission	Fonctionnalité
+saas.activity.view	Consulter et rechercher les activités centrales
+saas.activity.export	Exporter les activités autorisées
+Fichiers :
+app/Models/Central/Activity.php
+
+app/Http/Controllers/Central/Admin/
+    ActivityLogController.php
+
+app/Services/Central/Audit/
+    CentralActivityService.php
+
+resources/views/central/pages/admin/activity-log/
+    index.blade.php
+    show.blade.php
+
+config/activitylog.php
+
+
+Cette interface utilise Spatie Activity Log. Elle ne doit pas donner une permission de modifier ou supprimer librement des événements d'audit.
+Module 25 — Tableau de bord administrateur
+Tables : agrégats provenant des tables centrales.
+Interface : Administration → Dashboard
+Permission	Fonctionnalité
+saas.dashboard.view	Consulter le tableau de bord général
+saas.dashboard.financial.view	Consulter les indicateurs financiers globaux
+Fichiers :
+app/Http/Controllers/Central/Admin/
+    DashboardController.php
+
+app/Services/Central/Dashboard/
+    AdminDashboardService.php
+
+resources/views/central/pages/admin/dashboard/
+    index.blade.php
+
+
+Les graphiques et indicateurs s'appuient sur les données disponibles. Ils n'exigent pas de nouvelle table dashboard.
+Module 26 — Opérations techniques centrales
+Tables : dépendantes des opérations.
+Interface : Administration → Exploitation
+Permission	Fonctionnalité
+saas.operations.view	Consulter les opérations techniques centrales
+saas.operations.subscriptions.reconcile	Lancer une réconciliation des abonnements
+saas.operations.payments.reconcile	Lancer un rapprochement financier central
+Les relances de déploiement utilisent les permissions du module 07. Il n'est pas nécessaire de créer une permission supplémentaire qui ferait exactement la même chose.
+Fichiers :
+app/Http/Controllers/Central/Admin/
+    OperationsController.php
+
+app/Console/Commands/Central/
+    ReconcileSubscriptionsCommand.php
+    ReconcileSaasTransfersCommand.php
+
+resources/views/central/pages/admin/operations/
+    index.blade.php
+
+
+
+
+
+4. Comment afficher ces permissions dans « Créer un rôle SaaS »
+Toutes les permissions des 26 modules doivent être disponibles dans un seul formulaire de création de rôle, organisées par catégories.
+L'administrateur ne doit pas taper manuellement les codes : il sélectionne les actions déjà enregistrées dans la table permissions.
+Exemple de formulaire
+{
+  "permissions": {
+    "saas.users.view": 9999,
+    "saas.users.update": 365,
+    "saas.users.approve": 90,
+    "saas.tenants.view": 9999
+  }
+}
+
+
+Créer un rôle SaaS
+Nom du rôleGestionnaire des utilisateurs
+
+DescriptionAdministrateur chargé de la gestion des comptes utilisateurs.
+
+
+Permissions du rôle
+Exemple interactif
+
+
+Utilisateurs
+[x] Consulter les utilisateurs
+
+saas.users.view
+
+
+Jours
+
+[ ] Créer des utilisateurs
+
+saas.users.create
+
+
+[x] Modifier les utilisateurs
+
+saas.users.update
+
+
+Jours
+
+[x] Approuver les inscriptions
+
+saas.users.approve
+
+
+Jours
+
+[ ] Suspendre les comptes
+
+saas.users.suspend
+
+
+
+
+Boutiques
+[x] Consulter les boutiques
+
+saas.tenants.view
+
+
+Jours
+
+[ ] Modifier les boutiques
+
+saas.tenants.update
+
+
+
+
+Abonnements
+[ ] Consulter les abonnements
+
+saas.subscriptions.view
+
+
+[ ] Attribuer un abonnement
+
+saas.subscriptions.assign
+
+
+
+
+4 permissions sélectionnées
+ Copier la sélection
+Simulation avec quelques permissions pour illustrer l'interface. La version Laravel devra charger toutes les permissions disponibles de la BDD et enregistrer le rôle via le service sécurisé.
+
+
+
+
+
+Créer un rôle SaaS
+Nom du rôleGestionnaire des utilisateurs
+
+DescriptionAdministrateur chargé de la gestion des comptes utilisateurs.
+
+
+Permissions du rôle
+Exemple interactif
+
+
+Utilisateurs
+[x] Consulter les utilisateurs
+
+saas.users.view
+
+
+Jours
+
+[ ] Créer des utilisateurs
+
+saas.users.create
+
+
+[x] Modifier les utilisateurs
+
+saas.users.update
+
+
+Jours
+
+[x] Approuver les inscriptions
+
+saas.users.approve
+
+
+Jours
+
+[ ] Suspendre les comptes
+
+saas.users.suspend
+
+
+
+
+Boutiques
+[x] Consulter les boutiques
+
+saas.tenants.view
+
+
+Jours
+
+[ ] Modifier les boutiques
+
+saas.tenants.update
+
+
+
+
+Abonnements
+[ ] Consulter les abonnements
+
+saas.subscriptions.view
+
+
+[ ] Attribuer un abonnement
+
+saas.subscriptions.assign
+
+
+
+
+4 permissions sélectionnées
+ Copier la sélection
+Simulation avec quelques permissions pour illustrer l'interface. La version Laravel devra charger toutes les permissions disponibles de la BDD et enregistrer le rôle via le service sécurisé.
+
+Point essentiel : la création d'un rôle doit être alimentée directement par le catalogue de permissions de la BDD. Ainsi, lorsqu'une nouvelle fonctionnalité administrative est développée et enregistrée par le seeder, elle devient disponible dans l'écran « Créer un rôle SaaS », sans ajouter manuellement une nouvelle case dans le Blade.

@@ -15,6 +15,20 @@ class UserPolicy
         return $this->access->allows($actor, 'saas.users.view', listing: true);
     }
 
+    public function updateProfilePhoto(User $actor, User $target): bool
+    {
+        $actor = $actor->fresh();
+
+        return ! tenancy()->initialized && $actor !== null && $actor->status === StatusEnum::ACTIVE
+            && ! $actor->trashed() && ! $target->trashed() && $actor->is($target) && $actor->uuid === $target->uuid;
+    }
+
+    public function viewProfilePhoto(User $actor, User $target): bool
+    {
+        return $this->updateProfilePhoto($actor, $target)
+            || (! tenancy()->initialized && ($this->view($actor, $target) || $this->viewStaff($actor, $target)));
+    }
+
     public function view(User $actor, User $target): bool
     {
         return $this->access->allows($actor, 'saas.users.view', $target);
@@ -89,6 +103,13 @@ class UserPolicy
     {
         return $target->status === StatusEnum::ACTIVE && ! $target->hasVerifiedEmail()
             && $this->manageStaff($actor, $target, 'saas.staff.invite.resend');
+    }
+
+    public function resendInvitation(User $actor, User $target): bool
+    {
+        return $this->access->isStaff($target)
+            ? $this->resendStaffInvitation($actor, $target)
+            : $this->update($actor, $target);
     }
 
     public function renewStaffAssignments(User $actor, User $target): bool
