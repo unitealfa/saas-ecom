@@ -31,6 +31,14 @@ class CentralRoleCatalog
         'saas.staff.activate' => 'Réactiver le personnel SaaS',
         'saas.staff.archive' => 'Archiver le personnel SaaS',
         'saas.users.roles.assign' => 'Attribuer les rôles du personnel SaaS',
+        'saas.roles.view' => 'Consulter les rôles SaaS',
+        'saas.roles.create' => 'Créer un rôle SaaS',
+        'saas.roles.update' => 'Modifier le nom et les informations d’un rôle',
+        'saas.roles.delete' => 'Supprimer un rôle personnalisable inutilisé',
+        'saas.roles.permissions.view' => 'Consulter les permissions associées à un rôle',
+        'saas.roles.permissions.update' => 'Ajouter ou retirer des permissions d’un rôle',
+        'saas.roles.durations.update' => 'Modifier les durées des permissions d’un rôle',
+        'saas.roles.assignments.view' => 'Consulter les administrateurs possédant un rôle',
         'saas.countries.view' => 'Consulter les pays',
         'saas.countries.create' => 'Créer des pays',
         'saas.countries.update' => 'Modifier les pays',
@@ -44,6 +52,7 @@ class CentralRoleCatalog
         'Historique des utilisateurs' => ['saas.users.history.view'],
         'Personnel SaaS' => ['saas.staff.view', 'saas.staff.invite', 'saas.staff.invite.resend', 'saas.staff.update', 'saas.staff.permissions.view', 'saas.staff.assignments.renew', 'saas.staff.suspend', 'saas.staff.activate', 'saas.staff.archive', 'saas.users.roles.assign'],
         'Pays' => ['saas.countries.view', 'saas.countries.create', 'saas.countries.update', 'saas.countries.activate', 'saas.countries.delete'],
+        'Rôles SaaS' => ['saas.roles.view', 'saas.roles.create', 'saas.roles.update', 'saas.roles.delete', 'saas.roles.permissions.view', 'saas.roles.permissions.update', 'saas.roles.durations.update', 'saas.roles.assignments.view'],
     ];
 
     public const VIEW_ACTIONS = [
@@ -51,6 +60,8 @@ class CentralRoleCatalog
         'saas.staff.view' => ['saas.staff.invite', 'saas.staff.invite.resend', 'saas.staff.update', 'saas.users.roles.assign', 'saas.staff.permissions.view', 'saas.staff.assignments.renew', 'saas.staff.suspend', 'saas.staff.activate', 'saas.staff.archive'],
         'saas.users.legal.view' => ['saas.users.legal.validate', 'saas.users.legal.reject'],
         'saas.countries.view' => ['saas.countries.create', 'saas.countries.update', 'saas.countries.activate', 'saas.countries.delete'],
+        'saas.roles.view' => ['saas.roles.create', 'saas.roles.update', 'saas.roles.delete', 'saas.roles.permissions.view', 'saas.roles.permissions.update', 'saas.roles.durations.update', 'saas.roles.assignments.view'],
+        'saas.roles.permissions.view' => ['saas.roles.permissions.update', 'saas.roles.durations.update'],
     ];
 
     public const ROLES = [

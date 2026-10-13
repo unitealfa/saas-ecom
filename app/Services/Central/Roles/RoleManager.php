@@ -7,29 +7,67 @@ use App\Models\Central\Permission;
 use App\Models\Central\Role;
 use App\Models\Central\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
+use App\Services\Central\Authorization\CentralUserAccess;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 class RoleManager
 {
-    public function __construct(private AuthorizationMutation $mutations) {}
+    public function __construct(private AuthorizationMutation $mutations, private CentralUserAccess $access) {}
 
     public function save(User $actor, RoleData $data, ?Role $role = null): Role
     {
         return $this->mutations->run(function () use ($actor, $data, $role): Role {
             $role = $role === null ? null : Role::whereKey($role->id)->lockForUpdate()->firstOrFail();
-            Gate::forUser($actor)->authorize($role === null ? 'create' : 'update', $role ?? Role::class);
+            $gate = Gate::forUser($actor);
+            $gate->authorize($role === null ? 'create' : 'edit', $role ?? Role::class);
+            $oldGrants = $role?->permissions()->get()->mapWithKeys(fn ($permission): array => [
+                $permission->uuid => (int) $permission->pivot->duration_days,
+            ])->all() ?? [];
+            $durations = $data->permissionDurations ?? $oldGrants;
+            foreach ($durations as $uuid => $days) {
+                $durations[$uuid] = $days ?? $oldGrants[$uuid] ?? 9999;
+            }
+            foreach ($data->durations as $uuid => $days) {
+                if (! array_key_exists($uuid, $durations)) {
+                    throw ValidationException::withMessages(['durations' => 'Cette permission ne fait pas partie du rôle.']);
+                }
+                $durations[$uuid] = $days;
+            }
+            $name = $data->name ?? $role?->name;
+            $label = $data->label ?? $role?->label;
+            if (! is_string($name) || trim($name) === '' || ! is_string($label) || trim($label) === '') {
+                throw ValidationException::withMessages(['name' => 'Renseignez le nom et le libellé du rôle.']);
+            }
+            $name = trim($name);
+            $label = trim($label);
+            if ($role !== null) {
+                if ($name !== $role->name || $label !== $role->label) {
+                    $gate->authorize('update', $role);
+                }
+                if (array_diff_key($durations, $oldGrants) !== [] || array_diff_key($oldGrants, $durations) !== []) {
+                    $gate->authorize('updatePermissions', $role);
+                }
+                foreach ($durations as $uuid => $days) {
+                    if ($days !== ($oldGrants[$uuid] ?? 9999)) {
+                        $gate->authorize('updateDurations', $role);
+                        break;
+                    }
+                }
+            }
             $permissions = Permission::where('guard_name', 'central')
                 ->whereIn('name', array_keys(CentralRoleCatalog::PERMISSIONS))
-                ->whereIn('uuid', array_keys($data->permissionDurations))->orderBy('id')->lockForUpdate()->get();
-            if ($permissions->isEmpty() || $permissions->count() !== count($data->permissionDurations)) {
+                ->whereIn('uuid', array_keys($durations))->orderBy('id')->lockForUpdate()->get();
+            if ($permissions->isEmpty() || $permissions->count() !== count($durations)) {
                 throw ValidationException::withMessages(['permissions' => 'Sélectionnez des permissions centrales disponibles.']);
             }
 
             $grants = [];
             $parts = [];
             foreach ($permissions as $permission) {
-                $days = $data->permissionDurations[$permission->uuid];
+                abort_unless($this->access->ownsPermission($actor, $permission->name), 403);
+                $days = $durations[$permission->uuid];
                 if ($days < 1 || $days > 9999) {
                     throw ValidationException::withMessages(['durations' => 'Chaque durée doit être comprise entre 1 et 9 999 jours.']);
                 }
@@ -37,8 +75,8 @@ class RoleManager
                 $parts[] = [$permission->id, $days];
             }
             $signature = hash('sha256', json_encode($parts, JSON_THROW_ON_ERROR));
-            $duplicates = Role::where('guard_name', 'central')->where(function ($query) use ($data, $signature): void {
-                $query->where('name', $data->name)->orWhere('permission_signature', $signature);
+            $duplicates = Role::where('guard_name', 'central')->where(function ($query) use ($name, $signature): void {
+                $query->where('name', $name)->orWhere('permission_signature', $signature);
             });
             if ($role !== null) {
                 $duplicates->whereKeyNot($role->id);
@@ -48,23 +86,58 @@ class RoleManager
                 throw ValidationException::withMessages(['name' => 'Un rôle possède déjà ce nom ou les mêmes permissions et durées.']);
             }
 
+            $created = $role === null;
             $role ??= new Role;
-            $oldGrants = $role->exists ? $role->permissions()->get()->mapWithKeys(fn ($permission): array => [
-                $permission->getAttribute('uuid') => (int) $permission->getRelation('pivot')->getAttribute('duration_days'),
-            ])->all() : [];
-            $role->fill(['name' => $data->name, 'label' => $data->label]);
+            $before = ['name' => $role->name, 'label' => $role->label, 'permissions' => $oldGrants];
+            $permissionsChanged = $role->permission_signature !== $signature;
+            $role->fill(['name' => $name, 'label' => $label]);
             $role->setAttribute('permission_signature', $signature);
-            if ($role->exists) {
+            if ($role->exists && $permissionsChanged) {
                 $role->setAttribute('permission_version', $role->getAttribute('permission_version') + 1);
             }
+            if (! $created && ! $role->isDirty()) {
+                return $role;
+            }
             $role->save();
-            $role->permissions()->sync($grants);
+            if ($permissionsChanged) {
+                $role->permissions()->sync($grants);
+            }
             $role->unsetRelation('permissions');
-            activity()->causedBy($actor)->performedOn($role)->event('permissions_updated')
-                ->withProperties(['before' => $oldGrants, 'after' => $data->permissionDurations])
-                ->log('Permissions et durées du rôle central enregistrées.');
+            activity()->causedBy($actor)->performedOn($role)->event($created ? 'role_created' : 'role_updated')
+                ->withProperties(['before' => $before, 'after' => ['name' => $name, 'label' => $label, 'permissions' => $durations]])
+                ->log('Rôle central enregistré.');
 
             return $role;
+        });
+    }
+
+    public function delete(User $actor, Role $role): void
+    {
+        $this->mutations->run(function () use ($actor, $role): void {
+            $role = Role::whereKey($role->id)->lockForUpdate()->firstOrFail();
+            Gate::forUser($actor)->authorize('delete', $role);
+            $connection = $role->getConnection();
+            if ($connection->table(config('permission.table_names.model_has_roles'))->where('role_id', $role->id)->exists()) {
+                throw ValidationException::withMessages(['role' => 'Ce rôle est encore attribué. Retirez ses attributions avant de le supprimer.']);
+            }
+            if ($connection->getSchemaBuilder()->hasTable('admin_restrictions')
+                && $connection->table('admin_restrictions')->where('target_role_id', $role->id)->exists()) {
+                throw ValidationException::withMessages(['role' => 'Une référence métier existante empêche la suppression de ce rôle.']);
+            }
+            $before = ['uuid' => $role->uuid, 'name' => $role->name, 'label' => $role->label,
+                'permissions' => $role->permissions()->get()->mapWithKeys(fn ($permission): array => [
+                    $permission->uuid => (int) $permission->pivot->duration_days,
+                ])->all()];
+            try {
+                $role->delete();
+            } catch (QueryException $exception) {
+                if (($exception->errorInfo[1] ?? null) === 1451) {
+                    throw ValidationException::withMessages(['role' => 'Une référence métier existante empêche la suppression de ce rôle.']);
+                }
+                throw $exception;
+            }
+            activity()->causedBy($actor)->performedOn($role)->event('role_deleted')
+                ->withProperties(['before' => $before])->log('Rôle central personnalisé inutilisé supprimé.');
         });
     }
 
@@ -73,7 +146,7 @@ class RoleManager
     {
         $db = $role->getConnection();
         $recipients = $db->table('model_has_roles')->where('role_id', $role->id)->orderBy('model_id')->get();
-        User::whereIn('id', $recipients->where('model_type', 'central_user')->pluck('model_id'))
+        User::withTrashed()->whereIn('id', $recipients->where('model_type', 'central_user')->pluck('model_id'))
             ->orderBy('id')->lockForUpdate()->get();
         foreach ($recipients as $recipient) {
             $overlap = $db->table('model_has_roles as assignment')

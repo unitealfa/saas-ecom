@@ -10,21 +10,33 @@
         <form method="POST" action="{{ $role ? route('central.roles.update', $role) : route('central.roles.store') }}" class="flex flex-col gap-5">
             @csrf
             @if ($role) @method('PUT') @endif
-            <flux:input name="name" label="Nom unique du rôle" :value="old('name', $role?->name)" required />
-            <flux:input name="label" label="Nom affiché" :value="old('label', $role?->label)" required />
-            <flux:text>Un droit de gestion donne aussi accès à la consultation de son module, pendant sa durée de validité et dans les limites des restrictions. Il ne donne aucun autre droit de modification.</flux:text>
+            @if ($role === null || auth('central')->user()->can('update', $role))
+                <flux:input name="name" label="Nom unique du rôle" :value="old('name', $role?->name)" required />
+                <flux:input name="label" label="Nom affiché" :value="old('label', $role?->label)" required />
+            @else
+                <flux:text>{{ $role->label }} ({{ $role->name }})</flux:text>
+            @endif
+            <flux:text>Un droit de gestion donne aussi accès à la consultation nécessaire de son module pendant sa validité. Il ne donne aucun autre droit de modification ni de délégation.</flux:text>
             @foreach ($permissionGroups as $groupLabel => $permissionNames)
+            @if ($permissions->whereIn('name', $permissionNames)->isNotEmpty())
             <fieldset class="flex flex-col gap-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
                 <legend class="px-2 font-medium">{{ $groupLabel }}</legend>
                 @foreach ($permissions->whereIn('name', $permissionNames) as $permission)
                     <div class="grid gap-3 rounded-lg border border-zinc-200 p-4 sm:grid-cols-2 dark:border-zinc-700">
-                        <flux:checkbox name="permissions[]" :value="$permission->uuid" :label="$permission->label"
-                            :checked="in_array($permission->uuid, old('permissions', array_keys($grants)), true)" />
-                        <flux:input type="number" name="durations[{{ $permission->uuid }}]" label="Durée en jours"
-                            min="1" max="9999" :value="old('durations.'.$permission->uuid, $grants[$permission->uuid] ?? 9999)" required />
+                        @if ($canChangePermissions)
+                            <flux:checkbox name="permissions[]" :value="$permission->uuid" :label="$permission->label"
+                                :checked="in_array($permission->uuid, old('permissions', array_keys($grants)), true)" />
+                        @else
+                            <flux:text>{{ $permission->label }}</flux:text>
+                        @endif
+                        @if ($canChangeDurations)
+                            <flux:input type="number" name="durations[{{ $permission->uuid }}]" label="Durée en jours"
+                                min="1" max="9999" :value="old('durations.'.$permission->uuid, $grants[$permission->uuid] ?? 9999)" required />
+                        @endif
                     </div>
                 @endforeach
             </fieldset>
+            @endif
             @endforeach
             <flux:text>Deux rôles ne peuvent avoir le même nom, ni exactement les mêmes permissions et durées.</flux:text>
             <div class="flex flex-wrap gap-3">
