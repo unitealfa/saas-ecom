@@ -162,19 +162,20 @@ test('creation and assignment remain usable after the separate viewing permissio
     ]));
     $grant = Role::createWithPermissions('merchant-creator', ['saas.users.create' => 9999]);
     $this->travel(2)->days();
-    $this->actingAs($actor, 'central')->get(route('central.users.index'))->assertForbidden();
-    $this->get(route('dashboard'))->assertOk()->assertSee('Créer un compte')->assertDontSee('Consulter les utilisateurs');
-    $this->get(route('central.users.create'))->assertOk()->assertSee('Retour au dashboard');
+    expect($actor->checkPermissionTo('saas.users.view', 'central'))->toBeFalse();
+    $this->actingAs($actor, 'central')->get(route('central.users.index'))->assertOk();
+    $this->get(route('dashboard'))->assertOk()->assertSee('Créer un compte')->assertSee('Utilisateurs');
+    $this->get(route('central.users.create'))->assertOk()->assertSee('Retour aux utilisateurs');
     $this->post(route('central.users.store'), [
         'last_name' => 'Merchant', 'email' => 'new-merchant@example.test', 'account_kind' => 'merchant',
         'country_uuid' => Country::where('code', 'DZ')->firstOrFail()->uuid,
-    ])->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
+    ])->assertSessionHasNoErrors()->assertRedirect(route('central.users.index'));
     $target = User::where('email', 'new-merchant@example.test')->firstOrFail();
     Notification::assertSentTo($target, AccountInvitation::class);
     $this->get(route('dashboard'))->assertOk()->assertSee('Compte créé pour Merchant');
-    $this->get(route('central.users.roles.edit', $target))->assertOk()->assertSee('Retour au dashboard');
+    $this->get(route('central.users.roles.edit', $target))->assertOk()->assertSee('Retour aux utilisateurs');
     $this->put(route('central.users.roles.update', $target), ['roles' => [$grant->uuid]])
-        ->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
+        ->assertSessionHasNoErrors()->assertRedirect(route('central.users.index'));
     expect($target->hasRole($grant))->toBeTrue();
 });
 

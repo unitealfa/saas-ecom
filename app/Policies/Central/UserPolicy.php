@@ -54,8 +54,70 @@ class UserPolicy
         return ! $target->trashed() && ! $target->roles()->where('guard_name', 'central')->where('is_super_admin', true)->exists()
             && ! in_array($target->status, [StatusEnum::PENDING, StatusEnum::REJECTED], true)
             && ($actor->id !== $target->id || $this->access->isSuperAdmin($actor))
-            && $this->access->allows($actor, 'saas.staff.invite', $target)
-            && $this->access->allows($actor, 'saas.users.roles.assign', $target);
+            && ($this->access->isStaff($target) || $this->access->allows($actor, 'saas.staff.invite', $target))
+            && $this->access->allows($actor, 'saas.users.roles.assign', $target)
+            && (! $this->access->isStaff($target) || $this->access->mayManageStaff($actor, $target));
+    }
+
+    public function viewAnyStaff(User $actor): bool
+    {
+        return $this->access->allows($actor, 'saas.staff.view');
+    }
+
+    public function viewStaff(User $actor, User $target): bool
+    {
+        return $this->access->isStaff($target) && $this->viewAnyStaff($actor);
+    }
+
+    public function updateStaff(User $actor, User $target): bool
+    {
+        return $this->access->isStaff($target)
+            && $this->access->allows($actor, 'saas.staff.update') && $this->update($actor, $target);
+    }
+
+    public function assignStaffRoles(User $actor, User $target): bool
+    {
+        return $this->access->isStaff($target) && $this->assignRoles($actor, $target);
+    }
+
+    public function viewStaffPermissions(User $actor, User $target): bool
+    {
+        return $this->access->isStaff($target) && $this->access->allows($actor, 'saas.staff.permissions.view');
+    }
+
+    public function resendStaffInvitation(User $actor, User $target): bool
+    {
+        return $target->status === StatusEnum::ACTIVE && ! $target->hasVerifiedEmail()
+            && $this->manageStaff($actor, $target, 'saas.staff.invite.resend');
+    }
+
+    public function renewStaffAssignments(User $actor, User $target): bool
+    {
+        return ! in_array($target->status, [StatusEnum::PENDING, StatusEnum::REJECTED], true)
+            && $this->manageStaff($actor, $target, 'saas.staff.assignments.renew');
+    }
+
+    public function suspendStaff(User $actor, User $target): bool
+    {
+        return $target->status === StatusEnum::ACTIVE && $this->manageStaff($actor, $target, 'saas.staff.suspend');
+    }
+
+    public function activateStaff(User $actor, User $target): bool
+    {
+        return in_array($target->status, [StatusEnum::INACTIVE, StatusEnum::SUSPENDED], true)
+            && $this->manageStaff($actor, $target, 'saas.staff.activate');
+    }
+
+    public function archiveStaff(User $actor, User $target): bool
+    {
+        return $this->manageStaff($actor, $target, 'saas.staff.archive');
+    }
+
+    private function manageStaff(User $actor, User $target, string $permission): bool
+    {
+        return $this->access->isStaff($target) && ! $target->trashed() && $actor->id !== $target->id
+            && ! $target->roles()->where('guard_name', 'central')->where('is_super_admin', true)->exists()
+            && $this->access->allows($actor, $permission) && $this->access->mayManageStaff($actor, $target);
     }
 
     public function suspend(User $actor, User $target): bool
@@ -124,6 +186,7 @@ class UserPolicy
 
         return ($this->access->allows($actor, 'saas.users.'.$action, $target)
                 || ($legacy !== $action && $this->access->allows($actor, 'saas.users.'.$legacy, $target))
+                || ($staff && $this->access->allows($actor, 'saas.staff.'.$action, $target))
                 || ($staff && $this->access->allows($actor, 'saas.staff.'.$legacy, $target)))
             && (! $staff || $this->access->mayManageStaff($actor, $target));
     }

@@ -21,11 +21,15 @@ class CentralRoleCatalog
         'saas.users.legal.validate' => 'Valider les dossiers professionnels',
         'saas.users.legal.reject' => 'Rejeter les vérifications professionnelles',
         'saas.users.history.view' => 'Consulter l’historique administratif des utilisateurs',
+        'saas.staff.view' => 'Consulter le personnel SaaS',
         'saas.staff.invite' => 'Inviter du personnel SaaS',
+        'saas.staff.invite.resend' => 'Renvoyer une invitation au personnel SaaS',
         'saas.staff.update' => 'Modifier le personnel SaaS',
+        'saas.staff.permissions.view' => 'Consulter les permissions effectives du personnel SaaS',
+        'saas.staff.assignments.renew' => 'Renouveler une attribution du personnel SaaS',
         'saas.staff.suspend' => 'Suspendre le personnel SaaS',
-        'saas.staff.restore' => 'Réactiver le personnel SaaS',
-        'saas.staff.delete' => 'Supprimer le personnel SaaS',
+        'saas.staff.activate' => 'Réactiver le personnel SaaS',
+        'saas.staff.archive' => 'Archiver le personnel SaaS',
         'saas.users.roles.assign' => 'Attribuer les rôles du personnel SaaS',
         'saas.countries.view' => 'Consulter les pays',
         'saas.countries.create' => 'Créer des pays',
@@ -38,12 +42,13 @@ class CentralRoleCatalog
         'Utilisateurs centraux' => ['saas.users.view', 'saas.users.create', 'saas.users.update', 'saas.users.approve', 'saas.users.reject', 'saas.users.suspend', 'saas.users.activate', 'saas.users.archive'],
         'Dossiers professionnels' => ['saas.users.legal.view', 'saas.users.legal.validate', 'saas.users.legal.reject'],
         'Historique des utilisateurs' => ['saas.users.history.view'],
-        'Personnel SaaS' => ['saas.staff.invite', 'saas.staff.update', 'saas.staff.suspend', 'saas.staff.restore', 'saas.staff.delete', 'saas.users.roles.assign'],
+        'Personnel SaaS' => ['saas.staff.view', 'saas.staff.invite', 'saas.staff.invite.resend', 'saas.staff.update', 'saas.staff.permissions.view', 'saas.staff.assignments.renew', 'saas.staff.suspend', 'saas.staff.activate', 'saas.staff.archive', 'saas.users.roles.assign'],
         'Pays' => ['saas.countries.view', 'saas.countries.create', 'saas.countries.update', 'saas.countries.activate', 'saas.countries.delete'],
     ];
 
     public const VIEW_ACTIONS = [
-        'saas.users.view' => ['saas.users.create', 'saas.users.update', 'saas.users.approve', 'saas.users.reject', 'saas.users.suspend', 'saas.users.activate', 'saas.users.archive', 'saas.users.legal.view', 'saas.users.legal.validate', 'saas.users.legal.reject', 'saas.users.history.view', 'saas.staff.invite', 'saas.staff.update', 'saas.staff.suspend', 'saas.staff.restore', 'saas.staff.delete', 'saas.users.roles.assign'],
+        'saas.users.view' => ['saas.users.create', 'saas.users.update', 'saas.users.approve', 'saas.users.reject', 'saas.users.suspend', 'saas.users.activate', 'saas.users.archive', 'saas.users.legal.view', 'saas.users.legal.validate', 'saas.users.legal.reject', 'saas.users.history.view', 'saas.staff.invite', 'saas.staff.update', 'saas.staff.suspend', 'saas.staff.activate', 'saas.staff.archive', 'saas.users.roles.assign'],
+        'saas.staff.view' => ['saas.staff.invite', 'saas.staff.invite.resend', 'saas.staff.update', 'saas.users.roles.assign', 'saas.staff.permissions.view', 'saas.staff.assignments.renew', 'saas.staff.suspend', 'saas.staff.activate', 'saas.staff.archive'],
         'saas.users.legal.view' => ['saas.users.legal.validate', 'saas.users.legal.reject'],
         'saas.countries.view' => ['saas.countries.create', 'saas.countries.update', 'saas.countries.activate', 'saas.countries.delete'],
     ];
@@ -77,7 +82,7 @@ class CentralRoleCatalog
                 throw new LogicException('The existing root role must remain protected.');
             }
 
-            foreach (['saas.users.restore' => 'saas.users.activate', 'saas.users.delete' => 'saas.users.archive'] as $old => $new) {
+            foreach (['saas.users.restore' => 'saas.users.activate', 'saas.users.delete' => 'saas.users.archive', 'saas.staff.restore' => 'saas.staff.activate', 'saas.staff.delete' => 'saas.staff.archive'] as $old => $new) {
                 $legacy = Permission::where('guard_name', 'central')->where('name', $old)->first();
                 if ($legacy !== null) {
                     if (Permission::where('guard_name', 'central')->where('name', $new)->exists()) {

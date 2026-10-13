@@ -25,6 +25,11 @@
                             {{ __('Créer un compte') }}
                         </flux:sidebar.item>
                     @endif
+                    @can('viewAnyStaff', \App\Models\User::class)
+                        <flux:sidebar.item :href="route('central.staff.index')" :current="request()->routeIs('central.staff.*')" wire:navigate>
+                            {{ __('Personnel SaaS') }}
+                        </flux:sidebar.item>
+                    @endcan
                     @can('viewAny', \App\Models\Central\Role::class)
                         <flux:sidebar.item :href="route('central.roles.index')" :current="request()->routeIs('central.roles.*')" wire:navigate>
                             {{ __('Rôles SaaS') }}

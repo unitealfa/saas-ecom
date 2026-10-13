@@ -99,12 +99,12 @@ class UserManagementService
         return new UserSaveResult($user, $emailSent);
     }
 
-    public function update(User $actor, User $target, UserProfileData $data): UserSaveResult
+    public function update(User $actor, User $target, UserProfileData $data, string $ability = 'update'): UserSaveResult
     {
         $emailSent = null;
-        $user = $this->mutations->run(function () use ($actor, $target, $data, &$emailSent): User {
+        $user = $this->mutations->run(function () use ($actor, $target, $data, $ability, &$emailSent): User {
             $target = User::whereKey($target->id)->lockForUpdate()->firstOrFail();
-            Gate::forUser($actor)->authorize('update', $target);
+            Gate::forUser($actor)->authorize($ability, $target);
             $country = Country::where('uuid', $data->countryUuid)
                 ->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $target->country_id))->lockForUpdate()->firstOrFail();
             $emailChanged = $target->email !== $data->email;

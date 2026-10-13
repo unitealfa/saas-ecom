@@ -45,9 +45,20 @@ class CentralUserAccess
 
     public function mayDelegateRole(User $actor, Role $role): bool
     {
+        return $this->allows($actor, 'saas.users.roles.assign') && $this->ownsRolePermissions($actor, $role);
+    }
+
+    public function ownsRolePermissions(User $actor, Role $role): bool
+    {
         return $role->guard_name === 'central' && ! $role->getAttribute('is_super_admin')
-            && $this->allows($actor, 'saas.users.roles.assign')
-            && $role->permissions->every(fn ($permission): bool => $this->allows($actor, $permission->name));
+            && $role->permissions->every(fn ($permission): bool => $this->ownsPermission($actor, $permission->name));
+    }
+
+    public function ownsPermission(User $actor, string $permission): bool
+    {
+        $actor = $actor->fresh();
+
+        return $actor !== null && $this->active($actor) && $actor->checkPermissionTo($permission, 'central');
     }
 
     public function isStaff(User $user): bool
@@ -62,7 +73,7 @@ class CentralUserAccess
     public function mayManageStaff(User $actor, User $target): bool
     {
         return $this->isSuperAdmin($actor)
-            || $target->getAllPermissions()->every(fn ($permission): bool => $this->allows($actor, $permission->name));
+            || $target->getAllPermissions()->every(fn ($permission): bool => $this->ownsPermission($actor, $permission->name));
     }
 
     private function active(User $user): bool
