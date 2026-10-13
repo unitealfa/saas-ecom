@@ -4,10 +4,12 @@ namespace App\Providers;
 
 use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
 use App\Models\Central\Country;
+use App\Models\Central\Permission;
 use App\Models\Central\Role;
 use App\Models\Central\Tenant;
 use App\Models\User;
 use App\Policies\Central\CountryPolicy;
+use App\Policies\Central\PermissionPolicy;
 use App\Policies\Central\RolePolicy;
 use App\Policies\Central\TenantPolicy;
 use App\Policies\Central\UserPolicy;
@@ -45,6 +47,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(\App\Models\Central\User::class, UserPolicy::class);
         Gate::policy(Role::class, RolePolicy::class);
+        Gate::policy(Permission::class, PermissionPolicy::class);
         Gate::policy(Country::class, CountryPolicy::class);
         Gate::policy(Tenant::class, TenantPolicy::class);
         Livewire::addPersistentMiddleware([EnsureActiveCentralAccount::class]);

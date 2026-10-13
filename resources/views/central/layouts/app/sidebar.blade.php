@@ -35,6 +35,11 @@
                             {{ __('Rôles SaaS') }}
                         </flux:sidebar.item>
                     @endcan
+                    @can('viewAny', \App\Models\Central\Permission::class)
+                        <flux:sidebar.item :href="route('central.permissions.index')" :current="request()->routeIs('central.permissions.*')" wire:navigate>
+                            {{ __('Permissions') }}
+                        </flux:sidebar.item>
+                    @endcan
                     @can('viewAny', \App\Models\Central\Country::class)
                         <flux:sidebar.item :href="route('central.countries.index')" :current="request()->routeIs('central.countries.*')" wire:navigate>
                             {{ __('Pays') }}

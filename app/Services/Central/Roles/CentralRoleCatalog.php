@@ -39,6 +39,8 @@ class CentralRoleCatalog
         'saas.roles.permissions.update' => 'Ajouter ou retirer des permissions d’un rôle',
         'saas.roles.durations.update' => 'Modifier les durées des permissions d’un rôle',
         'saas.roles.assignments.view' => 'Consulter les administrateurs possédant un rôle',
+        'saas.permissions.view' => 'Consulter et rechercher le catalogue des permissions',
+        'saas.permissions.update' => 'Modifier les libellés des permissions',
         'saas.countries.view' => 'Consulter les pays',
         'saas.countries.create' => 'Créer des pays',
         'saas.countries.update' => 'Modifier les pays',
@@ -53,6 +55,7 @@ class CentralRoleCatalog
         'Personnel SaaS' => ['saas.staff.view', 'saas.staff.invite', 'saas.staff.invite.resend', 'saas.staff.update', 'saas.staff.permissions.view', 'saas.staff.assignments.renew', 'saas.staff.suspend', 'saas.staff.activate', 'saas.staff.archive', 'saas.users.roles.assign'],
         'Pays' => ['saas.countries.view', 'saas.countries.create', 'saas.countries.update', 'saas.countries.activate', 'saas.countries.delete'],
         'Rôles SaaS' => ['saas.roles.view', 'saas.roles.create', 'saas.roles.update', 'saas.roles.delete', 'saas.roles.permissions.view', 'saas.roles.permissions.update', 'saas.roles.durations.update', 'saas.roles.assignments.view'],
+        'Catalogue des permissions' => ['saas.permissions.view', 'saas.permissions.update'],
     ];
 
     public const VIEW_ACTIONS = [
@@ -62,6 +65,7 @@ class CentralRoleCatalog
         'saas.countries.view' => ['saas.countries.create', 'saas.countries.update', 'saas.countries.activate', 'saas.countries.delete'],
         'saas.roles.view' => ['saas.roles.create', 'saas.roles.update', 'saas.roles.delete', 'saas.roles.permissions.view', 'saas.roles.permissions.update', 'saas.roles.durations.update', 'saas.roles.assignments.view'],
         'saas.roles.permissions.view' => ['saas.roles.permissions.update', 'saas.roles.durations.update'],
+        'saas.permissions.view' => ['saas.permissions.update'],
     ];
 
     public const ROLES = [
@@ -104,10 +108,7 @@ class CentralRoleCatalog
             }
 
             foreach (self::PERMISSIONS as $name => $label) {
-                $permission = Permission::firstOrCreate(['name' => $name, 'guard_name' => 'central'], ['label' => $label]);
-                if ($permission->label !== $label) {
-                    $permission->forceFill(['label' => $label])->save();
-                }
+                Permission::firstOrCreate(['name' => $name, 'guard_name' => 'central'], ['label' => $label]);
             }
 
             foreach (self::ROLES as $name => $definition) {
