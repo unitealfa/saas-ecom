@@ -89,6 +89,7 @@ class TenantProvisioner
             }
 
             $tenant->schema_version = $schemaVersion;
+            $tenant->provisioned_at ??= now();
             $tenant->status = StatusEnum::PROVISIONING;
             $tenant->setInternal('shop_settings', null);
             $tenant->save();

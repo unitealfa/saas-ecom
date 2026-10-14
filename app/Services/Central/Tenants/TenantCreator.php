@@ -49,7 +49,7 @@ class TenantCreator
             if ($quota === null || ! $quota->is_active) {
                 throw ValidationException::withMessages(['shop_name' => 'L’offre actuelle ne permet pas de créer de boutique.']);
             }
-            $count = Tenant::where('user_id', $owner->id)->lockForUpdate()->count();
+            $count = Tenant::where('user_id', $owner->id)->orderBy('id')->lockForUpdate()->get(['id'])->count();
             if ($quota->limit !== null && $count >= $quota->limit) {
                 throw ValidationException::withMessages(['shop_name' => 'Le nombre maximum de boutiques de cette offre est atteint.']);
             }

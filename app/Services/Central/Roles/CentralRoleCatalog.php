@@ -41,6 +41,14 @@ class CentralRoleCatalog
         'saas.roles.assignments.view' => 'Consulter les administrateurs possédant un rôle',
         'saas.permissions.view' => 'Consulter et rechercher le catalogue des permissions',
         'saas.permissions.update' => 'Modifier les libellés des permissions',
+        'saas.tenants.view' => 'Consulter et rechercher les boutiques',
+        'saas.tenants.create' => 'Créer une boutique depuis l’administration',
+        'saas.tenants.update' => 'Modifier les informations centrales d’une boutique',
+        'saas.tenants.suspend' => 'Suspendre une boutique',
+        'saas.tenants.activate' => 'Réactiver une boutique éligible',
+        'saas.tenants.archive' => 'Archiver une boutique',
+        'saas.tenants.history.view' => 'Consulter l’historique administratif d’une boutique',
+        'saas.tenants.priority.update' => 'Modifier les priorités des boutiques d’un propriétaire',
         'saas.countries.view' => 'Consulter les pays',
         'saas.countries.create' => 'Créer des pays',
         'saas.countries.update' => 'Modifier les pays',
@@ -56,6 +64,7 @@ class CentralRoleCatalog
         'Pays' => ['saas.countries.view', 'saas.countries.create', 'saas.countries.update', 'saas.countries.activate', 'saas.countries.delete'],
         'Rôles SaaS' => ['saas.roles.view', 'saas.roles.create', 'saas.roles.update', 'saas.roles.delete', 'saas.roles.permissions.view', 'saas.roles.permissions.update', 'saas.roles.durations.update', 'saas.roles.assignments.view'],
         'Catalogue des permissions' => ['saas.permissions.view', 'saas.permissions.update'],
+        'Boutiques' => ['saas.tenants.view', 'saas.tenants.create', 'saas.tenants.update', 'saas.tenants.suspend', 'saas.tenants.activate', 'saas.tenants.archive', 'saas.tenants.history.view', 'saas.tenants.priority.update'],
     ];
 
     public const VIEW_ACTIONS = [
@@ -66,6 +75,7 @@ class CentralRoleCatalog
         'saas.roles.view' => ['saas.roles.create', 'saas.roles.update', 'saas.roles.delete', 'saas.roles.permissions.view', 'saas.roles.permissions.update', 'saas.roles.durations.update', 'saas.roles.assignments.view'],
         'saas.roles.permissions.view' => ['saas.roles.permissions.update', 'saas.roles.durations.update'],
         'saas.permissions.view' => ['saas.permissions.update'],
+        'saas.tenants.view' => ['saas.tenants.create', 'saas.tenants.update', 'saas.tenants.suspend', 'saas.tenants.activate', 'saas.tenants.archive', 'saas.tenants.history.view', 'saas.tenants.priority.update'],
     ];
 
     public const ROLES = [

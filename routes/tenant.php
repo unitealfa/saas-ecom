@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Tenant\Diagnostics\DatabaseDiagnosticsController;
 use App\Http\Middleware\EnsureLocalDiagnostics;
+use App\Http\Middleware\Tenant\EnsureTenantAvailable;
 use App\Http\Middleware\Tenant\FinishTenantRequest;
 use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
@@ -10,6 +11,7 @@ use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 Route::middleware([
     FinishTenantRequest::class,
     PreventAccessFromCentralDomains::class,
+    EnsureTenantAvailable::class,
     InitializeTenancyByDomain::class,
     'web',
 ])->group(function (): void {

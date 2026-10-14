@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Http\Middleware\Tenant\EnsureTenantAvailable;
 use App\Http\Middleware\Tenant\FinishTenantRequest;
 use App\Models\Central\Tenant;
 use App\Models\Central\TenantSchemaDeployment;
@@ -68,6 +69,7 @@ class TenancyServiceProvider extends ServiceProvider
         foreach (array_reverse([
             FinishTenantRequest::class,
             PreventAccessFromCentralDomains::class,
+            EnsureTenantAvailable::class,
             InitializeTenancyByDomain::class,
         ]) as $middleware) {
             $this->app->make(Kernel::class)->prependToMiddlewarePriority($middleware);
