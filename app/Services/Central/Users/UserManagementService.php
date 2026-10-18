@@ -84,7 +84,9 @@ class UserManagementService
             $user->phone = $data->phone;
             $user->save();
             $this->subscriptions->ensure($user, $actor);
-            $this->applyRoles($user, $roles);
+            if ($data->staff) {
+                $this->applyRoles($user, $roles);
+            }
             $token = Password::broker('central')->createToken($user);
             $user->getConnection()->afterCommit(function () use ($user, $token, &$emailSent): void {
                 $emailSent = $this->mail->invitation($user, $token);
@@ -229,12 +231,16 @@ class UserManagementService
     public function assignRoles(User $actor, User $target, array $roleUuids): void
     {
         $this->mutations->run(function () use ($actor, $target, $roleUuids): void {
-            $roles = $this->delegableRoles($actor, $roleUuids);
             $target = User::whereKey($target->id)->lockForUpdate()->firstOrFail();
             Gate::forUser($actor)->authorize('assignRoles', $target);
+            $roles = $this->delegableRoles($actor, $roleUuids);
+            $revokedPermissions = $roles->isEmpty() ? $target->permissions()->pluck('uuid')->all() : [];
             $this->applyRoles($target, $roles);
+            if ($revokedPermissions !== []) {
+                $target->syncPermissions([]);
+            }
             activity()->causedBy($actor)->performedOn($target)->event('central_roles_updated')
-                ->withProperties(['role_uuids' => $roles->pluck('uuid')->all()])
+                ->withProperties(['role_uuids' => $roles->pluck('uuid')->all(), 'revoked_permission_uuids' => $revokedPermissions])
                 ->log('Rôles centraux attribués via Spatie.');
         });
     }

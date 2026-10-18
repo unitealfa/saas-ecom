@@ -9,6 +9,7 @@ use App\Http\Requests\Central\Users\StoreUserRequest;
 use App\Http\Requests\Central\Users\UpdateUserRequest;
 use App\Models\Central\Country;
 use App\Models\Central\User;
+use App\Services\Central\Authorization\CentralUserAccess;
 use App\Services\Central\Users\UserManagementService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -61,12 +62,19 @@ class UserController extends Controller
         ]);
     }
 
-    public function edit(User $user): View
+    public function edit(User $user, CentralUserAccess $access): View
     {
         Gate::authorize('update', $user);
+        $user->load(['country', 'roles']);
+        $ownerShops = $access->isStaff($user) ? collect()
+            : $user->tenants()->orderBy('activation_priority')->orderBy('id')->get();
+        if ($ownerShops->isNotEmpty() && Gate::denies('updatePriorities', $ownerShops->first())) {
+            $ownerShops = collect();
+        }
 
         return view('central.pages.admin.users.edit', [
-            'user' => $user->load(['country', 'roles']),
+            'user' => $user,
+            'ownerShops' => $ownerShops,
             'countries' => Country::where(fn ($query) => $query->where('is_active', true)->orWhere('id', $user->country_id))
                 ->orderBy('name_fr')->get(),
         ]);

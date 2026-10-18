@@ -39,9 +39,11 @@ class StoreUserRequest extends FormRequest
             'phone' => ['nullable', 'string', 'max:255'],
             'country_uuid' => ['required', 'uuid', Rule::exists('countries', 'uuid')->where('is_active', true)->whereNull('deleted_at')],
             'account_kind' => ['required', Rule::in(['merchant', 'staff'])],
-            'roles' => [Rule::requiredIf($this->input('account_kind') === 'staff'), 'array'],
+            'roles' => [Rule::prohibitedIf($this->input('account_kind') === 'merchant'),
+                Rule::requiredIf($this->input('account_kind') === 'staff'), 'array'],
             'roles.*' => ['uuid', 'distinct', Rule::exists('roles', 'uuid')->where('guard_name', 'central')->where('is_super_admin', false)],
             'is_super_admin' => ['prohibited'], 'password' => ['prohibited'],
+            'permissions' => ['prohibited'], 'guard_name' => ['prohibited'],
         ];
     }
 

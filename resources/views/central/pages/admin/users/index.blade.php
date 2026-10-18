@@ -70,7 +70,7 @@ new #[Title('Utilisateurs')] class extends Component {
                 <tr>
                     <th class="p-4">{{ __('Nom') }}</th>
                     <th class="p-4">{{ __('E-mail') }}</th>
-                    <th class="p-4">{{ __('Rôles SaaS') }}</th>
+                    <th class="p-4">{{ __('Type de compte') }}</th>
                     <th class="p-4">{{ __('État') }}</th>
                     <th class="p-4">{{ __('Actions') }}</th>
                 </tr>

@@ -7,8 +7,11 @@ use App\Models\Central\Role;
 use App\Models\Central\Tenant;
 use App\Models\User;
 use App\Notifications\Central\Auth\AccountInvitation;
+use App\Services\Central\Authorization\CentralRoleAssignmentService;
+use App\Services\Central\Users\UserManagementService;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Database\Seeders\Central\CountrySeeder;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Mail\Transport\ArrayTransport;
 use Illuminate\Notifications\ChannelManager;
@@ -38,6 +41,27 @@ function editableCentralProfile(User $user): array
         'phone' => $user->phone, 'country_uuid' => $user->country()->firstOrFail()->uuid,
     ];
 }
+
+test('merchants cannot receive SaaS roles or direct permissions through either administration module', function (): void {
+    $merchant = User::factory()->create();
+    $role = Role::findByName('user-reader', 'central');
+    expect(Gate::forUser($this->admin)->allows('assignRoles', $merchant))->toBeFalse()
+        ->and(Gate::forUser($this->admin)->allows('assignStaffRoles', $merchant))->toBeFalse();
+    $this->actingAs($this->admin, 'central')->get(route('central.users.show', $merchant))->assertOk()
+        ->assertDontSee('id="saas-roles"', false)->assertDontSee(route('central.users.roles.edit', $merchant), false);
+    foreach (['central.users.roles', 'central.staff.roles'] as $module) {
+        $this->get(route($module.'.edit', $merchant))->assertForbidden();
+        $this->put(route($module.'.update', $merchant), ['roles' => [$role->uuid]])->assertForbidden();
+    }
+    expect(fn () => app(UserManagementService::class)->assignRoles($this->admin, $merchant, [$role->uuid]))
+        ->toThrow(AuthorizationException::class);
+    expect(fn () => app(CentralRoleAssignmentService::class)->replace($this->admin, $merchant, [$role->uuid]))
+        ->toThrow(AuthorizationException::class);
+    expect(fn () => $merchant->givePermissionTo('saas.users.view'))->toThrow(LogicException::class);
+    expect(fn () => $merchant->syncPermissions('saas.users.view'))->toThrow(LogicException::class);
+    expect($merchant->roles()->exists())->toBeFalse()->and($merchant->permissions()->exists())->toBeFalse()
+        ->and($merchant->checkPermissionTo('saas.users.view', 'central'))->toBeFalse();
+});
 
 test('an admin created account sends its invitation immediately without a queue worker', function (): void {
     Notification::swap(new ChannelManager(app()));

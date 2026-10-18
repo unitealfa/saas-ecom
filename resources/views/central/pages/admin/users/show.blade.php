@@ -28,8 +28,10 @@
                 <div><dt class="font-medium">{{ $label }}</dt><dd><flux:text>{{ $value ?? 'Non renseigné' }}</flux:text></dd></div>
             @endforeach
         </dl>
-        <flux:heading level="2">Rôles SaaS</flux:heading>
-        <flux:text>{{ $user->roles->pluck('label')->join(', ') ?: 'Aucun rôle SaaS' }}</flux:text>
+        @if ($user->roles->isNotEmpty())
+            <flux:heading level="2" id="saas-roles">Rôles SaaS</flux:heading>
+            <flux:text>{{ $user->roles->pluck('label')->join(', ') }}</flux:text>
+        @endif
         @if ($user->roles->isEmpty())
             <flux:heading level="2">Boutiques</flux:heading>
             @forelse ($shops as $shop)

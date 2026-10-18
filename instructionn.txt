@@ -177,7 +177,7 @@ Table : permissions
 Interface : Administration → Permissions
 Permission	Fonctionnalité
 saas.permissions.view	Consulter et rechercher le catalogue des permissions
-saas.permissions.update	Modifier les libellés descriptifs autorisés des permissions
+Décision du 14 octobre 2026 : catalogue consultatif uniquement, sans Actions, Informations ni modification des permissions. Seule la permission de consultation est conservée ; la capacité inutile d’édition du libellé est entièrement supprimée.
 Je recommande que la création des codes techniques de permissions se fasse dans les seeders Laravel, plutôt que de permettre à un administrateur d'inventer une permission sans contrôle dans un formulaire.
 L'ajout d'une fonctionnalité dans le code doit créer sa permission par seeder. Le panneau admin permet ensuite de la sélectionner lors de la création d'un rôle.
 Fichiers :
@@ -194,7 +194,6 @@ database/seeders/Central/
 
 resources/views/central/pages/admin/permissions/
     index.blade.php
-    show.blade.php
 
 
 Module 05 — Administration des boutiques

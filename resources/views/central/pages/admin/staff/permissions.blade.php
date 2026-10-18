@@ -1,6 +1,9 @@
 <x-layouts::app title="Permissions effectives">
     <section class="mx-auto flex max-w-4xl flex-col gap-6">
         <flux:heading size="xl" level="1">Permissions de {{ $user->name }}</flux:heading>
+        @can('assignStaffRoles', $user)
+            <flux:button :href="route('central.staff.roles.edit', $user)">Rôles de {{ $user->name }}</flux:button>
+        @endcan
         <flux:text>Les durées commencent à la date d’attribution du rôle. Une attribution expirée reste visible ici, mais n’autorise plus l’action.</flux:text>
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm">

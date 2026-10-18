@@ -1,6 +1,7 @@
 <x-layouts::app :title="__('Modifier le compte')">
     <section class="mx-auto flex max-w-2xl flex-col gap-6">
         <flux:heading size="xl" level="1">Modifier {{ $user->name }}</flux:heading>
+        @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
         <flux:text>Un changement d’e-mail demande une nouvelle vérification. Le mot de passe et les rôles ne sont pas modifiés par ce formulaire.</flux:text>
         @if ($errors->any())
             <flux:callout variant="danger" role="alert">
@@ -43,5 +44,20 @@
                 @endcan
             </div>
         </form>
+        @if ($ownerShops->isNotEmpty())
+            @can('updatePriorities', $ownerShops->first())
+                <form method="POST" action="{{ route('central.tenants.priorities', $ownerShops->first()) }}" class="flex flex-col gap-4 rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
+                    @csrf @method('PUT')
+                    <flux:heading level="2">Priorités des boutiques de {{ $user->name }}</flux:heading>
+                    <flux:text>Classez toutes ses boutiques de 1 à {{ $ownerShops->count() }}, sans doublon. Les boutiques éligibles sont choisies sous le quota de l’offre ; les suspensions et les préparations ne sont pas annulées.</flux:text>
+                    @foreach ($ownerShops as $shop)
+                        <flux:input type="number" name="priorities[{{ $shop->uuid }}]" :label="$shop->shop_name.' — '.$shop->status->label()" min="1" :max="$ownerShops->count()"
+                            :value="old('priorities.'.$shop->uuid, $shop->activation_priority ?? ($loop->index + 1))" required />
+                    @endforeach
+                    <flux:input name="reason" label="Motif facultatif" :value="old('reason')" />
+                    <flux:button type="submit" variant="primary">Enregistrer les priorités</flux:button>
+                </form>
+            @endcan
+        @endif
     </section>
 </x-layouts::app>

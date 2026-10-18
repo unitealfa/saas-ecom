@@ -173,10 +173,19 @@ test('creation and assignment remain usable after the separate viewing permissio
     $target = User::where('email', 'new-merchant@example.test')->firstOrFail();
     Notification::assertSentTo($target, AccountInvitation::class);
     $this->get(route('dashboard'))->assertOk()->assertSee('Compte créé pour Merchant');
-    $this->get(route('central.users.roles.edit', $target))->assertOk()->assertSee('Retour aux utilisateurs');
+    $this->get(route('central.users.roles.edit', $target))->assertForbidden();
     $this->put(route('central.users.roles.update', $target), ['roles' => [$grant->uuid]])
+        ->assertForbidden();
+    expect($target->roles()->exists())->toBeFalse();
+    $this->post(route('central.users.store'), [
+        'last_name' => 'Staff', 'email' => 'new-staff@example.test', 'account_kind' => 'staff',
+        'country_uuid' => Country::where('code', 'DZ')->firstOrFail()->uuid, 'roles' => [$grant->uuid],
+    ])->assertSessionHasNoErrors();
+    $staff = User::where('email', 'new-staff@example.test')->firstOrFail();
+    $this->get(route('central.users.roles.edit', $staff))->assertOk()->assertSee('Retour aux utilisateurs');
+    $this->put(route('central.users.roles.update', $staff), ['roles' => [$grant->uuid]])
         ->assertSessionHasNoErrors()->assertRedirect(route('central.users.index'));
-    expect($target->hasRole($grant))->toBeTrue();
+    expect($staff->hasRole($grant))->toBeTrue();
 });
 
 test('delegated staff management is limited to currently owned permissions and never root', function (): void {
@@ -186,6 +195,7 @@ test('delegated staff management is limited to currently owned permissions and n
     ]);
     $delegator->assignRole($role);
     $target = User::factory()->create();
+    $target->assignRole(Role::findByName('user-reader'));
     $this->actingAs($delegator, 'central')->put(route('central.users.roles.update', $target), [
         'roles' => [Role::findByName('user-reader')->uuid],
     ])->assertSessionHasNoErrors();
@@ -282,6 +292,7 @@ test('expired subscriptions fall back to the new free version without rewriting 
 test('an administrator can delegate an owned role globally without target lists', function (): void {
     $role = Role::findByName('user-reader');
     $target = User::factory()->create();
+    $target->assignRole(Role::findByName('user-manager'));
     $this->actingAs($this->admin, 'central')->put(route('central.users.roles.update', $target), ['roles' => [$role->uuid]])->assertSessionHasNoErrors();
     expect($target->fresh()->hasRole($role))->toBeTrue();
 });

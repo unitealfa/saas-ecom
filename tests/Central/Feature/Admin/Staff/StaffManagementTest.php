@@ -127,8 +127,10 @@ test('staff role replacement refuses overlaps root assignments and merchant targ
 
 test('removing all staff roles revokes access without deleting the central account', function (): void {
     $staff = staffTestAccount();
+    $staff->givePermissionTo('saas.countries.view');
     $this->actingAs($this->admin, 'central')->put(route('central.staff.roles.update', $staff), ['roles' => []])->assertRedirect(route('central.staff.index'));
     expect($staff->fresh()->roles()->exists())->toBeFalse();
+    expect($staff->fresh()->permissions()->exists())->toBeFalse();
     expect($staff->fresh()->trashed())->toBeFalse();
     $event = Activity::forSubject($staff)->where('event', 'central_staff_roles_replaced')->firstOrFail();
     expect($event->getProperty('before')[0]['role_uuid'])->toBe(Role::findByName('user-reader')->uuid);
@@ -166,6 +168,7 @@ test('effective permission display matches Spatie expiry and escapes role and ac
     expect($permission['effective'])->toBeFalse();
     expect($staff->checkPermissionTo('saas.users.view', 'central'))->toBeFalse();
     $this->actingAs($this->admin, 'central')->get(route('central.staff.permissions.index', $staff))->assertOk()
+        ->assertSee(route('central.staff.roles.edit', $staff), false)
         ->assertSee('Non autorisé')->assertSee('&lt;script&gt;role()', escape: false)
         ->assertDontSee('<script>role()</script>', escape: false)->assertDontSee('<script>staff()</script>', escape: false);
 });

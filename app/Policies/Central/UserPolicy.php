@@ -65,12 +65,13 @@ class UserPolicy
 
     public function assignRoles(User $actor, User $target): bool
     {
-        return ! $target->trashed() && ! $target->roles()->where('guard_name', 'central')->where('is_super_admin', true)->exists()
+        return $this->access->isStaff($target) && ! $target->trashed()
+            && ! $target->tenants()->withTrashed()->exists()
+            && ! $target->roles()->where('guard_name', 'central')->where('is_super_admin', true)->exists()
             && ! in_array($target->status, [StatusEnum::PENDING, StatusEnum::REJECTED], true)
             && ($actor->id !== $target->id || $this->access->isSuperAdmin($actor))
-            && ($this->access->isStaff($target) || $this->access->allows($actor, 'saas.staff.invite', $target))
             && $this->access->allows($actor, 'saas.users.roles.assign', $target)
-            && (! $this->access->isStaff($target) || $this->access->mayManageStaff($actor, $target));
+            && $this->access->mayManageStaff($actor, $target);
     }
 
     public function viewAnyStaff(User $actor): bool

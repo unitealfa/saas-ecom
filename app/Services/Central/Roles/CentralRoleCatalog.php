@@ -40,7 +40,6 @@ class CentralRoleCatalog
         'saas.roles.durations.update' => 'Modifier les durées des permissions d’un rôle',
         'saas.roles.assignments.view' => 'Consulter les administrateurs possédant un rôle',
         'saas.permissions.view' => 'Consulter et rechercher le catalogue des permissions',
-        'saas.permissions.update' => 'Modifier les libellés des permissions',
         'saas.tenants.view' => 'Consulter et rechercher les boutiques',
         'saas.tenants.create' => 'Créer une boutique depuis l’administration',
         'saas.tenants.update' => 'Modifier les informations centrales d’une boutique',
@@ -63,7 +62,7 @@ class CentralRoleCatalog
         'Personnel SaaS' => ['saas.staff.view', 'saas.staff.invite', 'saas.staff.invite.resend', 'saas.staff.update', 'saas.staff.permissions.view', 'saas.staff.assignments.renew', 'saas.staff.suspend', 'saas.staff.activate', 'saas.staff.archive', 'saas.users.roles.assign'],
         'Pays' => ['saas.countries.view', 'saas.countries.create', 'saas.countries.update', 'saas.countries.activate', 'saas.countries.delete'],
         'Rôles SaaS' => ['saas.roles.view', 'saas.roles.create', 'saas.roles.update', 'saas.roles.delete', 'saas.roles.permissions.view', 'saas.roles.permissions.update', 'saas.roles.durations.update', 'saas.roles.assignments.view'],
-        'Catalogue des permissions' => ['saas.permissions.view', 'saas.permissions.update'],
+        'Catalogue des permissions' => ['saas.permissions.view'],
         'Boutiques' => ['saas.tenants.view', 'saas.tenants.create', 'saas.tenants.update', 'saas.tenants.suspend', 'saas.tenants.activate', 'saas.tenants.archive', 'saas.tenants.history.view', 'saas.tenants.priority.update'],
     ];
 
@@ -74,7 +73,6 @@ class CentralRoleCatalog
         'saas.countries.view' => ['saas.countries.create', 'saas.countries.update', 'saas.countries.activate', 'saas.countries.delete'],
         'saas.roles.view' => ['saas.roles.create', 'saas.roles.update', 'saas.roles.delete', 'saas.roles.permissions.view', 'saas.roles.permissions.update', 'saas.roles.durations.update', 'saas.roles.assignments.view'],
         'saas.roles.permissions.view' => ['saas.roles.permissions.update', 'saas.roles.durations.update'],
-        'saas.permissions.view' => ['saas.permissions.update'],
         'saas.tenants.view' => ['saas.tenants.create', 'saas.tenants.update', 'saas.tenants.suspend', 'saas.tenants.activate', 'saas.tenants.archive', 'saas.tenants.history.view', 'saas.tenants.priority.update'],
     ];
 

@@ -72,8 +72,6 @@ class TenantController extends Controller
 
         return view('central.pages.admin.tenants.show', [
             'tenant' => $tenant, 'subscription' => $this->tenants->subscriptions(collect([$tenant]))->get($tenant->user_id),
-            'ownerShops' => Gate::allows('updatePriorities', $tenant)
-                ? Tenant::where('user_id', $tenant->user_id)->orderBy('activation_priority')->orderBy('id')->get() : collect(),
         ]);
     }
 
@@ -115,7 +113,12 @@ class TenantController extends Controller
     {
         $this->states->priorities($this->actor($request), $tenant, $request->validated('priorities'), $request->validated('reason'));
 
-        return redirect()->route('central.tenants.show', $tenant)->with('status', 'Priorités enregistrées et boutiques éligibles recalculées sous quota.');
+        $owner = $tenant->owner;
+        $response = Gate::allows('update', $owner)
+            ? redirect()->route('central.users.edit', $owner)
+            : redirect()->route('central.tenants.show', $tenant);
+
+        return $response->with('status', 'Priorités enregistrées et boutiques éligibles recalculées sous quota.');
     }
 
     private function changeState(ChangeTenantStatusRequest $request, Tenant $tenant, string $action, string $message): RedirectResponse

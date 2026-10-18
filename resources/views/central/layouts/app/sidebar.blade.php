@@ -20,11 +20,6 @@
                             {{ __('Utilisateurs') }}
                         </flux:sidebar.item>
                     @endcan
-                    @if (auth('central')->user()->can('create', \App\Models\User::class) || auth('central')->user()->can('createStaff', \App\Models\User::class))
-                        <flux:sidebar.item :href="route('central.users.create')" :current="request()->routeIs('central.users.create')" wire:navigate>
-                            {{ __('Créer un compte') }}
-                        </flux:sidebar.item>
-                    @endif
                     @can('viewAnyStaff', \App\Models\User::class)
                         <flux:sidebar.item :href="route('central.staff.index')" :current="request()->routeIs('central.staff.*')" wire:navigate>
                             {{ __('Personnel SaaS') }}

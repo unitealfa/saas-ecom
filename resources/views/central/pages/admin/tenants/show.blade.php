@@ -22,19 +22,6 @@
         </dl>
         <flux:text>L’archivage conserve la base et ses données. Le nom de la base reste stable après un renommage. Les interfaces de gestion des boutiques restent en préparation.</flux:text>
         @include('central.pages.admin.tenants.actions', ['detail' => true])
-        @can('updatePriorities', $tenant)
-            <form method="POST" action="{{ route('central.tenants.priorities', $tenant) }}" class="flex flex-col gap-4 rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
-                @csrf @method('PUT')
-                <flux:heading level="2">Priorités des boutiques de ce propriétaire</flux:heading>
-                <flux:text>Classez toutes ses boutiques de 1 à {{ $ownerShops->count() }}, sans doublon. Les boutiques éligibles sont choisies sous le quota de l’offre ; les suspensions et les préparations ne sont pas annulées.</flux:text>
-                @foreach ($ownerShops as $shop)
-                    <flux:input type="number" name="priorities[{{ $shop->uuid }}]" :label="$shop->shop_name.' — '.$shop->status->label()" min="1" :max="$ownerShops->count()"
-                        :value="old('priorities.'.$shop->uuid, $shop->activation_priority ?? ($loop->index + 1))" required />
-                @endforeach
-                <flux:input name="reason" label="Motif facultatif" :value="old('reason')" />
-                <flux:button type="submit" variant="primary">Enregistrer les priorités</flux:button>
-            </form>
-        @endcan
         <flux:button :href="route('central.tenants.index')">Retour aux boutiques</flux:button>
     </section>
 </x-layouts::app>

@@ -1,9 +1,6 @@
 @can('updateStaff', $user)
     <flux:button :href="route('central.staff.edit', $user)">Modifier</flux:button>
 @endcan
-@can('assignStaffRoles', $user)
-    <flux:button :href="route('central.staff.roles.edit', $user)">Rôles</flux:button>
-@endcan
 @can('viewStaffPermissions', $user)
     <flux:button :href="route('central.staff.permissions.index', $user)">Permissions effectives</flux:button>
 @endcan

@@ -20,6 +20,7 @@ class AssignRolesRequest extends FormRequest
             'roles' => ['sometimes', 'array'],
             'roles.*' => ['uuid', 'distinct', Rule::exists('roles', 'uuid')->where('guard_name', 'central')->where('is_super_admin', false)],
             'is_super_admin' => ['prohibited'],
+            'permissions' => ['prohibited'], 'account_kind' => ['prohibited'], 'guard_name' => ['prohibited'],
         ];
     }
 }

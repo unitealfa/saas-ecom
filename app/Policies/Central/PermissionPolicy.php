@@ -22,7 +22,6 @@ class PermissionPolicy
 
     public function update(User $actor, Permission $permission): bool
     {
-        return $permission->guard_name === 'central'
-            && ($this->access->isSuperAdmin($actor) || $this->access->allows($actor, 'saas.permissions.update'));
+        return false;
     }
 }

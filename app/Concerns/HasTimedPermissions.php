@@ -80,6 +80,10 @@ trait HasTimedPermissions
         return $this->getConnection()->transaction(function () use ($permissions): static {
             $this->newQuery()->whereKey($this->getKey())->lockForUpdate()->firstOrFail();
             $permissionIds = $this->collectPermissions($permissions);
+            if ($permissionIds !== [] && $this->getMorphClass() === 'central_user'
+                && ! $this->roles()->where('guard_name', 'central')->exists()) {
+                throw new \LogicException('A merchant account cannot receive SaaS permissions.');
+            }
             foreach ($this->roles()->get() as $role) {
                 if ($role->getAttribute('is_super_admin') || $role->permissions()->whereKey($permissionIds)->exists()) {
                     throw new \LogicException('A direct permission cannot overlap with an assigned role.');
@@ -139,6 +143,9 @@ trait HasTimedPermissions
             return false;
         }
         if ($this->getMorphClass() === 'shop_user' && $this->getAttribute('membership_status') !== MembershipStatusEnum::ACTIVE) {
+            return false;
+        }
+        if ($this->getMorphClass() === 'central_user' && ! $this->roles()->where('guard_name', 'central')->exists()) {
             return false;
         }
         $permission = $this->filterPermission($permission, $guardName);

@@ -60,6 +60,7 @@ class UpdateUserRequest extends FormRequest
             'country_uuid' => ['required', 'uuid', Rule::exists('countries', 'uuid')->whereNull('deleted_at')
                 ->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $user->country_id))],
             'password' => ['prohibited'], 'roles' => ['prohibited'], 'status' => ['prohibited'],
+            'permissions' => ['prohibited'], 'account_kind' => ['prohibited'], 'guard_name' => ['prohibited'],
             'email_verified_at' => ['prohibited'], 'is_super_admin' => ['prohibited'],
             'phone_verified_at' => ['prohibited'], 'whatsapp_verified_at' => ['prohibited'],
             'legal_profile_version' => ['prohibited'], 'legal_verification_status' => ['prohibited'],
