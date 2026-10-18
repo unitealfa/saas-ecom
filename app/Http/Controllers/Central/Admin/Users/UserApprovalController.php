@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Central\Admin\Users;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Users\UserApprovalRequest;
 use App\Models\Central\User;
+use App\Enums\Central\Users\StatusEnum;
 use App\Services\Central\Users\UserApprovalService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -34,9 +35,10 @@ class UserApprovalController extends Controller
     {
         $actor = $request->user('central');
         abort_unless($actor instanceof User, 403);
-        $approvals->decide($actor, $user, $approved, $request->validated('reason'));
+        $approvals->decide($actor, $user, $approved, $request->validated('reason'),
+            (int) $request->validated('legal_profile_version'), StatusEnum::from((int) $request->validated('expected_status')));
 
         return redirect()->route('central.users.pending')
-            ->with('status', $approved ? 'Compte approuvé. L’approbation ne remplace pas la vérification de l’e-mail.' : 'Demande d’accès refusée.');
+            ->with('status', $approved ? 'Compte approuvé et dossier validé. L’e-mail doit être vérifié séparément.' : 'Compte refusé et dossier rejeté.');
     }
 }

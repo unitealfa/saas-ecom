@@ -3,6 +3,7 @@
 namespace App\Policies\Central;
 
 use App\Enums\Central\Users\StatusEnum;
+use App\Enums\VerificationStatusEnum;
 use App\Models\Central\User;
 use App\Services\Central\Authorization\CentralUserAccess;
 
@@ -16,6 +17,11 @@ class UserPolicy
     }
 
     public function updateProfilePhoto(User $actor, User $target): bool
+    {
+        return $this->updateOwnProfile($actor, $target);
+    }
+
+    public function updateOwnProfile(User $actor, User $target): bool
     {
         $actor = $actor->fresh();
 
@@ -159,8 +165,12 @@ class UserPolicy
 
     private function decideRegistration(User $actor, User $target, string $action): bool
     {
+        $needsReview = $target->status === StatusEnum::PENDING
+            || ($target->status === StatusEnum::ACTIVE && $target->legal_verification_status !== VerificationStatusEnum::VERIFIED);
+
         return ! $target->trashed() && $actor->id !== $target->id
-            && $target->status === StatusEnum::PENDING && ! $this->access->isStaff($target)
+            && ($needsReview || ($action === 'approve' && $target->status === StatusEnum::REJECTED))
+            && ! $this->access->isStaff($target)
             && $this->access->allows($actor, 'saas.users.'.$action);
     }
 
@@ -182,14 +192,12 @@ class UserPolicy
 
     public function validateLegal(User $actor, User $target): bool
     {
-        return ! $target->trashed() && $actor->id !== $target->id && ! $this->access->isStaff($target)
-            && $this->access->allows($actor, 'saas.users.legal.validate');
+        return $this->approve($actor, $target);
     }
 
     public function rejectLegal(User $actor, User $target): bool
     {
-        return ! $target->trashed() && $actor->id !== $target->id && ! $this->access->isStaff($target)
-            && $this->access->allows($actor, 'saas.users.legal.reject');
+        return $this->reject($actor, $target);
     }
 
     public function viewHistory(User $actor, User $target): bool

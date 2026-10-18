@@ -20,11 +20,13 @@ class EnsureTenantAvailable
         $tenant = $domain->tenant;
         $owner = $tenant->owner;
         $unavailable = $owner === null || $owner->status !== UserStatus::ACTIVE
-            || in_array($tenant->status, [StatusEnum::INACTIVE, StatusEnum::SUSPENDED, StatusEnum::DELETED], true);
+            || $tenant->status !== StatusEnum::ACTIVE;
         abort_if($unavailable && ! $request->routeIs('tenant.home'), 403);
-        if ($unavailable || $tenant->schema_version === null || $tenant->status === StatusEnum::PROVISIONING_FAILED) {
+        if ($unavailable || blank($tenant->schema_version) || $tenant->provisioned_at === null) {
             $message = 'Cette boutique est en préparation.';
-            if (! $unavailable && app()->environment(['local', 'testing']) && config('app.debug')
+            if ($owner?->status === UserStatus::ACTIVE
+                && in_array($tenant->status, [StatusEnum::PROVISIONING, StatusEnum::PROVISIONING_FAILED, StatusEnum::ACTIVE], true)
+                && app()->environment(['local', 'testing']) && config('app.debug')
                 && in_array($request->ip(), ['127.0.0.1', '::1', '::ffff:127.0.0.1'], true)) {
                 $message .= "\nID de la boutique : ".$tenant->id."\nID du propriétaire (compte central) : ".$tenant->user_id;
             }

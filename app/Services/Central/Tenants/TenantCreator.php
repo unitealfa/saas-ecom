@@ -25,9 +25,19 @@ class TenantCreator
 
     public function create(User $actor, User $owner, TenantData $data): Tenant
     {
-        return $this->mutations->run(function () use ($actor, $owner, $data): Tenant {
+        return $this->persist($actor, $owner, $data, false);
+    }
+
+    public function createFirst(User $owner, TenantData $data): Tenant
+    {
+        return $this->persist($owner, $owner, $data, true);
+    }
+
+    private function persist(User $actor, User $owner, TenantData $data, bool $first): Tenant
+    {
+        return $this->mutations->run(function () use ($actor, $owner, $data, $first): Tenant {
             $owner = User::whereKey($owner->id)->lockForUpdate()->firstOrFail();
-            Gate::forUser($actor)->authorize('create', [Tenant::class, $owner]);
+            Gate::forUser($actor)->authorize($first ? 'createFirst' : 'create', [Tenant::class, $owner]);
             if ($owner->status !== StatusEnum::ACTIVE) {
                 throw ValidationException::withMessages(['shop_name' => 'Le compte propriétaire doit être actif.']);
             }
@@ -40,6 +50,10 @@ class TenantCreator
                 }
 
                 return $existing;
+            }
+
+            if ($first && Tenant::where('user_id', $owner->id)->exists()) {
+                throw ValidationException::withMessages(['shop_name' => 'Votre première boutique est déjà configurée.']);
             }
 
             $subscription = $this->subscriptions->ensure($owner, $actor);

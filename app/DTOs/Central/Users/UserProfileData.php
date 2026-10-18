@@ -14,5 +14,6 @@ final readonly class UserProfileData
         public string $countryUuid,
         /** @var array<string, string|int|float|null> */
         public array $attributes = [],
+        public ?string $phoneCountryUuid = null,
     ) {}
 }

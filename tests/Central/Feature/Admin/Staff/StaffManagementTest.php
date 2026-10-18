@@ -211,7 +211,7 @@ test('staff profile changes preserve role and password and report an email trans
     });
     $this->actingAs($this->admin, 'central')->get(route('central.staff.edit', $staff))->assertOk();
     $this->put(route('central.staff.update', $staff), [
-        ...staffTestProfile($staff), 'email' => 'changed-staff@example.test', 'last_name' => 'Changed', 'phone' => '0123456789',
+        ...staffTestProfile($staff), 'email' => 'changed-staff@example.test', 'last_name' => 'Changed', 'phone' => '0779107446',
     ])->assertSessionHasNoErrors()->assertSessionHas('warning');
     expect($staff->fresh()->last_name)->toBe('Changed');
     expect($staff->fresh()->email)->toBe('changed-staff@example.test');

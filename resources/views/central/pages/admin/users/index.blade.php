@@ -49,6 +49,11 @@ new #[Title('Utilisateurs')] class extends Component {
     <flux:heading size="xl" level="1">{{ __('Utilisateurs') }}</flux:heading>
     @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
     @if (session('warning'))<flux:callout variant="warning">{{ session('warning') }}</flux:callout>@endif
+    @if ($errors->any())
+        <flux:callout variant="danger" role="alert">
+            @foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach
+        </flux:callout>
+    @endif
     @if (auth('central')->user()->can('create', \App\Models\User::class) || auth('central')->user()->can('createStaff', \App\Models\User::class))
         <flux:button :href="route('central.users.create')" variant="primary">Créer un compte</flux:button>
     @endif

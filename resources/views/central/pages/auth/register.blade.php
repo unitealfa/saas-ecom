@@ -9,7 +9,17 @@
             @csrf
             <flux:input name="last_name" label="Nom de famille" :value="old('last_name')" type="text" required autofocus autocomplete="family-name" />
             <flux:input name="first_name" label="Prénom" :value="old('first_name')" type="text" autocomplete="given-name" />
-            <flux:input name="phone" label="Téléphone" :value="old('phone')" type="tel" autocomplete="tel" />
+            <flux:field>
+                <flux:label>Téléphone</flux:label>
+                <flux:select name="country_uuid" label="Pays et indicatif du téléphone" required>
+                    <option value="">Choisissez le pays du numéro</option>
+                    @foreach ($countries as $country)
+                        <option value="{{ $country->uuid }}" @selected(old('country_uuid') === $country->uuid)>{{ $country->name_fr }} ({{ $country->calling_code }})</option>
+                    @endforeach
+                </flux:select>
+                <flux:input name="phone" label="Numéro local ou international" :value="old('phone')" type="tel" autocomplete="tel" placeholder="Ex. : 0779107446 pour l’Algérie" required />
+                <flux:description>Le pays de votre profil sera initialisé avec ce choix. Votre numéro sera enregistré au format international.</flux:description>
+            </flux:field>
 
             <!-- Email Address -->
             <flux:input
@@ -23,13 +33,6 @@
             />
 
             <!-- Password -->
-            <flux:select name="country_uuid" label="Pays" required>
-                <option value="">Sélectionnez votre pays</option>
-                @foreach ($countries as $country)
-                    <option value="{{ $country->uuid }}" @selected(old('country_uuid') === $country->uuid)>{{ $country->name_fr }}</option>
-                @endforeach
-            </flux:select>
-
             <flux:input
                 name="password"
                 :label="__('Password')"

@@ -8,6 +8,7 @@
             @foreach ([
                 'Prénom' => $user->first_name, 'Nom de famille' => $user->last_name, 'E-mail' => $user->email,
                 'Téléphone' => $user->phone, 'Pays' => $user->country?->name_fr,
+                'Pays du téléphone' => $user->phoneCountry?->name_fr,
                 'Langue' => $user->getAttribute('locale'), 'État' => $user->status->label(),
                 'E-mail vérifié' => $user->hasVerifiedEmail() ? 'Oui' : 'Non',
                 'Vérification de l’e-mail' => $user->email_verified_at?->format('d/m/Y H:i'),

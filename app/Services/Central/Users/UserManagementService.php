@@ -20,6 +20,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use LogicException;
@@ -31,13 +32,16 @@ class UserManagementService
         private DefaultSubscription $subscriptions,
         private CentralUserAccess $access,
         private AccountMailDelivery $mail,
+        private UserApprovalService $approvals,
+        private PhoneNumberNormalizer $phones,
     ) {}
 
     /** @return LengthAwarePaginator<\App\Models\User> */
     public function search(User $actor, string $search, ?StatusEnum $status = null): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize('viewAny', User::class);
-        $query = \App\Models\User::query()->select(['id', 'uuid', 'first_name', 'last_name', 'email', 'status', 'email_verified_at'])
+        $query = \App\Models\User::query()->select(['id', 'uuid', 'first_name', 'last_name', 'email', 'status', 'email_verified_at',
+            'legal_verification_status', 'legal_profile_version', 'deleted_at'])
             ->with(['roles:id,uuid,label,guard_name', 'profilePhoto:id,uuid,model_type,model_id']);
         if ($status === StatusEnum::DELETED) {
             $query->onlyTrashed();
@@ -48,7 +52,12 @@ class UserManagementService
         if (trim($search) !== '') {
             $query->where(function ($query) use ($search): void {
                 $pattern = '%'.trim($search).'%';
-                $query->where('first_name', 'like', $pattern)->orWhere('last_name', 'like', $pattern)->orWhere('email', 'like', $pattern);
+                $query->where('first_name', 'like', $pattern)->orWhere('last_name', 'like', $pattern)->orWhere('email', 'like', $pattern)
+                    ->orWhere('phone', 'like', $pattern);
+                $digits = preg_replace('/[^0-9]/', '', $search);
+                if (strlen($digits) >= 5) {
+                    $query->orWhere('phone', 'like', '%'.ltrim($digits, '0').'%');
+                }
             });
         }
 
@@ -71,18 +80,32 @@ class UserManagementService
             if (! $data->staff && $data->roleUuids !== []) {
                 throw ValidationException::withMessages(['roles' => 'Un compte commerçant est créé sans rôle SaaS.']);
             }
+            if ($data->staff && $data->professionalAttributes !== []) {
+                throw ValidationException::withMessages(['legal_form' => 'Le personnel SaaS ne possède pas de dossier professionnel commerçant.']);
+            }
             $roles = $data->staff ? $this->delegableRoles($actor, $data->roleUuids) : collect();
             if ($data->staff && $roles->isEmpty()) {
                 throw ValidationException::withMessages(['roles' => 'Sélectionnez au moins un rôle pour le personnel SaaS.']);
             }
-            $country = Country::where('uuid', $data->countryUuid)->where('is_active', true)->lockForUpdate()->firstOrFail();
+            $country = Country::where('uuid', $data->countryUuid)->where('is_active', true)->lockForUpdate()->first();
+            if ($country === null) {
+                throw ValidationException::withMessages(['country_uuid' => 'Ce pays n’est plus disponible.']);
+            }
             $user = new \App\Models\User([
                 'last_name' => $data->lastName, 'first_name' => $data->firstName,
                 'email' => $data->email, 'password' => Str::random(64),
             ]);
             $user->country_id = $country->id;
-            $user->phone = $data->phone;
+            $user->forceFill($this->phoneAttributes($data->phone, $data->phoneCountryUuid, $country));
+            $user->status = StatusEnum::ACTIVE;
+            if (! $data->staff) {
+                Validator::make($data->professionalAttributes, LegalVerificationService::profileRules())->validate();
+                $user->forceFill(array_intersect_key($data->professionalAttributes, array_flip(UserProfileData::PROFESSIONAL_FIELDS)));
+            }
             $user->save();
+            if (! $data->staff) {
+                $this->approvals->approveCreatedMerchant($actor, $user);
+            }
             $this->subscriptions->ensure($user, $actor);
             if ($data->staff) {
                 $this->applyRoles($user, $roles);
@@ -103,21 +126,23 @@ class UserManagementService
 
     public function update(User $actor, User $target, UserProfileData $data, string $ability = 'update'): UserSaveResult
     {
+        abort_unless(in_array($ability, ['update', 'updateStaff', 'updateOwnProfile'], true), 403);
         $emailSent = null;
-        $user = $this->mutations->run(function () use ($actor, $target, $data, $ability, &$emailSent): User {
-            $target = User::whereKey($target->id)->lockForUpdate()->firstOrFail();
+        $mutation = function () use ($actor, $target, $data, $ability, &$emailSent): User {
+            $target = $target->newQuery()->whereKey($target->id)->lockForUpdate()->firstOrFail();
             Gate::forUser($actor)->authorize($ability, $target);
             $country = Country::where('uuid', $data->countryUuid)
                 ->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $target->country_id))->lockForUpdate()->firstOrFail();
-            $emailChanged = $target->email !== $data->email;
+            $emailChanged = $target->email !== strtolower(trim($data->email));
             $wasVerified = $target->hasVerifiedEmail();
             if ($emailChanged) {
                 Password::broker('central')->deleteToken($target);
             }
             $target->forceFill([
                 'first_name' => $data->firstName, 'last_name' => $data->lastName,
-                'email' => $data->email, 'phone' => $data->phone, 'country_id' => $country->id,
+                'email' => strtolower(trim($data->email)), 'country_id' => $country->id,
             ]);
+            $target->forceFill($this->phoneAttributes($data->phone, $data->phoneCountryUuid, $country, $target));
             $attributes = array_intersect_key($data->attributes, array_flip(['locale', ...UserProfileData::PROFESSIONAL_FIELDS]));
             if (array_intersect_key($attributes, array_flip(UserProfileData::PROFESSIONAL_FIELDS)) !== []) {
                 Gate::forUser($actor)->authorize('viewLegal', $target);
@@ -132,15 +157,16 @@ class UserManagementService
             if ($target->isDirty('phone')) {
                 $target->forceFill(['phone_verified_at' => null, 'whatsapp_verified_at' => null]);
             }
-            $hasProfessionalProfile = collect(UserProfileData::PROFESSIONAL_FIELDS)
-                ->contains(fn (string $field): bool => $target->getAttribute($field) !== null && $target->getAttribute($field) !== '');
-            if ($target->isDirty(['first_name', 'last_name', 'email', 'phone', 'country_id', ...UserProfileData::PROFESSIONAL_FIELDS])
-                && ($target->legal_profile_version !== null || $hasProfessionalProfile)) {
+            if ($target->isDirty(['first_name', 'last_name', 'email', 'phone', 'phone_country_id', 'country_id', ...UserProfileData::PROFESSIONAL_FIELDS])
+                && ! $this->access->isStaff($target)) {
                 $target->forceFill([
                     'legal_profile_version' => ($target->legal_profile_version ?? 0) + 1,
                     'legal_verification_status' => VerificationStatusEnum::PENDING,
                     'legal_verified_at' => null, 'legal_verified_by_id' => null,
                 ]);
+                if (in_array($target->status, [StatusEnum::ACTIVE, StatusEnum::REJECTED], true)) {
+                    $target->status = StatusEnum::PENDING;
+                }
             }
             $fields = array_keys($target->getDirty());
             $target->save();
@@ -154,9 +180,34 @@ class UserManagementService
                 ->withProperties(['changed_fields' => $fields])->log('Informations du compte central modifiées.');
 
             return $target;
-        });
+        };
+        $user = $ability === 'updateOwnProfile'
+            ? $target->getConnection()->transaction($mutation, 3)
+            : $this->mutations->run($mutation);
+        $target->setRawAttributes($user->getAttributes(), true)->unsetRelations();
 
         return new UserSaveResult($user, $emailSent);
+    }
+
+    /** @return array{phone: ?string, phone_country_id: ?int} */
+    private function phoneAttributes(?string $value, ?string $countryUuid, Country $profileCountry, ?User $user = null): array
+    {
+        if ($value === null || trim($value) === '') {
+            return ['phone' => null, 'phone_country_id' => null];
+        }
+        $country = $countryUuid !== null
+            ? Country::withTrashed()->where('uuid', $countryUuid)->lockForUpdate()->first()
+            : Country::withTrashed()->whereKey($user?->phone_country_id ?? $profileCountry->id)->lockForUpdate()->first();
+        $currentCountry = $user?->phone_country_id;
+        if ($country === null) {
+            throw ValidationException::withMessages(['phone_country_uuid' => 'Choisissez un pays actif pour le téléphone.']);
+        }
+        $normalized = $this->phones->normalize($value, $country->code);
+        if ((! $country->is_active || $country->trashed()) && ($currentCountry !== $country->id || $normalized !== $user?->phone)) {
+            throw ValidationException::withMessages(['phone_country_uuid' => 'Choisissez un pays actif pour un nouveau numéro.']);
+        }
+
+        return ['phone' => $normalized, 'phone_country_id' => $country->id];
     }
 
     public function resendInvitation(User $actor, User $target): UserSaveResult
@@ -191,13 +242,15 @@ class UserManagementService
                 || ($status === StatusEnum::ACTIVE && ! in_array($target->status, [StatusEnum::SUSPENDED, StatusEnum::INACTIVE], true))) {
                 throw ValidationException::withMessages(['status' => 'Cette transition de statut n’est pas disponible.']);
             }
-            $target->status = $status;
+            $target->status = $status === StatusEnum::ACTIVE && ! $this->access->isStaff($target)
+                && $target->legal_verification_status !== VerificationStatusEnum::VERIFIED
+                ? StatusEnum::PENDING : $status;
             $target->save();
             if ($status === StatusEnum::SUSPENDED) {
                 $this->invalidateAccountAccess($target);
             }
             activity()->causedBy($actor)->performedOn($target)->event('central_account_status_updated')
-                ->withProperties(['status' => $status->value])->log('État du compte central modifié.');
+                ->withProperties(['status' => $target->status->value, 'requested_status' => $status->value])->log('État du compte central modifié.');
         });
     }
 

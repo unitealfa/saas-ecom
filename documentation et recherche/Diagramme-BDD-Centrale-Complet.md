@@ -1,5 +1,7 @@
 # Diagramme complet de la BDD centrale
 
+**Coordonnées centrales, décision du 18 octobre 2026 :** un seul e-mail et un seul téléphone par compte, chacun unique dans le central, comptes archivés compris. Le téléphone est obligatoire à l’inscription publique ; les comptes historiques sans téléphone sont conservés. Cette décision remplace la demande initiale de coordonnées multiples : aucune table supplémentaire. `users.phone` devient UNIQUE, normalisé en E.164 ; `phone_country_id` désigne le pays propre au numéro, indépendamment du pays du profil. Les indicatifs viennent de libphonenumber à partir du code ISO, sans colonne redondante dans countries. Évolution préparée dans `2026_10_18_105836_add_international_phone_identity_to_users_table.php`, non appliquée : les conflits existants doivent être corrigés manuellement avant migration. Le dessin décrit cette cible, pas l’état déjà appliqué de MySQL.
+
 **Photos de profil, 13 octobre 2026 :** chaque compte possède une photo facultative et affiche public/default-avatar.svg en son absence. La photo personnelle est liée à users par media.model_type=central_user, media.model_id=users.id et collection_name=profile_photo ; au maximum un principal actif grâce à l’index existant. Ajout/remplacement/retrait dans le profil central, fichiers privés, URL signée et Policy Laravel, audit Activitylog. Aucun champ ajouté à users ni nouvelle table ; le fichier est séparé de la BDD.
 
 **Approbation confirmée le 12 octobre 2026 :** `App\Enums\Central\Users\StatusEnum` ajoute 5 PENDING et 6 REJECTED au central uniquement. Inscription publique : 5 ; approbation : 5 → 1 ; refus : 5 → 6. Les comptes existants restent inchangés ; l’invitation administrative garde le défaut 1. La migration centrale d’évolution est appliquée le 12 octobre après autorisation et tests sur MySQL temporaire. La vérification de l’e-mail et du dossier professionnel ne remplacent pas cette décision.
@@ -66,7 +68,7 @@ Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md),
 
 **Un « ? » ne signifie pas « toujours facultatif » :** une date de validation peut être vide avant validation, mais devient obligatoire après ; les champs d'abonnement/échéance dépendent du type de ligne, et un avoir exige sa facture d'origine. Les règles du schéma imposent ces obligations. Les colonnes calculées sont remplies par la BDD, sans saisie utilisateur.
 
-Les 62 liens FK couvrent toutes les colonnes marquées FK. Les 29 liens POLY sont conditionnels : subject_type, causer_type ou model_type choisissent un modèle explicitement autorisé ; aucune FK SQL universelle n’est créée. Les traits pleins participent à la PK ; les autres sont pointillés. Les FK composites, types, phases, plafonds et transactions restent obligatoires selon le schéma principal, même si le dessin montre chaque colonne séparément.
+Les 63 liens FK couvrent toutes les colonnes marquées FK. Les 29 liens POLY sont conditionnels : subject_type, causer_type ou model_type choisissent un modèle explicitement autorisé ; aucune FK SQL universelle n’est créée. Les traits pleins participent à la PK ; les autres sont pointillés. Les FK composites, types, phases, plafonds et transactions restent obligatoires selon le schéma principal, même si le dessin montre chaque colonne séparément.
 
 Les comptes et pivots utilisent central_user ; les comptes employés restent locaux. Les sujets du nouveau catalogue sont audités au central ; les décisions privées de boutique sont auditées localement. Les PDF fiscaux et preuves de virements restent dans media, avec leurs parents typés et contrôles de §7.6. Aucun bureau central ne contient les clés API, clients ou tarifs privés d’une boutique.
 
@@ -91,15 +93,16 @@ users {
   u64 id PK "AUTO_INCREMENT ; interne"
   uuid uuid UK "UUID v4 ; public"
   u64 country_id FK
+  u64 phone_country_id FK "? ; pays du telephone"
   u64 legal_verified_by_id FK "?"
   varchar email UK
+  varchar phone UK "? ; E.164"
   varchar last_name
   varchar first_name "?"
   varchar password
   text two_factor_secret "?"
   text two_factor_recovery_codes "?"
   timestamp two_factor_confirmed_at "?"
-  varchar phone "?"
   datetime email_verified_at "?"
   datetime phone_verified_at "?"
   datetime whatsapp_verified_at "?"
@@ -607,6 +610,7 @@ pickup_points {
 }
 
 countries ||..o{ users : "FK country_id"
+countries |o..o{ users : "FK phone_country_id"
 users |o..o{ users : "FK legal_verified_by_id"
 users ||..o{ tenants : "FK user_id"
 tenants ||..o{ domains : "FK tenant_id"
@@ -718,7 +722,7 @@ La liste des pays : Algérie, France, Arabie saoudite, Soudan et Égypte.
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 | `deleted_at` | La date du retrait du pays, sans effacer sa fiche ; vide tant qu’il n’est pas retiré. |
 
-### 2. `users` — 33 champs
+### 2. `users` — 34 champs
 
 Les comptes des propriétaires de boutiques et des administrateurs du SaaS : nom, e-mail, mot de passe protégé, téléphone, pays… Elle contient aussi les informations professionnelles du propriétaire.
 
@@ -727,6 +731,7 @@ Les comptes des propriétaires de boutiques et des administrateurs du SaaS : nom
 | `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `country_id` | Le pays du compte, à retrouver dans countries. |
+| `phone_country_id` | Le pays du numéro de téléphone. Il peut être différent du pays du profil et ne change pas automatiquement avec celui-ci. Vide si le compte historique n’a pas de téléphone. |
 | `legal_verified_by_id` | L’administrateur central qui a vérifié les informations professionnelles du propriétaire. |
 | `email` | Son adresse e-mail, unique parmi les comptes de cette base. |
 | `last_name` | Le nom de famille du titulaire du compte, par exemple Amrani. |
@@ -735,7 +740,7 @@ Les comptes des propriétaires de boutiques et des administrateurs du SaaS : nom
 | `two_factor_secret` | Le secret privé utilisé pour vérifier les codes de double authentification. Vide tant qu’elle n’est pas configurée. |
 | `two_factor_recovery_codes` | Les codes privés de secours pour se connecter si le moyen habituel de double authentification est indisponible. |
 | `two_factor_confirmed_at` | La date où la personne a confirmé sa double authentification. |
-| `phone` | Le numéro de téléphone du compte. |
+| `phone` | L’unique téléphone du compte, normalisé en E.164 et réservé à ce compte dans le central. Vide possible sur un compte historique ; obligatoire à l’inscription publique. |
 | `email_verified_at` | La date où l’adresse e-mail a été confirmée. |
 | `phone_verified_at` | La date où le numéro de téléphone a été confirmé. |
 | `whatsapp_verified_at` | La date où le contact WhatsApp a été confirmé. |

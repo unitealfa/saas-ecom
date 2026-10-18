@@ -43,6 +43,15 @@ test('email verification status is unchanged when email address is unchanged', f
     expect($user->refresh()->email_verified_at)->not->toBeNull();
 });
 
+test('saving an unchanged personal profile preserves the identity and administrative state', function (): void {
+    $user = User::factory()->create();
+    $identity = [$user->first_name, $user->last_name, $user->legal_profile_version, $user->status];
+    $this->actingAs($user, 'central');
+    Livewire::test('pages::settings.profile')->call('updateProfileInformation')->assertHasNoErrors();
+    $user->refresh();
+    expect([$user->first_name, $user->last_name, $user->legal_profile_version, $user->status])->toBe($identity);
+});
+
 test('user can delete their account', function () {
     $user = User::factory()->create();
 

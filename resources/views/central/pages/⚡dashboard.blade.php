@@ -33,8 +33,8 @@ new class extends Component {
         @endcan
     @else
         <flux:callout>
-            <flux:callout.heading>{{ __('La gestion des boutiques est en préparation.') }}</flux:callout.heading>
-            <flux:callout.text>{{ __('Votre compte est actif. La création et la gestion des boutiques ne sont pas encore disponibles depuis cet espace.') }}</flux:callout.text>
+            <flux:callout.heading>{{ __('Bienvenue dans votre espace commerçant.') }}</flux:callout.heading>
+            <flux:callout.text>{{ __('Votre compte est actif. Vous trouverez vos boutiques ci-dessous. La gestion interne des boutiques sera disponible dans une prochaine étape.') }}</flux:callout.text>
         </flux:callout>
         @if ($this->overview['shops']->isNotEmpty())
             <div class="space-y-3">

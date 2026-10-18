@@ -47,7 +47,10 @@ test('user management actions have a global scope without target lists', functio
 test('suspension invalidates sessions and reactivation requires its own permission', function (): void {
     $moderator = User::factory()->create();
     $moderator->assignRole(Role::createWithPermissions('suspend-only', ['saas.users.suspend' => 9999]));
-    $target = User::factory()->create();
+    $target = User::factory()->create([
+        'legal_profile_version' => 1, 'legal_verification_status' => VerificationStatusEnum::VERIFIED,
+        'legal_verified_at' => now(), 'legal_verified_by_id' => $this->admin->id,
+    ]);
     DB::table('sessions')->insert([
         'id' => 'target-session', 'user_id' => $target->id, 'payload' => '', 'last_activity' => time(),
     ]);

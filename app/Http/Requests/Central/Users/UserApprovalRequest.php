@@ -5,6 +5,8 @@ namespace App\Http\Requests\Central\Users;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
+use App\Enums\Central\Users\StatusEnum;
+use Illuminate\Validation\Rule;
 
 class UserApprovalRequest extends FormRequest
 {
@@ -14,7 +16,7 @@ class UserApprovalRequest extends FormRequest
     public function authorize(): bool
     {
         return Gate::forUser($this->user('central'))->allows(
-            $this->route()->getActionMethod() === 'approve' ? 'approve' : 'reject',
+            $this->approving() ? 'approve' : 'reject',
             $this->route('user'),
         );
     }
@@ -26,6 +28,24 @@ class UserApprovalRequest extends FormRequest
      */
     public function rules(): array
     {
-        return ['reason' => ['nullable', 'string', 'max:1000']];
+        return [
+            'expected_status' => ['required', Rule::enum(StatusEnum::class)],
+            'legal_profile_version' => ['required', 'integer', 'min:0'],
+            'reason' => $this->approving() ? ['prohibited'] : ['required', 'string', 'max:1000'],
+        ];
+    }
+
+    private function approving(): bool
+    {
+        return in_array($this->route()->getActionMethod(), ['approve', 'validateProfile'], true);
+    }
+
+    public function messages(): array
+    {
+        return [
+            'reason.required' => 'Le motif du refus est obligatoire.',
+            'expected_status.required' => 'Rechargez la fiche pour décider à partir de son état actuel.',
+            'legal_profile_version.required' => 'Rechargez la fiche pour obtenir la version actuelle du dossier.',
+        ];
     }
 }

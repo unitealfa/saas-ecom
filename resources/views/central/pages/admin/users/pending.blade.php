@@ -1,7 +1,7 @@
 <x-layouts::app :title="__('Inscriptions en attente')">
     <section class="flex flex-col gap-6">
         <flux:heading size="xl" level="1">Inscriptions en attente d’approbation</flux:heading>
-        <flux:text>Approuver autorise la connexion. L’adresse e-mail doit également être vérifiée par son propriétaire.</flux:text>
+        <flux:text>Les comptes en attente disposent d’une session limitée. Approuver leur inscription permet ensuite de configurer la première boutique, après vérification de l’adresse e-mail.</flux:text>
         @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
         @if ($errors->any())
             <flux:callout variant="danger" role="alert">

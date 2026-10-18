@@ -32,6 +32,13 @@ class TenantPolicy
         return ! $tenant->trashed() && $this->allows($actor, 'saas.tenants.update');
     }
 
+    public function createFirst(User $actor, User $owner): bool
+    {
+        return $actor->id === $owner->id && ! $owner->trashed()
+            && $owner->status === StatusEnum::ACTIVE && $owner->hasVerifiedEmail()
+            && ! $this->access->isStaff($owner);
+    }
+
     public function suspend(User $actor, Tenant $tenant): bool
     {
         return ! $tenant->trashed() && $this->allows($actor, 'saas.tenants.suspend');

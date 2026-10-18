@@ -4,6 +4,7 @@ namespace App\Http\Requests\Central\Users;
 
 use App\DTOs\Central\Users\UserProfileData;
 use App\Models\Central\User;
+use App\Services\Central\Users\LegalVerificationService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -48,15 +49,10 @@ class UpdateUserRequest extends FormRequest
             'last_name' => ['required', 'string', 'max:255'],
             'email' => ['bail', 'required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:255'],
+            'phone_country_uuid' => ['nullable', 'uuid', Rule::exists('countries', 'uuid')
+                ->where(fn ($query) => $query->where('is_active', true)->whereNull('deleted_at')->orWhere('id', $user->phone_country_id))],
             'locale' => ['sometimes', 'required', 'string', 'regex:/^[a-z]{2,3}([_-][A-Za-z]{2,4})?$/', 'max:255'],
-            'legal_form' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'activity_nature' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'nif' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'nis' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'registration_number' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'artisan_card_number' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'legal_address' => ['sometimes', 'nullable', 'string', 'max:65535'],
-            'share_capital' => ['sometimes', 'nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:999999999999.99'],
+            ...LegalVerificationService::profileRules(),
             'country_uuid' => ['required', 'uuid', Rule::exists('countries', 'uuid')->whereNull('deleted_at')
                 ->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $user->country_id))],
             'password' => ['prohibited'], 'roles' => ['prohibited'], 'status' => ['prohibited'],
@@ -75,6 +71,6 @@ class UpdateUserRequest extends FormRequest
 
         return new UserProfileData($data['last_name'], $data['first_name'] ?? null, $data['email'],
             $data['phone'] ?? null, $data['country_uuid'],
-            array_intersect_key($data, array_flip(['locale', ...UserProfileData::PROFESSIONAL_FIELDS])));
+            array_intersect_key($data, array_flip(['locale', ...UserProfileData::PROFESSIONAL_FIELDS])), $data['phone_country_uuid'] ?? null);
     }
 }

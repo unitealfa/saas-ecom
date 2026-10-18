@@ -27,7 +27,7 @@ class StoreCountryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'code' => ['required', 'string', 'regex:/^[A-Z]{2}$/', Rule::unique(Country::class, 'code')->ignore($this->route('country')?->id)],
+            'code' => ['required', 'string', 'regex:/^[A-Z]{2}$/', Rule::in(\libphonenumber\PhoneNumberUtil::getInstance()->getSupportedRegions()), Rule::unique(Country::class, 'code')->ignore($this->route('country')?->id)],
             'name_fr' => ['required', 'string', 'max:255'],
             'name_en' => ['required', 'string', 'max:255'],
             'name_ar' => ['nullable', 'string', 'max:255'],

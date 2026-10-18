@@ -30,6 +30,8 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
  * @property int $id
  * @property string $uuid
  * @property int $country_id
+ * @property int|null $phone_country_id
+ * @property Country|null $phoneCountry
  * @property string $last_name
  * @property string|null $first_name
  * @property string $name
@@ -51,7 +53,7 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
  * @property CarbonImmutable|null $updated_at
  */
 #[Fillable(['name', 'last_name', 'first_name', 'email', 'password'])]
-#[Hidden(['id', 'country_id', 'legal_verified_by_id', 'password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
+#[Hidden(['id', 'country_id', 'phone_country_id', 'legal_verified_by_id', 'password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
     protected $attributes = ['locale' => 'fr', 'status' => 1];
@@ -86,7 +88,60 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     {
         static::saving(function (self $user): void {
             $user->email = Str::lower(trim($user->email));
+            if (! $user->exists || $user->isDirty(['phone', 'phone_country_id'])) {
+                $user->normalizePhone();
+            }
         });
+    }
+
+    private function normalizePhone(): void
+    {
+        if (! $this->getConnection()->getSchemaBuilder()->hasColumn('users', 'phone_country_id')) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['phone' => 'La mise à jour des coordonnées est temporairement indisponible. Contactez l’administration.']);
+        }
+        if ($this->phone === null || trim($this->phone) === '') {
+            $this->phone = null;
+            $this->phone_country_id = null;
+        } else {
+            $countryId = $this->phone_country_id ?? $this->country_id;
+            $sameCountry = $this->exists && (int) $this->getRawOriginal('phone_country_id') === (int) $countryId;
+            $country = Country::withTrashed()->find($countryId);
+            if ($country === null) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['phone_country_uuid' => 'Choisissez un pays actif pour le téléphone.']);
+            }
+            $this->phone = app(\App\Services\Central\Users\PhoneNumberNormalizer::class)->normalize($this->phone, $country->code);
+            if ((! $country->is_active || $country->trashed()) && (! $sameCountry || $this->phone !== $this->getRawOriginal('phone'))) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['phone_country_uuid' => 'Choisissez un pays actif pour un nouveau numéro.']);
+            }
+            $this->phone_country_id = $country->id;
+            if (self::withTrashed()->where('phone', $this->phone)->when($this->exists, fn ($query) => $query->whereKeyNot($this->id))->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['phone' => 'Ce numéro est déjà attribué à un compte.']);
+            }
+        }
+        if ($this->exists && $this->isDirty('phone')) {
+            $this->phone_verified_at = null;
+            $this->whatsapp_verified_at = null;
+        }
+    }
+
+    public function save(array $options = []): bool
+    {
+        try {
+            return parent::save($options);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $exception) {
+            foreach (['phone', 'email'] as $field) {
+                if (str_contains($exception->getMessage(), 'users_'.$field.'_unique')) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([$field => 'Cette coordonnée est déjà attribuée à un compte.']);
+                }
+            }
+            throw $exception;
+        }
+    }
+
+    /** @return BelongsTo<Country, $this> */
+    public function phoneCountry(): BelongsTo
+    {
+        return $this->belongsTo(Country::class, 'phone_country_id')->withTrashed();
     }
 
     /** @return BelongsTo<Country, $this> */
@@ -125,6 +180,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             'password' => 'hashed',
             'status' => StatusEnum::class,
             'country_id' => 'integer',
+            'phone_country_id' => 'integer',
             'legal_profile_version' => 'integer',
             'legal_verification_status' => VerificationStatusEnum::class,
             'legal_verified_by_id' => 'integer',

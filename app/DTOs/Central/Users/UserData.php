@@ -13,5 +13,8 @@ final readonly class UserData
         public bool $staff,
         public array $roleUuids,
         public ?string $phone = null,
+        /** @var array<string, string|int|float|null> */
+        public array $professionalAttributes = [],
+        public ?string $phoneCountryUuid = null,
     ) {}
 }

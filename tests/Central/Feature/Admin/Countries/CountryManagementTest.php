@@ -44,6 +44,7 @@ test('a new country starts inactive and active selection is enforced during regi
     $this->get(route('register'))->assertOk()->assertSee($country->uuid);
     $this->post(route('register.store'), [
         'last_name' => 'Country Owner', 'email' => 'country-owner@example.test',
+        'phone' => '20123456',
         'password' => 'password', 'password_confirmation' => 'password', 'country_uuid' => $country->uuid,
     ])->assertSessionHasNoErrors();
     expect(User::where('email', 'country-owner@example.test')->firstOrFail()->country_id)->toBe($country->id);

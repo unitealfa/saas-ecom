@@ -14,6 +14,11 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 
+function centralDecisionPayload(User $user): array
+{
+    return ['expected_status' => $user->status->value, 'legal_profile_version' => $user->legal_profile_version ?? 0];
+}
+
 beforeEach(function (): void {
     $this->seed(AuthorizationSeeder::class);
     $this->admin = User::factory()->create();
@@ -57,20 +62,27 @@ test('professional validation records its version and reviewer and rejects a sta
         'legal_address' => 'Alger', 'registration_number' => 'RC123',
         'legal_profile_version' => 2, 'legal_verification_status' => VerificationStatusEnum::PENDING,
     ]);
-    $this->actingAs($this->admin, 'central')->post(route('central.users.legal.validate', $target), ['legal_profile_version' => 1])
+    $this->actingAs($this->admin, 'central')->post(route('central.users.legal.validate', $target), [...centralDecisionPayload($target), 'legal_profile_version' => 1])
         ->assertSessionHasErrors('legal_profile_version');
     expect($target->fresh()->legal_verification_status)->toBe(VerificationStatusEnum::PENDING);
-    $this->post(route('central.users.legal.validate', $target), ['legal_profile_version' => 2])->assertSessionHasNoErrors();
+    $this->post(route('central.users.legal.validate', $target), centralDecisionPayload($target))->assertSessionHasNoErrors();
     expect($target->fresh()->legal_verification_status)->toBe(VerificationStatusEnum::VERIFIED);
     expect($target->fresh()->getAttribute('legal_verified_by_id'))->toBe($this->admin->id);
     expect($target->fresh()->getAttribute('legal_verified_at'))->not->toBeNull();
-    $this->post(route('central.users.legal.reject', $target), ['legal_profile_version' => 2, 'reason' => 'Informations incorrectes'])
+    $this->post(route('central.users.legal.reject', $target), [...centralDecisionPayload($target), 'reason' => 'Ancien formulaire'])
+        ->assertForbidden();
+    $this->put(route('central.users.update', $target), [
+        'last_name' => $target->last_name, 'first_name' => $target->first_name, 'email' => $target->email,
+        'country_uuid' => $target->country->uuid, 'legal_address' => 'Nouvelle adresse à examiner',
+    ])->assertSessionHasNoErrors();
+    $target = $target->fresh();
+    $this->post(route('central.users.legal.reject', $target), [...centralDecisionPayload($target), 'reason' => 'Informations incorrectes'])
         ->assertSessionHasNoErrors();
     expect($target->fresh()->legal_verification_status)->toBe(VerificationStatusEnum::FAILED);
     expect($target->fresh()->getAttribute('legal_verified_at'))->toBeNull();
     $other = User::factory()->create();
     activity()->performedOn($other)->event('central_profile_updated')->log('OTHER-USER-HISTORY');
-    $this->get(route('central.users.history', $target))->assertOk()->assertSee('Vérification professionnelle rejetée.')
+    $this->get(route('central.users.history', $target))->assertOk()->assertSee('Dossier rejeté avec le refus du compte.')
         ->assertDontSee('OTHER-USER-HISTORY');
 });
 
@@ -80,8 +92,8 @@ test('an empty professional dossier can be validated with its current version', 
         'legal_profile_version' => $version, 'legal_verification_status' => VerificationStatusEnum::INCOMPLETE,
     ]);
     $this->actingAs($this->admin, 'central')->get(route('central.users.show', $target))
-        ->assertSee('Valider le dossier');
-    $this->post(route('central.users.legal.validate', $target), ['legal_profile_version' => $version ?? 0])
+        ->assertSee('>Approuver<', false)->assertDontSee('Valider le dossier');
+    $this->post(route('central.users.legal.validate', $target), centralDecisionPayload($target))
         ->assertRedirect(route('central.users.show', $target))->assertSessionHasNoErrors();
 
     $updated = $target->fresh();
@@ -94,8 +106,8 @@ test('an empty professional dossier can be validated with its current version', 
     }
     expect(Activity::forSubject($target)->where('event', 'central_legal_validated')->firstOrFail()
         ->getProperty('legal_profile_version'))->toBe($version ?? 1);
-    $this->post(route('central.users.legal.validate', $target), ['legal_profile_version' => 0])
-        ->assertSessionHasErrors('legal_profile_version');
+    $this->post(route('central.users.legal.validate', $target), [...centralDecisionPayload($target), 'legal_profile_version' => 0])
+        ->assertForbidden();
     expect(Activity::forSubject($target)->where('event', 'central_legal_validated')->count())->toBe(1);
 })->with(['first decision' => null, 'legacy incomplete dossier' => 1]);
 
@@ -153,15 +165,15 @@ test('the pending list displays contact details without other accounts or privat
         ->assertDontSee($active->email)->assertDontSee('PRIVATE-PENDING-NIF');
 });
 
-test('approval grants login access without verifying the email or professional dossier', function (): void {
+test('approval validates the dossier without verifying the email', function (): void {
     $approver = User::factory()->create();
     $approver->assignRole(Role::createWithPermissions('registration-approver', ['saas.users.approve' => 10]));
     $target = User::factory()->unverified()->create(['status' => StatusEnum::PENDING, 'legal_verification_status' => VerificationStatusEnum::INCOMPLETE]);
     $this->actingAs($approver, 'central')->get(route('central.users.pending'))->assertOk();
-    $this->post(route('central.users.approve', $target))->assertRedirect(route('central.users.pending'));
+    $this->post(route('central.users.approve', $target), centralDecisionPayload($target))->assertRedirect(route('central.users.pending'));
     expect($target->fresh()->status)->toBe(StatusEnum::ACTIVE);
     expect($target->fresh()->hasVerifiedEmail())->toBeFalse();
-    expect($target->fresh()->legal_verification_status)->toBe(VerificationStatusEnum::INCOMPLETE);
+    expect($target->fresh()->legal_verification_status)->toBe(VerificationStatusEnum::VERIFIED);
     expect(Activity::forSubject($target)->where('event', 'central_account_approved')->count())->toBe(1);
     $this->post(route('logout'));
     $this->post(route('login.store'), ['email' => $target->email, 'password' => 'password'])->assertSessionHasNoErrors();
@@ -169,16 +181,18 @@ test('approval grants login access without verifying the email or professional d
     $this->get(route('dashboard'))->assertRedirect(route('verification.notice'));
 });
 
-test('refusing an inscription keeps the account but denies subsequent login', function (): void {
+test('refusing an inscription keeps the account and limits login to refusal guidance', function (): void {
     $target = User::factory()->create(['status' => StatusEnum::PENDING]);
-    $this->actingAs($this->admin, 'central')->post(route('central.users.reject', $target), ['reason' => 'Demande refusée'])
+    $this->actingAs($this->admin, 'central')->post(route('central.users.reject', $target), [...centralDecisionPayload($target), 'reason' => 'Demande refusée'])
         ->assertRedirect(route('central.users.pending'));
     expect($target->fresh()->status)->toBe(StatusEnum::REJECTED);
     expect($target->fresh()->trashed())->toBeFalse();
     expect(Activity::forSubject($target)->where('event', 'central_account_rejected')->count())->toBe(1);
     $this->post(route('logout'));
-    $this->post(route('login.store'), ['email' => $target->email, 'password' => 'password'])->assertSessionHasErrors('email');
-    $this->assertGuest('central');
+    $this->post(route('login.store'), ['email' => $target->email, 'password' => 'password'])
+        ->assertSessionHasNoErrors()->assertRedirect(route('registration.status'));
+    $this->assertAuthenticatedAs($target, 'central');
+    $this->get(route('registration.status'))->assertOk()->assertSee('Inscription refusée')->assertSee('Demande refusée');
 });
 
 test('approval and refusal are independent permissions and ordinary readers cannot decide', function (): void {
@@ -197,7 +211,7 @@ test('approval and refusal are independent permissions and ordinary readers cann
 
 test('a decided inscription cannot be approved or refused a second time', function (): void {
     $target = User::factory()->create(['status' => StatusEnum::PENDING]);
-    $this->actingAs($this->admin, 'central')->post(route('central.users.approve', $target))->assertRedirect();
+    $this->actingAs($this->admin, 'central')->post(route('central.users.approve', $target), centralDecisionPayload($target))->assertRedirect();
     $this->post(route('central.users.reject', $target))->assertForbidden();
     $this->post(route('central.users.approve', $target))->assertForbidden();
     expect($target->fresh()->status)->toBe(StatusEnum::ACTIVE);

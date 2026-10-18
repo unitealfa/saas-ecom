@@ -56,7 +56,7 @@ class UserController extends Controller
         Gate::authorize('view', $user);
 
         return view('central.pages.admin.users.show', [
-            'user' => $user->load(['country', 'roles', 'legalVerifier']),
+            'user' => $user->load(['country', 'phoneCountry', 'roles', 'legalVerifier']),
             'subscriptions' => $user->subscriptions()->with('plan')->orderByDesc('id')->paginate(10),
             'shops' => $user->tenants()->select(['uuid', 'shop_name', 'status'])->orderBy('id')->get(),
         ]);
@@ -65,7 +65,7 @@ class UserController extends Controller
     public function edit(User $user, CentralUserAccess $access): View
     {
         Gate::authorize('update', $user);
-        $user->load(['country', 'roles']);
+        $user->load(['country', 'phoneCountry', 'roles']);
         $ownerShops = $access->isStaff($user) ? collect()
             : $user->tenants()->orderBy('activation_priority')->orderBy('id')->get();
         if ($ownerShops->isNotEmpty() && Gate::denies('updatePriorities', $ownerShops->first())) {
@@ -75,6 +75,8 @@ class UserController extends Controller
         return view('central.pages.admin.users.edit', [
             'user' => $user,
             'ownerShops' => $ownerShops,
+            'phoneCountries' => Country::withTrashed()->where(fn ($query) => $query->where('is_active', true)->whereNull('deleted_at')
+                ->orWhere('id', $user->phone_country_id))->orderBy('name_fr')->get(),
             'countries' => Country::where(fn ($query) => $query->where('is_active', true)->orWhere('id', $user->country_id))
                 ->orderBy('name_fr')->get(),
         ]);
@@ -125,7 +127,8 @@ class UserController extends Controller
         $this->userServices->changeStatus($actor, $user, $status);
 
         return redirect()->route('central.users.show', $user)
-            ->with('status', $status === StatusEnum::SUSPENDED ? 'Compte suspendu.' : 'Compte réactivé.');
+            ->with('status', $status === StatusEnum::SUSPENDED ? 'Compte suspendu.'
+                : ($user->fresh()->status === StatusEnum::PENDING ? 'Compte remis en attente : son dossier nécessite une nouvelle approbation.' : 'Compte réactivé.'));
     }
 
     public function destroy(Request $request, User $user): RedirectResponse

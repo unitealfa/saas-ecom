@@ -16,6 +16,9 @@ new #[Title('Profile settings')] class extends Component {
 
     public string $name = '';
     public string $email = '';
+    public string $phone = '';
+    public string $country_uuid = '';
+    public string $phone_country_uuid = '';
 
     /**
      * Mount the component.
@@ -24,6 +27,9 @@ new #[Title('Profile settings')] class extends Component {
     {
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
+        $this->phone = Auth::user()->phone ?? '';
+        $this->country_uuid = Auth::user()->country->uuid;
+        $this->phone_country_uuid = Auth::user()->phoneCountry?->uuid ?? $this->country_uuid;
     }
 
     /**
@@ -32,18 +38,51 @@ new #[Title('Profile settings')] class extends Component {
     public function updateProfileInformation(): void
     {
         $user = Auth::user();
+        $this->email = strtolower(trim($this->email));
 
-        $validated = $this->validate($this->profileRules($user->id));
+        $validated = $this->validate([
+            ...$this->profileRules($user->id),
+            'phone' => ['nullable', 'string', 'max:255'],
+            'country_uuid' => ['required', 'uuid'],
+            'phone_country_uuid' => ['required', 'uuid'],
+        ]);
 
-        $user->fill($validated);
+        $result = app(\App\Services\Central\Users\UserManagementService::class)->update(
+            $user, $user,
+            new \App\DTOs\Central\Users\UserProfileData(
+                trim($validated['name']) === $user->name ? $user->last_name : trim($validated['name']),
+                trim($validated['name']) === $user->name ? $user->first_name : null,
+                strtolower(trim($validated['email'])),
+                $validated['phone'] ?: null, $validated['country_uuid'], [], $validated['phone_country_uuid'],
+            ),
+            ability: 'updateOwnProfile',
+        );
+        $this->phone = $result->user->phone ?? '';
+        $this->phone_country_uuid = $result->user->phoneCountry?->uuid ?? $result->user->country->uuid;
+        if ($result->emailSent === false) {
+            Session::flash('warning', 'Le profil est enregistré, mais le message de vérification n’a pas pu être envoyé. Réessayez depuis la page de vérification.');
+        }
+        if ($result->user->status === \App\Enums\Central\Users\StatusEnum::PENDING) {
+            $this->redirect(app(\App\Services\Central\Auth\RegistrationJourney::class)->destination($result->user));
 
-        if ($user->isDirty('email')) {
-            $user->email_verified_at = null;
+            return;
         }
 
-        $user->save();
-
         Flux::toast(variant: 'success', text: __('Profile updated.'));
+    }
+
+    #[Computed]
+    public function countries()
+    {
+        return \App\Models\Central\Country::query()->where(fn ($query) => $query->where('is_active', true)
+            ->orWhere('id', Auth::user()->country_id))->orderBy('name_fr')->get();
+    }
+
+    #[Computed]
+    public function phoneCountries()
+    {
+        return \App\Models\Central\Country::withTrashed()->where(fn ($query) => $query->where('is_active', true)->whereNull('deleted_at')
+            ->orWhere('id', Auth::user()->phone_country_id))->orderBy('name_fr')->get();
     }
 
     /* @chisel-email-verification */
@@ -60,8 +99,15 @@ new #[Title('Profile settings')] class extends Component {
             return;
         }
 
-        $user->sendEmailVerificationNotification();
+        $sent = \Illuminate\Support\Facades\RateLimiter::attempt(
+            'profile-verification:'.$user->id, 5,
+            fn () => app(\App\Services\Central\Auth\AccountMailDelivery::class)->verification($user), 60,
+        );
+        if ($sent !== true) {
+            $this->addError('email', 'Le message n’a pas pu être envoyé ou la limite de demandes est atteinte. Réessayez dans une minute.');
 
+            return;
+        }
         Session::flash('status', 'verification-link-sent');
     }
 
@@ -87,6 +133,7 @@ new #[Title('Profile settings')] class extends Component {
 
     <x-pages::settings.layout :heading="__('Profile')" :subheading="__('Update your name and email address')">
         @include('central.partials.profile-photo-form')
+        @if (session('warning'))<flux:callout variant="warning">{{ session('warning') }}</flux:callout>@endif
         <form wire:submit="updateProfileInformation" class="my-6 w-full space-y-6">
             <flux:input wire:model="name" :label="__('Name')" type="text" required autofocus autocomplete="name" />
 
@@ -113,6 +160,19 @@ new #[Title('Profile settings')] class extends Component {
                 @endif
                 {{-- @end-chisel-email-verification --}}
             </div>
+
+            <flux:select wire:model="country_uuid" label="Pays du profil" required>
+                @foreach ($this->countries as $country)
+                    <option value="{{ $country->uuid }}">{{ $country->name_fr }}</option>
+                @endforeach
+            </flux:select>
+            <flux:select wire:model="phone_country_uuid" label="Pays et indicatif du téléphone" required>
+                @foreach ($this->phoneCountries as $country)
+                    <option value="{{ $country->uuid }}">{{ $country->name_fr }} ({{ $country->calling_code }}){{ $country->is_active ? '' : ' — numéro existant uniquement' }}</option>
+                @endforeach
+            </flux:select>
+            <flux:input wire:model="phone" label="Téléphone" type="tel" autocomplete="tel" placeholder="Numéro local ou international" />
+            <flux:text>Le pays du profil et celui du téléphone peuvent être différents. Changer le pays du profil ne transforme pas votre numéro.</flux:text>
 
             <div class="flex items-center gap-4">
                 <div class="flex items-center justify-end">

@@ -2,7 +2,7 @@
 Ce qui constitue une permission : une action concrète disponible dans l'administration, par exemple consulter, créer, modifier, supprimer, suspendre, approuver, attribuer, importer, exporter ou relancer.
 Ce qui ne constitue pas une permission : les validations et protections techniques, comme empêcher un administrateur de s'attribuer des droits supérieurs, vérifier l'unicité d'un UUID, contrôler une clé étrangère ou empêcher une double validation de paiement. Ces contrôles sont obligatoires dans les services et Policies, mais ils ne doivent pas devenir des cases à cocher dans la création d'un rôle.
 Autres décisions à appliquer :
-- Le commerçant n'a pas de fonctionnalités de gestion pour l'instant. On conserve uniquement sa connexion et le parcours de création de compte soumis à approbation administrative.
+- Le commerçant conserve le parcours guidé d’inscription et la configuration explicite de sa première boutique après approbation et vérification d’e-mail (décision du 18 octobre 2026). Les dashboards et la gestion fonctionnelle Tenant restent reportés. Aucun tenant n’est créé à l’inscription ni automatiquement à l’approbation.
 - Les rôles définissent des permissions globales par action, sans liste blanche ou noire de boutiques et d'utilisateurs.
 - Le module admin_restrictions doit être retiré de l'architecture cible, conformément à ta nouvelle décision.
 - Les permissions concernent uniquement la BDD centrale et utilisent le guard central.
@@ -25,14 +25,12 @@ Permission	Fonctionnalité
 saas.users.view	Consulter et rechercher les utilisateurs
 saas.users.create	Créer un compte utilisateur
 saas.users.update	Modifier un compte utilisateur
-saas.users.approve	Approuver un compte en attente d'accès
-saas.users.reject	Refuser une demande d'accès
+saas.users.approve	Approuver le compte et valider son dossier
+saas.users.reject	Refuser le compte et rejeter son dossier avec motif obligatoire
 saas.users.suspend	Suspendre un utilisateur
 saas.users.activate	Réactiver un utilisateur
 saas.users.archive	Archiver un utilisateur
 saas.users.legal.view	Consulter son dossier professionnel
-saas.users.legal.validate	Valider son dossier professionnel
-saas.users.legal.reject	Rejeter la vérification professionnelle
 saas.users.history.view	Consulter l'historique administratif d'un utilisateur
 Fichiers principaux :
 app/Models/Central/User.php
@@ -58,24 +56,27 @@ resources/views/central/pages/admin/users/
 
 
 Fonctionnalité supplémentaire : validation des inscriptions
+Décision actualisée, Missions 3–4 du 18 octobre 2026 : deux actions seulement, Approuver et Refuser. Approuver synchronise ACTIVE/VERIFIED sans motif ; Refuser synchronise REJECTED/FAILED avec un motif obligatoire. Les anciens droits legal.validate/legal.reject restent historiques et ne suffisent plus à décider via leurs anciennes routes, devenues des adaptateurs. Les formulaires transmettent l’état et la version attendus ; le service refuse les décisions doubles ou obsolètes sous verrou. Un compte refusé peut ensuite être approuvé. Les champs professionnels restent facultatifs selon la décision déjà validée, avec leurs contrôles de type et format. Un commerçant créé par un administrateur est immédiatement approuvé avec dossier validé, puis reçoit le lien sécurisé pour choisir son mot de passe et prouver son e-mail. Aucun tenant n’est créé par ces décisions ni par la création du compte. Une modification matérielle demande une nouvelle approbation cohérente, sans lever implicitement une suspension.
 Tu as également demandé dans ton fichier de notes une page permettant aux administrateurs de valider les comptes créés depuis « Create an account ».
 Le fonctionnement souhaité est le suivant :
 Formulaire Create an account
 Nom, prénom, e-mail, téléphone, pays et mot de passe selon le parcours retenu
 Compte créé en attente d'approbation
+Session limitée, modale de confirmation et e-mail de vérification automatique
+Vérification d’e-mail par lien Fortify signé, puis confirmation et retour à la connexion
 Pas d'accès aux fonctionnalités protégées tant que l'administrateur n'a pas accepté
 Administrateur SaaS
 Consulte les coordonnées et choisit Approuver ou Refuser
 Approuvé
-Compte autorisé à se connecter
+Compte vérifié guidé vers la configuration explicite de sa première boutique ; aucune création automatique. Le nom de boutique est obligatoire. Tableau de bord accessible uniquement lorsqu’au moins une boutique est ACTIVE avec sa préparation technique terminée ; sinon page de préparation.
 
 Refusé
-Compte sans accès
+Compte limité à la vérification d’e-mail et à la page de refus, sans accès métier. Le motif facultatif de l’administrateur est visible sur cette page. Le refus conserve la session limitée et peut être suivi d’une approbation (REJECTED → ACTIVE) avec saas.users.approve. La page de statut se réactualise toutes les 15 secondes lorsqu’elle est visible.
 
 
 
 
-Les deux permissions à ajouter sont donc saas.users.approve et saas.users.reject.
+Les deux permissions à utiliser sont saas.users.approve et saas.users.reject ; préserver leurs enregistrements Spatie existants.
 Attention : il faut distinguer l'approbation administrative de la vérification de l'adresse e-mail. Le schéma existant possède users.status et email_verified_at ; Codex doit vérifier comment représenter une inscription en attente et un refus sans inventer arbitrairement des valeurs d'enum ou une nouvelle table.
 Correction du double contrôle de l'adresse e-mail
 Tu as signalé qu'un utilisateur qui reçoit un lien pour choisir son mot de passe doit ensuite vérifier une deuxième fois son adresse e-mail.

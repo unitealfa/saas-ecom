@@ -5,9 +5,15 @@ namespace App\Providers;
 use App\Actions\Central\Auth\Fortify\CreateNewUser;
 use App\Actions\Central\Auth\Fortify\ResetUserPassword;
 use App\Enums\Central\Users\StatusEnum;
+use App\Http\Controllers\Central\Auth\VerificationNotificationController;
+use App\Http\Responses\Central\Auth\LoginResponse as CentralLoginResponse;
 use App\Http\Responses\Central\Auth\RegistrationResponse;
+use App\Http\Responses\Central\Auth\VerifiedEmailResponse;
 use App\Models\Central\Country;
 use App\Models\User;
+use App\Services\Central\Auth\RegistrationJourney;
+use App\Services\Central\Auth\RegistrationVerificationNotification;
+use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -16,7 +22,11 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Support\Timebox;
 use Laravel\Fortify\Contracts\RegisterResponse;
+use Laravel\Fortify\Contracts\LoginResponse;
+use Laravel\Fortify\Contracts\TwoFactorLoginResponse;
+use Laravel\Fortify\Contracts\VerifyEmailResponse;
 use Laravel\Fortify\Fortify;
+use Laravel\Fortify\Http\Controllers\EmailVerificationNotificationController;
 use Laravel\Passkeys\Contracts\PasskeyUser;
 use Laravel\Passkeys\Passkeys;
 
@@ -28,6 +38,11 @@ class FortifyServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(RegisterResponse::class, RegistrationResponse::class);
+        $this->app->bind(SendEmailVerificationNotification::class, RegistrationVerificationNotification::class);
+        $this->app->bind(EmailVerificationNotificationController::class, VerificationNotificationController::class);
+        $this->app->singleton(LoginResponse::class, CentralLoginResponse::class);
+        $this->app->singleton(TwoFactorLoginResponse::class, CentralLoginResponse::class);
+        $this->app->singleton(VerifyEmailResponse::class, VerifiedEmailResponse::class);
     }
 
     /**
@@ -61,7 +76,7 @@ class FortifyServiceProvider extends ServiceProvider
                 $password = $request->string('password')->toString();
                 $user = User::where('email', $email)->first();
 
-                if ($user === null || $user->status !== StatusEnum::ACTIVE || ! Hash::check($password, $user->password)) {
+                if ($user === null || ! app(RegistrationJourney::class)->mayAuthenticate($user) || ! Hash::check($password, $user->password)) {
                     return null;
                 }
 

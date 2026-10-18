@@ -23,4 +23,9 @@ class Country extends Model
     {
         return ['is_active' => 'boolean'];
     }
+
+    public function getCallingCodeAttribute(): ?string
+    {
+        return app(\App\Services\Central\Users\PhoneNumberNormalizer::class)->callingCode($this->code);
+    }
 }

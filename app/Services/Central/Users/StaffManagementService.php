@@ -34,7 +34,12 @@ class StaffManagementService
         if (trim($search) !== '') {
             $query->where(function ($query) use ($search): void {
                 $pattern = '%'.trim($search).'%';
-                $query->where('first_name', 'like', $pattern)->orWhere('last_name', 'like', $pattern)->orWhere('email', 'like', $pattern);
+                $query->where('first_name', 'like', $pattern)->orWhere('last_name', 'like', $pattern)->orWhere('email', 'like', $pattern)
+                    ->orWhere('phone', 'like', $pattern);
+                $digits = preg_replace('/[^0-9]/', '', $search);
+                if (strlen($digits) >= 5) {
+                    $query->orWhere('phone', 'like', '%'.ltrim($digits, '0').'%');
+                }
             });
         }
 

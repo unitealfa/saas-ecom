@@ -2,25 +2,7 @@
 
 namespace App\Http\Requests\Central\Users;
 
-use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Facades\Gate;
-
-class LegalVerificationRequest extends FormRequest
+class LegalVerificationRequest extends UserApprovalRequest
 {
-    public function authorize(): bool
-    {
-        return Gate::forUser($this->user('central'))->allows(
-            $this->route()->getActionMethod() === 'validateProfile' ? 'validateLegal' : 'rejectLegal',
-            $this->route('user'),
-        );
-    }
-
-    /** @return array<string, mixed> */
-    public function rules(): array
-    {
-        return [
-            'legal_profile_version' => ['required', 'integer', 'min:0'],
-            'reason' => ['nullable', 'string', 'max:1000'],
-        ];
-    }
+    // Compatibilité des anciennes routes : même validation et même décision complète.
 }

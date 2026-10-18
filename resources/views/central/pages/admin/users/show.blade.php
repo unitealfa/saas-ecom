@@ -13,6 +13,7 @@
                 'Prénom' => $user->first_name, 'Nom de famille' => $user->last_name,
                 'E-mail' => $user->email, 'Téléphone' => $user->phone,
                 'Pays' => $user->country?->name_fr,
+                'Pays du téléphone' => $user->phoneCountry?->name_fr,
                 'Langue du compte' => $user->getAttribute('locale'),
                 'Type de compte' => $user->roles->isEmpty() ? 'Commerçant' : 'Personnel SaaS',
                 'État' => $user->status->label(),
@@ -45,7 +46,7 @@
         @endif
         @can('viewLegal', $user)
             <flux:heading level="2">Informations professionnelles</flux:heading>
-            <flux:text>Ces informations sont facultatives. Vous pouvez valider le dossier même si elles ne sont pas renseignées.</flux:text>
+            <flux:text>Ces informations sont facultatives. L’action Approuver valide aussi le dossier ; Refuser le rejette avec un motif obligatoire.</flux:text>
             <dl class="grid gap-4 sm:grid-cols-2">
                 @foreach ([
                     'Forme juridique' => $user->getAttribute('legal_form'),
@@ -70,20 +71,6 @@
                     <div><dt class="font-medium">{{ $label }}</dt><dd><flux:text>{{ $value ?? 'Non renseigné' }}</flux:text></dd></div>
                 @endforeach
             </dl>
-            @if (! $user->trashed())
-                <div class="flex flex-col gap-4">
-                    @foreach (['validateLegal' => ['central.users.legal.validate', 'Valider le dossier'], 'rejectLegal' => ['central.users.legal.reject', 'Rejeter le dossier']] as $ability => [$action, $label])
-                        @can($ability, $user)
-                            <form method="POST" action="{{ route($action, $user) }}" class="flex flex-col gap-3">
-                                @csrf
-                                <input type="hidden" name="legal_profile_version" value="{{ $user->legal_profile_version ?? 0 }}">
-                                <flux:textarea name="reason" label="Motif (facultatif)" />
-                                <flux:button type="submit">{{ $label }}</flux:button>
-                            </form>
-                        @endcan
-                    @endforeach
-                </div>
-            @endif
         @endcan
         <flux:heading level="2">Abonnements</flux:heading>
         @forelse ($subscriptions as $subscription)

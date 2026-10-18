@@ -24,16 +24,17 @@ test('new users can register', function () {
     $response = $this->post(route('register.store'), [
         'first_name' => 'John', 'last_name' => 'Doe',
         'email' => 'test@example.com',
+        'phone' => '0779107446',
         'password' => 'password',
         'password_confirmation' => 'password',
         'country_uuid' => Country::where('code', 'DZ')->firstOrFail()->uuid,
     ]);
 
     $response->assertSessionHasNoErrors()
-        ->assertRedirect(route('login'))
-        ->assertSessionHas('status');
+        ->assertRedirect(route('verification.notice'))
+        ->assertSessionHas('registration_created');
 
-    $this->assertGuest('central');
+    $this->assertAuthenticated('central');
     $user = User::where('email', 'test@example.com')->firstOrFail();
     expect($user->status)->toBe(StatusEnum::PENDING);
     expect($user->hasVerifiedEmail())->toBeFalse();
@@ -44,16 +45,16 @@ test('public registration cannot inject an approved status or privileged fields'
     Notification::fake();
     $this->seed(CountrySeeder::class);
     $this->postJson(route('register.store'), [
-        'last_name' => 'Public', 'email' => 'public@example.test', 'phone' => '0123456789',
+        'last_name' => 'Public', 'email' => 'public@example.test', 'phone' => '0779107446',
         'password' => 'password', 'password_confirmation' => 'password',
         'country_uuid' => Country::where('code', 'DZ')->firstOrFail()->uuid,
         'status' => 1, 'email_verified_at' => now()->toDateTimeString(), 'roles' => ['root'],
     ])->assertCreated()->assertJsonPath('status', 5);
-    $this->assertGuest('central');
+    $this->assertAuthenticated('central');
     $target = User::where('email', 'public@example.test')->firstOrFail();
     expect($target->status)->toBe(StatusEnum::PENDING);
     expect($target->hasVerifiedEmail())->toBeFalse();
     expect($target->roles()->exists())->toBeFalse();
-    expect($target->phone)->toBe('0123456789');
+    expect($target->phone)->toBe('+213779107446');
     Notification::assertSentTo($target, VerifyEmail::class);
 });

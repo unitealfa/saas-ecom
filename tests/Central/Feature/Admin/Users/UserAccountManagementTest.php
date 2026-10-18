@@ -250,9 +250,9 @@ test('optional professional fields can all be cleared and the dossier validated 
         ->and($updated->legal_verification_status)->toBe(VerificationStatusEnum::PENDING)
         ->and($updated->legal_verified_at)->toBeNull()
         ->and($updated->getAttribute('legal_verified_by_id'))->toBeNull();
-    $this->post(route('central.users.legal.validate', $target), ['legal_profile_version' => 1])
+    $this->post(route('central.users.legal.validate', $target), ['expected_status' => $updated->status->value, 'legal_profile_version' => 1])
         ->assertSessionHasErrors('legal_profile_version');
-    $this->post(route('central.users.legal.validate', $target), ['legal_profile_version' => 2])
+    $this->post(route('central.users.legal.validate', $target), ['expected_status' => $updated->status->value, 'legal_profile_version' => 2])
         ->assertSessionHasNoErrors();
     expect($target->fresh()->legal_verification_status)->toBe(VerificationStatusEnum::VERIFIED);
 });

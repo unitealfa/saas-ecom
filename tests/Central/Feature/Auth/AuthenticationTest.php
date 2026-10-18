@@ -25,7 +25,7 @@ test('users can authenticate using the login screen', function () {
 
     $response
         ->assertSessionHasNoErrors()
-        ->assertRedirect(route('dashboard', absolute: false));
+        ->assertRedirect(route('owner.first-shop'));
 
     $this->assertAuthenticatedAs($user, 'central');
     $this->assertGuest('tenant');
@@ -53,7 +53,7 @@ test('login accepts an email with surrounding spaces and uppercase letters', fun
     $this->post(route('login.store'), [
         'email' => '  MERCHANT@EXAMPLE.TEST  ',
         'password' => 'password',
-    ])->assertSessionHasNoErrors()->assertRedirect(route('dashboard', absolute: false));
+    ])->assertSessionHasNoErrors()->assertRedirect(route('owner.first-shop'));
 
     $this->assertAuthenticatedAs($user, 'central');
 });
@@ -67,7 +67,7 @@ test('login updates an outdated password hash without changing the password', fu
     $this->post(route('login.store'), [
         'email' => $user->email,
         'password' => 'password',
-    ])->assertSessionHasNoErrors()->assertRedirect(route('dashboard', absolute: false));
+    ])->assertSessionHasNoErrors()->assertRedirect(route('owner.first-shop'));
 
     $newHash = $user->fresh()->password;
     expect($newHash)->not->toBe($oldHash);
@@ -85,13 +85,22 @@ test('login rejects an unknown central account with the same credentials error',
     $this->assertGuest('central');
 });
 
-test('non-active central accounts cannot log in with a valid password', function (StatusEnum $status): void {
+test('central login respects administrative account status', function (StatusEnum $status): void {
     $user = User::factory()->create(['status' => $status]);
 
-    $this->post(route('login.store'), [
+    $response = $this->post(route('login.store'), [
         'email' => $user->email,
         'password' => 'password',
-    ])->assertSessionHasErrors(['email' => __('auth.failed')]);
+    ]);
+
+    if (in_array($status, [StatusEnum::PENDING, StatusEnum::REJECTED], true)) {
+        $response->assertSessionHasNoErrors()->assertRedirect(route('registration.status'));
+        $this->assertAuthenticatedAs($user, 'central');
+        $this->get(route('registration.status'))->assertOk();
+
+        return;
+    }
+    $response->assertSessionHasErrors(['email' => __('auth.failed')]);
 
     $this->assertGuest('central');
 })->with([
@@ -186,10 +195,15 @@ test('users can logout', function () {
     $this->assertGuest();
 });
 
-test('a stale pending session cannot access protected settings or Fortify account endpoints', function (string $routeName): void {
-    $user = User::factory()->create(['status' => StatusEnum::PENDING]);
-    $this->actingAs($user, 'central')->get(route($routeName))->assertForbidden();
-    $this->assertGuest('central');
+test('a pending session is limited to email verification and registration guidance', function (string $routeName): void {
+    $user = User::factory()->unverified()->create(['status' => StatusEnum::PENDING]);
+    $response = $this->actingAs($user, 'central')->get(route($routeName));
+    if ($routeName === 'verification.notice') {
+        $response->assertOk();
+    } else {
+        $response->assertRedirect(route('verification.notice'));
+    }
+    $this->assertAuthenticatedAs($user, 'central');
 })->with(['profile.edit', 'password.confirm', 'verification.notice', 'dashboard']);
 
 test('an account disabled during its two factor challenge does not remain authenticated', function (): void {

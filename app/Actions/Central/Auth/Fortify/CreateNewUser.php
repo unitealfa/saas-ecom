@@ -4,6 +4,7 @@ namespace App\Actions\Central\Auth\Fortify;
 
 use App\Concerns\PasswordValidationRules;
 use App\Enums\Central\Users\StatusEnum;
+use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Country;
 use App\Models\User;
 use App\Services\Central\Subscriptions\DefaultSubscription;
@@ -37,7 +38,7 @@ class CreateNewUser implements CreatesNewUsers
             'first_name' => ['nullable', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique(User::class, 'email')],
-            'phone' => ['nullable', 'string', 'max:255'],
+            'phone' => ['required', 'string', 'max:255'],
             'password' => $this->passwordRules(),
             'country_uuid' => ['required', 'uuid', Rule::exists(Country::class, 'uuid')->where('is_active', true)->whereNull('deleted_at')],
         ])->validate();
@@ -56,6 +57,8 @@ class CreateNewUser implements CreatesNewUsers
             $user->country_id = $country->id;
             $user->phone = $input['phone'] ?? null;
             $user->status = StatusEnum::PENDING;
+            $user->legal_profile_version = 1;
+            $user->legal_verification_status = VerificationStatusEnum::PENDING;
             $user->save();
             $this->subscriptions->ensure($user);
             activity()->performedOn($user)->event('central_registration_requested')

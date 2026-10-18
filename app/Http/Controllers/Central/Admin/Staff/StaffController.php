@@ -44,7 +44,7 @@ class StaffController extends Controller
     {
         Gate::authorize('viewStaff', $user);
 
-        return view('central.pages.admin.staff.show', ['user' => $user->load(['country', 'roles'])]);
+        return view('central.pages.admin.staff.show', ['user' => $user->load(['country', 'phoneCountry', 'roles'])]);
     }
 
     public function edit(User $user): View
@@ -52,7 +52,9 @@ class StaffController extends Controller
         Gate::authorize('updateStaff', $user);
 
         return view('central.pages.admin.staff.edit', [
-            'user' => $user->load('country'),
+            'user' => $user->load(['country', 'phoneCountry']),
+            'phoneCountries' => Country::withTrashed()->where(fn ($query) => $query->where('is_active', true)->whereNull('deleted_at')
+                ->orWhere('id', $user->phone_country_id))->orderBy('name_fr')->get(),
             'countries' => Country::where(fn ($query) => $query->where('is_active', true)->orWhere('id', $user->country_id))
                 ->orderBy('name_fr')->get(),
         ]);
