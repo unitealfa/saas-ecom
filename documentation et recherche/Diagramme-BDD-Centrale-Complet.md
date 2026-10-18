@@ -739,15 +739,15 @@ Les comptes des propriétaires de boutiques et des administrateurs du SaaS : nom
 | `email_verified_at` | La date où l’adresse e-mail a été confirmée. |
 | `phone_verified_at` | La date où le numéro de téléphone a été confirmé. |
 | `whatsapp_verified_at` | La date où le contact WhatsApp a été confirmé. |
-| `legal_form` | La forme juridique déclarée de l’activité ou de l’entreprise. |
-| `activity_nature` | Le genre d’activité professionnelle exercée par le propriétaire. |
-| `nif` | Le numéro d’identification fiscale du professionnel. |
-| `nis` | Le numéro d’identification statistique du professionnel. |
-| `registration_number` | Le numéro d’immatriculation professionnelle, par exemple le registre du commerce. |
-| `artisan_card_number` | Le numéro de carte d’artisan si ce document concerne cette activité. |
-| `legal_address` | L’adresse professionnelle officielle du propriétaire ou de son entreprise. |
+| `legal_form` | La forme juridique déclarée de l’activité ou de l’entreprise. Facultative, même pour valider le dossier. |
+| `activity_nature` | Le genre d’activité professionnelle exercée par le propriétaire. Facultatif. |
+| `nif` | Le numéro d’identification fiscale du professionnel. Facultatif. |
+| `nis` | Le numéro d’identification statistique du professionnel. Facultatif. |
+| `registration_number` | Le numéro d’immatriculation professionnelle, par exemple le registre du commerce. Facultatif. |
+| `artisan_card_number` | Le numéro de carte d’artisan si ce document concerne cette activité. Facultatif. |
+| `legal_address` | L’adresse professionnelle du propriétaire ou de son entreprise. Facultative. |
 | `share_capital` | Le montant du capital de l’entreprise, lorsque cette information s’applique. |
-| `legal_profile_version` | Le numéro de version du dossier professionnel. Il augmente quand les informations importantes changent. |
+| `legal_profile_version` | Le numéro de version du dossier professionnel. Il commence à 1 au premier dossier ou à sa première validation/décision, même sans informations facultatives, puis augmente quand les informations importantes changent. |
 | `legal_verification_status` | L’état de vérification du dossier professionnel. Choix : 1 = en attente ; 2 = vérifié ; 3 = échec ; 4 = expiré ; 5 = incomplet. |
 | `legal_verified_at` | La date où le dossier professionnel a été validé. |
 | `locale` | La langue choisie pour utiliser le SaaS. Exemple : français ou arabe. |

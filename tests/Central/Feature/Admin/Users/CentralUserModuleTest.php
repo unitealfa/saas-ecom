@@ -1,5 +1,6 @@
 <?php
 
+use App\DTOs\Central\Users\UserProfileData;
 use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Activity;
@@ -73,12 +74,30 @@ test('professional validation records its version and reviewer and rejects a sta
         ->assertDontSee('OTHER-USER-HISTORY');
 });
 
-test('an incomplete professional dossier cannot be validated', function (): void {
-    $target = User::factory()->create(['legal_profile_version' => 1, 'legal_verification_status' => VerificationStatusEnum::INCOMPLETE]);
-    $this->actingAs($this->admin, 'central')->post(route('central.users.legal.validate', $target), ['legal_profile_version' => 1])
-        ->assertSessionHasErrors('legal');
-    expect($target->fresh()->legal_verification_status)->toBe(VerificationStatusEnum::INCOMPLETE);
-});
+test('an empty professional dossier can be validated with its current version', function (?int $version): void {
+    $target = User::factory()->create([
+        ...array_fill_keys(UserProfileData::PROFESSIONAL_FIELDS, null),
+        'legal_profile_version' => $version, 'legal_verification_status' => VerificationStatusEnum::INCOMPLETE,
+    ]);
+    $this->actingAs($this->admin, 'central')->get(route('central.users.show', $target))
+        ->assertSee('Valider le dossier');
+    $this->post(route('central.users.legal.validate', $target), ['legal_profile_version' => $version ?? 0])
+        ->assertRedirect(route('central.users.show', $target))->assertSessionHasNoErrors();
+
+    $updated = $target->fresh();
+    expect($updated->legal_verification_status)->toBe(VerificationStatusEnum::VERIFIED)
+        ->and($updated->legal_profile_version)->toBe($version ?? 1)
+        ->and($updated->getAttribute('legal_verified_by_id'))->toBe($this->admin->id)
+        ->and($updated->legal_verified_at)->not->toBeNull();
+    foreach (UserProfileData::PROFESSIONAL_FIELDS as $field) {
+        expect($updated->getAttribute($field))->toBeNull();
+    }
+    expect(Activity::forSubject($target)->where('event', 'central_legal_validated')->firstOrFail()
+        ->getProperty('legal_profile_version'))->toBe($version ?? 1);
+    $this->post(route('central.users.legal.validate', $target), ['legal_profile_version' => 0])
+        ->assertSessionHasErrors('legal_profile_version');
+    expect(Activity::forSubject($target)->where('event', 'central_legal_validated')->count())->toBe(1);
+})->with(['first decision' => null, 'legacy incomplete dossier' => 1]);
 
 test('an invitation token verifies the current email once without a second verification message', function (): void {
     Notification::fake();

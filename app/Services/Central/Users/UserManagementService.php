@@ -136,14 +136,9 @@ class UserManagementService
                 ->contains(fn (string $field): bool => $target->getAttribute($field) !== null && $target->getAttribute($field) !== '');
             if ($target->isDirty(['first_name', 'last_name', 'email', 'phone', 'country_id', ...UserProfileData::PROFESSIONAL_FIELDS])
                 && ($target->legal_profile_version !== null || $hasProfessionalProfile)) {
-                $professionalChanged = $target->isDirty(UserProfileData::PROFESSIONAL_FIELDS);
-                $complete = ! $professionalChanged && $target->legal_profile_version !== null
-                    ? $target->legal_verification_status !== VerificationStatusEnum::INCOMPLETE
-                    : filled($target->legal_form) && filled($target->activity_nature) && filled($target->legal_address)
-                        && (filled($target->getAttribute('registration_number')) || filled($target->getAttribute('artisan_card_number')));
                 $target->forceFill([
                     'legal_profile_version' => ($target->legal_profile_version ?? 0) + 1,
-                    'legal_verification_status' => $complete ? VerificationStatusEnum::PENDING : VerificationStatusEnum::INCOMPLETE,
+                    'legal_verification_status' => VerificationStatusEnum::PENDING,
                     'legal_verified_at' => null, 'legal_verified_by_id' => null,
                 ]);
             }

@@ -17,26 +17,22 @@ class LegalVerificationService
         $this->mutations->run(function () use ($actor, $target, $version, $validated, $reason): void {
             $target = User::whereKey($target->id)->lockForUpdate()->firstOrFail();
             Gate::forUser($actor)->authorize($validated ? 'validateLegal' : 'rejectLegal', $target);
-            if ($version < 1 || $target->legal_profile_version !== $version) {
+            if ($version < 0 || ($target->legal_profile_version ?? 0) !== $version) {
                 throw ValidationException::withMessages(['legal_profile_version' => 'Le dossier a changé. Rechargez sa fiche avant de décider.']);
             }
             $status = $validated ? VerificationStatusEnum::VERIFIED : VerificationStatusEnum::FAILED;
             if ($target->legal_verification_status === $status) {
                 throw ValidationException::withMessages(['legal' => 'Cette décision est déjà enregistrée.']);
             }
-            if ($validated && (! filled($target->legal_form) || ! filled($target->activity_nature)
-                || ! filled($target->legal_address)
-                || (! filled($target->getAttribute('registration_number')) && ! filled($target->getAttribute('artisan_card_number'))))) {
-                throw ValidationException::withMessages(['legal' => 'Complétez la forme juridique, l’activité, l’adresse et le registre de commerce ou la carte artisan avant validation.']);
-            }
             $target->forceFill([
+                'legal_profile_version' => $target->legal_profile_version ?? 1,
                 'legal_verification_status' => $status,
                 'legal_verified_at' => $validated ? now() : null,
                 'legal_verified_by_id' => $validated ? $actor->id : null,
             ])->save();
             activity()->causedBy($actor)->performedOn($target)
                 ->event($validated ? 'central_legal_validated' : 'central_legal_rejected')
-                ->withProperties(['legal_profile_version' => $version, 'reason' => $reason])
+                ->withProperties(['legal_profile_version' => $target->legal_profile_version, 'reason' => $reason])
                 ->log($validated ? 'Dossier professionnel validé.' : 'Vérification professionnelle rejetée.');
         });
     }

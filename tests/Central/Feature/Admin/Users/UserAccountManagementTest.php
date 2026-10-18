@@ -1,5 +1,6 @@
 <?php
 
+use App\DTOs\Central\Users\UserProfileData;
 use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Activity;
 use App\Models\Central\Country;
@@ -213,7 +214,7 @@ test('changing the email removes the old password token and requires verificatio
     Notification::assertSentTo(App\Models\Central\User::findOrFail($target->id), VerifyEmail::class);
 });
 
-test('editing an unverified account sends a fresh invitation to its new address and keeps incomplete legal status', function (): void {
+test('editing an unverified account sends a fresh invitation and requests a new professional review', function (): void {
     $target = User::factory()->unverified()->create();
     $target->forceFill(['legal_profile_version' => 1, 'legal_verification_status' => VerificationStatusEnum::INCOMPLETE])->save();
     Password::broker('central')->createToken($target);
@@ -221,10 +222,39 @@ test('editing an unverified account sends a fresh invitation to its new address 
         ...editableCentralProfile($target), 'email' => 'new-invited@example.test',
     ])->assertSessionHasNoErrors();
     $updated = $target->fresh();
-    expect($updated->legal_verification_status)->toBe(VerificationStatusEnum::INCOMPLETE);
+    expect($updated->legal_verification_status)->toBe(VerificationStatusEnum::PENDING);
     expect($updated->legal_profile_version)->toBe(2);
     expect(DB::table('password_reset_tokens')->where('email', $target->email)->exists())->toBeFalse();
     Notification::assertSentTo(App\Models\Central\User::findOrFail($target->id), AccountInvitation::class);
+});
+
+test('optional professional fields can all be cleared and the dossier validated again', function (): void {
+    $target = User::factory()->create([
+        'legal_form' => 'SARL', 'activity_nature' => 'Vente', 'legal_address' => 'Alger',
+        'nif' => '00123', 'nis' => '00456', 'registration_number' => 'RC-TEST', 'artisan_card_number' => 'ART-TEST',
+        'legal_profile_version' => 1, 'legal_verification_status' => VerificationStatusEnum::VERIFIED,
+        'legal_verified_at' => now(), 'legal_verified_by_id' => $this->admin->id,
+    ]);
+    $this->actingAs($this->admin, 'central')->get(route('central.users.edit', $target))
+        ->assertSee('Numéro d’identification fiscale')->assertSee('Numéro d’identification statistique')
+        ->assertSee('Ex. fictif : RC-EXEMPLE-001')->assertSee('Adresse professionnelle (facultatif)');
+    $this->put(route('central.users.update', $target), [
+        ...editableCentralProfile($target),
+        ...array_fill_keys(UserProfileData::PROFESSIONAL_FIELDS, ''),
+    ])->assertSessionHasNoErrors();
+    $updated = $target->fresh();
+    foreach (UserProfileData::PROFESSIONAL_FIELDS as $field) {
+        expect($updated->getAttribute($field))->toBeNull();
+    }
+    expect($updated->legal_profile_version)->toBe(2)
+        ->and($updated->legal_verification_status)->toBe(VerificationStatusEnum::PENDING)
+        ->and($updated->legal_verified_at)->toBeNull()
+        ->and($updated->getAttribute('legal_verified_by_id'))->toBeNull();
+    $this->post(route('central.users.legal.validate', $target), ['legal_profile_version' => 1])
+        ->assertSessionHasErrors('legal_profile_version');
+    $this->post(route('central.users.legal.validate', $target), ['legal_profile_version' => 2])
+        ->assertSessionHasNoErrors();
+    expect($target->fresh()->legal_verification_status)->toBe(VerificationStatusEnum::VERIFIED);
 });
 
 test('edit validation rejects duplicates malformed fields inactive countries and privilege injection', function (): void {

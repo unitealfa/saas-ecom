@@ -19,7 +19,7 @@ class LegalVerificationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'legal_profile_version' => ['required', 'integer', 'min:1'],
+            'legal_profile_version' => ['required', 'integer', 'min:0'],
             'reason' => ['nullable', 'string', 'max:1000'],
         ];
     }

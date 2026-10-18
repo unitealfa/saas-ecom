@@ -23,16 +23,19 @@
             <flux:input name="locale" label="Langue du compte (fr, en, ar…)" :value="old('locale', $user->getAttribute('locale'))" required />
             @can('viewLegal', $user)
                 <flux:heading level="2">Informations professionnelles</flux:heading>
-                <flux:text>Toute modification du dossier vendeur demande une nouvelle vérification. Les documents historiques conservent leur identité d’origine.</flux:text>
+                <flux:text>Tous ces champs sont facultatifs, même pour valider le dossier professionnel. Toute modification des informations du dossier demande une nouvelle vérification. Les exemples sont illustratifs : saisissez vos propres informations si vous souhaitez les renseigner.</flux:text>
                 @foreach ([
-                    'legal_form' => 'Forme juridique', 'activity_nature' => 'Nature de l’activité',
-                    'nif' => 'NIF', 'nis' => 'NIS', 'registration_number' => 'Registre de commerce',
-                    'artisan_card_number' => 'Carte artisan',
-                ] as $field => $label)
-                    <flux:input :name="$field" :label="$label" :value="old($field, $user->getAttribute($field))" />
+                    'legal_form' => ['Forme juridique', 'Le statut sous lequel vous exercez votre activité.', 'Ex. : entreprise individuelle, EURL ou SARL'],
+                    'activity_nature' => ['Nature de l’activité', 'Décrivez simplement les produits vendus ou votre activité.', 'Ex. : vente de vêtements en ligne'],
+                    'nif' => ['NIF', 'Numéro d’identification fiscale : recopiez celui de votre document fiscal, en conservant les zéros au début.', 'Ex. fictif : 000123456789012'],
+                    'nis' => ['NIS', 'Numéro d’identification statistique : recopiez celui de votre document statistique, en conservant les zéros au début.', 'Ex. fictif : 000987654321098'],
+                    'registration_number' => ['Registre de commerce', 'Le numéro inscrit sur votre registre de commerce. Recopiez-le tel qu’il apparaît.', 'Ex. fictif : RC-EXEMPLE-001'],
+                    'artisan_card_number' => ['Carte artisan', 'Le numéro inscrit sur votre carte professionnelle d’artisan, si vous en possédez une.', 'Ex. fictif : ART-EXEMPLE-001'],
+                ] as $field => [$label, $description, $placeholder])
+                    <flux:input :name="$field" :label="$label.' (facultatif)'" :description="$description" :placeholder="$placeholder" :value="old($field, $user->getAttribute($field))" />
                 @endforeach
-                <flux:textarea name="legal_address" label="Adresse professionnelle">{{ old('legal_address', $user->getAttribute('legal_address')) }}</flux:textarea>
-                <flux:input type="number" name="share_capital" label="Capital social (facultatif)" min="0" step="0.01" :value="old('share_capital', $user->getAttribute('share_capital'))" />
+                <flux:textarea name="legal_address" label="Adresse professionnelle (facultatif)" description="L’adresse où votre activité est établie : numéro, rue, commune, wilaya ou région et pays." placeholder="Ex. fictif : 12 rue des Oliviers, Bab Ezzouar, Alger, Algérie">{{ old('legal_address', $user->getAttribute('legal_address')) }}</flux:textarea>
+                <flux:input type="number" name="share_capital" label="Capital social (facultatif)" description="Le montant du capital de votre société, si applicable. Laissez vide si cela ne vous concerne pas." placeholder="Ex. : 100000.00" min="0" step="0.01" :value="old('share_capital', $user->getAttribute('share_capital'))" />
             @endcan
             <flux:text>Les rôles se gèrent avec le bouton Rôles ; l’état du compte avec Suspendre ou Réactiver. Les abonnements et les validations sont consultables sur la fiche et ne sont pas modifiés par ce formulaire.</flux:text>
             <div class="flex flex-wrap gap-3">
