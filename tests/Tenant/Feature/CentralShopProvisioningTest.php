@@ -19,7 +19,8 @@ test('the durable central queue provisions two isolated MySQL shops with real ow
     $this->seed(AuthorizationSeeder::class);
     $admin = User::factory()->create();
     $admin->assignRole(Role::findByName('root', 'central'));
-    $owner = User::factory()->create();
+    $owner = User::factory()->create(['legal_profile_version' => 1,
+        'legal_verification_status' => \App\Enums\VerificationStatusEnum::VERIFIED, 'legal_verified_at' => now(), 'legal_verified_by_id' => $admin->id]);
     $databases = [];
 
     try {
@@ -41,6 +42,7 @@ test('the durable central queue provisions two isolated MySQL shops with real ow
         expect(TenantSchemaDeployment::where('status', StatusEnum::SUCCEEDED)->count())->toBe(2);
         expect(DB::table('failed_jobs')->count())->toBe(0);
         foreach (Tenant::where('user_id', $owner->id)->get() as $tenant) {
+            expect($tenant->status)->toBe(\App\Enums\Central\Tenants\StatusEnum::ACTIVE);
             expect($tenant->schema_version)->not->toBeNull();
             $tenant->run(function () use ($tenant, $owner): void {
                 expect(Shop::count())->toBe(1);

@@ -20,7 +20,7 @@ class StaffInvitationService
     {
         $emailSent = null;
         $user = $this->mutations->run(function () use ($actor, $target, &$emailSent): User {
-            $target = User::whereKey($target->id)->lockForUpdate()->firstOrFail();
+            $target = \App\Models\User::whereKey($target->id)->lockForUpdate()->firstOrFail();
             Gate::forUser($actor)->authorize('resendStaffInvitation', $target);
             $token = Password::broker('central')->createToken($target);
             $target->getConnection()->afterCommit(function () use ($target, $token, &$emailSent): void {

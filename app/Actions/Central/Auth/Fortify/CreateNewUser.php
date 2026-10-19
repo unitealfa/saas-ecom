@@ -41,7 +41,7 @@ class CreateNewUser implements CreatesNewUsers
             'phone' => ['required', 'string', 'max:255'],
             'password' => $this->passwordRules(),
             'country_uuid' => ['required', 'uuid', Rule::exists(Country::class, 'uuid')->where('is_active', true)->whereNull('deleted_at')],
-        ])->validate();
+        ], ['email.unique' => 'Cette adresse e-mail est déjà utilisée.'])->validate();
 
         return (new User)->getConnection()->transaction(function () use ($input): User {
             $country = Country::where('uuid', $input['country_uuid'])->where('is_active', true)->lockForUpdate()->first();

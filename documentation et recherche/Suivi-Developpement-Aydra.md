@@ -1171,3 +1171,288 @@ Ces décisions remplacent la validation professionnelle indépendante et le moti
 - Documentation : AGENTS.md, architecture §32, schéma principal et diagramme central actualisés. Comptes locaux Tenant audités séparément : connexion/guard et identité propres à leur BDD, éventuel lien central_user_uuid ; aucun nouveau champ, migration ni contrainte inter-BDD Tenant.
 - Contrôles exécutés : audit MySQL en lecture seule et commande d’audit (conflits signalés, aucune correction automatique) ; syntaxe PHP des fichiers modifiés/nouveaux, PHP du composant de profil, compatibilité des méthodes contre les sources installées ; composer validate (valide, avertissement préexistant sur le verrouillage exact de stancl/tenancy) ; git diff --check. Aucun test, Pint, PHPStan, HTTP, navigateur, SMTP réel, worker, migration ni seeder exécuté. Les contrôles de syntaxe ne valident pas le comportement fonctionnel.
 - Reste nécessaire : correction manuelle des conflits, sauvegarde et déploiement coordonné du code et de la migration avec écritures/workers arrêtés, puis tests isolés et parcours HTTP lors d’une autorisation ultérieure. Ne pas annoncer la migration appliquée ni les fonctionnalités validées sur MySQL réel. Commandes exactes et précautions dans architecture §32 ; ne pas utiliser les nouveaux formulaires avant application de l’évolution SQL.
+## 18 octobre 2026 — Missions 7–8 : boutiques automatiques après préparation et worker supervisé
+
+- Causes vérifiées : deux jobs tenant-provisioning en attente, aucun worker actif, aucun failed_job ; composer dev écoutait la file ordinaire et non la connexion dédiée. central-provisioning est bien la connexion et tenant-provisioning sa file ; la commande initiale queue:work central-provisioning était correcte. Autre blocage réel : TenantProvisioner laissait PROVISIONING même après initialisation réussie, imposant ensuite une activation manuelle distincte.
+- Métier : première boutique explicitement configurée après approbation compte/dossier et vérification d’e-mail ; aucun tenant créé à l’inscription ou à l’approbation. RegistrationJourney contrôle aussi la preuve du dossier et interdit le dashboard sans une boutique réellement prête. Création volontaire de boutiques supplémentaires via Controller/Request Owner et TenantCreator, sous verrou propriétaire, quota courant, clé et empreinte d’idempotence. Aucun remplissage automatique du quota. La création initiale et les créations supplémentaires partagent la même implémentation et le même formulaire.
+- Fin de provisionnement : le job utilise un verrou GET_LOCK central par base/tenant, crée/migre et initialise avec TenantProvisioner hors transaction centrale, puis TenantStatusService.completeProvisioning synchronise l’opération SUCCEEDED et l’état d’accès sous verrou. ACTIVE si éligible, OVER_QUOTA si le quota/droit est indisponible, INACTIVE si le propriétaire n’est plus éligible. PROVISIONING n’est plus activable administrativement ; seules les réactivations légitimes INACTIVE/SUSPENDED/OVER_QUOTA conservent leur route et leur permission. Aucun droit Spatie, UUID, attribution ou schéma SQL supprimé.
+- Reprises : erreurs publiques nettoyées et failed() terminal, trois tentatives/backoff conservés, verrou SQL libéré à la fin ou à la fermeture du processus. TenantProvisioningRetry remet la même opération en file sans recréer la boutique ni perdre ses paramètres. Boutons de reprise autorisés dans la page de suivi propriétaire et la fiche administrative ; refus d’accès à la boutique d’un autre propriétaire. La réservation/job reste atomique dans la même transaction MySQL avant commit, et le travail lourd commence uniquement après visibilité du commit dans un processus worker distinct.
+- Fichiers principaux : app/Jobs/Central/ProvisionTenantDatabase.php ; app/Services/Central/Tenants/{TenantCreator,TenantStatusService,TenantProvisioningRetry}.php ; app/Policies/Central/TenantPolicy.php ; app/Services/Central/Auth/RegistrationJourney.php ; app/Http/Controllers/Central/Owner/Tenants/TenantController.php ; app/Http/Requests/Central/Tenants/StoreOwnedTenantRequest.php ; routes/central.php ; vues owner/tenants/first-shop, auth/registration-status, dashboard et admin/tenants/{actions,show}. Documentation : AGENTS.md, architecture §33, schéma et diagramme centraux. Aucun déplacement, migration nouvelle ou modification des fichiers de migration dans ce lot.
+- Supervision locale : commande app/Console/Commands/Central/LocalProvisioningWorker.php. Tâche Aydra-Provisioning-54a25334e8a4 installée pour l’utilisateur courant en droits limités, initialement désactivée ; démarrage ensuite autorisé explicitement après validation des tests. Elle est maintenant Running et Enabled, en arrière-plan masqué, avec déclenchement aux connexions Windows, redémarrage configuré après panne et une seule instance. PHP du listener et de son worker contrôlé : C:\Users\habou\.config\herd\bin\php85\php.exe. queue:listen central-provisioning --queue=tenant-provisioning, timeout Symfony 300 et retry_after 360. Les sorties inattendues normales du listener sont aussi converties en panne pour la supervision. Aucune modification de Device Guard, ExecutionPolicy, hosts, permissions globales ou configuration Herd.
+- composer dev démarre la tâche gérée via @php puis Vite ; Herd continue de servir HTTP. Préparation production : deployment/supervisor/aydra-provisioning.conf, valeurs d’environnement pour racine/PHP/compte de service, autorestart et arrêt groupé, délai d’arrêt 420, rotation des journaux. Fichier préparé uniquement, aucun service de production installé. Procédure et commandes dans architecture §33.
+- Tests autorisés : MySQL temporaire isolé et vrais jobs pour ces missions, puis autorisation distincte de traiter les deux boutiques réelles après réussite. 45 cas distincts validés par exécutions ciblées : MerchantJourneyTest + TenantManagementTest, 35/35 (412 assertions) ; CentralShopProvisioningTest, 1/1 avec deux vrais tenants (30 assertions) ; ShopCreationWorkflowTest, 9 cas validés au total par la passe initiale et les reprises ciblées. Couverture : aucune boutique à l’inscription/approbation, formulaire et refus du dashboard initial, création volontaire, double soumission, quota, refus d’accès, échec/reprise conservant les réglages, rollback réservation/job, verrou concurrent contrôlé avec deux connexions SQL et tentative de reprise étrangère renvoyant 403.
+- Corrections des tests durant la vérification : fixture VERIFIED complétée avec son validateur pour respecter le CHECK existant, sans affaiblir la contrainte. Deux ajustements du parcours intégré dus au worker exécuté dans le même processus de test : AccountContextBootstrapper réinitialise guards et SessionManager lors du changement de contexte. Réauthentifier l’acteur de la requête HTTP suivante simule la séparation réelle navigateur/worker ; vérifier le refus de quota via la réponse JSON 422 et le champ shop_name évite de dépendre de la session array réinitialisée. Les assertions de disponibilité, compte des boutiques et quota sont conservées et renforcées. Dernière reprise du parcours complet : 1/1, 27 assertions. Le changement de contexte n’a pas été affaibli pour faire passer le test.
+- Contrôles réels après démarrage autorisé : les deux boutiques unite alpha 2 et boutique alpha sont ACTIVE, opérations SUCCEEDED ; 69 tables dans chacune, singleton shop correspondant au bon tenant, exactement un propriétaire local lié par central_user_uuid au bon compte et version enregistrée égale à la dernière migration réelle. File vide, failed_jobs vide ; quatre opérations SUCCEEDED au total, dont les deux anciennes et les deux traitées pendant cette intervention. Aucune suppression de données ou de base réelle, aucun envoi de mail ni seeder réel. Les anciennes bases restent présentes.
+- Autres contrôles : syntaxe PHP, chargement des nouvelles routes et protections centrales, composer validate valide (avertissement préexistant sur le verrouillage exact de stancl/tenancy), git diff --check. Aucun Pint, PHPStan ou build systématique. Rendu Blade traversé par les requêtes HTTP des tests ; aucun parcours navigateur réel authentifié ni crash forcé du worker réel. Le redémarrage est configuré dans Windows, pas annoncé comme un scénario de panne forcée exécuté.
+- Limite indépendante conservée : la migration des coordonnées du §32 n’est toujours pas appliquée dans la BDD centrale (phone_country_id absent, vérifié en lecture seule). Les nouvelles créations/modifications de comptes restent bloquées par sa protection tant que l’utilisateur n’a pas corrigé les conflits et appliqué cette migration. Aucune correction automatique des numéros ni migration centrale forcée pendant ces missions. Les boutiques des propriétaires déjà éligibles sont maintenant préparées et actives ; les dashboards/authentifications internes Tenant restent reportés comme prévu.
+## 18 octobre 2026 — Missions 9–10 : audit des unicités et parcours intégré
+
+État : code et contrôles ciblés terminés ; déploiement réel bloqué par les conflits de coordonnées conservés.
+
+### Décisions confirmées et périmètre
+
+- L’utilisateur remplace explicitement la règle d’une coordonnée par type : plusieurs e-mails et téléphones, un principal par type ; tous les e-mails secondaires vérifiés permettent connexion et récupération du même compte.
+- Autorisation de tests MySQL temporaires, notifications simulées et vrais jobs isolés. Les bases existantes sont consultées uniquement en lecture. Aucun compte, téléphone ou boutique réel créé, fusionné, supprimé ou modifié pour ce lot.
+- Références : architecture §32–34, schéma et diagramme central synchronisés ; aucune évolution des comptes locaux Tenant ni de leurs permissions.
+
+### Anomalies et corrections
+
+| Anomalie | Correction et fichiers |
+|---|---|
+| MySQL réel ne possède pas encore l’unicité du téléphone normalisé | Ancienne migration téléphonique bloquée par des conflits réels, pas forcée. Audit readonly ContactMigrationAudit/AuditUserContacts. Deux numéros invalides et deux groupes de doublons (3 et 2 comptes), zéro groupe d’e-mails normalisés en double. Correction réelle laissée à l’utilisateur. |
+| Coordonnées secondaires absentes | Migration additive create_user_contacts_table, modèle UserContact, UserContactService ; principales dans users projetées atomiquement vers le registre par triggers INSERT/UPDATE. UNIQUE(kind,value) et UNIQUE(user_id,kind,primary_slot), FK réelles et CHECK. Même un UPDATE users SQL direct ne peut prendre le secondaire d’un autre propriétaire. |
+| Alias non disponibles pour Fortify | ContactUserProvider central uniquement, FortifyServiceProvider et config/auth ; secondaire non vérifié refusé, secondaire vérifié accepté. ResetUserPassword et User routent la récupération vers l’adresse demandée, contrôlent à nouveau sa possession et invalident les autres tokens du compte après changement de mot de passe. |
+| Risque de perte d’un ancien principal | L’ancien reste secondaire ; suppression explicite des seuls secondaires, révocation des tokens associés ; principal non supprimable avant remplacement. |
+| Pays d’un secondaire non pris en compte dans les protections | CountryService contrôle aussi les références user_contacts ; PhoneNumberNormalizer reste le moteur E.164. Pays actifs contrôlés sous verrou pour un nouvel ajout. |
+| Secondaires absents des recherches | UserManagementService et StaffManagementService recherchent aussi les coordonnées secondaires, sous les mêmes permissions. |
+| Domaine déjà occupé provoquant une exception Stancl visible | TenantCreator traduit DomainOccupiedByOtherTenantException et la collision SQL en erreur du champ slug ; transaction annule la réservation et aucun job n’est envoyé. |
+| Renvoi d’invitation avec deux classes de modèle différentes | UserManagementService.resendInvitation recharge le modèle d’authentification App/Models/User, comme la création ; le scénario d’invitation expirée puis remplacée réussit. |
+| Tests historiques supposant qu’ACTIVE prouve un dossier approuvé | AuthenticationTest fournit maintenant explicitement la preuve professionnelle et son auteur pour les cas « approuvé sans boutique ». Aucune règle métier assouplie. |
+| Audit de schéma rejetant la table historique conservée | tests/Pest.php distingue admin_restrictions, conservée physiquement selon la documentation, des tables cibles. L’égalité exacte des listes reste contrôlée ; aucune table supprimée. |
+| Comparaison incorrecte d’un modèle avant/après audit | InternationalContactsTest recharge le même état SQL avant la comparaison, incluant les colonnes par défaut. L’assertion d’absence de modification reste complète. |
+
+### Déploiement réel bloqué, sans correction automatique
+
+L’état MySQL contrôlé en lecture seule contient 16 utilisateurs et 4 boutiques. phone_country_id et user_contacts sont absents ; les deux migrations de coordonnées n’ont PAS été appliquées. Zéro job en attente et zéro failed job lors du contrôle. Le worker local supervisé est Running/Enabled ; aucun crash volontaire ni redémarrage forcé effectué.
+
+L’utilisateur doit fournir/corriger les coordonnées authentiques des comptes signalés par :
+
+| Conflit réel | UUID publics des comptes à examiner (aucun numéro personnel recopié) |
+|---|---|
+| Numéros invalides pour leur région | f68f2e70-5689-403f-96a9-5337a502fd31 ; 5b823a45-427a-4bdd-9886-0b36ba92ab87 |
+| Même numéro normalisé, groupe de trois | 0156bd5d-a381-4188-b1db-cd5770daa256 ; faac7a56-e8a7-42b1-b8aa-4d450afe187c ; 4aca283f-5753-457a-b75c-ad669ed7c9d6 |
+| Même numéro normalisé, groupe de deux | ae2b7e70-a125-413b-91e4-a697b81e8162 ; 9f34aa75-e52d-4456-984e-f46e63050722 |
+
+Les fiches administratives sont accessibles via /admin/users/{uuid}. Les écritures applicatives de coordonnées restent bloquées tant que l’évolution SQL n’est pas déployée ; une correction préalable dans MySQL ou une intervention précisément autorisée est nécessaire. Les UUID ci-dessus servent uniquement à identifier les conflits, pas à autoriser un accès.
+
+~~~powershell
+& 'C:\Users\habou\.config\herd\bin\php85\php.exe' artisan aydra:audit-user-contacts --no-interaction
+~~~
+
+Ne pas inventer de numéros, retirer des comptes ou supprimer des contacts pour faire passer la migration. Si une correction nécessite retrait/transfert/fusion, obtenir un accord précis. Après correction : audit sans conflit, sauvegarde, fenêtre sans écritures ni worker, puis migrations centrales d’évolution ; rétablir le worker après validation. Aucun lancement de cette procédure réelle pendant cet audit.
+
+### Portée des unicités
+
+- Central : e-mails normalisés et téléphones E.164 réservés par toutes les coordonnées, comptes archivés compris ; pays ISO, slugs, domaines et références documentaires selon leurs index.
+- UUID : unicité SQL dans chaque table/base, génération v4 ; aucune fausse contrainte SQL inter-BDD. Les clés entières restent locales et internes.
+- Boutiques : nom affiché non unique ; slug global central, domaine global central, clé de création par propriétaire. Le nom physique est réservé par le mécanisme Tenant existant. Idempotence et quota restent sous verrou.
+- Noms/prénoms, nom public d’une boutique, pays de profil, NIF/NIS et autres informations professionnelles : aucune unicité globale inventée lorsqu’elle n’est pas documentée. Les règles de format et preuves restent indépendantes.
+- Tenant : identités et codes locaux réservés dans leur propre BDD ; aucune unicité de téléphone ou e-mail centrale imposée aux comptes/acheteurs locaux.
+- Les index ci-dessous sont ceux réellement lus dans information_schema ; ils ne signifient pas que toutes les fonctionnalités futures de leurs tables sont déjà développées.
+
+### Inventaire des contraintes UNIQUE effectivement présentes
+
+| Contexte / table | Clés UNIQUE réelles (hors PK) |
+|---|---|
+| Central / `activity_log` | `operation_key` ; `uuid` |
+| Central / `admin_restrictions` | `uuid` ; `admin_id,permission_id,normalized_target_type,normalized_target_id,effect,active_slot` |
+| Central / `cache` | PK uniquement |
+| Central / `cache_locks` | PK uniquement |
+| Central / `carrier_geo_mappings` | `uuid` ; `carrier_id,geographic_area_id` |
+| Central / `contact_verifications` | `uuid` |
+| Central / `countries` | `code` ; `uuid` |
+| Central / `domains` | `domain` ; `tenant_id,primary_slot` ; `uuid` |
+| Central / `failed_jobs` | `uuid` |
+| Central / `feature_usage` | `uuid` ; `user_id,feature_id,period_starts_at` |
+| Central / `features` | `code` ; `uuid` |
+| Central / `geographic_areas` | `uuid` ; `country_id,type,parent_key,code` ; `id,country_id,type` ; `id,type` ; `id,parent_id,type` |
+| Central / `job_batches` | PK uniquement |
+| Central / `jobs` | PK uniquement |
+| Central / `media` | `storage_key` ; `uuid` ; `model_type,model_id,collection_name,primary_slot` |
+| Central / `migrations` | PK uniquement |
+| Central / `model_has_permissions` | PK uniquement |
+| Central / `model_has_roles` | PK uniquement |
+| Central / `passkeys` | `credential_id` |
+| Central / `password_reset_tokens` | PK uniquement |
+| Central / `permissions` | `name,guard_name` ; `uuid` |
+| Central / `pickup_points` | `uuid` ; `carrier_id,external_code` |
+| Central / `plan_features` | `uuid` ; `plan_id,feature_id` |
+| Central / `plans` | `uuid` ; `code,version` |
+| Central / `role_has_permissions` | PK uniquement |
+| Central / `roles` | `name,guard_name` ; `super_admin_slot` ; `uuid` ; `guard_name,permission_signature` |
+| Central / `saas_billing_settings` | `operation_key` ; `uuid` ; `id,document_type,fiscal_year,record_type` ; `id,record_type` ; `document_type,fiscal_year,sequence_slot` ; `code,version` |
+| Central / `saas_document_deliveries` | `operation_key` ; `uuid` |
+| Central / `saas_invoice_lines` | `operation_key` ; `uuid` ; `document_id,line_number` ; `id,document_id,user_id,document_type` ; `document_id,original_invoice_line_id` |
+| Central / `saas_invoices` | `number` ; `operation_key` ; `uuid` ; `id,user_id,document_type` ; `id,installment_id,subscription_id,user_id,document_type` ; `id,original_invoice_id,user_id,document_type` ; `sequence_id,sequence_number` |
+| Central / `saas_transfers` | `active_transaction_fingerprint` ; `operation_key` ; `uuid` ; `id,document_id,user_id,original_payment_id,record_type` ; `id,document_id,user_id,record_type` ; `reversal_of_id` |
+| Central / `sessions` | PK uniquement |
+| Central / `shipping_carriers` | `code` ; `uuid` |
+| Central / `subscriptions` | `installment_number` ; `operation_key` ; `uuid` ; `id,user_id,record_type` ; `user_id,active_owner_slot` ; `id,parent_subscription_id,user_id,record_type` |
+| Central / `tenant_schema_deployments` | `uuid` ; `tenant_id` ; `operation_key` |
+| Central / `tenants` | `document_prefix` ; `id,user_id` ; `slug` ; `user_id,creation_key` ; `uuid` |
+| Central / `users` | `email` ; `uuid` |
+
+Les quatre bases boutique présentes ont les mêmes index uniques : 256 index (PK comprises) sur 69 tables chacune.
+
+| Table tenant | Clés UNIQUE réelles (hors PK) |
+|---|---|
+| `activity_log` | `operation_key` ; `uuid` |
+| `billing_obligations` | `operation_key` ; `uuid` ; `invoice_id` |
+| `billing_rules` | `uuid` ; `id,document_type,fiscal_year,record_type` ; `id,record_type` ; `document_type,fiscal_year,sequence_slot` ; `code,version` |
+| `cache` | PK uniquement |
+| `cache_locks` | PK uniquement |
+| `carrier_accounts` | `uuid` ; `carrier_uuid,external_account_id` |
+| `carrier_fees` | `uuid` ; `id,shipment_id,provider_id` ; `operation_key` ; `reversal_of_id` |
+| `carrier_operation_attempts` | `uuid` ; `operation_id,attempt_number` |
+| `carrier_operations` | `uuid` ; `operation_key` |
+| `carrier_receivables` | `uuid` ; `id,provider_id` ; `operation_key` ; `reversal_of_id` |
+| `carrier_remittance_batches` | `operation_key` ; `uuid` ; `reversal_of_id` ; `carrier_account_id,external_reference` ; `id,carrier_account_id` |
+| `carrier_settlement_lines` | `operation_key` ; `uuid` ; `id,record_type,provider_id,shipment_id` ; `id,record_type,provider_id,carrier_fee_id` ; `id,record_type,provider_id,receivable_id` ; `id,record_type,provider_id` ; `id,record_type,provider_id,collection_id` ; `id,provider_id,record_type` ; `reversal_of_id` |
+| `cart_items` | `uuid` ; `cart_id,variant_id,customization_signature` |
+| `carts` | `uuid` ; `visitor_id` |
+| `categories` | `uuid` ; `id,record_type` ; `record_type,slug` |
+| `collection_entries` | `uuid` ; `id,collection_id` ; `operation_key` ; `reversal_of_id` |
+| `collections` | `uuid` ; `id,shipment_id` ; `shipment_id` |
+| `commercial_correction_lines` | `uuid` ; `correction_id,order_item_id` |
+| `commercial_corrections` | `operation_key` ; `uuid` ; `id,order_id,source_revision_id` ; `id,source_revision_id` ; `correction_of_id` |
+| `contact_verifications` | `uuid` |
+| `content_pages` | `uuid` ; `id,product_id` ; `page_kind,slug` ; `id,page_kind` |
+| `customer_adjustments` | `uuid` ; `id,order_id,incident_id` ; `operation_key` ; `reversal_of_id` |
+| `domains` | `domain` ; `tenant_id,primary_slot` ; `uuid` |
+| `expenses` | `uuid` ; `operation_key` ; `reversal_of_id` |
+| `failed_jobs` | `uuid` |
+| `free_shipping_rules` | `uuid` |
+| `invoices` | `uuid` ; `number` ; `id,order_id,revision_id,document_type` ; `id,order_id,revision_id,document_type,original_invoice_id` ; `sequence_id,sequence_number` ; `operation_key` ; `id,order_id` |
+| `job_batches` | PK uniquement |
+| `jobs` | PK uniquement |
+| `media` | `storage_key` ; `uuid` ; `model_type,model_id,collection_name,primary_slot` |
+| `migrations` | PK uniquement |
+| `model_has_permissions` | PK uniquement |
+| `model_has_roles` | PK uniquement |
+| `navigation_events` | `uuid` |
+| `order_documents` | `uuid` ; `number,document_version` |
+| `order_history` | `uuid` |
+| `order_incident_details` | `uuid` |
+| `order_incidents` | `operation_key` ; `order_item_id` ; `uuid` ; `id,order_id` |
+| `order_items` | `uuid` ; `id,variant_id` ; `id,product_id` ; `id,revision_id` |
+| `order_returns` | `uuid` ; `id,shipment_id` ; `shipment_id` ; `id,order_id` ; `id,shipped_revision_id` |
+| `order_revisions` | `uuid` ; `id,order_id,pickup_point_uuid` ; `id,order_id,delivery_mode` ; `order_id,revision_number` ; `id,order_id` |
+| `orders` | `uuid` ; `number` ; `original_return_id,unpaid_resend_slot` ; `submission_key` ; `cart_id` |
+| `password_reset_tokens` | PK uniquement |
+| `permissions` | `name,guard_name` ; `uuid` |
+| `product_options` | `uuid` ; `product_id` ; `id,parent_id,product_id,record_type` ; `parent_id,identity_code` ; `id,product_id,record_type` ; `parent_id` |
+| `product_promotions` | `uuid` |
+| `product_reviews` | `uuid` |
+| `product_tags` | `uuid` ; `product_id,tag_id` |
+| `product_variants` | `uuid` ; `product_id,combination_signature` ; `id,product_id` ; `sku` |
+| `products` | `uuid` ; `slug` |
+| `remittance_statements` | `uuid` ; `id,provider_id` ; `operation_key` ; `reversal_of_id` ; `provider_id,number` |
+| `return_items` | `uuid` ; `id,variant_id` ; `return_id,order_item_id` |
+| `role_has_permissions` | PK uniquement |
+| `roles` | `name,guard_name` ; `super_admin_slot` ; `uuid` ; `guard_name,permission_signature` |
+| `sales_terms_acceptances` | `operation_key` ; `uuid` |
+| `sessions` | PK uniquement |
+| `shipment_events` | `uuid` ; `deduplication_key` |
+| `shipments` | `uuid` ; `provider_id,tracking` ; `id,provider_id` ; `order_id` ; `id,order_id` ; `id,order_id,shipped_revision_id` ; `provider_id,merchant_reference` |
+| `shipping_providers` | `uuid` ; `carrier_account_id` |
+| `shipping_rates` | `uuid` ; `record_type,carrier_account_id,starts_at` ; `record_type,provider_scope_id,province_uuid,municipality_scope_uuid,delivery_mode,service_type,current_slot` ; `id,carrier_account_id,record_type` |
+| `shop` | `singleton` ; `uuid` ; `tenant_uuid` |
+| `shop_addresses` | `uuid` ; `id,shop_id,record_type` ; `shop_id,primary_slot` |
+| `stock_movements` | `uuid` ; `id,variant_id` ; `variant_id,variant_sequence` ; `operation_key` ; `reversal_of_id` |
+| `team_invitations` | `token_hash` ; `uuid` |
+| `tenants` | `document_prefix` ; `id,user_id` ; `slug` ; `user_id,creation_key` ; `uuid` |
+| `users` | `central_user_uuid` ; `email` ; `uuid` |
+| `variant_option_values` | `variant_id,option_id` ; `uuid` |
+| `visit_sessions` | `uuid` |
+| `visitors` | `token_hash` ; `uuid` |
+
+### Résultats finaux des scénarios
+
+Bilan détaillé ci-dessous. Les limites non exécutées restent explicitement identifiées.
+
+### Résultats observés, scénario par scénario
+
+Les résultats « réussi » ci-dessous correspondent aux tests réellement exécutés sur MySQL temporaire ou aux lectures SQL indiquées. Ce n’est pas une exécution sur les données réelles ni un essai de navigateur.
+
+| Scénario | Attendu | Observé | Résultat | Fichiers / contrôles |
+|---|---|---|---|---|
+| Inscription publique | Compte PENDING, e-mail non vérifié, aucun tenant | États et absence de boutique contrôlés | Réussi | CreateNewUser ; RegistrationTest ; ShopCreationWorkflowTest |
+| Confirmation d’inscription | Modale explicative et guidage vers la vérification | HTML de la modale, message et bouton de renvoi présents | Réussi côté HTTP ; ouverture visuelle non exécutée | RegistrationResponse ; verify-email.blade.php ; RegistrationTest |
+| Envoi de vérification | Notification envoyée au compte inscrit | Notification émise et destinataire contrôlé, envoi simulé | Réussi côté application | RegistrationVerificationNotification ; RegistrationTest |
+| Vérification native | Preuve d’e-mail, événement Verified, retour connexion | Preuve enregistrée et session commerçant fermée | Réussi | EmailVerificationTest ; VerifiedEmailResponse |
+| Lien principal expiré/invalide | Refus, pas de preuve anticipée, page d’explication | 403 et preuve inchangée ; vue d’erreur vérifiée | Réussi | EmailVerificationTest ; bootstrap/app.php |
+| Lien déjà consommé | Ne pas rejouer Verified | Aucun second événement | Réussi | EmailVerificationTest |
+| Renvoi de vérification | Nouvelle notification, limitation des demandes | Notification simulée puis 429 au dépassement | Réussi | VerificationNotificationController ; EmailVerificationTest |
+| Identifiants incorrects | Erreur générique, pas de session | Refus contrôlé pour compte inconnu/mauvais mot de passe | Réussi | FortifyServiceProvider ; AuthenticationTest |
+| E-mail principal non vérifié | Redirection vers la vérification | Accès limité, pas de dashboard | Réussi | RegistrationJourney ; AuthenticationTest |
+| Compte en attente | Session limitée, page d’attente | Pages métier et créations directes bloquées | Réussi | EnsureActiveCentralAccount ; MerchantJourneyTest |
+| Compte refusé | Motif visible, pas d’accès commerçant | Page de refus et motif propres au compte | Réussi | MerchantJourneyTest |
+| Changement de décision pendant une session | État actualisé et destination cohérente | JSON privé et version passent attente → refus → configuration | Réussi côté HTTP/JSON | RegistrationJourney ; MerchantJourneyTest |
+| Actualisation toutes les 15 secondes | Le navigateur suit l’état automatiquement | Code conservé et endpoint testé ; horloge navigateur non parcourue | Non exécuté dans un navigateur | registration-status.blade.php |
+| Approuvé sans boutique | Configuration obligatoire | Dashboard redirige vers première boutique | Réussi | MerchantJourneyTest ; ShopCreationWorkflowTest |
+| Nom de la première boutique | Nom obligatoire avant réservation | Formulaire vide refusé et réservation explicite seulement | Réussi | StoreTenantRequest ; MerchantJourneyTest |
+| Approuver sans motif | ACTIVE et dossier VERIFIED ensemble, aucun tenant | États/auteur/date/historique synchronisés | Réussi | UserApprovalService ; MerchantApprovalWorkflowTest |
+| Refuser avec/sans motif | Motif obligatoire, REJECTED/FAILED cohérents | Motif vide refusé aux différents points d’entrée | Réussi | UserApprovalRequest ; MerchantApprovalWorkflowTest |
+| Approuver après refus | Reprendre le parcours et conserver l’historique | Ancien motif conservé dans l’audit, absent du refus courant | Réussi | UserApprovalService ; MerchantJourneyTest |
+| Boutons de décision | Actions adaptées au statut réel | Absence des anciennes doubles validations vérifiée | Réussi | MerchantApprovalWorkflowTest |
+| Deux décisions simultanées | Une seule décision acceptée, aucune désynchronisation | Deux processus PHP/MySQL : une réussite, un conflit ; un seul événement de décision | Réussi | UserContactConcurrencyTest |
+| Création administrative | Compte et dossier approuvés, pas de tenant | Champs fournis validés et invitation créée après transaction | Réussi | UserManagementService ; MerchantApprovalWorkflowTest |
+| Invitation / mot de passe | Token limité et consommable une fois, pas de mot de passe envoyé | Expiration, renvoi et activation vérifiés ; preuve d’e-mail au bon moment | Réussi | ResetUserPassword ; MerchantApprovalWorkflowTest |
+| Modification administrative/personnelle | Garder ses coordonnées, refuser celles d’un autre | Mises à jour et rollback contrôlés, permissions appliquées | Réussi | MultipleContactsTest ; InternationalContactsTest ; UserAccountManagementTest |
+| Même e-mail sur deux comptes | Refus après normalisation | Création publique/admin et collision avec secondaire refusées | Réussi | MultipleContactsTest |
+| Même téléphone local/international | 0779107446 et +213779107446 sont identiques en DZ | E.164 identique, refus public/admin/model/SQL et archives | Réussi | PhoneNumberNormalizer ; InternationalContactsTest ; MultipleContactsTest |
+| E-mails/téléphones secondaires | Plusieurs valeurs liées au bon propriétaire | Ajout personnel/admin, normalisation et pays conservés | Réussi | UserContactService ; MultipleContactsTest |
+| Nouveau secondaire non vérifié | Pas d’authentification ni de récupération via cet alias | Provider ne retourne pas le compte | Réussi | ContactUserProvider ; MultipleContactsTest |
+| Vérification secondaire | URL signée, expirante, limitée au propriétaire | Autre compte/expiration/altération refusés ; preuve propre à l’adresse | Réussi | VerifyContactEmail ; MultipleContactsTest |
+| Session limitée et secondaire | Prouver son adresse sans ouvrir le profil ni prouver le principal | Vérification permise ; ajout interdit ; principal reste non vérifié | Réussi | EnsureActiveCentralAccount ; MultipleContactsTest |
+| Secondaire devenu principal avant utilisation du lien | Conserver Verified et le retour Fortify | Preuve acquise, événement unique, retour connexion, statut PENDING conservé | Réussi | MultipleContactsTest |
+| Connexion par alias vérifié | Même compte, mêmes restrictions | Login accepté par Fortify | Réussi | MultipleContactsTest |
+| Récupération via alias vérifié | Message au bon alias, token sécurisé | Adresse destinataire, reset et refus de réutilisation contrôlés | Réussi | ResetUserPassword ; MultipleContactsTest |
+| Principal / conservation | Un principal par type, ancien conservé | E-mail vérifié conservé, téléphone et sa preuve conservés lors de la sélection | Réussi | UserContactService ; MultipleContactsTest |
+| Suppression secondaire | Supprimer le secondaire et révoquer ses tokens | Récupération par l’ancien alias devenue impossible | Réussi | MultipleContactsTest |
+| Suppression du principal | Ne pas laisser des coordonnées sans principal | Suppression directe et remise à vide du téléphone principal refusées | Réussi | MultipleContactsTest |
+| Recherche par secondaire | Résultat unique, espaces autorisés seulement | Propriétaire retrouvé, lecture/écriture non autorisées refusées | Réussi | UserManagementService ; StaffManagementService ; MultipleContactsTest |
+| Pays actifs | Refuser les nouveaux choix inactifs | Ajouts refusés pour FR inactive ; ancienne donnée conservable | Réussi | CountryManagementTest ; InternationalContactsTest |
+| Téléphone étranger au pays de profil | Pays propre au numéro sans changement du profil | Secondaire FR normalisé +33 et profil DZ conservé | Réussi | MultipleContactsTest |
+| Formats et indicatif partagé | Valider le numéro pour le pays ISO explicite | Formats DZ, séparateurs, invalides et cas US/CA +1 contrôlés dans le normaliseur | Réussi | InternationalContactsTest |
+| Unicité SQL des coordonnées | Interdire les collisions même hors validation Laravel | INSERT registre et UPDATE users concurrents ne peuvent partager la valeur | Réussi | UserContactConcurrencyTest ; MultipleContactsTest |
+| Unicité UUID / principal | UUID unique et au plus un principal par type | Violations UNIQUE réellement rejetées par MySQL | Réussi | MultipleContactsTest |
+| Réservation de première boutique simultanée | Même clé → un tenant et un job | Deux processus acceptés, une seule réservation persistée | Réussi | UserContactConcurrencyTest |
+| Deux créations pour la dernière place | Ne pas dépasser le quota | Une création acceptée, l’autre refusée ; deux boutiques au total sous offre gratuite | Réussi | UserContactConcurrencyTest |
+| Slug / domaine déjà pris | Erreur compréhensible, pas de réservation orpheline | Collision slug et exception Stancl de domaine traduites ; aucun job ajouté | Réussi | TenantCreator ; TenantManagementTest |
+| Provisionnement en cours | Pas de dashboard avant disponibilité | Redirection préparation et blocage du domaine indisponible | Réussi | MerchantJourneyTest ; ShopCreationWorkflowTest |
+| Première boutique prête | Migration tenant, singleton, propriétaire local et activation | Vrai job isolé ; références UUID et accès central corrects | Réussi | ShopCreationWorkflowTest |
+| Boutiques suivantes / quota | Création sur demande, quota respecté | Deux boutiques actives puis troisième refusée, pas de précréation | Réussi | ShopCreationWorkflowTest |
+| Double soumission / rollback | Pas de duplication ou job orphelin | Réservation idempotente et annulation transactionnelle contrôlées | Réussi | ShopCreationWorkflowTest |
+| Échec / reprise | Garder la réservation et ses réglages, reprise possible | Échec injecté puis vrai job réussi avec mêmes réglages | Réussi | TenantProvisioningRetry ; ShopCreationWorkflowTest |
+| Parcours complet joint | Inscription → vérification → approbation → boutique → dashboard | Scénario HTTP continu exécuté avec vrai provisionnement isolé et liens propriétaire/shop vérifiés | Réussi | ShopCreationWorkflowTest |
+| Isolation et sécurité | Refuser URLs d’autres comptes/boutiques et privilèges non détenus | Refus d’accès, guard Tenant invité, contexte avant initialisation et références testés | Réussi sur les parcours concernés | MerchantJourneyTest ; ShopCreationWorkflowTest ; StaffManagementTest |
+| Schéma central cible | Tables, types, FK et UK conformes aux deux documents | Comparaison sur MySQL temporaire réussie ; table historique explicitement distinguée | Réussi | DocumentedCentralSchemaTest ; tests/Pest.php |
+| Métadonnées des bases existantes | Auditer sans les modifier | 119 index uniques centraux ; mêmes 256 index dans les 4 bases tenant | Réussi en lecture seule | information_schema ; inventaire ci-dessus |
+| Données réelles sans doublons | Pas de conflit avant migration | Deux numéros invalides et deux groupes partagés restent présents | Échoué sur les données actuelles, déploiement bloqué | AuditUserContacts ; correction métier requise |
+| Réception SMTP dans une boîte réelle | Livraison de bout en bout | Aucun message réel envoyé ; notifications simulées conformément à l’accord | Non exécuté | SMTP réel hors ce test |
+| Panne/redémarrage du worker Windows | Redémarrage supervisé | État Running/Enabled lu ; pas de crash volontaire | Non exécuté pour la panne | LocalProvisioningWorker |
+| Dashboard / connexion interne des boutiques | Développement tenant séparé | Reportés selon la décision d’architecture | Hors périmètre ; non exécuté | Architecture §19 et §33 |
+| Toute la suite historique / charge / performance | Contrôle exhaustif et mesures représentatives | Contrôles ciblés seulement, aucun benchmark ni test de charge annoncé | Non exécuté exhaustivement | Aucun gain de performance chiffré revendiqué |
+
+### Exécutions et résultats chiffrés
+
+- 66/66 tests, 471 assertions : AuthenticationTest, PasswordResetTest, MerchantJourneyTest et MerchantApprovalWorkflowTest.
+- 35/35 tests, 273 assertions : TenantManagementTest, CountryManagementTest, ProfileUpdateTest, RegistrationTest et EmailVerificationTest.
+- 53/53 tests, 434 assertions : MultipleContactsTest (16 cas à cet instant), StaffManagementTest, UserAccountManagementTest et les deux premiers scénarios de concurrence.
+- InternationalContactsTest : les 25 cas ont réussi dans un lot arrêté ensuite sur une ancienne assertion de StaffManagementTest. L’erreur du lot n’est pas transformée en commande réussie ; le personnel a ensuite été repris dans le lot vert de 53 tests.
+- DocumentedCentralSchemaTest : comparaison réussie dans le lot de 18 réussites avant arrêt sur la collision de domaine désormais corrigée ; l’égalité des tables/champs/types/FK/UK reste testée, aucune assertion retirée.
+- ShopCreationWorkflowTest : 9/9 tests, 72 assertions, puis le nouveau parcours public complet 1/1, 26 assertions, chacun avec le vrai job dans les bases isolées.
+- Reprise ciblée finale : 3/3 tests, 17 assertions, pour le lien secondaire devenu principal et la conservation des preuves des principaux.
+- Dernière reprise : 5/5 tests, 55 assertions : secondaire international, vraie concurrence téléphone, vraie concurrence de décisions, vraie double création et vraie concurrence de quota.
+- Total : **193 scénarios distincts exécutés et validés**, en plusieurs lots et reprises ciblées, sans compter plusieurs fois les reprises d’un même scénario. Ce n’est pas une suite complète verte lancée en une commande.
+- Syntaxe PHP vérifiée sur les 57 fichiers PHP modifiés/nouveaux alors présents (incluant les changements préexistants des Missions 7–8) ; les dernières modifications de tests sont également chargées par Pest. Routes de coordonnées chargées et rendus Blade traversés par HTTP. git diff --check sans erreur, simples avertissements CRLF.
+- Pas de Pint, PHPStan, build systématique, migration réelle, seeder réel ni test destructif sur les bases conservées.
+
+### Fichiers principaux concernés
+
+- Données : app/Models/Central/User.php ; app/Models/Central/UserContact.php ; database/migrations/central/2026_10_18_172424_create_user_contacts_table.php.
+- Métier : app/Services/Central/Users/UserContactService.php ; UserManagementService.php ; StaffManagementService.php ; StaffInvitationService.php ; ContactMigrationAudit.php ; app/Services/Central/Countries/CountryService.php ; app/Services/Central/Tenants/TenantCreator.php.
+- Authentification : app/Services/Central/Auth/ContactUserProvider.php ; app/Providers/FortifyServiceProvider.php ; config/auth.php ; app/Actions/Central/Auth/Fortify/{CreateNewUser,ResetUserPassword}.php ; app/Http/Middleware/Central/Auth/EnsureActiveCentralAccount.php.
+- Validation : app/Http/Requests/Central/Users/{StoreUserContactRequest,StoreUserRequest,UpdateUserRequest}.php.
+- Entrées : app/Http/Controllers/Central/Settings/UserContactController.php et app/Http/Controllers/Central/Admin/Users/UserContactController.php ; routes/central/settings.php et routes/central/admin/users.php.
+- Notification : app/Notifications/Central/Auth/VerifyContactEmail.php.
+- Interfaces : resources/views/central/pages/settings/contacts.blade.php ; resources/views/central/partials/user-contacts.blade.php ; profil personnel existant ; resources/views/central/pages/admin/{users,staff}/edit.blade.php ; resources/views/central/pages/auth/{registration-status,verify-email}.blade.php.
+- Tests : tests/Central/Feature/Settings/{MultipleContactsTest,InternationalContactsTest,ProfileUpdateTest}.php ; tests/Central/Feature/Auth/{AuthenticationTest,RegistrationTest,EmailVerificationTest,MerchantJourneyTest}.php ; tests/Central/Feature/Admin/{Users/UserAccountManagementTest,Staff/StaffManagementTest,Tenants/TenantManagementTest}.php ; tests/Central/Integration/UserContactConcurrencyTest.php ; tests/Tenant/Feature/ShopCreationWorkflowTest.php ; tests/Pest.php ; phpunit.xml.
+- Documentation durable : AGENTS.md, architecture §32–34, schéma principal, diagramme central et ce suivi. Les recherches historiques restent conservées, la dernière décision explicite remplace leur ancienne limitation.
+
+Versions réellement installées contrôlées : PHP 8.5.10, Laravel 13.34.0, Fortify 1.41.0, Livewire 4.4.7, Flux 2.20.1, Permission 8.3.0, Activity Log 5.0.0, Stancl 3.10.1, libphonenumber 9.0.41. Aucun package ajouté ni mis à jour pendant ces missions.
+
+### Point de reprise
+
+Code et audit ciblé vérifiés ; reste bloquant pour le déploiement réel : faire corriger les coordonnées authentiques des sept comptes identifiés, relancer l’audit, puis organiser la sauvegarde et la migration centrale avec arrêt temporaire des écritures/workers. Ne pas forcer les migrations ni inventer des numéros. La source actuelle reste utilisable pour les comptes existants, mais ses créations/modifications de coordonnées sont protégées tant que le schéma n’est pas déployé. La gestion multiple affiche cette indisponibilité au lieu de prétendre avoir enregistré une modification.

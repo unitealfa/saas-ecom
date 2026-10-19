@@ -39,6 +39,10 @@ test('new users can register', function () {
     expect($user->status)->toBe(StatusEnum::PENDING);
     expect($user->hasVerifiedEmail())->toBeFalse();
     Notification::assertSentTo($user, VerifyEmail::class);
+    $this->get(route('verification.notice'))->assertOk()
+        ->assertSee('registration-created', false)->assertSee('Votre compte Aydra a été créé avec succès !')
+        ->assertSee('Renvoyer l’e-mail de vérification');
+    expect(\App\Models\Central\Tenant::count())->toBe(0);
 });
 
 test('public registration cannot inject an approved status or privileged fields', function (): void {

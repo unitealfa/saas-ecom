@@ -56,9 +56,24 @@ class ContactMigrationAudit
                 }
             });
 
+        if ((new User)->getConnection()->getSchemaBuilder()->hasTable('user_contacts')) {
+            \App\Models\Central\UserContact::where('kind', 'phone')->where('is_primary', false)
+                ->with(['country', 'user:id,uuid'])->chunkById(200, function ($contacts) use (&$owners, &$invalid, &$changed): void {
+                    foreach ($contacts as $contact) {
+                        try {
+                            $value = $this->phones->normalize($contact->value, $contact->country?->code ?? '');
+                            $owners[$value][] = $contact->user->uuid;
+                            $changed += (int) ($value !== $contact->value);
+                        } catch (ValidationException) {
+                            $invalid[] = $contact->user->uuid;
+                        }
+                    }
+                });
+        }
+
         return [
-            'invalid' => $invalid,
-            'duplicates' => array_values(array_filter($owners, fn (array $users): bool => count($users) > 1)),
+            'invalid' => array_values(array_unique($invalid)),
+            'duplicates' => array_values(array_filter(array_map(fn (array $users) => array_values(array_unique($users)), $owners), fn (array $users): bool => count($users) > 1)),
             'changed' => $changed,
         ];
     }

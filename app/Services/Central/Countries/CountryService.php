@@ -67,6 +67,8 @@ class CountryService
         return User::withTrashed()->where('country_id', $country->id)->exists()
             || ($country->getConnection()->getSchemaBuilder()->hasColumn('users', 'phone_country_id')
                 && User::withTrashed()->where('phone_country_id', $country->id)->exists())
+            || ($country->getConnection()->getSchemaBuilder()->hasTable('user_contacts')
+                && \App\Models\Central\UserContact::where('country_id', $country->id)->exists())
             || $country->getConnection()->table('geographic_areas')->where('country_id', $country->id)->exists();
     }
 }

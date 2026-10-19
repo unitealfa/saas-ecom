@@ -62,7 +62,7 @@ test('unavailable shops retain the public preparation response without opening a
 test('each tenant permission opens consultation and only its own administrative action', function (): void {
     module05Admin();
     $owner = User::factory()->create();
-    $shop = module05Shop($owner);
+    $shop = module05Shop($owner, ['status' => StatusEnum::INACTIVE]);
     $actions = ['view' => 'view', 'create' => 'create', 'update' => 'update', 'suspend' => 'suspend', 'activate' => 'activate',
         'archive' => 'archive', 'history.view' => 'viewHistory', 'priority.update' => 'updatePriorities'];
     foreach ($actions as $suffix => $ability) {
@@ -129,6 +129,21 @@ test('shop creation refuses staff owners and inactive merchant accounts', functi
     expect(Tenant::count())->toBe(0);
 });
 
+test('duplicate slugs and domains return a validation error without reserving another shop or job', function (): void {
+    $admin = module05Admin();
+    $owner = User::factory()->create();
+    $existing = module05Shop($owner, ['slug' => 'reserved']);
+    $existing->domains()->create(['domain' => 'free-slug.'.config('tenancy.saas_base_domain'), 'type' => 1, 'is_primary' => true]);
+    Queue::fake([ProvisionTenantDatabase::class]);
+    foreach (['reserved', 'free-slug'] as $slug) {
+        $this->actingAs($admin, 'central')->post(route('central.users.tenants.store', $owner), [
+            'shop_name' => 'Nouvelle boutique', 'slug' => $slug, 'creation_key' => (string) Str::uuid(),
+        ])->assertSessionHasErrors('slug');
+        expect(Tenant::where('user_id', $owner->id)->count())->toBe(1);
+    }
+    Queue::assertNothingPushed();
+});
+
 test('shop renaming retains routing database and ownership while queuing a versioned projection and audit', function (): void {
     module05Admin();
     $owner = User::factory()->create();
@@ -189,14 +204,14 @@ test('archival cannot race with a running deployment', function (): void {
     expect($shop->fresh()->trashed())->toBeFalse();
 });
 
-test('activation refuses unverified owners and a tenant whose database is not prepared', function (): void {
+test('initial provisioning cannot be replaced by a manual administrative activation', function (): void {
     $admin = module05Admin();
     $owner = User::factory()->create();
     $shop = module05Shop($owner);
-    $this->actingAs($admin, 'central')->post(route('central.tenants.activate', $shop), ['expected_status' => 1])->assertSessionHasErrors('tenant');
+    $this->actingAs($admin, 'central')->post(route('central.tenants.activate', $shop), ['expected_status' => 1])->assertForbidden();
     expect($shop->fresh()->status)->toBe(StatusEnum::PROVISIONING);
     $owner->forceFill(['legal_profile_version' => 1, 'legal_verification_status' => 2, 'legal_verified_at' => now(), 'legal_verified_by_id' => $admin->id])->save();
-    $this->post(route('central.tenants.activate', $shop), ['expected_status' => 1])->assertSessionHasErrors('tenant');
+    $this->post(route('central.tenants.activate', $shop), ['expected_status' => 1])->assertForbidden();
     expect($shop->fresh()->status)->toBe(StatusEnum::PROVISIONING);
 });
 

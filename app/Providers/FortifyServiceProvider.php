@@ -50,6 +50,8 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        \Illuminate\Support\Facades\Auth::provider('central_contacts', fn ($app, array $config) =>
+            new \App\Services\Central\Auth\ContactUserProvider($app['hash'], $config['model']));
         $this->configureActions();
         $this->configureAuthentication();
         $this->configureViews();
@@ -74,7 +76,7 @@ class FortifyServiceProvider extends ServiceProvider
             return (new Timebox)->call(function () use ($request): ?User {
                 $email = Str::lower(trim($request->string(Fortify::username())->toString()));
                 $password = $request->string('password')->toString();
-                $user = User::where('email', $email)->first();
+                $user = \Illuminate\Support\Facades\Auth::createUserProvider('central_users')->retrieveByCredentials(['email' => $email]);
 
                 if ($user === null || ! app(RegistrationJourney::class)->mayAuthenticate($user) || ! Hash::check($password, $user->password)) {
                     return null;

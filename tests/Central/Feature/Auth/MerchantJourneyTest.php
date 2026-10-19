@@ -14,8 +14,18 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Stancl\Tenancy\Events\TenantCreated;
 
+function journeyMerchant(array $attributes = []): User
+{
+    if (($attributes['status'] ?? StatusEnum::ACTIVE) === StatusEnum::ACTIVE) {
+        $validator = User::factory()->create();
+        $attributes += ['legal_profile_version' => 1, 'legal_verified_by_id' => $validator->id,
+            'legal_verification_status' => \App\Enums\VerificationStatusEnum::VERIFIED, 'legal_verified_at' => now()];
+    }
+    return User::factory()->create($attributes);
+}
+
 test('merchant authentication follows email approval and shop readiness', function (StatusEnum $status, bool $verified, ?TenantStatus $shopStatus, bool $prepared, string $state, string $destination): void {
-    $merchant = User::factory()->create(['status' => $status, 'email_verified_at' => $verified ? now() : null]);
+    $merchant = journeyMerchant(['status' => $status, 'email_verified_at' => $verified ? now() : null]);
     if ($shopStatus !== null) {
         Event::fake([TenantCreated::class]);
         Tenant::factory()->create([
@@ -54,7 +64,7 @@ test('merchant authentication follows email approval and shop readiness', functi
 ]);
 
 test('pending credentials errors remain generic when the password is wrong', function (): void {
-    $merchant = User::factory()->create(['status' => StatusEnum::PENDING]);
+    $merchant = journeyMerchant(['status' => StatusEnum::PENDING]);
     foreach ([$merchant->email, 'unknown-merchant@example.test'] as $email) {
         $this->post(route('login.store'), ['email' => $email, 'password' => 'incorrect'])
             ->assertSessionHasErrors(['email' => __('auth.failed')]);
@@ -66,7 +76,7 @@ test('a limited session observes rejection and subsequent approval without creat
     $this->seed(AuthorizationSeeder::class);
     $admin = User::factory()->create();
     $admin->assignRole(Role::findByName('root', 'central'));
-    $merchant = User::factory()->create(['status' => StatusEnum::PENDING]);
+    $merchant = journeyMerchant(['status' => StatusEnum::PENDING]);
     $merchant->getConnection()->table('sessions')->insert([
         'id' => 'limited-merchant-session', 'user_id' => $merchant->id,
         'payload' => base64_encode(serialize([])), 'last_activity' => now()->timestamp,
@@ -100,7 +110,7 @@ test('a limited session observes rejection and subsequent approval without creat
 test('first shop creation requires its name and remains explicit owned and idempotent', function (): void {
     $this->seed(AuthorizationSeeder::class);
     Queue::fake([ProvisionTenantDatabase::class]);
-    $merchant = User::factory()->create();
+    $merchant = journeyMerchant();
     $other = User::factory()->create();
     $payload = ['shop_name' => 'Première boutique', 'slug' => 'premiere', 'creation_key' => (string) Str::uuid(), 'user_id' => $other->id];
 
@@ -120,7 +130,7 @@ test('first shop creation requires its name and remains explicit owned and idemp
 });
 
 test('progress cannot use another merchants ready shop or expose their refusal reason', function (): void {
-    $merchant = User::factory()->create();
+    $merchant = journeyMerchant();
     $other = User::factory()->create(['status' => StatusEnum::REJECTED]);
     activity()->performedOn($other)->event('central_account_rejected')->withProperties(['reason' => 'PRIVATE-OTHER-REASON'])->log('Refus.');
     Event::fake([TenantCreated::class]);
@@ -136,7 +146,7 @@ test('progress requires a central session', function (): void {
 });
 
 test('an unavailable shop domain is blocked before tenant initialization', function (TenantStatus $status, bool $prepared): void {
-    $merchant = User::factory()->create();
+    $merchant = journeyMerchant();
     Event::fake([TenantCreated::class]);
     $shop = Tenant::factory()->create([
         'user_id' => $merchant->id, 'status' => $status,

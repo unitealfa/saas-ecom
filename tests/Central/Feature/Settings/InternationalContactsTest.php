@@ -168,7 +168,7 @@ test('public registration requires a phone and rejects inactive selected countri
 
 test('phone audit is read only and does not alter administrative or verification state', function (): void {
     $user = User::factory()->create(['phone' => '0779107446', 'status' => StatusEnum::PENDING]);
-    $attributes = $user->getRawOriginal();
+    $attributes = $user->fresh()->getRawOriginal();
     expect(app(ContactMigrationAudit::class)->inspect())->toBe(['invalid' => [], 'duplicates' => [], 'changed' => 0]);
     expect($user->refresh()->getRawOriginal())->toBe($attributes);
 });

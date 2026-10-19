@@ -78,3 +78,22 @@ test('already verified user visiting verification link is redirected without fir
     expect($user->fresh()->hasVerifiedEmail())->toBeTrue();
     Event::assertNotDispatched(Verified::class);
 });
+
+test('an expired verification link gives guidance without verifying the address', function (): void {
+    $user = User::factory()->unverified()->create();
+    $url = URL::temporarySignedRoute('verification.verify', now()->subMinute(), ['id' => $user->id, 'hash' => sha1($user->email)]);
+    $this->actingAs($user, 'central')->get($url)->assertForbidden()->assertViewIs('central.pages.auth.verification-error');
+    expect($user->fresh()->hasVerifiedEmail())->toBeFalse();
+});
+
+test('verification resend sends a notification and repeated requests are throttled', function (): void {
+    \Illuminate\Support\Facades\Notification::fake();
+    $user = User::factory()->unverified()->create();
+    $this->actingAs($user, 'central')->post(route('verification.send'))->assertSessionHasNoErrors();
+    \Illuminate\Support\Facades\Notification::assertSentTo($user, \Illuminate\Auth\Notifications\VerifyEmail::class);
+    foreach (range(1, 5) as $attempt) {
+        $this->post(route('verification.send'));
+    }
+    $this->post(route('verification.send'))->assertTooManyRequests();
+    expect($user->fresh()->hasVerifiedEmail())->toBeFalse();
+});

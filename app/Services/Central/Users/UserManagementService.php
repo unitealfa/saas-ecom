@@ -54,9 +54,15 @@ class UserManagementService
                 $pattern = '%'.trim($search).'%';
                 $query->where('first_name', 'like', $pattern)->orWhere('last_name', 'like', $pattern)->orWhere('email', 'like', $pattern)
                     ->orWhere('phone', 'like', $pattern);
+                if ((new User)->getConnection()->getSchemaBuilder()->hasTable('user_contacts')) {
+                    $query->orWhereHas('contacts', fn ($contacts) => $contacts->where('value', 'like', $pattern));
+                }
                 $digits = preg_replace('/[^0-9]/', '', $search);
                 if (strlen($digits) >= 5) {
                     $query->orWhere('phone', 'like', '%'.ltrim($digits, '0').'%');
+                    if ((new User)->getConnection()->getSchemaBuilder()->hasTable('user_contacts')) {
+                        $query->orWhereHas('contacts', fn ($contacts) => $contacts->where('kind', 'phone')->where('value', 'like', '%'.ltrim($digits, '0').'%'));
+                    }
                 }
             });
         }
@@ -124,12 +130,12 @@ class UserManagementService
         return new UserSaveResult($user, $emailSent);
     }
 
-    public function update(User $actor, User $target, UserProfileData $data, string $ability = 'update'): UserSaveResult
+    public function update(User $actor, User $target, UserProfileData $data, string $ability = 'update', bool $notifyEmailChange = true): UserSaveResult
     {
         abort_unless(in_array($ability, ['update', 'updateStaff', 'updateOwnProfile'], true), 403);
         $emailSent = null;
-        $mutation = function () use ($actor, $target, $data, $ability, &$emailSent): User {
-            $target = $target->newQuery()->whereKey($target->id)->lockForUpdate()->firstOrFail();
+        $mutation = function () use ($actor, $target, $data, $ability, $notifyEmailChange, &$emailSent): User {
+            $target = \App\Models\User::whereKey($target->id)->lockForUpdate()->firstOrFail();
             Gate::forUser($actor)->authorize($ability, $target);
             $country = Country::where('uuid', $data->countryUuid)
                 ->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $target->country_id))->lockForUpdate()->firstOrFail();
@@ -170,7 +176,7 @@ class UserManagementService
             }
             $fields = array_keys($target->getDirty());
             $target->save();
-            if ($emailChanged) {
+            if ($emailChanged && $notifyEmailChange) {
                 $token = $wasVerified ? null : Password::broker('central')->createToken($target);
                 $target->getConnection()->afterCommit(function () use ($target, $token, &$emailSent): void {
                     $emailSent = $token === null ? $this->mail->verification($target) : $this->mail->invitation($target, $token);
@@ -214,7 +220,7 @@ class UserManagementService
     {
         $emailSent = null;
         $user = $this->mutations->run(function () use ($actor, $target, &$emailSent): User {
-            $target = User::whereKey($target->id)->lockForUpdate()->firstOrFail();
+            $target = \App\Models\User::whereKey($target->id)->lockForUpdate()->firstOrFail();
             Gate::forUser($actor)->authorize('resendInvitation', $target);
             if ($target->hasVerifiedEmail()) {
                 throw ValidationException::withMessages(['invitation' => 'Ce compte a déjà vérifié son adresse e-mail.']);

@@ -9,6 +9,16 @@ use Laravel\Fortify\Features;
 use Laravel\Passkeys\Passkey;
 use Laravel\Passkeys\Passkeys;
 
+function approvedAuthenticationMerchant(array $attributes = []): User
+{
+    $validator = User::factory()->create();
+
+    return User::factory()->create([
+        'legal_profile_version' => 1, 'legal_verification_status' => \App\Enums\VerificationStatusEnum::VERIFIED,
+        'legal_verified_at' => now(), 'legal_verified_by_id' => $validator->id, ...$attributes,
+    ]);
+}
+
 test('login screen can be rendered', function () {
     $response = $this->get(route('login'));
 
@@ -16,7 +26,7 @@ test('login screen can be rendered', function () {
 });
 
 test('users can authenticate using the login screen', function () {
-    $user = User::factory()->create();
+    $user = approvedAuthenticationMerchant();
 
     $response = $this->post(route('login.store'), [
         'email' => $user->email,
@@ -48,7 +58,7 @@ test('the central super admin can log in and open the dashboard', function (): v
 });
 
 test('login accepts an email with surrounding spaces and uppercase letters', function (): void {
-    $user = User::factory()->create(['email' => 'merchant@example.test']);
+    $user = approvedAuthenticationMerchant(['email' => 'merchant@example.test']);
 
     $this->post(route('login.store'), [
         'email' => '  MERCHANT@EXAMPLE.TEST  ',
@@ -59,7 +69,7 @@ test('login accepts an email with surrounding spaces and uppercase letters', fun
 });
 
 test('login updates an outdated password hash without changing the password', function (): void {
-    $user = User::factory()->create(['password' => Hash::make('password', ['rounds' => 4])]);
+    $user = approvedAuthenticationMerchant(['password' => Hash::make('password', ['rounds' => 4])]);
     $oldHash = $user->password;
     config(['hashing.bcrypt.rounds' => 5, 'hashing.rehash_on_login' => true]);
     Hash::forgetDrivers();

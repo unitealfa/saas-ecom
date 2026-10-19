@@ -6,6 +6,7 @@ use App\Enums\Central\Users\StatusEnum;
 use App\Models\Central\Tenant;
 use App\Models\Central\User;
 use App\Services\Central\Authorization\CentralUserAccess;
+use App\Enums\VerificationStatusEnum;
 
 class TenantPolicy
 {
@@ -34,9 +35,22 @@ class TenantPolicy
 
     public function createFirst(User $actor, User $owner): bool
     {
+        return $this->createOwned($actor, $owner);
+    }
+
+    public function createOwned(User $actor, User $owner): bool
+    {
         return $actor->id === $owner->id && ! $owner->trashed()
             && $owner->status === StatusEnum::ACTIVE && $owner->hasVerifiedEmail()
+            && $owner->legal_verification_status === VerificationStatusEnum::VERIFIED
+            && $owner->legal_verified_at !== null && $owner->legal_profile_version !== null
             && ! $this->access->isStaff($owner);
+    }
+
+    public function retryProvisioning(User $actor, Tenant $tenant): bool
+    {
+        return ! $tenant->trashed() && ($this->createOwned($actor, $tenant->owner)
+            || $this->allows($actor, 'saas.tenants.create'));
     }
 
     public function suspend(User $actor, Tenant $tenant): bool
@@ -46,7 +60,9 @@ class TenantPolicy
 
     public function activate(User $actor, Tenant $tenant): bool
     {
-        return ! $tenant->trashed() && $this->allows($actor, 'saas.tenants.activate');
+        return ! $tenant->trashed() && in_array($tenant->status, [\App\Enums\Central\Tenants\StatusEnum::INACTIVE,
+            \App\Enums\Central\Tenants\StatusEnum::SUSPENDED, \App\Enums\Central\Tenants\StatusEnum::OVER_QUOTA], true)
+            && $this->allows($actor, 'saas.tenants.activate');
     }
 
     public function archive(User $actor, Tenant $tenant): bool

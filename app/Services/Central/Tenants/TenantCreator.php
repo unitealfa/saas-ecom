@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use LogicException;
+use Illuminate\Database\UniqueConstraintViolationException;
 
 class TenantCreator
 {
@@ -33,11 +34,16 @@ class TenantCreator
         return $this->persist($owner, $owner, $data, true);
     }
 
-    private function persist(User $actor, User $owner, TenantData $data, bool $first): Tenant
+    public function createOwned(User $owner, TenantData $data): Tenant
     {
-        return $this->mutations->run(function () use ($actor, $owner, $data, $first): Tenant {
+        return $this->persist($owner, $owner, $data, false, true);
+    }
+
+    private function persist(User $actor, User $owner, TenantData $data, bool $first, bool $owned = false): Tenant
+    {
+        return $this->mutations->run(function () use ($actor, $owner, $data, $first, $owned): Tenant {
             $owner = User::whereKey($owner->id)->lockForUpdate()->firstOrFail();
-            Gate::forUser($actor)->authorize($first ? 'createFirst' : 'create', [Tenant::class, $owner]);
+            Gate::forUser($actor)->authorize($first || $owned ? 'createOwned' : 'create', [Tenant::class, $owner]);
             if ($owner->status !== StatusEnum::ACTIVE) {
                 throw ValidationException::withMessages(['shop_name' => 'Le compte propriétaire doit être actif.']);
             }
@@ -54,6 +60,9 @@ class TenantCreator
 
             if ($first && Tenant::where('user_id', $owner->id)->exists()) {
                 throw ValidationException::withMessages(['shop_name' => 'Votre première boutique est déjà configurée.']);
+            }
+            if ($owned && ! Tenant::where('user_id', $owner->id)->exists()) {
+                throw ValidationException::withMessages(['shop_name' => 'Configurez d’abord votre première boutique.']);
             }
 
             $subscription = $this->subscriptions->ensure($owner, $actor);
@@ -92,13 +101,19 @@ class TenantCreator
             $tenant->configureShopForProvisioning($data->settings->toArray());
             try {
                 $tenant->save();
+            } catch (UniqueConstraintViolationException $exception) {
+                throw ValidationException::withMessages(['slug' => 'Cette adresse de boutique est déjà réservée.']);
             } catch (LogicException $exception) {
                 throw ValidationException::withMessages(['slug' => 'Ce slug ou ce nom de base est réservé ou indisponible.']);
             }
-            $tenant->domains()->create([
-                'domain' => $domain, 'type' => 1, 'is_primary' => true,
-                'verification_status' => 2, 'verified_at' => now(),
-            ]);
+            try {
+                $tenant->domains()->create([
+                    'domain' => $domain, 'type' => 1, 'is_primary' => true,
+                    'verification_status' => 2, 'verified_at' => now(),
+                ]);
+            } catch (UniqueConstraintViolationException|\Stancl\Tenancy\Exceptions\DomainOccupiedByOtherTenantException) {
+                throw ValidationException::withMessages(['slug' => 'Ce domaine de boutique est déjà utilisé.']);
+            }
             $deployment = TenantSchemaDeployment::create([
                 'tenant_id' => $tenant->id, 'target_version' => pathinfo(end($versions), PATHINFO_FILENAME),
                 'operation' => OperationEnum::PROVISIONING, 'status' => DeploymentStatus::PENDING, 'attempt_number' => 1,

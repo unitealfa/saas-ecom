@@ -32,6 +32,9 @@ new class extends Component {
             </div>
         @endcan
     @else
+        @can('createOwned', [\App\Models\Central\Tenant::class, auth('central')->user()])
+            <div><flux:button :href="route('owner.shops.create')">Créer une boutique</flux:button></div>
+        @endcan
         <flux:callout>
             <flux:callout.heading>{{ __('Bienvenue dans votre espace commerçant.') }}</flux:callout.heading>
             <flux:callout.text>{{ __('Votre compte est actif. Vous trouverez vos boutiques ci-dessous. La gestion interne des boutiques sera disponible dans une prochaine étape.') }}</flux:callout.text>

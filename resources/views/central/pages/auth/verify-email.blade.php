@@ -22,6 +22,9 @@
         @if (session('status') === 'verification-link-sent')
             <flux:text role="status">Un nouvel e-mail de vérification a été envoyé.</flux:text>
         @endif
+        @if (session('status') && session('status') !== 'verification-link-sent')
+            <flux:callout>{{ session('status') }}</flux:callout>
+        @endif
         @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
         @isset($verificationError)<flux:text role="alert">{{ $verificationError }}</flux:text>@endisset
         <form method="POST" action="{{ route('verification.send') }}">

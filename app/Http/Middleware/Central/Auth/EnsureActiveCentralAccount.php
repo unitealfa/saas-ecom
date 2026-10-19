@@ -47,6 +47,9 @@ class EnsureActiveCentralAccount
                 }
                 return;
             }
+            if ($request->routeIs('central.contacts.verify', '*.central.contacts.verify')) {
+                return;
+            }
             if ($allowGuest && $request->routeIs('login', 'login.store', 'register', 'register.store', 'logout', 'verification.*', 'registration.status', '*.registration.status')) {
                 return;
             }

@@ -27,6 +27,47 @@ class TenantStatusService
         private CentralUserAccess $access,
     ) {}
 
+    public function completeProvisioning(Tenant $tenant, int $deploymentId): void
+    {
+        $this->mutations->run(function () use ($tenant, $deploymentId): void {
+            $owner = User::withTrashed()->whereKey($tenant->user_id)->lockForUpdate()->firstOrFail();
+            $shops = Tenant::where('user_id', $owner->id)->orderBy('id')->lockForUpdate()->get();
+            $tenant = $shops->firstWhere('id', $tenant->id);
+            $deployment = TenantSchemaDeployment::whereKey($deploymentId)->lockForUpdate()->firstOrFail();
+            if ($tenant === null || $deployment->tenant_id !== $tenant->id || $deployment->status !== DeploymentStatus::RUNNING) {
+                throw new \LogicException('The provisioning reservation is no longer current.');
+            }
+            $deployment->update(['status' => DeploymentStatus::SUCCEEDED, 'ended_at' => now()]);
+            if (! in_array($tenant->status, [StatusEnum::PROVISIONING, StatusEnum::PROVISIONING_FAILED], true)) {
+                return;
+            }
+            $this->profiles->assertPrepared($tenant, $owner);
+            try {
+                $this->assertOwnerEligible($owner);
+            } catch (ValidationException) {
+                $tenant->status = StatusEnum::INACTIVE;
+                $tenant->save();
+                activity()->performedOn($tenant)->event('tenant_provisioned_blocked')
+                    ->withProperties(['reason' => 'owner_ineligible', 'deployment_uuid' => $deployment->uuid])
+                    ->log('Boutique initialisée, accès bloqué par l’état du propriétaire.');
+                return;
+            }
+            $subscription = $this->subscriptions->ensure($owner);
+            $feature = Feature::where('code', 'shops')->where('is_active', true)->first();
+            $grant = $feature === null ? null : PlanFeature::where('plan_id', $subscription->plan_id)
+                ->where('feature_id', $feature->id)->lockForUpdate()->first();
+            if ($grant === null || ! $grant->is_active) {
+                $tenant->forceFill(['status' => StatusEnum::OVER_QUOTA, 'over_quota_since_at' => now()])->save();
+            } else {
+                $tenant->status = StatusEnum::ACTIVE;
+                $this->rebalance($owner, $owner, $shops, null, null);
+            }
+            activity()->performedOn($tenant)->event('tenant_provisioned')
+                ->withProperties(['status' => $tenant->status->value, 'deployment_uuid' => $deployment->uuid])
+                ->log('Boutique initialisée et état d’accès calculé automatiquement.');
+        });
+    }
+
     public function change(User $actor, Tenant $tenant, string $action, StatusEnum $expected, ?string $reason): void
     {
         abort_unless(in_array($action, ['suspend', 'activate', 'archive'], true), 403);
@@ -60,6 +101,9 @@ class TenantStatusService
                 }
                 $tenant->forceFill(['status' => StatusEnum::SUSPENDED, 'over_quota_since_at' => null])->save();
             } else {
+                if (! in_array($tenant->status, [StatusEnum::INACTIVE, StatusEnum::SUSPENDED, StatusEnum::OVER_QUOTA], true)) {
+                    throw ValidationException::withMessages(['tenant' => 'L’activation initiale est automatique après la préparation technique.']);
+                }
                 if ($deployments->isNotEmpty() || $tenant->status === StatusEnum::PROVISIONING_FAILED) {
                     throw ValidationException::withMessages(['tenant' => 'Terminez la préparation technique avant l’activation.']);
                 }

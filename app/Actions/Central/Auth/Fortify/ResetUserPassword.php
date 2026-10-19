@@ -28,11 +28,14 @@ class ResetUserPassword implements ResetsUserPasswords
 
         $user->getConnection()->transaction(function () use ($user, $input): void {
             $current = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
-            if ($current->email !== ($input['email'] ?? null)
-                || ! Password::broker('central')->tokenExists($current, $input['token'] ?? '')) {
+            $email = strtolower(trim($input['email'] ?? ''));
+            $ownsEmail = $current->email === $email || ($current->getConnection()->getSchemaBuilder()->hasTable('user_contacts')
+                && $current->contacts()->where('kind', 'email')->where('value', $email)->whereNotNull('verified_at')->exists());
+            $current->recoveryEmail = $email;
+            if (! $ownsEmail || ! Password::broker('central')->tokenExists($current, $input['token'] ?? '')) {
                 throw ValidationException::withMessages(['email' => 'Ce lien est invalide ou a expiré.']);
             }
-            $invited = ! $current->hasVerifiedEmail() && Activity::forSubject($current)
+            $invited = $email === $current->email && ! $current->hasVerifiedEmail() && Activity::forSubject($current)
                 ->whereIn('event', ['account_invited', 'account_invitation_requested'])->exists();
             $current->forceFill(['password' => $input['password']]);
             if ($invited) {
@@ -40,6 +43,10 @@ class ResetUserPassword implements ResetsUserPasswords
             }
             $current->save();
             Password::broker('central')->deleteToken($current);
+            if ($current->getConnection()->getSchemaBuilder()->hasTable('user_contacts')) {
+                $current->getConnection()->table('password_reset_tokens')->whereIn('email',
+                    $current->contacts()->where('kind', 'email')->select('value'))->delete();
+            }
             $user->setRawAttributes($current->getAttributes(), true);
             if ($invited) {
                 activity()->performedOn($current)->event('account_invitation_accepted')

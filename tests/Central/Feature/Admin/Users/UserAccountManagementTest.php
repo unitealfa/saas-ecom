@@ -211,7 +211,7 @@ test('changing the email removes the old password token and requires verificatio
     expect($updated->email_verified_at)->toBeNull();
     expect($updated->password)->toBe($password);
     expect(DB::table('password_reset_tokens')->where('email', $target->email)->exists())->toBeFalse();
-    Notification::assertSentTo(App\Models\Central\User::findOrFail($target->id), VerifyEmail::class);
+    Notification::assertSentTo(User::findOrFail($target->id), VerifyEmail::class);
 });
 
 test('editing an unverified account sends a fresh invitation and requests a new professional review', function (): void {
@@ -225,7 +225,7 @@ test('editing an unverified account sends a fresh invitation and requests a new 
     expect($updated->legal_verification_status)->toBe(VerificationStatusEnum::PENDING);
     expect($updated->legal_profile_version)->toBe(2);
     expect(DB::table('password_reset_tokens')->where('email', $target->email)->exists())->toBeFalse();
-    Notification::assertSentTo(App\Models\Central\User::findOrFail($target->id), AccountInvitation::class);
+    Notification::assertSentTo(User::findOrFail($target->id), AccountInvitation::class);
 });
 
 test('optional professional fields can all be cleared and the dossier validated again', function (): void {
@@ -296,7 +296,7 @@ test('an authorized invitation retry renews the token and verified accounts cann
     $oldToken = Password::broker('central')->createToken($target);
     $this->actingAs($this->admin, 'central')->get(route('central.users.show', $target))->assertOk()->assertSee('Renvoyer l’invitation');
     $this->post(route('central.users.invitation', $target))->assertSessionHasNoErrors()->assertSessionHas('status', 'L’invitation a été envoyée.');
-    Notification::assertSentTo(App\Models\Central\User::findOrFail($target->id), AccountInvitation::class);
+    Notification::assertSentTo(User::findOrFail($target->id), AccountInvitation::class);
     expect(Password::broker('central')->tokenExists($target, $oldToken))->toBeFalse();
     expect(Activity::where('event', 'account_invitation_requested')->count())->toBe(1);
     $verified = User::factory()->create();

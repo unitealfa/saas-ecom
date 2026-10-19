@@ -8,6 +8,7 @@
                 @foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach
             </flux:callout>
         @endif
+        <flux:button :href="route('central.users.contacts.index', $user)">Gérer les e-mails et téléphones</flux:button>
         <form method="POST" action="{{ route('central.users.update', $user) }}" class="flex flex-col gap-5">
             @csrf
             @method('PUT')

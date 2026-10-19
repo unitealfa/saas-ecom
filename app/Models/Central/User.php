@@ -100,6 +100,10 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             throw \Illuminate\Validation\ValidationException::withMessages(['phone' => 'La mise à jour des coordonnées est temporairement indisponible. Contactez l’administration.']);
         }
         if ($this->phone === null || trim($this->phone) === '') {
+            if ($this->exists && $this->getConnection()->getSchemaBuilder()->hasTable('user_contacts')
+                && $this->contacts()->where('kind', 'phone')->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['phone' => 'Choisissez un autre numéro principal avant de retirer celui-ci.']);
+            }
             $this->phone = null;
             $this->phone_country_id = null;
         } else {
@@ -127,15 +131,49 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function save(array $options = []): bool
     {
         try {
-            return parent::save($options);
+            return $this->getConnection()->transaction(function () use ($options): bool {
+                if ($this->exists) {
+                    self::withTrashed()->whereKey($this->id)->lockForUpdate()->firstOrFail();
+                }
+                return parent::save($options);
+            });
         } catch (\Illuminate\Database\UniqueConstraintViolationException $exception) {
             foreach (['phone', 'email'] as $field) {
                 if (str_contains($exception->getMessage(), 'users_'.$field.'_unique')) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([$field => 'Cette coordonnée est déjà attribuée à un compte.']);
+                    throw \Illuminate\Validation\ValidationException::withMessages([$field => $field === 'email'
+                        ? 'Cette adresse e-mail est déjà utilisée.' : 'Ce numéro de téléphone est déjà associé à un compte.']);
                 }
+            }
+            if (str_contains($exception->getMessage(), 'user_contacts_kind_value_unique')) {
+                $field = str_contains($exception->getMessage(), 'user_contacts_kind_value_unique:phone') ? 'phone' : 'email';
+                if (! str_contains($exception->getMessage(), 'user_contacts_kind_value_unique:') && $this->phone !== null
+                    && UserContact::where('kind', 'phone')->where('value', $this->phone)->where('user_id', '<>', $this->id)
+                        ->lockForUpdate()->exists()) {
+                    $field = 'phone';
+                }
+                throw \Illuminate\Validation\ValidationException::withMessages([$field => $field === 'email'
+                    ? 'Cette adresse e-mail est déjà utilisée.' : 'Ce numéro de téléphone est déjà associé à un compte.']);
             }
             throw $exception;
         }
+    }
+
+    public function contacts(): HasMany
+    {
+        return $this->hasMany(UserContact::class);
+    }
+
+    public ?string $recoveryEmail = null;
+
+    public function getEmailForPasswordReset(): string
+    {
+        return $this->recoveryEmail ?? $this->email;
+    }
+
+    public function routeNotificationForMail(?object $notification = null): string
+    {
+        return $notification instanceof \Illuminate\Auth\Notifications\ResetPassword
+            ? $this->getEmailForPasswordReset() : $this->email;
     }
 
     /** @return BelongsTo<Country, $this> */

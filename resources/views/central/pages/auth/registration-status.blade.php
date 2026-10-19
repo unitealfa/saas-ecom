@@ -1,4 +1,5 @@
 <x-layouts::auth title="Votre inscription Aydra">
+    @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
     <div class="space-y-6"
         x-data="{
             version: @js($progress['version']),
@@ -61,11 +62,14 @@
                     <flux:callout.heading>{{ $shop['name'] }}</flux:callout.heading>
                     <flux:text>État : {{ $shop['status'] }}</flux:text>
                     @if ($shop['failed'])
-                        <flux:callout.text>La préparation a échoué. L’équipe Aydra doit intervenir ; vous n’avez pas besoin de créer une nouvelle boutique.</flux:callout.text>
+                        <flux:callout.text>La préparation a échoué. Vos informations sont conservées et vous n’avez pas besoin de créer une nouvelle boutique.</flux:callout.text>
+                        @if ($shop['retry_url'])
+                            <form method="POST" action="{{ $shop['retry_url'] }}">@csrf <flux:button type="submit">Relancer la préparation</flux:button></form>
+                        @endif
                     @elseif (! $shop['prepared'])
                         <flux:callout.text>La préparation technique est en cours. Votre boutique n’est pas encore accessible.</flux:callout.text>
                     @else
-                        <flux:callout.text>La préparation technique est terminée. L’accès attend que cette boutique soit autorisée à devenir active.</flux:callout.text>
+                        <flux:callout.text>La préparation est terminée. L’accès reste limité par l’état du compte, du quota ou de la boutique. Aucune seconde approbation de boutique n’est demandée.</flux:callout.text>
                     @endif
                 </flux:callout>
             @endforeach

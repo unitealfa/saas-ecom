@@ -64,4 +64,9 @@ class StoreUserRequest extends FormRequest
             $data['country_uuid'], $data['account_kind'] === 'staff', $data['roles'] ?? [], $data['phone'] ?? null,
             array_intersect_key($data, array_flip(UserProfileData::PROFESSIONAL_FIELDS)), $data['phone_country_uuid'] ?? null);
     }
+
+    public function messages(): array
+    {
+        return ['email.unique' => 'Cette adresse e-mail est déjà utilisée.'];
+    }
 }

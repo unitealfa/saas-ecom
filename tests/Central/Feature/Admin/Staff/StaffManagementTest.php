@@ -49,7 +49,9 @@ test('staff listing separates merchants archived accounts and protected root wit
     Livewire::actingAs($this->admin, 'central')->test('central::pages.admin.staff.index')
         ->set('status', '4')->assertSee($archived->email)->assertDontSee($staff->email);
     $this->get(route('central.staff.show', $staff))->assertOk()->assertDontSee($staff->password)
-        ->assertDontSeeText($staff->uuid)->assertDontSee('Boutiques');
+        ->assertDontSeeText($staff->uuid)
+        ->assertDontSee('href="'.route('central.users.tenants.create', $staff).'"', false)
+        ->assertDontSee('Priorités des boutiques de '.$staff->name);
 });
 
 test('staff pages refuse guests merchants and ordinary readers including direct URLs', function (): void {
@@ -196,7 +198,7 @@ test('staff invitation resend has its own permission and refuses verified or sus
     $this->actingAs($actor, 'central')->get(route('central.staff.show', $staff))->assertOk()->assertSee('Renvoyer l’invitation');
     $this->post(route('central.staff.invitation', $staff))->assertSessionHasNoErrors();
     expect(Password::broker('central')->tokenExists($staff, $old))->toBeFalse();
-    Notification::assertSentTo(App\Models\Central\User::findOrFail($staff->id), AccountInvitation::class);
+    Notification::assertSentTo(User::findOrFail($staff->id), AccountInvitation::class);
     $verified = staffTestAccount();
     $this->post(route('central.staff.invitation', $verified))->assertForbidden();
     $staff->forceFill(['status' => StatusEnum::SUSPENDED])->save();
@@ -306,7 +308,7 @@ test('legacy users invitation accepts the staff resend permission without granti
     $this->actingAs($actor, 'central')->get(route('central.users.show', $staff))->assertOk()->assertSee('Renvoyer l’invitation');
     $this->post(route('central.users.invitation', $staff))->assertSessionHasNoErrors()
         ->assertRedirect(route('central.users.show', $staff));
-    Notification::assertSentTo(App\Models\Central\User::findOrFail($staff->id), AccountInvitation::class);
+    Notification::assertSentTo(User::findOrFail($staff->id), AccountInvitation::class);
     expect(Activity::forSubject($staff)->where('event', 'account_invitation_requested')->count())->toBe(1);
 });
 

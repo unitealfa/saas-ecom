@@ -8,6 +8,8 @@ use App\Models\Central\Activity;
 use App\Models\Central\Tenant;
 use App\Models\Central\User;
 use App\Services\Central\Authorization\CentralUserAccess;
+use Illuminate\Support\Facades\Gate;
+use App\Enums\VerificationStatusEnum;
 
 class RegistrationJourney
 {
@@ -36,10 +38,13 @@ class RegistrationJourney
             $state = 'rejected';
         } elseif ($this->access->isStaff($user)) {
             $state = 'ready';
+        } elseif ($user->legal_verification_status !== VerificationStatusEnum::VERIFIED || $user->legal_verified_at === null || $user->legal_profile_version === null) {
+            $state = 'pending';
         } else {
             $tenants = Tenant::where('user_id', $user->id)->orderBy('id')
-                ->get(['shop_name', 'status', 'schema_version', 'provisioned_at']);
-            $shops = $tenants->map(function (Tenant $tenant): array {
+                ->get(['id', 'uuid', 'user_id', 'shop_name', 'status', 'schema_version', 'provisioned_at']);
+            $shops = $tenants->map(function (Tenant $tenant) use ($user): array {
+                $tenant->setRelation('owner', $user);
                 $prepared = $tenant->provisioned_at !== null && filled($tenant->schema_version);
 
                 return [
@@ -48,6 +53,8 @@ class RegistrationJourney
                     'prepared' => $prepared,
                     'failed' => $tenant->status === TenantStatus::PROVISIONING_FAILED,
                     'ready' => $prepared && $tenant->status === TenantStatus::ACTIVE,
+                    'retry_url' => $tenant->status === TenantStatus::PROVISIONING_FAILED && Gate::forUser($user)->allows('retryProvisioning', $tenant)
+                        ? route('owner.shops.retry', $tenant) : null,
                 ];
             })->all();
             $state = $tenants->isEmpty() ? 'setup' : (array_any($shops, fn (array $shop): bool => $shop['ready']) ? 'ready' : 'preparing');

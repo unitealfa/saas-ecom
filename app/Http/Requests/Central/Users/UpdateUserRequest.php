@@ -73,4 +73,9 @@ class UpdateUserRequest extends FormRequest
             $data['phone'] ?? null, $data['country_uuid'],
             array_intersect_key($data, array_flip(['locale', ...UserProfileData::PROFESSIONAL_FIELDS])), $data['phone_country_uuid'] ?? null);
     }
+
+    public function messages(): array
+    {
+        return ['email.unique' => 'Cette adresse e-mail est déjà utilisée.'];
+    }
 }

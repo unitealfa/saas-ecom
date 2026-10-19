@@ -10,6 +10,7 @@
         </testsuite>
         <testsuite name="Feature">
             <directory>tests/Central/Feature</directory>
+            <directory>tests/Central/Integration</directory>
         </testsuite>
         <testsuite name="Tenancy">
             <directory>tests/Tenant</directory>

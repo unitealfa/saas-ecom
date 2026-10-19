@@ -3,6 +3,7 @@
 use App\Http\Controllers\Central\Auth\RegistrationStatusController;
 use App\Http\Controllers\Central\Dashboard\DashboardController;
 use App\Http\Controllers\Central\Owner\Tenants\FirstTenantController;
+use App\Http\Controllers\Central\Owner\Tenants\TenantController as OwnerTenantController;
 use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
 use Illuminate\Support\Facades\Route;
 
@@ -18,6 +19,9 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
 
     Route::get('premiere-boutique', [FirstTenantController::class, 'create'])->name('owner.first-shop');
     Route::post('premiere-boutique', [FirstTenantController::class, 'store'])->middleware('throttle:6,1')->name('owner.first-shop.store');
+    Route::get('boutiques/creer', [OwnerTenantController::class, 'create'])->name('owner.shops.create');
+    Route::post('boutiques', [OwnerTenantController::class, 'store'])->middleware('throttle:6,1')->name('owner.shops.store');
+    Route::post('boutiques/{tenant}/reessayer', [OwnerTenantController::class, 'retry'])->middleware('throttle:3,1')->name('owner.shops.retry');
 
     require __DIR__.'/central/admin.php';
 });

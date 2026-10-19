@@ -24,6 +24,13 @@
             <flux:callout>Cette boutique est archivée. Son activation n’est pas disponible.</flux:callout>
         @elseif ($tenant->status === \App\Enums\Central\Tenants\StatusEnum::ACTIVE)
             <flux:callout>Cette boutique est déjà active. Aucune activation supplémentaire n’est nécessaire.</flux:callout>
+        @elseif ($tenant->status === \App\Enums\Central\Tenants\StatusEnum::PROVISIONING)
+            <flux:callout>La préparation technique est en cours. La boutique deviendra automatiquement active après son initialisation si le propriétaire et son quota le permettent. Aucune validation de boutique supplémentaire n’est nécessaire.</flux:callout>
+        @elseif ($tenant->status === \App\Enums\Central\Tenants\StatusEnum::PROVISIONING_FAILED)
+            <flux:callout variant="warning">La préparation a échoué. Les informations sont conservées ; corrigez le problème technique puis demandez une reprise.</flux:callout>
+            @can('retryProvisioning', $tenant)
+                <form method="POST" action="{{ route('owner.shops.retry', $tenant) }}">@csrf <flux:button type="submit">Relancer la préparation</flux:button></form>
+            @endcan
         @else
             @cannot('activate', $tenant)
                 <flux:callout variant="warning">Votre compte ne possède pas la permission d’activer cette boutique. Contactez un administrateur habilité.</flux:callout>
@@ -31,7 +38,7 @@
                 @if ($tenant->status === \App\Enums\Central\Tenants\StatusEnum::PROVISIONING_FAILED)
                     <flux:callout variant="warning">Activation indisponible : la préparation de la base de données a échoué. Un responsable technique doit corriger l’erreur et relancer la préparation.</flux:callout>
                 @elseif ($tenant->schema_version === null || $tenant->provisioned_at === null)
-                    <flux:callout variant="warning">Activation indisponible : la préparation de la base de données de cette boutique n’est pas terminée. Un responsable technique doit vérifier le traitement de la file de préparation. Rechargez cette page après sa réussite : le bouton Activer apparaîtra.</flux:callout>
+                    <flux:callout variant="warning">La préparation technique de cette boutique doit être terminée avant de rétablir son accès.</flux:callout>
                 @endif
             @endcannot
         @endif
