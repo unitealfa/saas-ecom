@@ -1,6 +1,6 @@
 # Diagramme complet de la BDD centrale
 
-**Coordonnées centrales, Missions 9–10 confirmées :** plusieurs e-mails et téléphones par compte, un principal par type. `user_contacts` réserve toutes les valeurs (archives comprises). Les e-mails secondaires vérifiés servent aussi à la connexion et à la récupération Fortify. `users.email`/`phone` sont les projections principales synchronisées par triggers SQL ; téléphone E.164 et pays propre au numéro. Les deux migrations du 18 octobre restent non appliquées au MySQL existant : conflits à corriger manuellement, aucune suppression/fusion autorisée. Ce dessin décrit la cible, pas le déploiement actuel. Voir architecture §32–34.
+**Coordonnées centrales — décision du 19 octobre 2026 :** un e-mail et au maximum un téléphone par compte, directement dans users, avec unicité centrale et normalisation E.164. user_contacts et ses deux triggers sont retirés par migration corrective. Fortify utilise uniquement l’e-mail actuel ; changement soumis à vérification. Le téléphone reste obligatoire à l’inscription publique ; comptes historiques sans numéro conservés. Voir architecture §32–34.
 
 **Photos de profil, 13 octobre 2026 :** chaque compte possède une photo facultative et affiche public/default-avatar.svg en son absence. La photo personnelle est liée à users par media.model_type=central_user, media.model_id=users.id et collection_name=profile_photo ; au maximum un principal actif grâce à l’index existant. Ajout/remplacement/retrait dans le profil central, fichiers privés, URL signée et Policy Laravel, audit Activitylog. Aucun champ ajouté à users ni nouvelle table ; le fichier est séparé de la BDD.
 
@@ -14,7 +14,7 @@
 
 **Mise à jour technique du 8 octobre 2026 :** MySQL, Spatie Permission 8.3.0 et Activity Log 5.0.0. `created_at`/`updated_at` proviennent de `timestamps()` et `deleted_at` de `softDeletes()` pour les tables archivables ; ces TIMESTAMP sont nullable. Les dates métier restent des DATETIME. Les migrations de création Permission et Activity Log sont publiées par les commandes officielles Spatie ; deux migrations d'extension centrales conservent les UUID, durées et informations d'audit décrits ici. Les FK conservent RESTRICT ; les index natifs ne sont pas recréés en doublon. La suppression de `protect_central_identifiers_and_ownership` est conservée ; voir la mise à jour technique du schéma principal pour ses conséquences sur les triggers. Les 62 relations FK simples centrales et 192 locales utilisent `foreignId()` avec leur vraie contrainte SQL vers la PK du parent ; cette colonne conserve un ID existant, sans AUTO_INCREMENT. Les index ordinaires et UNIQUE sont définis dans les migrations de leurs tables. Les FK simples et composites dont les parents sont disponibles sont définies au même endroit ; les références vers un parent créé ensuite, notamment le cycle commande/révision, sont ajoutées dans `add_documented_foreign_keys`, avec mention dans la migration de création. Les contrats REF/POLY restent distincts.
 
-Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.10 du 6 octobre 2026, synchronisée avec les migrations présentes le 8 octobre 2026. Ce document présente **les 28 tables centrales cibles et leurs champs dans un seul diagramme Mermaid**, puis explique chaque table et chaque champ simplement. Les permissions SaaS portent leurs durées dans les tables existantes ; les quotas viennent des offres. Les migrations correspondantes sont vérifiées sur des bases MySQL de test isolées.
+Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md), version V4.10 du 6 octobre 2026, synchronisée avec les migrations présentes le 8 octobre 2026. Ce document présente **les 27 tables centrales cibles et leurs champs dans un seul diagramme Mermaid**, puis explique chaque table et chaque champ simplement. Les permissions SaaS portent leurs durées dans les tables existantes ; les quotas viennent des offres. Les migrations correspondantes sont vérifiées sur des bases MySQL de test isolées.
 
 **Identifiants :** `id` est un numéro interne auto-incrémenté (1, 2, 3…), jamais un UUID. `uuid` est un champ distinct et unique pour les liens publics et les références entre BDD. Les FK locales utilisent les ID numériques ; les trois pivots Spatie gardent leurs PK composites. Le contexte technique Tenancy utilise `tenants.id`, avec `id_generator=null`, tandis que les routes publiques utilisent `tenants.uuid`.
 
@@ -26,7 +26,7 @@ Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md),
 
 **Décision du 11 octobre 2026 :** le plan gratuit par défaut, code `free`, autorise deux boutiques par propriétaire avec la fonctionnalité `shops`. Les nouveaux comptes reçoivent cet abonnement type 1. La gestion centrale utilise Spatie Permission, Fortify et les tables existantes pour la réservation/provision des bases boutique ; voir le §20 du document d’architecture. Aucun champ ou lien Mermaid n’est ajouté par ce lot.
 
-## 1. Les 28 tables expliquées très simplement
+## 1. Les 27 tables expliquées très simplement
 
 **Initialisation des boutiques :** un propriétaire central peut posséder plusieurs lignes `tenants`. Les créations fonctionnelles passent par `TenantCreator` et un job central qui appelle `TenantProvisioner` après commit : migrations tenant, création de son unique profil `shop` et du compte propriétaire local. Les quatre réglages initiaux peuvent être fournis avant la sauvegarde via `Tenant::configureShopForProvisioning()` ; leurs défauts sont `OTHER`, `default`, `{"primary":"#2563EB","secondary":"#FFFFFF"}` et `7` jours. `tenants.data.tenancy_shop_settings` porte seulement l'intention technique de création jusqu'au succès, puis est libéré ; les réglages courants appartiennent à la BDD tenant. Aucune table centrale supplémentaire ni nouvelle contrainte singleton n'est créée. Après initialisation réussie, le job active automatiquement la boutique si le propriétaire et son quota sont éligibles, sans validation administrative supplémentaire. Suspension, inactivité et dépassement de quota restent des blocages légitimes. Voir architecture §33 pour le worker supervisé, les reprises et les contrôles d’accès ; aucune table ou colonne ajoutée par ce workflow.
 
@@ -38,7 +38,6 @@ Source : [Schema-BDD-SaaS-Ecommerce-UUID.md](Schema-BDD-SaaS-Ecommerce-UUID.md),
 | **`users`** | Les comptes des propriétaires et administrateurs du SaaS : prénom (first_name), nom de famille (last_name), e-mail, mot de passe protégé, téléphone, pays et informations professionnelles prévues. Le nom de chaque boutique est dans tenants.shop_name. |
 | **`tenants`** | La liste des boutiques : leur nom, leur propriétaire, leur état et les informations pour retrouver leur propre base de données. |
 | **`domains`** | Les adresses Internet des boutiques. Elle indique à quelle boutique appartient chaque adresse. |
-| **`user_contacts`** | Tous les e-mails et téléphones des comptes centraux ; leur propriétaire unique, pays du numéro, vérification et choix du principal. |
 | **`contact_verifications`** | Les demandes de vérification d’un e-mail ou d’un téléphone : code protégé, expiration, essais et résultat. |
 | **`features`** | Le catalogue des possibilités des abonnements. Exemple : pouvoir créer plusieurs boutiques ou utiliser une fonctionnalité particulière. |
 | **`permissions`** | La liste des actions qu’une personne peut être autorisée à faire. Exemple : gérer les offres ou valider un paiement. |
@@ -127,19 +126,6 @@ users {
   timestamp deleted_at "?"
 }
 
-user_contacts {
-  u64 id PK "AUTO_INCREMENT ; interne"
-  uuid uuid UK "UUID v4 ; public"
-  u64 user_id FK
-  u64 country_id FK "? ; telephone uniquement"
-  varchar kind "email ou phone"
-  varchar value "UNIQUE avec kind ; normalise"
-  datetime verified_at "?"
-  boolean is_primary "DEFAULT FALSE"
-  u8 primary_slot "? ; generated STORED ; 1 si principal sinon NULL"
-  timestamp created_at "?"
-  timestamp updated_at "?"
-}
 tenants {
   u64 id PK "AUTO_INCREMENT ; interne"
   uuid uuid UK "UUID v4 ; public"
@@ -626,8 +612,6 @@ pickup_points {
 countries ||..o{ users : "FK country_id"
 countries |o..o{ users : "FK phone_country_id"
 users |o..o{ users : "FK legal_verified_by_id"
-users ||..o{ user_contacts : "FK user_id"
-countries |o..o{ user_contacts : "FK country_id"
 users ||..o{ tenants : "FK user_id"
 tenants ||..o{ domains : "FK tenant_id"
 users ||..o{ contact_verifications : "FK user_id"
@@ -1484,21 +1468,3 @@ Décisions confirmées : first_name/last_name pour les personnes centrales et lo
 
 
 Les scénarios d’invitation, réactivation, concurrence et isolation propres aux boutiques sont détaillés en T24.1 ; les contrôles temporels et la protection des callbacks Spatie sont requis dans les deux modèles utilisateurs.
-
-### 28. `user_contacts` — 11 champs
-
-| Champ | Explication simple |
-|---|---|
-| id | Numéro interne de cette coordonnée. |
-| uuid | Référence publique aléatoire. |
-| user_id | Compte central qui possède cette coordonnée. |
-| country_id | Pays propre au téléphone ; vide pour un e-mail. |
-| kind | E-mail ou téléphone. |
-| value | E-mail en minuscules sans espaces externes, ou téléphone E.164. Le couple kind/value est unique au central. |
-| verified_at | Date de preuve réelle de possession, facultative. |
-| is_primary | Coordonnée principale du compte pour ce type. |
-| primary_slot | Champ SQL calculé : garantit un seul principal par type et compte. |
-| created_at | Date d’ajout. |
-| updated_at | Dernière modification. |
-
-UNIQUE(user_id,kind,primary_slot), UNIQUE(kind,value), UUID unique ; FK restrictives vers users et countries. Aucun transfert implicite entre propriétaires. Le remplacement conserve l’ancien principal comme secondaire ; sa suppression doit être explicite. La table contact_verifications conserve ses demandes de codes : elle n’est pas un registre de coordonnées.

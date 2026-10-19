@@ -45,9 +45,6 @@ function runCentralRace(array $operations): array
             app(App\Services\Central\Users\UserApprovalService::class)->decide($actor, $target,
                 $argv[5] === 'approve', $argv[5] === 'reject' ? 'Dossier refusé pendant la concurrence.' : null,
                 1, App\Enums\Central\Users\StatusEnum::PENDING);
-        } elseif ($argv[5] === 'secondary') {
-            $db->table('user_contacts')->insert(['uuid' => (string) Illuminate\Support\Str::uuid(), 'user_id' => (int) $argv[3],
-                'country_id' => (int) $argv[4], 'kind' => 'phone', 'value' => '+213779107446', 'is_primary' => false]);
         } else {
             $db->table('users')->where('id', (int) $argv[3])->update(['phone' => '+213779107446', 'phone_country_id' => (int) $argv[4]]);
         }
@@ -96,12 +93,12 @@ function runCentralRace(array $operations): array
     }
 }
 
-test('two real MySQL clients cannot assign the same secondary and primary phone to different accounts', function (): void {
+test('two real MySQL clients cannot assign the same phone to different accounts', function (): void {
     $first = User::factory()->create(['phone' => '0555123456']);
     $second = User::factory()->create();
-    expect(runCentralRace([[$first->id, $first->country_id, 'secondary'], [$second->id, $second->country_id, 'primary']]))
+    expect(runCentralRace([[$first->id, $first->country_id, 'primary'], [$second->id, $second->country_id, 'primary']]))
         ->toBe(['conflict', 'created']);
-    expect(DB::table('user_contacts')->where('kind', 'phone')->where('value', '+213779107446')->count())->toBe(1);
+    expect(DB::table('users')->where('phone', '+213779107446')->count())->toBe(1);
 });
 
 test('two real approval decisions cannot overwrite each other or desynchronize account and dossier', function (): void {

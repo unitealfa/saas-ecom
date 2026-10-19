@@ -79,7 +79,6 @@
             <flux:text>Votre dossier est actuellement en attente de validation par notre équipe.</flux:text>
             <flux:text>Vous ne pouvez pas encore accéder à votre espace commerçant. Après approbation, vous pourrez créer votre première boutique.</flux:text>
         @endif
-        <flux:text>Cette page vérifie automatiquement votre situation toutes les 15 secondes lorsqu’elle est visible.</flux:text>
         <p x-cloak x-show="refreshFailed" role="status" class="text-sm text-zinc-600 dark:text-zinc-400">L’actualisation automatique est momentanément indisponible. Vous pouvez utiliser le bouton ci-dessous.</p>
         <flux:button :href="route('registration.status')">Actualiser mon statut</flux:button>
         <form method="POST" action="{{ route('logout') }}">@csrf <flux:button type="submit" variant="ghost">Se déconnecter</flux:button></form>

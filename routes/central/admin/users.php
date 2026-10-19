@@ -6,13 +6,6 @@ use App\Http\Controllers\Central\Admin\Users\UserController;
 use App\Http\Controllers\Central\Admin\Users\UserRoleController;
 use Illuminate\Support\Facades\Route;
 
-Route::controller(\App\Http\Controllers\Central\Admin\Users\UserContactController::class)->group(function () {
-    Route::get('admin/users/{user}/contacts', 'index')->name('central.users.contacts.index');
-    Route::post('admin/users/{user}/contacts', 'store')->middleware('throttle:6,1')->name('central.users.contacts.store');
-    Route::put('admin/users/{user}/contacts/{contact}/primary', 'primary')->name('central.users.contacts.primary');
-    Route::delete('admin/users/{user}/contacts/{contact}', 'destroy')->name('central.users.contacts.destroy');
-    Route::post('admin/users/{user}/contacts/{contact}/verify', 'resend')->middleware('throttle:6,1')->name('central.users.contacts.resend');
-});
 
 Route::livewire('admin/users', 'central::pages.admin.users.index')
     ->middleware('can:viewAny,App\\Models\\User')->name('central.users.index');

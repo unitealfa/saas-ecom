@@ -133,7 +133,6 @@ new #[Title('Profile settings')] class extends Component {
 
     <x-pages::settings.layout :heading="__('Profile')" :subheading="__('Update your name and email address')">
         @include('central.partials.profile-photo-form')
-        <flux:button :href="route('central.contacts.index')">Gérer mes e-mails et téléphones</flux:button>
         @if (session('warning'))<flux:callout variant="warning">{{ session('warning') }}</flux:callout>@endif
         <form wire:submit="updateProfileInformation" class="my-6 w-full space-y-6">
             <flux:input wire:model="name" :label="__('Name')" type="text" required autofocus autocomplete="name" />

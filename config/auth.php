@@ -67,7 +67,7 @@ return [
 
     'providers' => [
         'central_users' => [
-            'driver' => 'central_contacts',
+            'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
         ],
         'tenant_users' => [

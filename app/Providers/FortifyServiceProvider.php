@@ -50,8 +50,6 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        \Illuminate\Support\Facades\Auth::provider('central_contacts', fn ($app, array $config) =>
-            new \App\Services\Central\Auth\ContactUserProvider($app['hash'], $config['model']));
         $this->configureActions();
         $this->configureAuthentication();
         $this->configureViews();

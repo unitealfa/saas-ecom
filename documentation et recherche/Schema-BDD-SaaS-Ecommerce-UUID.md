@@ -444,19 +444,6 @@ erDiagram
         timestamp updated_at "nullable"
         timestamp deleted_at "nullable"
     }
-user_contacts {
-  u64 id PK "AUTO_INCREMENT ; interne"
-  uuid uuid UK "UUID v4 ; public"
-  u64 user_id FK
-  u64 country_id FK "nullable ; telephone uniquement"
-  varchar kind "email ou phone"
-  varchar value "UNIQUE avec kind ; normalise"
-  datetime verified_at "nullable"
-  boolean is_primary "DEFAULT FALSE"
-  u8 primary_slot "nullable ; generated STORED ; 1 si principal sinon NULL"
-  timestamp created_at "nullable"
-  timestamp updated_at "nullable"
-}
     tenants {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
@@ -509,8 +496,6 @@ user_contacts {
     }
     countries ||--o{ users : country_id
     countries |o--o{ users : phone_country_id
-    users ||--o{ user_contacts : user_id
-    countries |o--o{ user_contacts : country_id
     users ||--o{ tenants : user_id
     tenants ||--o{ domains : tenant_id
     users ||--o{ contact_verifications : user_id
@@ -5881,7 +5866,7 @@ Les noms/adaptations et décisions de connexion/quota/délégation, ainsi que le
 
 ## Annexe Inventaire complet
 
-### BDD centrale — 28 tables cibles (registre user_contacts ajouté par Missions 9–10)
+### BDD centrale — 27 tables cibles (coordonnées uniques dans users)
 
 1. `countries`
 2. `users`
@@ -5910,7 +5895,6 @@ Les noms/adaptations et décisions de connexion/quota/délégation, ainsi que le
 25. `shipping_carriers`
 26. `carrier_geo_mappings`
 27. `pickup_points`
-28. `user_contacts`
 
 ### BDD boutique — 59 tables
 
@@ -5974,13 +5958,11 @@ Les noms/adaptations et décisions de connexion/quota/délégation, ainsi que le
 58. `carrier_accounts`
 59. `carrier_remittance_batches`
 
-### Décision du 18 octobre 2026 — coordonnées centrales (Missions 5–6)
+### Décision du 19 octobre 2026 — coordonnées centrales uniques
 
-La confirmation Missions 9–10 remplace la restriction antérieure : plusieurs e-mails et téléphones par compte central, avec un principal par type. La nouvelle table user_contacts réserve toutes les valeurs normalisées, comptes archivés compris. users.email/phone conservent les projections principales, synchronisées dans la même instruction SQL par triggers. Le téléphone reste obligatoire à l’inscription publique ; aucune valeur fictive pour les comptes historiques.
+Un seul e-mail et au maximum un téléphone par compte central, directement dans users. UNIQUE(email), UNIQUE(phone) et normalisation E.164 sont conservés, archives comprises. Téléphone obligatoire à l’inscription publique ; champs historiques absents conservés sans valeur fictive. users.phone_country_id reste une FK réelle vers countries, indépendante du pays du profil. Pays actifs pour les nouvelles sélections, références historiques conservées.
 
-users.country_id décrit le pays du profil. Nouvelle FK users.phone_country_id → countries.id, nullable uniquement en l’absence de téléphone : pays propre au numéro, conservé indépendamment du profil. Le CHECK impose un téléphone E.164 associé à un pays, ou l’absence des deux. La sélection initiale du composant téléphone renseigne le pays du profil ; les changements ultérieurs sont indépendants. Les indicatifs sont calculés par libphonenumber avec le code ISO existant, sans colonne redondante. Les pays inactifs restent utilisables comme référence historique pour un numéro inchangé, mais ne sont pas proposés pour une nouvelle sélection. Les codes partagés exigent toujours le choix du pays ISO.
-
-Évolution préparée, non appliquée : 2026_10_18_105836_add_international_phone_identity_to_users_table.php. L’audit s’arrête sur les données invalides et les doublons, sans fusion ni suppression. L’utilisateur corrige les conflits avant migration ; procédure de déploiement et composants dans architecture §32. Fortify, les invitations, vérifications et réinitialisations utilisent le principal et les secondaires vérifiés pour la connexion et la récupération (architecture §34). Toute adresse de remplacement reste non vérifiée tant que sa possession n’est pas prouvée. Les comptes locaux Tenant sont indépendants, sans unicité inter-BDD ajoutée.
+Fortify, notifications, activation et récupération utilisent uniquement l’e-mail actuel ; sa modification exige une nouvelle preuve. Aucun secondaire ni registre parallèle. La migration corrective 2026_10_19_053933 retire user_contacts et ses deux triggers après vérification des projections et de l’absence de secondaires. Sauvegarde privée préalable et retrait réel autorisés le 19 octobre ; aucun compte ou boutique supprimé. Les migrations historiques restent conservées. Cette décision remplace les coordonnées multiples des Missions 9–10 ; les comptes locaux Tenant restent indépendants.
 
 ### Décision du 18 octobre 2026 — création et disponibilité des boutiques (Missions 7–8)
 
@@ -5989,8 +5971,3 @@ Aucune seconde approbation administrative d’une boutique : création explicite
 Le job termine l’initialisation technique par une transaction centrale : état d’opération SUCCEEDED et activation automatique si propriétaire/quota éligibles. Les contrôles d’état et de quota restent nécessaires ; suspension, inactivité et dépassement ne sont pas une nouvelle validation de boutique. Réactivation administrative conservée pour ces situations légitimes, pas pour PROVISIONING. Échecs et reprises réutilisent la réservation, les paramètres et la base ; verrou MySQL de provisionnement et clé d’idempotence empêchent les doubles créations. Aucune colonne ou table ajoutée.
 
 Connexion de queue central-provisioning, file tenant-provisioning, jobs/failed_jobs dans la BDD centrale. Worker local géré par une tâche Windows propre au projet et à l’utilisateur ; Supervisor prévu en production Linux. Commandes, garde-fous et fichiers dans architecture §33 ; les scripts et le terminal manuels ne remplacent pas cette supervision.
-### Missions 9–10 — registre des coordonnées centrales
-
-Migration additive 2026_10_18_172424_create_user_contacts_table.php, après l’évolution téléphonique. UNIQUE(kind,value), UNIQUE(user_id,kind,primary_slot), UUID unique ; FK réelles user_id/country_id restrictives. CHECK email normalisé et téléphone E.164, indicatif dérivé de countries.code via libphonenumber. Vérification des secondaires par URL signée expirante et compte propriétaire connecté. Gestion personnelle et administrative réutilisant UserPolicy ; recherche autorisée sur toutes les coordonnées. Changer un principal conserve l’ancien secondaire ; suppression du principal interdite avant remplacement. Les e-mails secondaires vérifiés servent à Fortify et à son broker de récupération, avec notification à l’adresse demandée et invalidation des tokens lors d’une suppression ou d’un changement de mot de passe.
-
-Aucune migration de ce lot appliquée aux bases existantes : deux numéros invalides et deux groupes de doublons doivent être corrigés par l’utilisateur. Aucun compte supprimé/fusionné ni coordonnée transférée. Les comptes locaux Tenant gardent leur portée propre ; ce registre concerne uniquement le central. Tests, observations et limites consignés dans Suivi-Developpement-Aydra.md.
