@@ -21,7 +21,7 @@ class UserApprovalService
     {
         Gate::forUser($actor)->authorize('viewAny', User::class);
 
-        return User::where('status', StatusEnum::PENDING->value)
+        return User::withStatus(StatusEnum::PENDING)
             ->select(['id', 'uuid', 'first_name', 'last_name', 'email', 'phone', 'country_id', 'status', 'legal_profile_version', 'legal_verification_status', 'created_at'])
             ->with(['country:id,name_fr', 'roles:id,guard_name,is_super_admin'])
             ->orderBy('created_at')->orderBy('id')->paginate(20);

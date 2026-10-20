@@ -7,6 +7,7 @@ use App\Enums\Central\Features\PeriodEnum;
 use App\Enums\Central\Features\QuotaScopeEnum;
 use App\Enums\Central\Features\ValueTypeEnum;
 use Database\Factories\Central\FeatureFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -25,6 +26,15 @@ class Feature extends Model
     use CentralConnection, HasFactory, HasPublicUuid, SoftDeletes;
 
     protected $fillable = ['code', 'name', 'value_type', 'unit', 'quota_scope', 'period', 'is_active'];
+
+    /**
+     * @param Builder<static> $query
+     * @return Builder<static>
+     */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
+    }
 
     protected static function newFactory(): FeatureFactory
     {

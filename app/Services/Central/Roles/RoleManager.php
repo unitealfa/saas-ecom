@@ -56,7 +56,7 @@ class RoleManager
                     }
                 }
             }
-            $permissions = Permission::where('guard_name', 'central')
+            $permissions = Permission::forCentralGuard()
                 ->whereIn('name', array_keys(CentralRoleCatalog::PERMISSIONS))
                 ->whereIn('uuid', array_keys($durations))->orderBy('id')->lockForUpdate()->get();
             if ($permissions->isEmpty() || $permissions->count() !== count($durations)) {
@@ -75,7 +75,7 @@ class RoleManager
                 $parts[] = [$permission->id, $days];
             }
             $signature = hash('sha256', json_encode($parts, JSON_THROW_ON_ERROR));
-            $duplicates = Role::where('guard_name', 'central')->where(function ($query) use ($name, $signature): void {
+            $duplicates = Role::forCentralGuard()->where(function ($query) use ($name, $signature): void {
                 $query->where('name', $name)->orWhere('permission_signature', $signature);
             });
             if ($role !== null) {

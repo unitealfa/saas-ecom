@@ -24,7 +24,7 @@ class AuthorizationMutation
         $connection = (new Role)->getConnection();
         try {
             return $connection->transaction(function () use ($mutation, $connection): mixed {
-                Role::where('guard_name', 'central')->where('is_super_admin', true)
+                Role::forCentralGuard()->where('is_super_admin', true)
                     ->where('is_system', true)->where('is_protected', true)->lockForUpdate()->firstOrFail();
                 $result = $mutation();
                 $connection->afterCommit(fn () => app(PermissionRegistrar::class)->forgetCachedPermissions());

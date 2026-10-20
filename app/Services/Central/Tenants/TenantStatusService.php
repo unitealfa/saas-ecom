@@ -53,7 +53,7 @@ class TenantStatusService
                 return;
             }
             $subscription = $this->subscriptions->ensure($owner);
-            $feature = Feature::where('code', 'shops')->where('is_active', true)->first();
+            $feature = Feature::where('code', 'shops')->active()->first();
             $grant = $feature === null ? null : PlanFeature::where('plan_id', $subscription->plan_id)
                 ->where('feature_id', $feature->id)->lockForUpdate()->first();
             if ($grant === null || ! $grant->is_active) {
@@ -162,7 +162,7 @@ class TenantStatusService
     private function rebalance(User $actor, User $owner, Collection $shops, ?Tenant $requested, ?string $reason): void
     {
         $subscription = $this->subscriptions->ensure($owner, $actor);
-        $feature = Feature::where('code', 'shops')->where('is_active', true)->firstOrFail();
+        $feature = Feature::where('code', 'shops')->active()->firstOrFail();
         $grant = PlanFeature::where('plan_id', $subscription->plan_id)->where('feature_id', $feature->id)->lockForUpdate()->first();
         if ($grant === null || ! $grant->is_active) {
             throw ValidationException::withMessages(['tenant' => 'L’offre applicable ne permet pas d’activer une boutique.']);

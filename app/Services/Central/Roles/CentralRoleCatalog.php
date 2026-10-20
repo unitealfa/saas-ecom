@@ -95,7 +95,7 @@ class CentralRoleCatalog
 
         $connection = (new Role)->getConnection();
         $connection->transaction(function (): void {
-            $root = Role::where('guard_name', 'central')->where('is_super_admin', true)->first();
+            $root = Role::forCentralGuard()->where('is_super_admin', true)->first();
             if ($root === null) {
                 $root = new Role(['name' => 'root', 'label' => 'Super Admin']);
                 $root->forceFill(['is_system' => true, 'is_protected' => true, 'is_super_admin' => true])->save();
@@ -106,9 +106,9 @@ class CentralRoleCatalog
             }
 
             foreach (['saas.users.restore' => 'saas.users.activate', 'saas.users.delete' => 'saas.users.archive', 'saas.staff.restore' => 'saas.staff.activate', 'saas.staff.delete' => 'saas.staff.archive'] as $old => $new) {
-                $legacy = Permission::where('guard_name', 'central')->where('name', $old)->first();
+                $legacy = Permission::forCentralGuard()->where('name', $old)->first();
                 if ($legacy !== null) {
-                    if (Permission::where('guard_name', 'central')->where('name', $new)->exists()) {
+                    if (Permission::forCentralGuard()->where('name', $new)->exists()) {
                         throw new LogicException('Conflicting permission names require an explicit migration: '.$old.' / '.$new);
                     }
                     $legacy->forceFill(['name' => $new])->save();
@@ -121,7 +121,7 @@ class CentralRoleCatalog
 
             foreach (self::ROLES as $name => $definition) {
                 $expected = array_fill_keys($definition['permissions'], 9999);
-                $role = Role::where('name', $name)->where('guard_name', 'central')->lockForUpdate()->first();
+                $role = Role::where('name', $name)->forCentralGuard()->lockForUpdate()->first();
                 if ($role === null) {
                     $role = Role::createWithPermissions($name, $expected);
                     $role->forceFill(['label' => $definition['label'], 'is_system' => true, 'is_protected' => true])->save();

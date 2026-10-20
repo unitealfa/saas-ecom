@@ -50,7 +50,7 @@ class TenantManagementService
     public function owners(User $actor, ?string $search): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize('create', Tenant::class);
-        $query = User::where('status', UserStatus::ACTIVE)->whereDoesntHave('roles', fn ($roles) => $roles->where('guard_name', 'central'));
+        $query = User::withStatus(UserStatus::ACTIVE)->whereDoesntHave('roles', fn ($roles) => $roles->where('guard_name', 'central'));
         if (filled($search)) {
             $pattern = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
             $query->where(fn ($query) => $query->where('first_name', 'like', $pattern)->orWhere('last_name', 'like', $pattern)->orWhere('email', 'like', $pattern));

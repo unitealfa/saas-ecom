@@ -23,7 +23,7 @@ class RoleController extends Controller
     {
         Gate::authorize('viewAny', Role::class);
 
-        $query = Role::where('guard_name', 'central');
+        $query = Role::forCentralGuard();
         if (Gate::allows('viewPermissions', new Role)) {
             $query->with('permissions');
         }
@@ -95,7 +95,7 @@ class RoleController extends Controller
         $canChangeDurations = $role === null || Gate::allows('updateDurations', $role);
         $permissions = collect();
         if ($canChangePermissions) {
-            $permissions = Permission::where('guard_name', 'central')->whereIn('name', array_keys(CentralRoleCatalog::PERMISSIONS))
+            $permissions = Permission::forCentralGuard()->whereIn('name', array_keys(CentralRoleCatalog::PERMISSIONS))
                 ->orderBy('id')->get()->filter(fn (Permission $permission): bool => $this->access->ownsPermission($actor, $permission->name));
         } elseif ($canChangeDurations) {
             $permissions = $role->permissions()->orderBy('permissions.id')->get();

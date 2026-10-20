@@ -7,6 +7,7 @@ use App\Services\Central\Countries\CountryCatalog;
 use Database\Factories\Central\CountryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -43,12 +44,21 @@ class Country extends Model
         return app(\App\Services\Central\Users\PhoneNumberNormalizer::class)->callingCode($this->code);
     }
 
-    public function scopeActive($query)
+    /**
+     * @param Builder<static> $query
+     * @return Builder<static>
+     */
+    public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
     }
-    public function scopeInactive($query, $value)
+
+    /**
+     * @param Builder<static> $query
+     * @return Builder<static>
+     */
+    public function scopeInactive(Builder $query): Builder
     {
-        return $query->where('is_active', $value);
+        return $query->where('is_active', false);
     }
 }

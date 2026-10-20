@@ -5,6 +5,7 @@ namespace App\Models\Central;
 use App\Concerns\HasPublicUuid;
 use App\Concerns\HasRoleMetadata;
 use App\Concerns\LogsSafeActivity;
+use Illuminate\Database\Eloquent\Builder;
 use Spatie\Permission\Models\Role as PackageRole;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
@@ -17,6 +18,15 @@ class Role extends PackageRole
     protected $attributes = ['guard_name' => 'central', 'is_system' => false, 'is_protected' => false, 'is_super_admin' => false, 'permission_version' => 1];
 
     protected $fillable = ['name', 'label'];
+
+    /**
+     * @param Builder<static> $query
+     * @return Builder<static>
+     */
+    public function scopeForCentralGuard(Builder $query): Builder
+    {
+        return $query->where('guard_name', 'central');
+    }
 
     /** @return array<string, string> */
     protected function casts(): array

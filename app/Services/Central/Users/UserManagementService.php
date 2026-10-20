@@ -47,7 +47,7 @@ class UserManagementService
             $query->onlyTrashed();
         }
         if ($status !== null) {
-            $query->where('status', $status->value);
+            $query->withStatus($status);
         }
         if (trim($search) !== '') {
             $query->where(function ($query) use ($search): void {
@@ -87,7 +87,7 @@ class UserManagementService
             if ($data->staff && $roles->isEmpty()) {
                 throw ValidationException::withMessages(['roles' => 'Sélectionnez au moins un rôle pour le personnel SaaS.']);
             }
-            $country = Country::where('uuid', $data->countryUuid)->where('is_active', true)->lockForUpdate()->first();
+            $country = Country::where('uuid', $data->countryUuid)->active()->lockForUpdate()->first();
             if ($country === null) {
                 throw ValidationException::withMessages(['country_uuid' => 'Ce pays n’est plus disponible.']);
             }
@@ -132,7 +132,7 @@ class UserManagementService
             $target = \App\Models\User::whereKey($target->id)->lockForUpdate()->firstOrFail();
             Gate::forUser($actor)->authorize($ability, $target);
             $country = Country::where('uuid', $data->countryUuid)
-                ->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $target->country_id))->lockForUpdate()->firstOrFail();
+                ->where(fn ($query) => $query->active()->orWhere('id', $target->country_id))->lockForUpdate()->firstOrFail();
             $emailChanged = $target->email !== strtolower(trim($data->email));
             $wasVerified = $target->hasVerifiedEmail();
             if ($emailChanged) {
@@ -296,7 +296,7 @@ class UserManagementService
     /** @return Collection<int, Role> */
     public function availableRoles(User $actor): Collection
     {
-        return Role::where('guard_name', 'central')->where('is_super_admin', false)->with('permissions')
+        return Role::forCentralGuard()->where('is_super_admin', false)->with('permissions')
             ->orderBy('name')->get()->filter(fn (Role $role): bool => $this->access->mayDelegateRole($actor, $role)
                 && $role->permissions->isNotEmpty()
                 && $role->permissions->every(fn ($permission): bool => array_key_exists($permission->name, CentralRoleCatalog::PERMISSIONS)
@@ -309,7 +309,7 @@ class UserManagementService
      */
     private function delegableRoles(User $actor, array $uuids): Collection
     {
-        $roles = Role::where('guard_name', 'central')->whereIn('uuid', $uuids)
+        $roles = Role::forCentralGuard()->whereIn('uuid', $uuids)
             ->orderBy('id')->lockForUpdate()->get();
         if ($roles->count() !== count(array_unique($uuids))) {
             throw ValidationException::withMessages(['roles' => 'Un rôle sélectionné n’est plus disponible.']);

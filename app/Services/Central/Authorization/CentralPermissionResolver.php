@@ -20,7 +20,7 @@ class CentralPermissionResolver
         $now = now();
         $roles = $target->roles;
         $root = $roles->first(fn ($role): bool => $role->getAttribute('is_super_admin') && $role->pivot->assigned_at <= $now);
-        $permissions = $root === null ? $target->getAllPermissions()->sortBy('name') : Permission::where('guard_name', 'central')->orderBy('name')->get();
+        $permissions = $root === null ? $target->getAllPermissions()->sortBy('name') : Permission::forCentralGuard()->orderBy('name')->get();
 
         return $permissions->map(function ($permission) use ($target, $roles, $root, $active, $now): array {
             $sources = [];

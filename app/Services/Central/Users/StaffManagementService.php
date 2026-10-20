@@ -29,7 +29,7 @@ class StaffManagementService
             $query->onlyTrashed();
         }
         if ($status !== null) {
-            $query->where('status', $status->value);
+            $query->withStatus($status);
         }
         if (trim($search) !== '') {
             $query->where(function ($query) use ($search): void {

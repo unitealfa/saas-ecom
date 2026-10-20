@@ -44,7 +44,7 @@ class CreateNewUser implements CreatesNewUsers
         ], ['email.unique' => 'Cette adresse e-mail est déjà utilisée.'])->validate();
 
         return (new User)->getConnection()->transaction(function () use ($input): User {
-            $country = Country::where('uuid', $input['country_uuid'])->where('is_active', true)->lockForUpdate()->first();
+            $country = Country::where('uuid', $input['country_uuid'])->active()->lockForUpdate()->first();
             if ($country === null) {
                 throw ValidationException::withMessages(['country_uuid' => 'Ce pays n’est plus disponible.']);
             }

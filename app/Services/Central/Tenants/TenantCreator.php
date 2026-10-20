@@ -66,7 +66,7 @@ class TenantCreator
             }
 
             $subscription = $this->subscriptions->ensure($owner, $actor);
-            $quotaFeature = Feature::where('code', 'shops')->where('is_active', true)->firstOrFail();
+            $quotaFeature = Feature::where('code', 'shops')->active()->firstOrFail();
             $quota = PlanFeature::where('plan_id', $subscription->plan_id)->where('feature_id', $quotaFeature->id)
                 ->lockForUpdate()->first();
             if ($quota === null || ! $quota->is_active) {

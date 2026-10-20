@@ -14,7 +14,7 @@ class PermissionCatalogService
     public function paginate(User $actor, ?string $search = null): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize('viewAny', Permission::class);
-        $query = Permission::where('guard_name', 'central');
+        $query = Permission::forCentralGuard();
         if ($search !== null && $search !== '') {
             $pattern = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
             $query->where(function ($query) use ($pattern): void {
