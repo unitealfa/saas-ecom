@@ -7,8 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Users\ChangeStaffStatusRequest;
 use App\Http\Requests\Central\Users\StoreStaffRequest;
 use App\Http\Requests\Central\Users\UpdateStaffRequest;
-use App\Models\Central\Country;
 use App\Models\Central\User;
+use App\Services\Central\Countries\CountryCatalog;
 use App\Services\Central\Users\StaffInvitationService;
 use App\Services\Central\Users\StaffManagementService;
 use App\Services\Central\Users\UserManagementService;
@@ -19,13 +19,15 @@ use Illuminate\Support\Facades\Gate;
 
 class StaffController extends Controller
 {
+    public function __construct(private CountryCatalog $countries) {}
+
     public function create(Request $request, UserManagementService $users): View
     {
         $actor = $this->actor($request);
         Gate::forUser($actor)->authorize('createStaff', User::class);
 
         return view('central.pages.admin.staff.create', [
-            'countries' => Country::where('is_active', true)->orderBy('name_fr')->get(),
+            'countries' => $this->countries->active(),
             'roles' => $users->availableRoles($actor),
         ]);
     }
@@ -53,10 +55,8 @@ class StaffController extends Controller
 
         return view('central.pages.admin.staff.edit', [
             'user' => $user->load(['country', 'phoneCountry']),
-            'phoneCountries' => Country::withTrashed()->where(fn ($query) => $query->where('is_active', true)->whereNull('deleted_at')
-                ->orWhere('id', $user->phone_country_id))->orderBy('name_fr')->get(),
-            'countries' => Country::where(fn ($query) => $query->where('is_active', true)->orWhere('id', $user->country_id))
-                ->orderBy('name_fr')->get(),
+            'phoneCountries' => $this->countries->forPhone($user->phone_country_id),
+            'countries' => $this->countries->forProfile($user->country_id),
         ]);
     }
 

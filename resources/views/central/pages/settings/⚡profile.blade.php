@@ -74,15 +74,13 @@ new #[Title('Profile settings')] class extends Component {
     #[Computed]
     public function countries()
     {
-        return \App\Models\Central\Country::query()->where(fn ($query) => $query->where('is_active', true)
-            ->orWhere('id', Auth::user()->country_id))->orderBy('name_fr')->get();
+        return app(\App\Services\Central\Countries\CountryCatalog::class)->forProfile(Auth::user()->country_id);
     }
 
     #[Computed]
     public function phoneCountries()
     {
-        return \App\Models\Central\Country::withTrashed()->where(fn ($query) => $query->where('is_active', true)->whereNull('deleted_at')
-            ->orWhere('id', Auth::user()->phone_country_id))->orderBy('name_fr')->get();
+        return app(\App\Services\Central\Countries\CountryCatalog::class)->forPhone(Auth::user()->phone_country_id);
     }
 
     /* @chisel-email-verification */

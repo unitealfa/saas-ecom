@@ -17,11 +17,18 @@ Route::get('inscription/statut', RegistrationStatusController::class)
 Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class])->group(function (): void {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
-    Route::get('premiere-boutique', [FirstTenantController::class, 'create'])->name('owner.first-shop');
-    Route::post('premiere-boutique', [FirstTenantController::class, 'store'])->middleware('throttle:6,1')->name('owner.first-shop.store');
-    Route::get('boutiques/creer', [OwnerTenantController::class, 'create'])->name('owner.shops.create');
-    Route::post('boutiques', [OwnerTenantController::class, 'store'])->middleware('throttle:6,1')->name('owner.shops.store');
-    Route::post('boutiques/{tenant}/reessayer', [OwnerTenantController::class, 'retry'])->middleware('throttle:3,1')->name('owner.shops.retry');
+    Route::name('owner.')->group(function (): void {
+        Route::controller(FirstTenantController::class)->prefix('premiere-boutique')->group(function (): void {
+            Route::get('/', 'create')->name('first-shop');
+            Route::post('/', 'store')->middleware('throttle:6,1')->name('first-shop.store');
+        });
+
+        Route::controller(OwnerTenantController::class)->prefix('boutiques')->name('shops.')->group(function (): void {
+            Route::get('creer', 'create')->name('create');
+            Route::post('/', 'store')->middleware('throttle:6,1')->name('store');
+            Route::post('{tenant}/reessayer', 'retry')->middleware('throttle:3,1')->name('retry');
+        });
+    });
 
     require __DIR__.'/central/admin.php';
 });

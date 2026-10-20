@@ -5,23 +5,27 @@ use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:central', EnsureActiveCentralAccount::class])->group(function () {
-    Route::redirect('settings', 'settings/profile');
+    Route::prefix('settings')->group(function (): void {
+        Route::redirect('/', 'settings/profile');
+        Route::livewire('profile', 'pages::settings.profile')->name('profile.edit');
+    });
 
-    Route::livewire('settings/profile', 'pages::settings.profile')->name('profile.edit');
-    Route::get('profile-photos/{user}', [ProfilePhotoController::class, 'show'])
-        ->withTrashed()->middleware('signed:relative')->name('central.profile-photo.show');
-    Route::post('settings/profile/photo', [ProfilePhotoController::class, 'update'])->name('central.profile-photo.update');
-    Route::delete('settings/profile/photo', [ProfilePhotoController::class, 'destroy'])->name('central.profile-photo.destroy');
+    Route::controller(ProfilePhotoController::class)->name('central.profile-photo.')->group(function (): void {
+        Route::get('profile-photos/{user}', 'show')
+            ->withTrashed()->middleware('signed:relative')->name('show');
+
+        Route::prefix('settings/profile/photo')->group(function (): void {
+            Route::post('/', 'update')->name('update');
+            Route::delete('/', 'destroy')->name('destroy');
+        });
+    });
 });
 
-Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class])->group(function () {
-    Route::livewire('settings/appearance', 'pages::settings.appearance')->name('appearance.edit');
+Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class])->prefix('settings')->group(function (): void {
+    Route::livewire('appearance', 'pages::settings.appearance')->name('appearance.edit');
 
-    Route::livewire('settings/security', 'pages::settings.security')
-        ->middleware([
-            'password.confirm',
-        ])
-        ->name('security.edit');
+    Route::livewire('security', 'pages::settings.security')
+        ->middleware('password.confirm')->name('security.edit');
 });
 
 Route::get('.well-known/passkey-endpoints', function () {

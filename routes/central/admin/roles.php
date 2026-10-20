@@ -3,10 +3,12 @@
 use App\Http\Controllers\Central\Admin\Roles\RoleController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('admin/roles', [RoleController::class, 'index'])->name('central.roles.index');
-Route::get('admin/roles/create', [RoleController::class, 'create'])->name('central.roles.create');
-Route::post('admin/roles', [RoleController::class, 'store'])->name('central.roles.store');
-Route::get('admin/roles/{role}', [RoleController::class, 'show'])->name('central.roles.show');
-Route::get('admin/roles/{role}/edit', [RoleController::class, 'edit'])->name('central.roles.edit');
-Route::put('admin/roles/{role}', [RoleController::class, 'update'])->name('central.roles.update');
-Route::delete('admin/roles/{role}', [RoleController::class, 'destroy'])->name('central.roles.destroy');
+Route::controller(RoleController::class)->prefix('roles')->name('roles.')->group(function (): void {
+    Route::get('/', 'index')->name('index');
+    Route::get('create', 'create')->name('create');
+    Route::post('/', 'store')->name('store');
+    Route::get('{role}', 'show')->name('show');
+    Route::get('{role}/edit', 'edit')->name('edit');
+    Route::put('{role}', 'update')->name('update');
+    Route::delete('{role}', 'destroy')->name('destroy');
+});

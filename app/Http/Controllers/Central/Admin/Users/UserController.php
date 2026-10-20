@@ -7,9 +7,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Users\ChangeUserStatusRequest;
 use App\Http\Requests\Central\Users\StoreUserRequest;
 use App\Http\Requests\Central\Users\UpdateUserRequest;
-use App\Models\Central\Country;
 use App\Models\Central\User;
 use App\Services\Central\Authorization\CentralUserAccess;
+use App\Services\Central\Countries\CountryCatalog;
 use App\Services\Central\Users\UserManagementService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Gate;
 
 class UserController extends Controller
 {
-    public function __construct(public UserManagementService $userServices) {}
+    public function __construct(public UserManagementService $userServices, private CountryCatalog $countries) {}
 
     public function create(Request $request): View
     {
@@ -28,7 +28,7 @@ class UserController extends Controller
             || Gate::forUser($actor)->allows('createStaff', User::class), 403);
 
         return view('central.pages.admin.users.create', [
-            'countries' => Country::where('is_active', true)->orderBy('name_fr')->get(),
+            'countries' => $this->countries->active(),
             'roles' => $this->userServices->availableRoles($actor),
             'canCreateMerchant' => Gate::forUser($actor)->allows('create', User::class),
             'canCreateStaff' => Gate::forUser($actor)->allows('createStaff', User::class),
@@ -75,10 +75,9 @@ class UserController extends Controller
         return view('central.pages.admin.users.edit', [
             'user' => $user,
             'ownerShops' => $ownerShops,
-            'phoneCountries' => Country::withTrashed()->where(fn ($query) => $query->where('is_active', true)->whereNull('deleted_at')
-                ->orWhere('id', $user->phone_country_id))->orderBy('name_fr')->get(),
-            'countries' => Country::where(fn ($query) => $query->where('is_active', true)->orWhere('id', $user->country_id))
-                ->orderBy('name_fr')->get(),
+            'phoneCountries' => $this->countries->forPhone($user->phone_country_id),
+            'phoneCountriesA' => $this->countries->active(),
+            'countries' => $this->countries->forProfile($user->country_id),
         ]);
     }
 

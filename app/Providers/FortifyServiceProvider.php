@@ -9,10 +9,10 @@ use App\Http\Controllers\Central\Auth\VerificationNotificationController;
 use App\Http\Responses\Central\Auth\LoginResponse as CentralLoginResponse;
 use App\Http\Responses\Central\Auth\RegistrationResponse;
 use App\Http\Responses\Central\Auth\VerifiedEmailResponse;
-use App\Models\Central\Country;
 use App\Models\User;
 use App\Services\Central\Auth\RegistrationJourney;
 use App\Services\Central\Auth\RegistrationVerificationNotification;
+use App\Services\Central\Countries\CountryCatalog;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -99,7 +99,7 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::twoFactorChallengeView(fn () => view('pages::auth.two-factor-challenge'));
         Fortify::confirmPasswordView(fn () => view('pages::auth.confirm-password'));
         Fortify::registerView(fn () => view('pages::auth.register', [
-            'countries' => Country::where('is_active', true)->orderBy('name_fr')->get(),
+            'countries' => app(CountryCatalog::class)->active(),
         ]));
         Fortify::resetPasswordView(fn () => view('pages::auth.reset-password'));
         Fortify::requestPasswordResetLinkView(fn () => view('pages::auth.forgot-password'));

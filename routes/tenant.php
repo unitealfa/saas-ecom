@@ -14,8 +14,8 @@ Route::middleware([
     EnsureTenantAvailable::class,
     InitializeTenancyByDomain::class,
     'web',
-])->group(function (): void {
+])->name('tenant.')->group(function (): void {
     require __DIR__.'/storefront.php';
     Route::get('/_dev/database', DatabaseDiagnosticsController::class)
-        ->middleware(EnsureLocalDiagnostics::class)->name('tenant.database-diagnostics');
+        ->middleware(EnsureLocalDiagnostics::class)->name('database-diagnostics');
 });
