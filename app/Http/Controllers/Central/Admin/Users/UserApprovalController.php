@@ -13,17 +13,18 @@ use Illuminate\Http\Request;
 
 class UserApprovalController extends Controller
 {
-    public function index(Request $request, UserApprovalService $approvals): View
+    public function __construct(public UserApprovalService $approvals) {}
+    public function index(Request $request): View
     {
         $actor = $request->user('central');
         abort_unless($actor instanceof User, 403);
 
-        return view('central.pages.admin.users.pending', ['users' => $approvals->pending($actor)]);
+        return view('central.pages.admin.users.pending', ['users' => $this->approvals->pending($actor)]);
     }
 
-    public function approve(UserApprovalRequest $request, User $user, UserApprovalService $approvals): RedirectResponse
+    public function approve(UserApprovalRequest $request, User $user): RedirectResponse
     {
-        return $this->decide($request, $user, $approvals, true);
+        return $this->decide($request, $user, $this->approvals, true);
     }
 
     public function reject(UserApprovalRequest $request, User $user, UserApprovalService $approvals): RedirectResponse
