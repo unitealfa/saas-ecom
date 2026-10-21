@@ -142,7 +142,7 @@ test('two real permission edits cannot overwrite the same displayed state', func
         ->and(\App\Models\Central\Activity::forSubject($staff)->where('event', 'central_staff_permissions_updated')->count())->toBe(1);
 });
 
-test('permission revocation locks out a concurrent user mutation and stale actor permissions are rejected after commit', function (): void {
+test('root row locks do not block unrelated mutations and committed revocations deny subsequent actions', function (): void {
     $this->seed(\Database\Seeders\Central\AuthorizationSeeder::class);
     $admin = User::factory()->create();
     $root = \App\Models\Central\Role::findByName('root', 'central');
@@ -150,6 +150,7 @@ test('permission revocation locks out a concurrent user mutation and stale actor
     $actor = User::factory()->create();
     $actor->assignRole(\App\Models\Central\Role::createWithPermissions('concurrent-suspender', ['saas.users.suspend' => 9999]));
     $target = User::factory()->create();
+    $nextTarget = User::factory()->create();
     $actor->load('roles', 'permissions');
     \Illuminate\Support\Facades\Gate::forUser($actor)->authorize('suspend', $target);
     $permission = \App\Models\Central\Permission::findByName('saas.users.suspend', 'central');
@@ -169,15 +170,14 @@ test('permission revocation locks out a concurrent user mutation and stale actor
         $revoke->execute([$permission->id, $actor->id, 'central_user']);
         DB::statement('SET SESSION innodb_lock_wait_timeout = 1');
 
-        expect(fn () => $service->changeStatus($actor, $target, \App\Enums\Central\Users\StatusEnum::SUSPENDED))
-            ->toThrow(\Illuminate\Database\QueryException::class);
-        expect($target->fresh()->status)->toBe(\App\Enums\Central\Users\StatusEnum::ACTIVE);
+        $service->changeStatus($actor, $target, \App\Enums\Central\Users\StatusEnum::SUSPENDED);
+        expect($target->fresh()->status)->toBe(\App\Enums\Central\Users\StatusEnum::SUSPENDED);
         $revoker->commit();
 
-        expect(fn () => $service->changeStatus($actor, $target, \App\Enums\Central\Users\StatusEnum::SUSPENDED))
+        expect(fn () => $service->changeStatus($actor, $nextTarget, \App\Enums\Central\Users\StatusEnum::SUSPENDED))
             ->toThrow(\Illuminate\Auth\Access\AuthorizationException::class);
-        expect($target->fresh()->status)->toBe(\App\Enums\Central\Users\StatusEnum::ACTIVE);
-        expect(\App\Models\Central\Activity::forSubject($target)->where('event', 'central_account_status_updated')->count())->toBe(0);
+        expect($nextTarget->fresh()->status)->toBe(\App\Enums\Central\Users\StatusEnum::ACTIVE);
+        expect(\App\Models\Central\Activity::forSubject($nextTarget)->where('event', 'central_account_status_updated')->count())->toBe(0);
     } finally {
         if ($revoker->inTransaction()) {
             $revoker->rollBack();

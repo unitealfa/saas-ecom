@@ -5,6 +5,7 @@ namespace App\Services\Central\Countries;
 use App\Models\Central\Country;
 use App\Models\Central\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Validation\ValidationException;
 
 class CountryService
@@ -29,7 +30,11 @@ class CountryService
                 if (! $country->exists) {
                     $country->is_active = false;
                 }
-                $country->save();
+                try {
+                    $country->save();
+                } catch (UniqueConstraintViolationException) {
+                    throw ValidationException::withMessages(['code' => 'Ce code pays est déjà utilisé.']);
+                }
                 activity()->causedBy($actor)->performedOn($country)->event('country_saved')
                     ->withProperties(['before' => $before, 'after' => $country->only(['code', 'name_fr', 'name_en', 'name_ar', 'is_active'])])
                     ->log('Pays enregistré.');

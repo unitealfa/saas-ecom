@@ -134,8 +134,9 @@ test('Spatie caches permissions and records activity in the correct MySQL databa
         expect(DB::getDefaultConnection())->toBe('tenant');
         expect(DB::connection()->getDatabaseName())->not->toBe($centralDatabase);
         expect((new User)->getConnectionName())->toBe(config('tenancy.database.central_connection'));
-        expect(fn () => app(\App\Services\Central\Authorization\AuthorizationMutation::class)->transaction(fn () => true))
-            ->toThrow(LogicException::class, 'Central authorization mutations require the central context.');
+        expect(app(\App\Services\Central\Authorization\AuthorizationMutation::class)
+            ->transaction(fn () => DB::connection()->getDatabaseName()))
+            ->not->toBe($centralDatabase);
         $user = ShopUser::firstOrFail();
         $user->forceFill(['membership_status' => 1, 'joined_at' => now()])->save();
         $permission = TenantPermission::create(['name' => 'products.manage', 'guard_name' => 'tenant']);

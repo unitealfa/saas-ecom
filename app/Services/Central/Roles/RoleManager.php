@@ -8,6 +8,8 @@ use App\Models\Central\Role;
 use App\Models\Central\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
@@ -105,7 +107,11 @@ class RoleManager
                 if (! $created) {
                     $role->setAttribute('permission_version', $role->getAttribute('permission_version') + 1);
                 }
-                $role->save();
+                try {
+                    $role->save();
+                } catch (UniqueConstraintViolationException) {
+                    throw ValidationException::withMessages(['name' => 'Un rôle possède déjà ce nom ou les mêmes permissions et durées.']);
+                }
                 if ($permissionsChanged) {
                     $role->permissionComposition()->sync($grants);
                 }
@@ -113,10 +119,10 @@ class RoleManager
                 activity()->causedBy($actor)->performedOn($role)->event($created ? 'role_created' : 'role_updated')
                     ->withProperties(['before' => $before, 'after' => ['name' => $name, 'label' => $label, 'permissions' => $durations]])
                     ->log('Rôle central enregistré.');
+                DB::afterCommit(fn () => $role->forgetCachedPermissions());
 
                 return $role;
             },
-            refreshPermissionCache: true,
         );
     }
 
@@ -150,8 +156,8 @@ class RoleManager
                 }
                 activity()->causedBy($actor)->performedOn($role)->event('role_deleted')
                     ->withProperties(['before' => $before])->log('Rôle central personnalisé inutilisé supprimé.');
+                DB::afterCommit(fn () => $role->forgetCachedPermissions());
             },
-            refreshPermissionCache: true,
         );
     }
 
