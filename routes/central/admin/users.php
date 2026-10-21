@@ -3,7 +3,6 @@
 use App\Http\Controllers\Central\Admin\Users\LegalVerificationController;
 use App\Http\Controllers\Central\Admin\Users\UserApprovalController;
 use App\Http\Controllers\Central\Admin\Users\UserController;
-use App\Http\Controllers\Central\Admin\Users\UserRoleController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth', 'verified')->prefix('users')->name('users.')->group(function (): void {
@@ -32,10 +31,5 @@ Route::middleware('auth', 'verified')->prefix('users')->name('users.')->group(fu
     Route::controller(LegalVerificationController::class)->prefix('{user}/legal')->name('legal.')->group(function (): void {
         Route::post('validate', 'validateProfile')->name('validate');
         Route::post('reject', 'rejectProfile')->name('reject');
-    });
-
-    Route::controller(UserRoleController::class)->prefix('{user}/roles')->name('roles.')->group(function (): void {
-        Route::get('/', 'edit')->name('edit');
-        Route::put('/', 'update')->name('update');
     });
 });

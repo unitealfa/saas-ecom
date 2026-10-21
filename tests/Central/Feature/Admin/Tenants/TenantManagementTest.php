@@ -59,7 +59,7 @@ test('unavailable shops retain the public preparation response without opening a
         ->and($shop->database()->manager()->databaseExists($shop->database()->getName()))->toBeFalse();
 });
 
-test('each tenant permission opens consultation and only its own administrative action', function (): void {
+test('each tenant permission grants only its action and listing requires its own permission', function (): void {
     module05Admin();
     $owner = User::factory()->create();
     $shop = module05Shop($owner, ['status' => StatusEnum::INACTIVE]);
@@ -68,7 +68,7 @@ test('each tenant permission opens consultation and only its own administrative 
     foreach ($actions as $suffix => $ability) {
         $actor = module05Actor('saas.tenants.'.$suffix);
         $gate = Gate::forUser($actor);
-        expect($gate->allows('viewAny', Tenant::class))->toBeTrue();
+        expect($gate->allows('viewAny', Tenant::class))->toBe($suffix === 'view');
         expect($gate->allows($ability, $ability === 'create' ? [Tenant::class, $owner] : $shop))->toBeTrue();
         foreach (['update', 'suspend', 'activate', 'archive', 'updatePriorities'] as $other) {
             if ($other !== $ability) {
@@ -105,6 +105,7 @@ test('a delegated creator reserves an idempotent shop under the free quota witho
     Queue::fake([ProvisionTenantDatabase::class]);
     $this->actingAs($actor, 'central')->get(route('central.tenants.create'))->assertOk()->assertSee($owner->email)
         ->assertViewHas('owners', fn ($owners): bool => ! $owners->getCollection()->contains('id', $actor->id));
+    $this->get(route('central.tenants.index'))->assertForbidden();
     $this->get(route('central.users.index'))->assertForbidden();
     $payload = ['shop_name' => 'Demo One', 'slug' => 'demo-one', 'creation_key' => (string) Str::uuid()];
     $this->post(route('central.users.tenants.store', $owner), $payload)->assertSessionHasNoErrors();
@@ -247,6 +248,8 @@ test('history consultation is available independently and search treats SQL and 
     $shop = module05Shop(User::factory()->create());
     $actor = module05Actor('saas.tenants.history.view');
     $this->actingAs($actor, 'central')->get(route('central.tenants.history', $shop))->assertOk()->assertSee('Historique de');
+    $this->get(route('central.tenants.index'))->assertForbidden();
+    $actor->givePermissionTo('saas.tenants.view');
     foreach (['%', "' OR 1=1 --"] as $search) {
         $this->get(route('central.tenants.index', ['search' => $search]))->assertOk()
             ->assertViewHas('shops', fn ($shops): bool => $shops->total() === 0);

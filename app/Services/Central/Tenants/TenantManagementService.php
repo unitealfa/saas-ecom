@@ -82,10 +82,11 @@ class TenantManagementService
     /** @param array{shop_name: string, internal_label: string, expected_profile_version: int|string} $data */
     public function update(User $actor, Tenant $tenant, array $data): void
     {
-        $this->mutations->run(function () use ($actor, $tenant, $data): void {
+        $this->mutations->run($actor, 'update', function () use ($tenant): Tenant {
             User::withTrashed()->whereKey($tenant->user_id)->lockForUpdate()->firstOrFail();
-            $tenant = Tenant::whereKey($tenant->id)->where('uuid', $tenant->uuid)->lockForUpdate()->firstOrFail();
-            Gate::forUser($actor)->authorize('update', $tenant);
+
+            return Tenant::whereKey($tenant->id)->where('uuid', $tenant->uuid)->lockForUpdate()->firstOrFail();
+        }, function (Tenant $tenant) use ($actor, $data): void {
             if ($tenant->profile_version !== (int) $data['expected_profile_version']) {
                 throw ValidationException::withMessages(['tenant' => 'La boutique a changé. Rechargez sa fiche.']);
             }

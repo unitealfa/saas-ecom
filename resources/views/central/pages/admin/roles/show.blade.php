@@ -20,7 +20,7 @@
                         </tbody>
                     </table>
                 </div>
-                <flux:text>Les échéances sont calculées depuis l’attribution à chaque compte. Modifier une durée conserve cette date de départ.</flux:text>
+                <flux:text>Ces droits et durées sont copiés lors d’une nouvelle attribution du profil. Les permissions individuelles existantes ne sont pas modifiées.</flux:text>
             @endif
         @endif
         @if ($assignments !== null)

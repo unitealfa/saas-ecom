@@ -20,6 +20,12 @@ class RolePolicy
         return $this->allows($actor, 'saas.roles.create');
     }
 
+    public function assign(User $actor, Role $role): bool
+    {
+        return $this->allows($actor, 'saas.users.roles.assign')
+            && $this->access->ownsRolePermissions($actor, $role);
+    }
+
     public function update(User $actor, Role $role): bool
     {
         return $this->mutable($actor, $role) && $this->allows($actor, 'saas.roles.update');

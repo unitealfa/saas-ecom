@@ -82,3 +82,25 @@ test('correct password must be provided to delete account', function () {
 
     expect($user->fresh())->not->toBeNull();
 });
+
+test('personal name and email changes retain merchant approval and only reset the email proof', function (): void {
+    \Illuminate\Support\Facades\Notification::fake();
+    $validator = User::factory()->create();
+    $user = User::factory()->create([
+        'legal_profile_version' => 1,
+        'legal_verification_status' => \App\Enums\VerificationStatusEnum::VERIFIED,
+        'legal_verified_at' => now(),
+        'legal_verified_by_id' => $validator->id,
+    ]);
+    $verifiedAt = $user->legal_verified_at;
+    $this->actingAs($user, 'central');
+    Livewire::test('pages::settings.profile')->set('name', 'Nom corrigé')
+        ->set('email', 'updated-profile@example.test')->call('updateProfileInformation')->assertHasNoErrors();
+    $user->refresh();
+    expect($user->status)->toBe(\App\Enums\Central\Users\StatusEnum::ACTIVE)
+        ->and($user->legal_verification_status)->toBe(\App\Enums\VerificationStatusEnum::VERIFIED)
+        ->and($user->legal_verified_at)->toEqual($verifiedAt)
+        ->and($user->email_verified_at)->toBeNull()
+        ->and($user->legal_profile_version)->toBe(2);
+    $this->get(route('verification.notice'))->assertOk();
+});

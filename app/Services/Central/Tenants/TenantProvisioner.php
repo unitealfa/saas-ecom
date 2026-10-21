@@ -50,7 +50,7 @@ class TenantProvisioner
             tenancy()->initialize($tenant);
             $owner = $tenant->owner;
 
-            DB::connection('tenant')->transaction(function () use ($owner, $tenant): void {
+            DB::transaction(function () use ($owner, $tenant): void {
                 $shop = Shop::query()->where('singleton', 1)->lockForUpdate()->first();
 
                 if ($shop === null) {

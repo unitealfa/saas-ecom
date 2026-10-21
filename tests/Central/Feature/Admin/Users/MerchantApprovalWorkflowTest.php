@@ -25,7 +25,7 @@ beforeEach(function (): void {
 test('approval validates the account and dossier atomically without verifying email or creating a shop', function (): void {
     $merchant = User::factory()->unverified()->create(['status' => StatusEnum::PENDING]);
     $this->actingAs($this->admin, 'central')->post(route('central.users.approve', $merchant), merchantDecisionSnapshot($merchant))
-        ->assertSessionHasNoErrors();
+        ->assertRedirect(route('central.users.index'))->assertSessionHasNoErrors();
     $updated = $merchant->fresh();
     expect($updated->status)->toBe(StatusEnum::ACTIVE)
         ->and($updated->legal_verification_status)->toBe(VerificationStatusEnum::VERIFIED)
@@ -40,6 +40,30 @@ test('approval validates the account and dossier atomically without verifying em
         ->assertDontSee('Valider le dossier')->assertDontSee('Rejeter le dossier');
     $this->get(route('central.users.pending'))->assertDontSee($updated->email);
 });
+
+test('merchant decisions return to the page that submitted the form', function (string $action, string $origin): void {
+    $merchant = User::factory()->unverified()->create(['status' => StatusEnum::PENDING]);
+    $previousUrl = $origin === 'show'
+        ? route('central.users.show', $merchant)
+        : route('central.users.'.$origin, ['search' => 'commerçant', 'page' => 2]);
+
+    $this->actingAs($this->admin, 'central')->from($previousUrl)
+        ->post(route('central.users.'.$action, $merchant), [
+            ...merchantDecisionSnapshot($merchant),
+            ...($action === 'reject' ? ['reason' => 'Dossier refusé.'] : []),
+        ])
+        ->assertRedirect($previousUrl)
+        ->assertSessionHasNoErrors();
+
+    expect($merchant->fresh()->status)->toBe($action === 'approve' ? StatusEnum::ACTIVE : StatusEnum::REJECTED);
+})->with([
+    'approve from users' => ['approve', 'index'],
+    'reject from users' => ['reject', 'index'],
+    'approve from pending registrations' => ['approve', 'pending'],
+    'reject from pending registrations' => ['reject', 'pending'],
+    'approve from user details' => ['approve', 'show'],
+    'reject from user details' => ['reject', 'show'],
+]);
 
 test('refusal requires a nonempty reason at every decision entry point', function (string $routeName, mixed $reason): void {
     $merchant = User::factory()->create(['status' => StatusEnum::PENDING]);
@@ -182,7 +206,7 @@ test('administrative creation validates supplied professional fields before savi
     Notification::assertNothingSent();
 })->with(['negative capital' => [['share_capital' => '-1']], 'invalid legal form' => [['legal_form' => ['invalid']]]]);
 
-test('a material dossier change invalidates approval and reactivation cannot validate it implicitly', function (): void {
+test('professional information changes preserve approval and an existing suspension', function (): void {
     $merchant = User::factory()->create(['status' => StatusEnum::PENDING]);
     $this->actingAs($this->admin, 'central')->post(route('central.users.approve', $merchant), merchantDecisionSnapshot($merchant))
         ->assertSessionHasNoErrors();
@@ -193,9 +217,33 @@ test('a material dossier change invalidates approval and reactivation cannot val
         'legal_address' => 'Nouvelle adresse professionnelle à examiner',
     ])->assertSessionHasNoErrors();
     expect($merchant->fresh()->status)->toBe(StatusEnum::SUSPENDED)
-        ->and($merchant->fresh()->legal_verification_status)->toBe(VerificationStatusEnum::PENDING)
+        ->and($merchant->fresh()->legal_verification_status)->toBe(VerificationStatusEnum::VERIFIED)
         ->and($merchant->fresh()->legal_profile_version)->toBe(2);
     $this->patch(route('central.users.status', $merchant), ['status' => StatusEnum::ACTIVE->value])->assertSessionHasNoErrors();
-    expect($merchant->fresh()->status)->toBe(StatusEnum::PENDING)
-        ->and($merchant->fresh()->legal_verification_status)->toBe(VerificationStatusEnum::PENDING);
+    expect($merchant->fresh()->status)->toBe(StatusEnum::ACTIVE)
+        ->and($merchant->fresh()->legal_verification_status)->toBe(VerificationStatusEnum::VERIFIED);
 });
+
+test('a pending profile edit versions the dossier and rejects an older decision form', function (): void {
+    $merchant = User::factory()->create(['status' => StatusEnum::PENDING,
+        'legal_profile_version' => 1, 'legal_verification_status' => VerificationStatusEnum::PENDING]);
+    $snapshot = merchantDecisionSnapshot($merchant);
+    $this->actingAs($this->admin, 'central')->put(route('central.users.update', $merchant), [
+        'last_name' => 'Nom rectifié', 'email' => $merchant->email,
+        'country_uuid' => $merchant->country->uuid,
+    ])->assertSessionHasNoErrors();
+    $this->post(route('central.users.approve', $merchant), $snapshot)
+        ->assertSessionHasErrors('legal_profile_version');
+    expect($merchant->fresh()->status)->toBe(StatusEnum::PENDING)
+        ->and($merchant->fresh()->legal_profile_version)->toBe(2);
+});
+
+test('protected root accounts cannot be approved or rejected as merchants', function (string $routeName): void {
+    $target = User::factory()->create();
+    $target->assignRole(Role::findByName('root', 'central'));
+    $before = $target->fresh()->getRawOriginal();
+    $this->actingAs($this->admin, 'central')->post(route($routeName, $target), [
+        ...merchantDecisionSnapshot($target), ...(str_ends_with($routeName, 'reject') ? ['reason' => 'Tentative interdite'] : []),
+    ])->assertForbidden();
+    expect($target->fresh()->getRawOriginal())->toBe($before);
+})->with(['central.users.approve', 'central.users.reject', 'central.users.legal.validate', 'central.users.legal.reject']);

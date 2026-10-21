@@ -5,6 +5,7 @@ namespace App\Policies\Central;
 use App\Models\Central\Permission;
 use App\Models\Central\User;
 use App\Services\Central\Authorization\CentralUserAccess;
+use App\Services\Central\Roles\CentralRoleCatalog;
 
 class PermissionPolicy
 {
@@ -23,5 +24,12 @@ class PermissionPolicy
     public function update(User $actor, Permission $permission): bool
     {
         return false;
+    }
+
+    public function delegate(User $actor, Permission $permission): bool
+    {
+        return $permission->guard_name === 'central'
+            && isset(CentralRoleCatalog::PERMISSIONS[$permission->name])
+            && $this->access->ownsPermission($actor, $permission->name);
     }
 }

@@ -12,6 +12,7 @@ use App\Models\Tenant\Role as TenantRole;
 use App\Models\Tenant\User as ShopUser;
 use App\Models\User;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Spatie\Activitylog\Support\CauserResolver;
 use Spatie\Permission\Exceptions\RoleAlreadyExists;
 use Spatie\Permission\PermissionRegistrar;
@@ -36,7 +37,7 @@ test('Spatie permissions keep the configured durations and use Laravel Gate', fu
     $role->givePermissionTo($permission);
     $user->assignRole($role);
 
-    expect((int) $role->permissions()->firstOrFail()->pivot->duration_days)->toBe(9999);
+    expect((int) $role->permissionComposition()->firstOrFail()->pivot->duration_days)->toBe(9999);
     expect($user->can('saas.orders.review'))->toBeTrue();
     $role->setPermissionDuration('saas.orders.review', 7);
     $assignedAt = $user->roles()->firstOrFail()->pivot->assigned_at;
@@ -44,13 +45,17 @@ test('Spatie permissions keep the configured durations and use Laravel Gate', fu
     $user->syncRoles($role);
     $role->syncPermissions($permission);
     expect($user->roles()->firstOrFail()->pivot->assigned_at)->toEqual($assignedAt);
-    expect((int) $role->permissions()->firstOrFail()->pivot->duration_days)->toBe(7);
+    expect((int) $role->permissionComposition()->firstOrFail()->pivot->duration_days)->toBe(7);
     $this->travel(8)->days();
-    expect($user->can('saas.orders.review'))->toBeFalse();
+    expect($user->can('saas.orders.review'))->toBeTrue();
+    $newUser = User::factory()->create();
+    $newUser->assignRole($role);
+    $this->travel(7)->days();
+    expect($newUser->can('saas.orders.review'))->toBeFalse();
 
     $direct = CentralPermission::create(['name' => 'saas.payments.review', 'guard_name' => 'central']);
     $user->givePermissionTo($direct);
-    $expiresAt = $user->permissions()->firstOrFail()->pivot->expires_at;
+    $expiresAt = $user->permissions()->whereKey($direct->id)->firstOrFail()->pivot->expires_at;
     $this->travel(1)->days();
     $user->syncPermissions($direct);
     expect($user->permissions()->firstOrFail()->pivot->expires_at)->toEqual($expiresAt);
@@ -66,13 +71,16 @@ test('Spatie refuses duplicate role names and identical permission compositions'
     expect(fn () => CentralRole::create(['name' => 'reviewer', 'guard_name' => 'central']))->toThrow(RoleAlreadyExists::class);
     $other = CentralRole::create(['name' => 'other-reviewer', 'guard_name' => 'central']);
     expect(fn () => $other->givePermissionTo($permission))->toThrow(QueryException::class);
-    expect($other->permissions()->count())->toBe(0);
+    expect($other->permissionComposition()->count())->toBe(0);
     expect(fn () => $role->setPermissionDuration('saas.orders.review', 10000))->toThrow(InvalidArgumentException::class);
     $user = User::factory()->create();
     $user->assignRole($role);
-    expect(fn () => $user->givePermissionTo($permission))->toThrow(LogicException::class);
-    $other->permissions()->attach($permission, ['duration_days' => 3]);
-    expect(fn () => $user->assignRole($other))->toThrow(LogicException::class);
+    $expires = $user->permissions()->first()->pivot->expires_at;
+    $user->givePermissionTo($permission);
+    $overlapping = CentralRole::createWithPermissions('short-reviewer', ['saas.orders.review' => 3]);
+    $user->assignRole($overlapping);
+    expect($user->permissions()->count())->toBe(1)
+        ->and($user->permissions()->first()->pivot->expires_at)->toEqual($expires);
 });
 
 test('roles are created with their complete composition and guarded metadata', function (): void {
@@ -93,7 +101,7 @@ test('roles are created with their complete composition and guarded metadata', f
     expect(fn () => $user->givePermissionTo($permission))->toThrow(LogicException::class);
 });
 
-test('changing an assigned role cannot introduce a permission shared with another role', function (): void {
+test('central profile changes preserve individual rights when profiles share defaults', function (): void {
     CentralPermission::create(['name' => 'saas.orders.review']);
     $catalog = CentralPermission::create(['name' => 'saas.catalog.manage']);
     $orders = CentralRole::createWithPermissions('orders', ['saas.orders.review' => 9999]);
@@ -101,14 +109,20 @@ test('changing an assigned role cannot introduce a permission shared with anothe
     $user = User::factory()->create();
     $user->assignRole($orders, $products);
 
-    expect(fn () => $orders->givePermissionTo($catalog))->toThrow(LogicException::class);
-    expect($orders->permissions()->count())->toBe(1);
+    $expires = $user->permissions()->whereKey($catalog->id)->first()->pivot->expires_at;
+    $orders->givePermissionTo($catalog);
+    expect($orders->permissionComposition()->count())->toBe(2);
+    expect($orders->permissions()->count())->toBe(2);
+    expect($user->permissions()->whereKey($catalog->id)->first()->pivot->expires_at)->toEqual($expires);
     expect($user->roles()->count())->toBe(2);
 });
 
 test('Spatie caches permissions and records activity in the correct MySQL database', function (): void {
+    $centralDatabase = DB::connection()->getDatabaseName();
+    expect(tenancy()->initialized)->toBeFalse();
+    expect(DB::getDefaultConnection())->toBe(config('tenancy.database.central_connection'));
     $owner = User::factory()->create();
-    $centralLog = activity()->causedBy($owner)->log('Central marker');
+    $centralLog = DB::transaction(fn () => activity()->causedBy($owner)->log('Central marker'));
     expect($centralLog)->toBeInstanceOf(CentralActivity::class);
     expect($centralLog->uuid)->toBeUuid();
     expect($centralLog->correlation_id)->toBeUuid();
@@ -116,7 +130,12 @@ test('Spatie caches permissions and records activity in the correct MySQL databa
     $first = Tenant::factory()->create(['user_id' => $owner->id, 'slug' => 'shop-a']);
     $second = Tenant::factory()->create(['user_id' => $owner->id, 'slug' => 'shop-b']);
 
-    $first->run(function (): void {
+    $first->run(function () use ($centralDatabase): void {
+        expect(DB::getDefaultConnection())->toBe('tenant');
+        expect(DB::connection()->getDatabaseName())->not->toBe($centralDatabase);
+        expect((new User)->getConnectionName())->toBe(config('tenancy.database.central_connection'));
+        expect(fn () => app(\App\Services\Central\Authorization\AuthorizationMutation::class)->transaction(fn () => true))
+            ->toThrow(LogicException::class, 'Central authorization mutations require the central context.');
         $user = ShopUser::firstOrFail();
         $user->forceFill(['membership_status' => 1, 'joined_at' => now()])->save();
         $permission = TenantPermission::create(['name' => 'products.manage', 'guard_name' => 'tenant']);
@@ -131,19 +150,28 @@ test('Spatie caches permissions and records activity in the correct MySQL databa
         expect($user->can('products.manage'))->toBeTrue();
         expect(app(CauserResolver::class)->resolve())->toBeNull();
         expect(app(PermissionRegistrar::class)->getPermissionClass())->toBe(TenantPermission::class);
-        $log = activity()->causedBy($user)->log('Shop A marker');
+        $log = DB::transaction(fn () => activity()->causedBy($user)->log('Shop A marker'));
         expect($log)->toBeInstanceOf(TenantActivity::class);
         expect($log->causer->getKey())->toBe($user->id);
+        expect(DB::table('activity_log')->where('description', 'Shop A marker')->exists())->toBeTrue();
+        expect(fn () => DB::transaction(function (): void {
+            activity()->log('Rolled back tenant marker');
+            throw new RuntimeException('Tenant rollback');
+        }))->toThrow(RuntimeException::class, 'Tenant rollback');
+        expect(DB::table('activity_log')->where('description', 'Rolled back tenant marker')->exists())->toBeFalse();
     });
     $second->run(function (): void {
         $user = ShopUser::firstOrFail();
         $user->forceFill(['membership_status' => 1, 'joined_at' => now()])->save();
         expect($user->can('products.manage'))->toBeFalse();
         expect(TenantActivity::where('description', 'Shop A marker')->exists())->toBeFalse();
-        activity()->causedBy($user)->log('Shop B marker');
+        DB::transaction(fn () => activity()->causedBy($user)->log('Shop B marker'));
     });
     expect(app(PermissionRegistrar::class)->getPermissionClass())->toBe(CentralPermission::class);
     expect(CentralActivity::whereIn('description', ['Shop A marker', 'Shop B marker'])->count())->toBe(0);
     expect(CentralActivity::where('description', 'Central marker')->count())->toBe(1);
     expect(CentralActivity::get()->toJson())->not->toContain('password', $owner->password);
+    expect(tenancy()->initialized)->toBeFalse();
+    expect(DB::getDefaultConnection())->toBe(config('tenancy.database.central_connection'));
+    expect(DB::transaction(fn () => DB::connection()->getDatabaseName()))->toBe($centralDatabase);
 });

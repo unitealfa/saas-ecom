@@ -7,6 +7,7 @@ use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Models\Central\Subscription;
 use App\Models\Central\User;
 use App\Services\Central\Plans\FreePlanCatalog;
+use Illuminate\Support\Facades\DB;
 use LogicException;
 
 class DefaultSubscription
@@ -19,7 +20,7 @@ class DefaultSubscription
             throw new LogicException('Subscriptions require the central context.');
         }
 
-        return $owner->getConnection()->transaction(function () use ($owner, $assignedBy): Subscription {
+        return DB::transaction(function () use ($owner, $assignedBy): Subscription {
             User::whereKey($owner->id)->lockForUpdate()->firstOrFail();
             $current = Subscription::where('user_id', $owner->id)
                 ->whereIn('status', [StatusEnum::ACTIVE, StatusEnum::TRIAL])->orderByDesc('id')->lockForUpdate()->first();

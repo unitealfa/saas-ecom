@@ -35,6 +35,16 @@ class UserApprovalRequest extends FormRequest
         ];
     }
 
+    public function expectedStatus(): StatusEnum
+    {
+        return StatusEnum::from((int) $this->validated('expected_status'));
+    }
+
+    public function profileVersion(): int
+    {
+        return (int) $this->validated('legal_profile_version');
+    }
+
     private function approving(): bool
     {
         return in_array($this->route()->getActionMethod(), ['approve', 'validateProfile'], true);

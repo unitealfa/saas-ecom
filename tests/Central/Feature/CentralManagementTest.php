@@ -50,7 +50,7 @@ test('the super admin sees and renders all central management forms', function (
     foreach (['central.roles.index', 'central.roles.create', 'central.users.create'] as $name) {
         $this->get(route($name))->assertOk();
     }
-    $this->get(route('central.users.roles.edit', $owner))->assertOk();
+    $this->get(route('central.staff.roles.edit', $owner))->assertForbidden();
     $this->get(route('central.users.tenants.create', $owner))->assertOk();
     $this->get(route('central.users.index'))->assertOk()->assertSee('Créer un compte')->assertSee('Boutiques');
 });
@@ -60,24 +60,25 @@ test('custom roles use Spatie with independent permission durations and reject d
     $this->actingAs($this->admin, 'central')->post(route('central.roles.store'), $payload)->assertSessionHasNoErrors()->assertRedirect(route('central.roles.index'));
     $role = Role::where('name', 'support-limited')->firstOrFail();
     expect($role)->toBeInstanceOf(Spatie\Permission\Models\Role::class);
-    expect($role->permissions()->where('name', 'saas.users.view')->firstOrFail()->pivot->duration_days)->toBe(12);
+    expect($role->permissionComposition()->where('name', 'saas.users.view')->firstOrFail()->pivot->duration_days)->toBe(12);
     $this->post(route('central.roles.store'), [...$payload, 'name' => 'same-composition'])->assertSessionHasErrors('name');
     $this->post(route('central.roles.store'), centralRolePayload('support-limited', ['saas.users.view' => 34]))->assertSessionHasErrors('name');
     $this->post(route('central.roles.store'), centralRolePayload('bad-duration', ['saas.users.view' => 10000]))->assertSessionHasErrors();
     $this->put(route('central.roles.update', Role::findByName('user-manager')), $payload)->assertForbidden();
 });
 
-test('changing a role cannot introduce overlap for any existing recipient', function (): void {
+test('changing a profile preserves existing direct rights when its defaults overlap another profile', function (): void {
     $target = User::factory()->create();
     $first = Role::createWithPermissions('short-reader', ['saas.users.view' => 2]);
     $second = Role::createWithPermissions('short-creator', ['saas.users.create' => 2]);
     $target->assignRole($first, $second);
     $this->actingAs($this->admin, 'central')->put(route('central.roles.update', $first),
-        centralRolePayload('short-reader', ['saas.users.view' => 2, 'saas.users.create' => 2]))->assertSessionHasErrors('permissions');
-    expect($first->permissions()->pluck('name')->all())->toBe(['saas.users.view']);
+        ['expected_version' => 1, ...centralRolePayload('short-reader', ['saas.users.view' => 2, 'saas.users.create' => 2])])->assertSessionHasNoErrors();
+    expect($first->permissionComposition()->pluck('name')->all())->toBe(['saas.users.view', 'saas.users.create']);
+    expect($target->permissions()->count())->toBe(2);
 });
 
-test('editing a custom role changes the effective duration without resetting its assignment date', function (): void {
+test('editing a custom profile changes future durations while existing expiration stays unchanged', function (): void {
     $this->freezeTime();
     $role = Role::createWithPermissions('adjustable-reader', ['saas.users.view' => 1]);
     $target = User::factory()->create();
@@ -86,10 +87,13 @@ test('editing a custom role changes the effective duration without resetting its
     $this->travel(2)->days();
     expect($target->checkPermissionTo('saas.users.view', 'central'))->toBeFalse();
     $this->actingAs($this->admin, 'central')->get(route('central.roles.edit', $role))->assertOk();
-    $this->put(route('central.roles.update', $role), centralRolePayload('adjustable-reader', ['saas.users.view' => 7]))->assertSessionHasNoErrors();
+    $this->put(route('central.roles.update', $role), ['expected_version' => 1, ...centralRolePayload('adjustable-reader', ['saas.users.view' => 7])])->assertSessionHasNoErrors();
     expect($role->fresh()->permission_version)->toBe(2);
     expect($target->roles()->firstOrFail()->pivot->assigned_at)->toEqual($assignedAt);
-    expect($target->checkPermissionTo('saas.users.view', 'central'))->toBeTrue();
+    expect($target->checkPermissionTo('saas.users.view', 'central'))->toBeFalse();
+    $newMember = User::factory()->create();
+    $newMember->assignRole($role->fresh());
+    expect($newMember->can('saas.users.view'))->toBeTrue();
 });
 
 test('staff invitation uses the central password broker and an actual parent country and subscription', function (): void {
@@ -163,18 +167,18 @@ test('creation and assignment remain usable after the separate viewing permissio
     $grant = Role::createWithPermissions('merchant-creator', ['saas.users.create' => 9999]);
     $this->travel(2)->days();
     expect($actor->checkPermissionTo('saas.users.view', 'central'))->toBeFalse();
-    $this->actingAs($actor, 'central')->get(route('central.users.index'))->assertOk();
-    $this->get(route('dashboard'))->assertOk()->assertSee('Créer un compte')->assertSee('Utilisateurs');
-    $this->get(route('central.users.create'))->assertOk()->assertSee('Retour aux utilisateurs');
+    $this->actingAs($actor, 'central')->get(route('central.users.index'))->assertForbidden();
+    $this->get(route('dashboard'))->assertOk();
+    $this->get(route('central.users.create'))->assertOk()->assertSee('Retour au dashboard');
     $this->post(route('central.users.store'), [
         'last_name' => 'Merchant', 'email' => 'new-merchant@example.test', 'account_kind' => 'merchant',
         'country_uuid' => Country::where('code', 'DZ')->firstOrFail()->uuid,
-    ])->assertSessionHasNoErrors()->assertRedirect(route('central.users.index'));
+    ])->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
     $target = User::where('email', 'new-merchant@example.test')->firstOrFail();
     Notification::assertSentTo($target, AccountInvitation::class);
     $this->get(route('dashboard'))->assertOk()->assertSee('Compte créé pour Merchant');
-    $this->get(route('central.users.roles.edit', $target))->assertForbidden();
-    $this->put(route('central.users.roles.update', $target), ['roles' => [$grant->uuid]])
+    $this->get(route('central.staff.roles.edit', $target))->assertForbidden();
+    $this->put(route('central.staff.roles.update', $target), ['roles' => [$grant->uuid]])
         ->assertForbidden();
     expect($target->roles()->exists())->toBeFalse();
     $this->post(route('central.users.store'), [
@@ -182,9 +186,9 @@ test('creation and assignment remain usable after the separate viewing permissio
         'country_uuid' => Country::where('code', 'DZ')->firstOrFail()->uuid, 'roles' => [$grant->uuid],
     ])->assertSessionHasNoErrors();
     $staff = User::where('email', 'new-staff@example.test')->firstOrFail();
-    $this->get(route('central.users.roles.edit', $staff))->assertOk()->assertSee('Retour aux utilisateurs');
-    $this->put(route('central.users.roles.update', $staff), ['roles' => [$grant->uuid]])
-        ->assertSessionHasNoErrors()->assertRedirect(route('central.users.index'));
+    $this->get(route('central.staff.roles.edit', $staff))->assertOk()->assertSee('Retour à la fiche');
+    $this->put(route('central.staff.roles.update', $staff), ['roles' => [$grant->uuid]])
+        ->assertSessionHasNoErrors()->assertRedirect(route('central.staff.index'));
     expect($staff->hasRole($grant))->toBeTrue();
 });
 
@@ -196,26 +200,27 @@ test('delegated staff management is limited to currently owned permissions and n
     $delegator->assignRole($role);
     $target = User::factory()->create();
     $target->assignRole(Role::findByName('user-reader'));
-    $this->actingAs($delegator, 'central')->put(route('central.users.roles.update', $target), [
+    $this->actingAs($delegator, 'central')->put(route('central.staff.roles.update', $target), [
         'roles' => [Role::findByName('user-reader')->uuid],
     ])->assertSessionHasNoErrors();
-    $this->put(route('central.users.roles.update', $target), ['roles' => [Role::findByName('user-manager')->uuid]])->assertForbidden();
-    $this->put(route('central.users.roles.update', $target), ['roles' => [Role::findByName('root')->uuid]])->assertSessionHasErrors('roles.0');
-    $this->put(route('central.users.roles.update', $this->admin), ['roles' => []])->assertForbidden();
+    $this->put(route('central.staff.roles.update', $target), ['roles' => [Role::findByName('user-manager')->uuid]])->assertForbidden();
+    $this->put(route('central.staff.roles.update', $target), ['roles' => [Role::findByName('root')->uuid]])->assertSessionHasErrors('roles.0');
+    $this->put(route('central.staff.roles.update', $this->admin), ['roles' => []])->assertForbidden();
     $this->travel(1)->days();
-    $this->put(route('central.users.roles.update', $target), ['roles' => [Role::findByName('user-reader')->uuid]])->assertForbidden();
+    $this->put(route('central.staff.roles.update', $target), ['roles' => [Role::findByName('user-reader')->uuid]])->assertForbidden();
 });
 
-test('Spatie assignments reject shared permissions and keep the original date when kept', function (): void {
+test('shared profiles preserve direct uniqueness and the original date when kept', function (): void {
     $target = User::factory()->create();
     $role = Role::findByName('user-reader');
     $target->assignRole($role);
     $assignedAt = $target->roles()->firstOrFail()->pivot->assigned_at;
     $this->travel(3)->days();
-    $this->actingAs($this->admin, 'central')->put(route('central.users.roles.update', $target), ['roles' => [$role->uuid]])->assertSessionHasNoErrors();
+    $this->actingAs($this->admin, 'central')->put(route('central.staff.roles.update', $target), ['roles' => [$role->uuid]])->assertSessionHasNoErrors();
     expect($target->roles()->firstOrFail()->pivot->assigned_at)->toEqual($assignedAt);
-    $this->put(route('central.users.roles.update', $target), ['roles' => [$role->uuid, Role::findByName('user-manager')->uuid]])->assertSessionHasErrors('roles');
-    expect($target->roles()->pluck('name')->all())->toBe(['user-reader']);
+    $this->put(route('central.staff.roles.update', $target), ['roles' => [$role->uuid, Role::findByName('user-manager')->uuid]])->assertSessionHasNoErrors();
+    expect($target->roles()->pluck('name')->all())->toBe(['user-manager', 'user-reader']);
+    expect($target->permissions()->where('name', 'saas.users.view')->count())->toBe(1);
 });
 
 test('reader and unverified users cannot access management actions by URL', function (): void {
@@ -232,7 +237,7 @@ test('a protected Super Admin assignment cannot be replaced even before its star
     $target = User::factory()->create();
     $target->assignRole(Role::findByName('root'));
     $target->roles()->updateExistingPivot(Role::findByName('root')->id, ['assigned_at' => now()->addDay()]);
-    $this->actingAs($this->admin, 'central')->put(route('central.users.roles.update', $target), [
+    $this->actingAs($this->admin, 'central')->put(route('central.staff.roles.update', $target), [
         'roles' => [Role::findByName('user-reader')->uuid],
     ])->assertForbidden();
     expect($target->hasRole('root'))->toBeTrue();
@@ -293,7 +298,7 @@ test('an administrator can delegate an owned role globally without target lists'
     $role = Role::findByName('user-reader');
     $target = User::factory()->create();
     $target->assignRole(Role::findByName('user-manager'));
-    $this->actingAs($this->admin, 'central')->put(route('central.users.roles.update', $target), ['roles' => [$role->uuid]])->assertSessionHasNoErrors();
+    $this->actingAs($this->admin, 'central')->put(route('central.staff.roles.update', $target), ['roles' => [$role->uuid]])->assertSessionHasNoErrors();
     expect($target->fresh()->hasRole($role))->toBeTrue();
 });
 test('provisioning failures retain the reservation and expose only a sanitized error for recovery', function (): void {

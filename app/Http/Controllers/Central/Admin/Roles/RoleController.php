@@ -25,7 +25,7 @@ class RoleController extends Controller
 
         $query = Role::forCentralGuard();
         if (Gate::allows('viewPermissions', new Role)) {
-            $query->with('permissions');
+            $query->with('permissionComposition');
         }
 
         return view('central.pages.admin.roles.index', ['roles' => $query->orderBy('id')->paginate(20)]);
@@ -34,7 +34,7 @@ class RoleController extends Controller
     public function show(Role $role): View
     {
         Gate::authorize('view', $role);
-        $permissions = Gate::allows('viewPermissions', $role) ? $role->permissions()->orderBy('name')->get() : null;
+        $permissions = Gate::allows('viewPermissions', $role) ? $role->permissionComposition()->orderBy('name')->get() : null;
         $assignments = null;
         if (Gate::allows('viewAssignments', $role)) {
             $assignments = User::withTrashed()->select(['id', 'uuid', 'first_name', 'last_name', 'email', 'status', 'deleted_at'])
@@ -98,7 +98,7 @@ class RoleController extends Controller
             $permissions = Permission::forCentralGuard()->whereIn('name', array_keys(CentralRoleCatalog::PERMISSIONS))
                 ->orderBy('id')->get()->filter(fn (Permission $permission): bool => $this->access->ownsPermission($actor, $permission->name));
         } elseif ($canChangeDurations) {
-            $permissions = $role->permissions()->orderBy('permissions.id')->get();
+            $permissions = $role->permissionComposition()->orderBy('permissions.id')->get();
         }
 
         return view('central.pages.admin.roles.form', [
@@ -107,7 +107,7 @@ class RoleController extends Controller
             'permissions' => $permissions,
             'canChangePermissions' => $canChangePermissions,
             'canChangeDurations' => $canChangeDurations,
-            'grants' => ($canChangePermissions || $canChangeDurations) ? ($role?->permissions()->get()->mapWithKeys(fn ($permission): array => [$permission->uuid => (int) $permission->pivot->duration_days])->all() ?? []) : [],
+            'grants' => ($canChangePermissions || $canChangeDurations) ? ($role?->permissionComposition()->get()->mapWithKeys(fn ($permission): array => [$permission->uuid => (int) $permission->pivot->duration_days])->all() ?? []) : [],
         ]);
     }
 }

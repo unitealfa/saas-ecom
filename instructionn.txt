@@ -94,8 +94,7 @@ saas.staff.invite.resend	Renvoyer une invitation
 saas.staff.update	Modifier les informations d'un administrateur
 saas.users.roles.assign	Attribuer, retirer ou remplacer ses rôles
 saas.staff.permissions.view	Consulter ses permissions effectives
-saas.staff.permissions.grant	Attribuer une permission directe (avec la fonctionaliter déjà existante de atribution et creation de role)
-saas.staff.permissions.revoke	Retirer une permission directe(avec la fonctionaliter déjà existante de atribution et creation de role)
+saas.staff.permissions.update	Attribuer ou retirer individuellement les permissions du personnel (transition Spatie validée le 21 octobre 2026)
 saas.staff.assignments.renew	Renouveler explicitement une attribution de rôle ou de permission (avec la fonctionaliter déjà existante de atribution et creation de role)
 saas.staff.suspend	Suspendre un administrateur
 saas.staff.activate	Réactiver un administrateur
@@ -132,7 +131,7 @@ La durée de chaque attribution doit être appliquée conformément à ta docume
 
 
 Module 03 — Gestion des rôles SaaS
-Tables : roles, role_has_permissions
+Tables : roles, role_has_permissions (composition initiale), model_has_roles et model_has_permissions (droits individuels centraux)
 Interface : Administration → Rôles
 Permission	Fonctionnalité
 saas.roles.view	Consulter les rôles SaaS

@@ -7,16 +7,12 @@ use App\DTOs\Central\Users\UserProfileData;
 use App\DTOs\Central\Users\UserSaveResult;
 use App\Enums\Central\Users\StatusEnum;
 use App\Models\Central\User;
-use App\Services\Central\Authorization\AuthorizationMutation;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 
 class StaffManagementService
 {
-    public function __construct(
-        private UserManagementService $users,
-        private AuthorizationMutation $mutations,
-    ) {}
+    public function __construct(private UserManagementService $users) {}
 
     /** @return LengthAwarePaginator<User> */
     public function search(User $actor, string $search, ?StatusEnum $status = null): LengthAwarePaginator
@@ -60,19 +56,11 @@ class StaffManagementService
 
     public function changeStatus(User $actor, User $target, StatusEnum $status): void
     {
-        $this->mutations->run(function () use ($actor, $target, $status): void {
-            $target = User::whereKey($target->id)->lockForUpdate()->firstOrFail();
-            Gate::forUser($actor)->authorize($status === StatusEnum::SUSPENDED ? 'suspendStaff' : 'activateStaff', $target);
-            $this->users->changeStatus($actor, $target, $status);
-        });
+        $this->users->changeStatus($actor, $target, $status, staffOnly: true);
     }
 
     public function archive(User $actor, User $target): void
     {
-        $this->mutations->run(function () use ($actor, $target): void {
-            $target = User::whereKey($target->id)->lockForUpdate()->firstOrFail();
-            Gate::forUser($actor)->authorize('archiveStaff', $target);
-            $this->users->archive($actor, $target);
-        });
+        $this->users->archive($actor, $target, staffOnly: true);
     }
 }

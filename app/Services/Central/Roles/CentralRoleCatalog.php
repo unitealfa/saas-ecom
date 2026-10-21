@@ -4,6 +4,7 @@ namespace App\Services\Central\Roles;
 
 use App\Models\Central\Permission;
 use App\Models\Central\Role;
+use Illuminate\Support\Facades\DB;
 use LogicException;
 
 class CentralRoleCatalog
@@ -26,6 +27,7 @@ class CentralRoleCatalog
         'saas.staff.invite.resend' => 'Renvoyer une invitation au personnel SaaS',
         'saas.staff.update' => 'Modifier le personnel SaaS',
         'saas.staff.permissions.view' => 'Consulter les permissions effectives du personnel SaaS',
+        'saas.staff.permissions.update' => 'Attribuer ou retirer les permissions individuelles du personnel SaaS',
         'saas.staff.assignments.renew' => 'Renouveler une attribution du personnel SaaS',
         'saas.staff.suspend' => 'Suspendre le personnel SaaS',
         'saas.staff.activate' => 'Réactiver le personnel SaaS',
@@ -59,7 +61,7 @@ class CentralRoleCatalog
         'Utilisateurs centraux' => ['saas.users.view', 'saas.users.create', 'saas.users.update', 'saas.users.approve', 'saas.users.reject', 'saas.users.suspend', 'saas.users.activate', 'saas.users.archive'],
         'Dossiers professionnels' => ['saas.users.legal.view', 'saas.users.legal.validate', 'saas.users.legal.reject'],
         'Historique des utilisateurs' => ['saas.users.history.view'],
-        'Personnel SaaS' => ['saas.staff.view', 'saas.staff.invite', 'saas.staff.invite.resend', 'saas.staff.update', 'saas.staff.permissions.view', 'saas.staff.assignments.renew', 'saas.staff.suspend', 'saas.staff.activate', 'saas.staff.archive', 'saas.users.roles.assign'],
+        'Personnel SaaS' => ['saas.staff.view', 'saas.staff.invite', 'saas.staff.invite.resend', 'saas.staff.update', 'saas.staff.permissions.view', 'saas.staff.permissions.update', 'saas.staff.assignments.renew', 'saas.staff.suspend', 'saas.staff.activate', 'saas.staff.archive', 'saas.users.roles.assign'],
         'Pays' => ['saas.countries.view', 'saas.countries.create', 'saas.countries.update', 'saas.countries.activate', 'saas.countries.delete'],
         'Rôles SaaS' => ['saas.roles.view', 'saas.roles.create', 'saas.roles.update', 'saas.roles.delete', 'saas.roles.permissions.view', 'saas.roles.permissions.update', 'saas.roles.durations.update', 'saas.roles.assignments.view'],
         'Catalogue des permissions' => ['saas.permissions.view'],
@@ -92,9 +94,7 @@ class CentralRoleCatalog
         if (tenancy()->initialized) {
             throw new LogicException('The central role catalogue requires the central context.');
         }
-
-        $connection = (new Role)->getConnection();
-        $connection->transaction(function (): void {
+        DB::transaction(function (): void {
             $root = Role::forCentralGuard()->where('is_super_admin', true)->first();
             if ($root === null) {
                 $root = new Role(['name' => 'root', 'label' => 'Super Admin']);
@@ -126,7 +126,7 @@ class CentralRoleCatalog
                     $role = Role::createWithPermissions($name, $expected);
                     $role->forceFill(['label' => $definition['label'], 'is_system' => true, 'is_protected' => true])->save();
                 } else {
-                    $actual = $role->permissions()->get()->mapWithKeys(fn (\Spatie\Permission\Models\Permission $permission): array => [
+                    $actual = $role->permissionComposition()->get()->mapWithKeys(fn (\Spatie\Permission\Models\Permission $permission): array => [
                         $permission->name => (int) $permission->getRelation('pivot')->getAttribute('duration_days'),
                     ])->all();
                     ksort($expected);

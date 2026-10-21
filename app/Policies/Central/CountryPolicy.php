@@ -12,7 +12,7 @@ class CountryPolicy
 
     public function viewAny(User $actor): bool
     {
-        return $this->access->allows($actor, 'saas.countries.view', listing: true);
+        return $this->access->allows($actor, 'saas.countries.view');
     }
 
     public function create(User $actor): bool

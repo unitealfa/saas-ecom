@@ -75,7 +75,7 @@ test('catalogue reads and ordinary seeding preserve labels native role grants an
     $this->seed(AuthorizationSeeder::class);
     expect($permission->fresh()->getAttributes())->toBe($before);
     expect($role->fresh()->getAttributes())->toBe($roleBefore);
-    expect($role->permissions()->first()->pivot->duration_days)->toBe(9999);
+    expect($role->permissionComposition()->first()->pivot->duration_days)->toBe(9999);
     expect($member->roles()->first()->pivot->assigned_at)->toEqual($assignedAt);
     expect($member->fresh()->checkPermissionTo('saas.users.view', 'central'))->toBeTrue();
     $this->get(route('central.roles.create'))->assertOk()->assertSee('Lecture personnalisée');

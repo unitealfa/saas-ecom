@@ -17,41 +17,37 @@ class CentralUserAccess
         }
 
         return $user->roles()->where('guard_name', 'central')
-            ->where('is_super_admin', true)->where('is_system', true)->where('is_protected', true)
+            ->where('is_super_admin', true)
+            ->where('is_system', true)
+            ->where('is_protected', true)
             ->wherePivot('assigned_at', '<=', now())->exists();
     }
 
-    public function allows(User $actor, string $ability, ?User $target = null, bool $listing = false): bool
+    public function allows(User $actor, string $ability): bool
     {
         $actor = $actor->fresh();
         if ($actor === null || ! $this->active($actor)) {
             return false;
         }
-        if (! $actor->checkPermissionTo($ability, 'central')) {
-            $derived = false;
+
+        if ($actor->checkPermissionTo($ability, 'central')) {
+            return true;
+        }
+        if (! config('permission.central_profiles', false)) {
             foreach (CentralRoleCatalog::VIEW_ACTIONS[$ability] ?? [] as $action) {
-                if ($this->allows($actor, $action, $target, $listing)) {
-                    $derived = true;
-                    break;
+                if ($this->allows($actor, $action)) {
+                    return true;
                 }
-            }
-            if (! $derived) {
-                return false;
             }
         }
 
-        return true;
-    }
-
-    public function mayDelegateRole(User $actor, Role $role): bool
-    {
-        return $this->allows($actor, 'saas.users.roles.assign') && $this->ownsRolePermissions($actor, $role);
+        return false;
     }
 
     public function ownsRolePermissions(User $actor, Role $role): bool
     {
         return $role->guard_name === 'central' && ! $role->getAttribute('is_super_admin')
-            && $role->permissions->every(fn ($permission): bool => $this->ownsPermission($actor, $permission->name));
+            && $role->permissionComposition->every(fn ($permission): bool => $this->ownsPermission($actor, $permission->name));
     }
 
     public function ownsPermission(User $actor, string $permission): bool

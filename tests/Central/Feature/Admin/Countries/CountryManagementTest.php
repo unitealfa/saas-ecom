@@ -19,7 +19,9 @@ test('countries have independent creation editing activation and removal permiss
     $editor = User::factory()->create();
     $editor->assignRole(Role::createWithPermissions('country-editor', ['saas.countries.update' => 7]));
     $country = Country::where('code', 'FR')->firstOrFail();
-    $this->actingAs($editor, 'central')->get(route('central.countries.index'))->assertOk();
+    $this->actingAs($editor, 'central')->get(route('central.countries.index'))->assertForbidden();
+    $editor->givePermissionTo('saas.countries.view');
+    $this->get(route('central.countries.index'))->assertOk();
     $this->get(route('central.countries.edit', $country))->assertOk();
     $this->put(route('central.countries.update', $country), [
         'code' => 'FR', 'name_fr' => 'France modifiée', 'name_en' => 'France', 'name_ar' => 'فرنسا',

@@ -28,6 +28,7 @@
                     <form method="POST" action="{{ route('central.staff.roles.renew', [$user, $role]) }}" class="flex flex-col gap-3">
                         @csrf
                         <input type="hidden" name="expected_assigned_at" value="{{ $role->pivot->assigned_at->toIso8601String() }}">
+                        <flux:text>Renouvelle les droits individuels encore attribués et présents dans ce profil. Aucun droit retiré n’est réattribué.</flux:text>
                         <flux:textarea name="reason" label="Motif du renouvellement" required />
                         <flux:button type="submit">Renouveler ce rôle</flux:button>
                     </form>

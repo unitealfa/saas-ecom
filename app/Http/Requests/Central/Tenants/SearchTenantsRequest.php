@@ -12,7 +12,9 @@ class SearchTenantsRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return Gate::forUser($this->user('central'))->allows('viewAny', Tenant::class);
+        $ability = $this->route()?->getActionMethod() === 'chooseOwner' ? 'create' : 'viewAny';
+
+        return Gate::forUser($this->user('central'))->allows($ability, Tenant::class);
     }
 
     protected function prepareForValidation(): void

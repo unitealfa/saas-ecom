@@ -8,6 +8,7 @@ use App\Enums\Central\Features\ValueTypeEnum;
 use App\Models\Central\Feature;
 use App\Models\Central\Plan;
 use App\Models\Central\PlanFeature;
+use Illuminate\Support\Facades\DB;
 use LogicException;
 
 class FreePlanCatalog
@@ -18,7 +19,7 @@ class FreePlanCatalog
             throw new LogicException('The free plan belongs to the central context.');
         }
 
-        return (new Plan)->getConnection()->transaction(function (): Plan {
+        return DB::transaction(function (): Plan {
             $feature = Feature::firstOrCreate(['code' => 'shops'], [
                 'name' => 'Nombre de boutiques', 'value_type' => ValueTypeEnum::QUANTITY,
                 'quota_scope' => QuotaScopeEnum::OWNER, 'period' => PeriodEnum::LIFETIME, 'is_active' => true,

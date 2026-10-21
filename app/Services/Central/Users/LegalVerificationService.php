@@ -2,6 +2,7 @@
 
 namespace App\Services\Central\Users;
 
+use App\DTOs\Central\Users\UserProfileData;
 use App\Enums\VerificationStatusEnum;
 use App\Models\Central\User;
 use Illuminate\Support\Facades\Validator;
@@ -9,6 +10,16 @@ use Illuminate\Validation\ValidationException;
 
 class LegalVerificationService
 {
+    /** Versionner les informations sans modifier la décision d'inscription. */
+    public function versionChangedProfile(User $target): void
+    {
+        if (! $target->isDirty(['first_name', 'last_name', 'email', 'phone', 'phone_country_id', 'country_id', ...UserProfileData::PROFESSIONAL_FIELDS])) {
+            return;
+        }
+
+        $target->legal_profile_version = ($target->legal_profile_version ?? 0) + 1;
+    }
+
     /** @return array<string, array> */
     public static function profileRules(): array
     {

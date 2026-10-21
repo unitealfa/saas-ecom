@@ -19,6 +19,7 @@ use App\Services\Central\Subscriptions\DefaultSubscription;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -34,6 +35,7 @@ class UserManagementService
         private AccountMailDelivery $mail,
         private UserApprovalService $approvals,
         private PhoneNumberNormalizer $phones,
+        private LegalVerificationService $legal,
     ) {}
 
     /** @return LengthAwarePaginator<\App\Models\User> */
@@ -75,51 +77,55 @@ class UserManagementService
     public function create(User $actor, UserData $data): UserSaveResult
     {
         $emailSent = null;
-        $user = $this->mutations->run(function () use ($actor, $data, &$emailSent): User {
-            Gate::forUser($actor)->authorize($data->staff ? 'createStaff' : 'create', User::class);
-            if (! $data->staff && $data->roleUuids !== []) {
-                throw ValidationException::withMessages(['roles' => 'Un compte commerçant est créé sans rôle SaaS.']);
-            }
-            if ($data->staff && $data->professionalAttributes !== []) {
-                throw ValidationException::withMessages(['legal_form' => 'Le personnel SaaS ne possède pas de dossier professionnel commerçant.']);
-            }
-            $roles = $data->staff ? $this->delegableRoles($actor, $data->roleUuids) : collect();
-            if ($data->staff && $roles->isEmpty()) {
-                throw ValidationException::withMessages(['roles' => 'Sélectionnez au moins un rôle pour le personnel SaaS.']);
-            }
-            $country = Country::where('uuid', $data->countryUuid)->active()->lockForUpdate()->first();
-            if ($country === null) {
-                throw ValidationException::withMessages(['country_uuid' => 'Ce pays n’est plus disponible.']);
-            }
-            $user = new \App\Models\User([
-                'last_name' => $data->lastName, 'first_name' => $data->firstName,
-                'email' => $data->email, 'password' => Str::random(64),
-            ]);
-            $user->country_id = $country->id;
-            $user->forceFill($this->phoneAttributes($data->phone, $data->phoneCountryUuid, $country));
-            $user->status = StatusEnum::ACTIVE;
-            if (! $data->staff) {
-                Validator::make($data->professionalAttributes, LegalVerificationService::profileRules())->validate();
-                $user->forceFill(array_intersect_key($data->professionalAttributes, array_flip(UserProfileData::PROFESSIONAL_FIELDS)));
-            }
-            $user->save();
-            if (! $data->staff) {
-                $this->approvals->approveCreatedMerchant($actor, $user);
-            }
-            $this->subscriptions->ensure($user, $actor);
-            if ($data->staff) {
-                $this->applyRoles($user, $roles);
-            }
-            $token = Password::broker('central')->createToken($user);
-            $user->getConnection()->afterCommit(function () use ($user, $token, &$emailSent): void {
-                $emailSent = $this->mail->invitation($user, $token);
-            });
-            activity()->causedBy($actor)->performedOn($user)->event('account_invited')
-                ->withProperties(['staff' => $data->staff, 'role_uuids' => $roles->pluck('uuid')->all()])
-                ->log('Compte central créé et invité à choisir son mot de passe.');
+        $user = $this->mutations->run(
+            actor: $actor,
+            ability: $data->staff ? 'createStaff' : 'create',
+            loadTarget: fn () => User::class,
+            mutation: function () use ($actor, $data, &$emailSent): User {
+                if (! $data->staff && $data->roleUuids !== []) {
+                    throw ValidationException::withMessages(['roles' => 'Un compte commerçant est créé sans rôle SaaS.']);
+                }
+                if ($data->staff && $data->professionalAttributes !== []) {
+                    throw ValidationException::withMessages(['legal_form' => 'Le personnel SaaS ne possède pas de dossier professionnel commerçant.']);
+                }
+                $roles = $data->staff ? $this->delegableRoles($actor, $data->roleUuids) : collect();
+                if ($data->staff && $roles->isEmpty()) {
+                    throw ValidationException::withMessages(['roles' => 'Sélectionnez au moins un rôle pour le personnel SaaS.']);
+                }
+                $country = Country::where('uuid', $data->countryUuid)->active()->lockForUpdate()->first();
+                if ($country === null) {
+                    throw ValidationException::withMessages(['country_uuid' => 'Ce pays n’est plus disponible.']);
+                }
+                $user = new \App\Models\User([
+                    'last_name' => $data->lastName, 'first_name' => $data->firstName,
+                    'email' => $data->email, 'password' => Str::random(64),
+                ]);
+                $user->country_id = $country->id;
+                $user->forceFill($this->phoneAttributes($data->phone, $data->phoneCountryUuid, $country));
+                $user->status = StatusEnum::ACTIVE;
+                if (! $data->staff) {
+                    Validator::make($data->professionalAttributes, LegalVerificationService::profileRules())->validate();
+                    $user->forceFill(array_intersect_key($data->professionalAttributes, array_flip(UserProfileData::PROFESSIONAL_FIELDS)));
+                }
+                $user->save();
+                if (! $data->staff) {
+                    $this->approvals->approveCreatedMerchant($actor, $user);
+                }
+                $this->subscriptions->ensure($user, $actor);
+                if ($data->staff) {
+                    $this->applyRoles($user, $roles);
+                }
+                $token = Password::broker('central')->createToken($user);
+                DB::afterCommit(function () use ($user, $token, &$emailSent): void {
+                    $emailSent = $this->mail->invitation($user, $token);
+                });
+                activity()->causedBy($actor)->performedOn($user)->event('account_invited')
+                    ->withProperties(['staff' => $data->staff, 'role_uuids' => $roles->pluck('uuid')->all()])
+                    ->log('Compte central créé et invité à choisir son mot de passe.');
 
-            return $user;
-        });
+                return $user;
+            },
+        );
 
         return new UserSaveResult($user, $emailSent);
     }
@@ -128,51 +134,25 @@ class UserManagementService
     {
         abort_unless(in_array($ability, ['update', 'updateStaff', 'updateOwnProfile'], true), 403);
         $emailSent = null;
-        $mutation = function () use ($actor, $target, $data, $ability, $notifyEmailChange, &$emailSent): User {
-            $target = \App\Models\User::whereKey($target->id)->lockForUpdate()->firstOrFail();
-            Gate::forUser($actor)->authorize($ability, $target);
-            $country = Country::where('uuid', $data->countryUuid)
-                ->where(fn ($query) => $query->active()->orWhere('id', $target->country_id))->lockForUpdate()->firstOrFail();
+        $loadTarget = fn () => \App\Models\User::whereKey($target->id)->lockForUpdate()->firstOrFail();
+        $mutation = function (User $target) use ($actor, $data, $notifyEmailChange, &$emailSent): User {
             $emailChanged = $target->email !== strtolower(trim($data->email));
             $wasVerified = $target->hasVerifiedEmail();
             if ($emailChanged) {
                 Password::broker('central')->deleteToken($target);
             }
-            $target->forceFill([
-                'first_name' => $data->firstName, 'last_name' => $data->lastName,
-                'email' => strtolower(trim($data->email)), 'country_id' => $country->id,
-            ]);
-            $target->forceFill($this->phoneAttributes($data->phone, $data->phoneCountryUuid, $country, $target));
-            $attributes = array_intersect_key($data->attributes, array_flip(['locale', ...UserProfileData::PROFESSIONAL_FIELDS]));
-            if (array_intersect_key($attributes, array_flip(UserProfileData::PROFESSIONAL_FIELDS)) !== []) {
-                Gate::forUser($actor)->authorize('viewLegal', $target);
-            }
-            if ($this->access->isStaff($target) && array_intersect_key($attributes, array_flip(UserProfileData::PROFESSIONAL_FIELDS)) !== []) {
-                throw ValidationException::withMessages(['legal_form' => 'Le personnel SaaS ne possède pas de profil professionnel vendeur.']);
-            }
-            $target->forceFill($attributes);
+            $this->fillProfile($actor, $target, $data);
             if ($emailChanged) {
                 $target->email_verified_at = null;
             }
             if ($target->isDirty('phone')) {
                 $target->forceFill(['phone_verified_at' => null, 'whatsapp_verified_at' => null]);
             }
-            if ($target->isDirty(['first_name', 'last_name', 'email', 'phone', 'phone_country_id', 'country_id', ...UserProfileData::PROFESSIONAL_FIELDS])
-                && ! $this->access->isStaff($target)) {
-                $target->forceFill([
-                    'legal_profile_version' => ($target->legal_profile_version ?? 0) + 1,
-                    'legal_verification_status' => VerificationStatusEnum::PENDING,
-                    'legal_verified_at' => null, 'legal_verified_by_id' => null,
-                ]);
-                if (in_array($target->status, [StatusEnum::ACTIVE, StatusEnum::REJECTED], true)) {
-                    $target->status = StatusEnum::PENDING;
-                }
-            }
             $fields = array_keys($target->getDirty());
             $target->save();
             if ($emailChanged && $notifyEmailChange) {
                 $token = $wasVerified ? null : Password::broker('central')->createToken($target);
-                $target->getConnection()->afterCommit(function () use ($target, $token, &$emailSent): void {
+                DB::afterCommit(function () use ($target, $token, &$emailSent): void {
                     $emailSent = $token === null ? $this->mail->verification($target) : $this->mail->invitation($target, $token);
                 });
             }
@@ -181,12 +161,44 @@ class UserManagementService
 
             return $target;
         };
-        $user = $ability === 'updateOwnProfile'
-            ? $target->getConnection()->transaction($mutation, 3)
-            : $this->mutations->run($mutation);
+        if ($ability === 'updateOwnProfile') {
+            $user = DB::transaction(function () use ($actor, $loadTarget, $mutation): User {
+                $target = $loadTarget();
+                Gate::forUser($actor)->authorize('updateOwnProfile', $target);
+
+                return $mutation($target);
+            }, 3);
+        } else {
+            $user = $this->mutations->run($actor, $ability, $loadTarget, $mutation);
+        }
         $target->setRawAttributes($user->getAttributes(), true)->unsetRelations();
 
         return new UserSaveResult($user, $emailSent);
+    }
+
+    private function fillProfile(User $actor, User $target, UserProfileData $data): void
+    {
+        $country = Country::where('uuid', $data->countryUuid)
+            ->where(fn ($query) => $query->active()->orWhere('id', $target->country_id))->lockForUpdate()->firstOrFail();
+        $attributes = array_intersect_key($data->attributes, array_flip(['locale', ...UserProfileData::PROFESSIONAL_FIELDS]));
+        $isStaff = $this->access->isStaff($target);
+        if (array_intersect_key($attributes, array_flip(UserProfileData::PROFESSIONAL_FIELDS)) !== []) {
+            if ($isStaff) {
+                throw ValidationException::withMessages(['legal_form' => 'Le personnel SaaS ne possède pas de profil professionnel vendeur.']);
+            }
+            Gate::forUser($actor)->authorize('viewLegal', $target);
+            Validator::make($attributes, LegalVerificationService::profileRules())->validate();
+        }
+
+        $target->forceFill([
+            'first_name' => $data->firstName, 'last_name' => $data->lastName,
+            'email' => strtolower(trim($data->email)), 'country_id' => $country->id,
+            ...$this->phoneAttributes($data->phone, $data->phoneCountryUuid, $country, $target),
+            ...$attributes,
+        ]);
+        if (! $isStaff) {
+            $this->legal->versionChangedProfile($target);
+        }
     }
 
     /** @return array{phone: ?string, phone_country_id: ?int} */
@@ -213,59 +225,68 @@ class UserManagementService
     public function resendInvitation(User $actor, User $target): UserSaveResult
     {
         $emailSent = null;
-        $user = $this->mutations->run(function () use ($actor, $target, &$emailSent): User {
-            $target = \App\Models\User::whereKey($target->id)->lockForUpdate()->firstOrFail();
-            Gate::forUser($actor)->authorize('resendInvitation', $target);
-            if ($target->hasVerifiedEmail()) {
-                throw ValidationException::withMessages(['invitation' => 'Ce compte a déjà vérifié son adresse e-mail.']);
-            }
-            $token = Password::broker('central')->createToken($target);
-            $target->getConnection()->afterCommit(function () use ($target, $token, &$emailSent): void {
-                $emailSent = $this->mail->invitation($target, $token);
-            });
-            activity()->causedBy($actor)->performedOn($target)->event('account_invitation_requested')
-                ->log('Renvoi de l’invitation centrale demandé.');
+        $user = $this->mutations->run(
+            actor: $actor,
+            ability: 'resendInvitation',
+            loadTarget: fn () => \App\Models\User::whereKey($target->id)->lockForUpdate()->firstOrFail(),
+            mutation: function (User $target) use ($actor, &$emailSent): User {
+                if ($target->hasVerifiedEmail()) {
+                    throw ValidationException::withMessages(['invitation' => 'Ce compte a déjà vérifié son adresse e-mail.']);
+                }
+                $token = Password::broker('central')->createToken($target);
+                DB::afterCommit(function () use ($target, $token, &$emailSent): void {
+                    $emailSent = $this->mail->invitation($target, $token);
+                });
+                activity()->causedBy($actor)->performedOn($target)->event('account_invitation_requested')
+                    ->log('Renvoi de l’invitation centrale demandé.');
 
-            return $target;
-        });
+                return $target;
+            },
+        );
 
         return new UserSaveResult($user, $emailSent);
     }
 
-    public function changeStatus(User $actor, User $target, StatusEnum $status): void
+    public function changeStatus(User $actor, User $target, StatusEnum $status, bool $staffOnly = false): void
     {
-        $this->mutations->run(function () use ($actor, $target, $status): void {
-            $target = User::whereKey($target->id)->lockForUpdate()->firstOrFail();
-            $action = $status === StatusEnum::SUSPENDED ? 'suspend' : 'activate';
-            Gate::forUser($actor)->authorize($action, $target);
-            if (! in_array($status, [StatusEnum::ACTIVE, StatusEnum::SUSPENDED], true)
-                || ($status === StatusEnum::ACTIVE && ! in_array($target->status, [StatusEnum::SUSPENDED, StatusEnum::INACTIVE], true))) {
-                throw ValidationException::withMessages(['status' => 'Cette transition de statut n’est pas disponible.']);
-            }
-            $target->status = $status === StatusEnum::ACTIVE && ! $this->access->isStaff($target)
-                && $target->legal_verification_status !== VerificationStatusEnum::VERIFIED
-                ? StatusEnum::PENDING : $status;
-            $target->save();
-            if ($status === StatusEnum::SUSPENDED) {
-                $this->invalidateAccountAccess($target);
-            }
-            activity()->causedBy($actor)->performedOn($target)->event('central_account_status_updated')
-                ->withProperties(['status' => $target->status->value, 'requested_status' => $status->value])->log('État du compte central modifié.');
-        });
+        $action = $status === StatusEnum::SUSPENDED ? 'suspend' : 'activate';
+        $this->mutations->run(
+            actor: $actor,
+            ability: $staffOnly ? $action.'Staff' : $action,
+            loadTarget: fn () => User::whereKey($target->id)->lockForUpdate()->firstOrFail(),
+            mutation: function (User $target) use ($actor, $status): void {
+                if (! in_array($status, [StatusEnum::ACTIVE, StatusEnum::SUSPENDED], true)
+                    || ($status === StatusEnum::ACTIVE && ! in_array($target->status, [StatusEnum::SUSPENDED, StatusEnum::INACTIVE], true))) {
+                    throw ValidationException::withMessages(['status' => 'Cette transition de statut n’est pas disponible.']);
+                }
+                $target->status = $status === StatusEnum::ACTIVE && ! $this->access->isStaff($target)
+                    && $target->legal_verification_status !== VerificationStatusEnum::VERIFIED
+                    ? StatusEnum::PENDING : $status;
+                $target->save();
+                if ($status === StatusEnum::SUSPENDED) {
+                    $this->invalidateAccountAccess($target);
+                }
+                activity()->causedBy($actor)->performedOn($target)->event('central_account_status_updated')
+                    ->withProperties(['status' => $target->status->value, 'requested_status' => $status->value])->log('État du compte central modifié.');
+            },
+        );
     }
 
-    public function archive(User $actor, User $target): void
+    public function archive(User $actor, User $target, bool $staffOnly = false): void
     {
-        $this->mutations->run(function () use ($actor, $target): void {
-            $target = User::whereKey($target->id)->lockForUpdate()->firstOrFail();
-            Gate::forUser($actor)->authorize('archive', $target);
-            $target->status = StatusEnum::DELETED;
-            $target->save();
-            $this->invalidateAccountAccess($target);
-            $target->delete();
-            activity()->causedBy($actor)->performedOn($target)->event('central_account_archived')
-                ->log('Compte central archivé ; données et boutiques conservées.');
-        });
+        $this->mutations->run(
+            actor: $actor,
+            ability: $staffOnly ? 'archiveStaff' : 'archive',
+            loadTarget: fn () => User::whereKey($target->id)->lockForUpdate()->firstOrFail(),
+            mutation: function (User $target) use ($actor): void {
+                $target->status = StatusEnum::DELETED;
+                $target->save();
+                $this->invalidateAccountAccess($target);
+                $target->delete();
+                activity()->causedBy($actor)->performedOn($target)->event('central_account_archived')
+                    ->log('Compte central archivé ; données et boutiques conservées.');
+            },
+        );
     }
 
     private function invalidateAccountAccess(User $target): void
@@ -278,29 +299,51 @@ class UserManagementService
     /** @param list<string> $roleUuids */
     public function assignRoles(User $actor, User $target, array $roleUuids): void
     {
-        $this->mutations->run(function () use ($actor, $target, $roleUuids): void {
-            $target = User::whereKey($target->id)->lockForUpdate()->firstOrFail();
-            Gate::forUser($actor)->authorize('assignRoles', $target);
-            $roles = $this->delegableRoles($actor, $roleUuids);
-            $revokedPermissions = $roles->isEmpty() ? $target->permissions()->pluck('uuid')->all() : [];
-            $this->applyRoles($target, $roles);
-            if ($revokedPermissions !== []) {
-                $target->syncPermissions([]);
-            }
-            activity()->causedBy($actor)->performedOn($target)->event('central_roles_updated')
-                ->withProperties(['role_uuids' => $roles->pluck('uuid')->all(), 'revoked_permission_uuids' => $revokedPermissions])
-                ->log('Rôles centraux attribués via Spatie.');
-        });
+        $this->mutations->run(
+            actor: $actor,
+            ability: 'assignRoles',
+            loadTarget: fn () => User::whereKey($target->id)->lockForUpdate()->firstOrFail(),
+            mutation: function (User $target) use ($actor, $roleUuids): void {
+                $before = $this->roleAssignments($target);
+                $roles = $this->delegableRoles($actor, $roleUuids);
+                // The form only edits delegable roles. Never revoke an assignment it cannot display.
+                $editableUuids = $this->availableRoles($actor)->pluck('uuid');
+                $preserved = $target->roles()->with('permissionComposition')->get()
+                    ->reject(fn (Role $role): bool => $editableUuids->contains($role->uuid));
+                $roles = $roles->merge($preserved)->unique('id');
+                $revokedPermissions = $roles->isEmpty() ? $target->permissions()->pluck('uuid')->all() : [];
+                $this->applyRoles($target, $roles);
+                if ($revokedPermissions !== []) {
+                    $target->syncPermissions([]);
+                }
+                activity()->causedBy($actor)->performedOn($target)->event('central_roles_updated')
+                    ->withProperties(['role_uuids' => $roles->pluck('uuid')->all(), 'revoked_permission_uuids' => $revokedPermissions])
+                    ->log('Rôles centraux attribués via Spatie.');
+                $after = $this->roleAssignments($target);
+                if ($before !== $after) {
+                    activity()->causedBy($actor)->performedOn($target)->event('central_staff_roles_replaced')
+                        ->withProperties(['before' => $before, 'after' => $after])
+                        ->log('Attributions des rôles du personnel SaaS modifiées.');
+                }
+            },
+        );
+    }
+
+    /** @return list<array{role_uuid: string, assigned_at: string}> */
+    private function roleAssignments(User $target): array
+    {
+        return $target->roles()->orderBy('roles.id')->get()->map(fn ($role): array => [
+            'role_uuid' => $role->uuid, 'assigned_at' => $role->pivot->assigned_at->toIso8601String(),
+        ])->all();
     }
 
     /** @return Collection<int, Role> */
     public function availableRoles(User $actor): Collection
     {
-        return Role::forCentralGuard()->where('is_super_admin', false)->with('permissions')
-            ->orderBy('name')->get()->filter(fn (Role $role): bool => $this->access->mayDelegateRole($actor, $role)
-                && $role->permissions->isNotEmpty()
-                && $role->permissions->every(fn ($permission): bool => array_key_exists($permission->name, CentralRoleCatalog::PERMISSIONS)
-                    && $this->access->allows($actor, $permission->name)))
+        return Role::forCentralGuard()->where('is_super_admin', false)->with('permissionComposition')
+            ->orderBy('name')->get()->filter(fn (Role $role): bool => Gate::forUser($actor)->allows('assign', $role)
+                && $role->permissionComposition->isNotEmpty()
+                && $role->permissionComposition->every(fn ($permission): bool => array_key_exists($permission->name, CentralRoleCatalog::PERMISSIONS)))
             ->values();
     }
 
@@ -316,15 +359,14 @@ class UserManagementService
         }
         $permissionIds = [];
         foreach ($roles as $role) {
-            abort_unless($this->access->mayDelegateRole($actor, $role), 403);
-            $permissions = $role->permissions()->get();
+            Gate::forUser($actor)->authorize('assign', $role);
+            $permissions = $role->permissionComposition()->get();
             if ($role->getAttribute('is_super_admin') || $permissions->isEmpty()) {
                 throw ValidationException::withMessages(['roles' => 'Le rôle Super Admin et les rôles vides ne sont pas attribuables ici.']);
             }
             foreach ($permissions as $permission) {
-                abort_unless(array_key_exists($permission->name, CentralRoleCatalog::PERMISSIONS)
-                    && $this->access->allows($actor, $permission->name), 403);
-                if (in_array($permission->getKey(), $permissionIds, true)) {
+                abort_unless(array_key_exists($permission->name, CentralRoleCatalog::PERMISSIONS), 403);
+                if (! $role->usesIndividualPermissions() && in_array($permission->getKey(), $permissionIds, true)) {
                     throw ValidationException::withMessages(['roles' => 'Les rôles sélectionnés partagent une permission.']);
                 }
                 $permissionIds[] = $permission->getKey();

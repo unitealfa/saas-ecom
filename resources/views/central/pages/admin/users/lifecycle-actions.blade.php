@@ -22,12 +22,20 @@
     </form>
 @endcan
 @can('approve', $user)
-    <form method="POST" action="{{ route('central.users.approve', $user) }}" class="inline-block">
-        @csrf
-        <input type="hidden" name="expected_status" value="{{ $user->status->value }}">
-        <input type="hidden" name="legal_profile_version" value="{{ $user->legal_profile_version ?? 0 }}">
-        <flux:button type="submit">Approuver</flux:button>
-    </form>
+    <flux:modal.trigger :name="'approve-registration-'.$user->uuid">
+        <flux:button>Approuver</flux:button>
+    </flux:modal.trigger>
+    <flux:modal :name="'approve-registration-'.$user->uuid" class="md:w-96">
+        <form method="POST" action="{{ route('central.users.approve', $user) }}" class="space-y-5">
+            @csrf
+            <input type="hidden" name="expected_status" value="{{ $user->status->value }}">
+            <input type="hidden" name="legal_profile_version" value="{{ $user->legal_profile_version ?? 0 }}">
+            <flux:heading size="lg">Approuver l’inscription de {{ $user->name }}</flux:heading>
+            <flux:text>Le compte et son dossier seront approuvés. La vérification de l’e-mail reste obligatoire. Aucune boutique ne sera créée automatiquement.</flux:text>
+            <flux:modal.close><flux:button>Annuler</flux:button></flux:modal.close>
+            <flux:button type="submit" variant="primary">Confirmer l’approbation</flux:button>
+        </form>
+    </flux:modal>
 @endcan
 @can('reject', $user)
     <flux:modal.trigger :name="'reject-registration-'.$user->uuid">

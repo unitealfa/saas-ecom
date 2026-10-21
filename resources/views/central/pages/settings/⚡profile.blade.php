@@ -62,12 +62,6 @@ new #[Title('Profile settings')] class extends Component {
         if ($result->emailSent === false) {
             Session::flash('warning', 'Le profil est enregistré, mais le message de vérification n’a pas pu être envoyé. Réessayez depuis la page de vérification.');
         }
-        if ($result->user->status === \App\Enums\Central\Users\StatusEnum::PENDING) {
-            $this->redirect(app(\App\Services\Central\Auth\RegistrationJourney::class)->destination($result->user));
-
-            return;
-        }
-
         Flux::toast(variant: 'success', text: __('Profile updated.'));
     }
 

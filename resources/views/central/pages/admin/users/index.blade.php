@@ -94,8 +94,10 @@ new #[Title('Utilisateurs')] class extends Component {
                             @can('update', $user)
                                 <flux:button :href="route('central.users.edit', $user)">Modifier</flux:button>
                             @endcan
-                            @can('assignRoles', $user)
-                                <flux:button :href="route('central.users.roles.edit', $user)">Rôles</flux:button>
+                            @can('updateStaffPermissions', $user)
+                                <flux:button :href="route('central.staff.permissions.index', $user)">Modifier les permissions</flux:button>
+                            @elsecan('viewStaffPermissions', $user)
+                                <flux:button :href="route('central.staff.permissions.index', $user)">Permissions effectives</flux:button>
                             @endcan
                             @can('create', [\App\Models\Central\Tenant::class, $user])
                                 <flux:button :href="route('central.users.tenants.create', $user)">Boutiques</flux:button>

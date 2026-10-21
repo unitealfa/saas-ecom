@@ -11,6 +11,7 @@ use App\Services\Central\Users\UserManagementService;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -21,6 +22,99 @@ beforeEach(function (): void {
     $this->admin = User::factory()->create();
     $this->admin->assignRole(Role::findByName('root', 'central'));
     Notification::fake();
+});
+
+test('saving staff roles preserves roles excluded from the delegable catalogue and direct grants', function (): void {
+    $this->freezeTime();
+    $legacy = \App\Models\Central\Permission::create(['name' => 'saas.legacy.operation', 'label' => 'Legacy']);
+    $hiddenRole = Role::createWithPermissions('legacy-profile', [$legacy->name => 7]);
+    $staff = staffTestAccount();
+    $staff->assignRole($hiddenRole);
+    $staff->givePermissionTo('saas.countries.view');
+    $reader = Role::findByName('user-reader', 'central');
+    $before = $staff->roles()->whereKey($hiddenRole->id)->first()->pivot->assigned_at;
+    $direct = $staff->permissions()->first()->pivot->expires_at;
+    expect(app(UserManagementService::class)->availableRoles($this->admin)->contains('id', $hiddenRole->id))->toBeFalse();
+    $this->travel(1)->days();
+    $this->actingAs($this->admin, 'central')->put(route('central.staff.roles.update', $staff), ['roles' => []])->assertSessionHasNoErrors();
+    expect($staff->fresh()->hasRole($hiddenRole))->toBeTrue()
+        ->and($staff->fresh()->hasRole($reader))->toBeFalse()
+        ->and($staff->roles()->first()->pivot->assigned_at)->toEqual($before)
+        ->and($staff->permissions()->first()->pivot->expires_at)->toEqual($direct)
+        ->and($staff->fresh()->can($legacy->name))->toBeTrue()
+        ->and($staff->fresh()->can('saas.countries.view'))->toBeTrue();
+});
+
+test('legacy users role page and mutation are removed while staff role management remains available', function (): void {
+    $staff = staffTestAccount();
+    $legacyPath = '/admin/users/'.$staff->uuid.'/roles';
+    $this->actingAs($this->admin, 'central')->get($legacyPath)->assertNotFound();
+    $this->put($legacyPath, ['roles' => []])->assertNotFound();
+    $this->get(route('central.users.show', $staff))->assertDontSee($legacyPath, false)
+        ->assertSee(route('central.staff.permissions.index', $staff), false);
+    $this->get(route('central.users.index'))->assertDontSee($legacyPath, false);
+    $this->get(route('central.staff.roles.edit', $staff))->assertSee('Enregistrer les rôles');
+    expect($staff->fresh()->hasRole('user-reader'))->toBeTrue();
+});
+
+test('permission display follows Gate for valid expired and suspended direct grants', function (): void {
+    $this->freezeTime();
+    $staff = staffTestAccount();
+    $staff->givePermissionTo('saas.countries.view');
+    $permission = $staff->permissions()->where('name', 'saas.countries.view')->firstOrFail();
+    $staff->permissions()->updateExistingPivot($permission->id, ['expires_at' => now()->addDay()]);
+    $resolver = app(CentralPermissionResolver::class);
+    foreach ([0, 1] as $days) {
+        if ($days) {
+            $this->travel(1)->days();
+        }
+        $row = $resolver->forStaff($this->admin, $staff)->firstWhere('code', 'saas.countries.view');
+        expect($row['effective'])->toBe($staff->fresh()->can('saas.countries.view'))->toBe($days === 0);
+    }
+    $staff->forceFill(['status' => StatusEnum::SUSPENDED])->save();
+    foreach ($resolver->forStaff($this->admin, $staff) as $row) {
+        expect($row['effective'])->toBeFalse()->toBe($staff->fresh()->can($row['code']));
+    }
+});
+
+test('central mutations roll back permissions and audit on the actual model connection', function (): void {
+    $staff = staffTestAccount();
+    $connection = $staff->getConnection();
+    expect(DB::getDefaultConnection())->toBe(config('tenancy.database.central_connection'))
+        ->and(DB::connection())->toBe($connection);
+    $events = Activity::count();
+    try {
+        app(\App\Services\Central\Authorization\AuthorizationMutation::class)->transaction(function () use ($staff, $connection): void {
+            expect($connection->transactionLevel())->toBeGreaterThan(0);
+            $staff->givePermissionTo('saas.countries.view');
+            activity()->performedOn($staff)->event('rollback_probe')->log('Isolated rollback test');
+            throw new \RuntimeException('rollback');
+        });
+        $this->fail('The mutation must fail.');
+    } catch (\RuntimeException $exception) {
+        expect($exception->getMessage())->toBe('rollback');
+    }
+    expect($staff->fresh()->can('saas.countries.view'))->toBeFalse()
+        ->and($staff->permissions()->count())->toBe(1)
+        ->and($staff->fresh()->can('saas.users.view'))->toBeTrue()
+        ->and(Activity::count())->toBe($events);
+});
+
+test('central mutation authorizes the actor and target before executing the write', function (): void {
+    $actor = staffTestAccount();
+    $staff = staffTestAccount();
+    $executed = false;
+    expect(fn () => app(\App\Services\Central\Authorization\AuthorizationMutation::class)->run(
+        actor: $actor,
+        ability: 'updateStaff',
+        loadTarget: fn (): User => User::whereKey($staff->id)->lockForUpdate()->firstOrFail(),
+        mutation: function (User $target) use (&$executed): void {
+            $executed = true;
+            $target->update(['last_name' => 'Interdit']);
+        },
+    ))->toThrow(AuthorizationException::class);
+    expect($executed)->toBeFalse();
+    expect($staff->fresh()->last_name)->not->toBe('Interdit');
 });
 
 function staffTestAccount(bool $verified = true): User
@@ -109,22 +203,23 @@ test('derived consultation does not permit delegation of a permission that is no
     $actor = User::factory()->create();
     $actor->assignRole(Role::createWithPermissions('staff-creator-without-explicit-read', ['saas.users.create' => 9999, 'saas.users.roles.assign' => 9999]));
     $staff = staffTestAccount();
-    expect(Gate::forUser($actor)->allows('viewAny', User::class))->toBeTrue();
+    expect(Gate::forUser($actor)->allows('viewAny', User::class))->toBeFalse();
     expect($actor->checkPermissionTo('saas.users.view', 'central'))->toBeFalse();
     $this->actingAs($actor, 'central')->put(route('central.staff.roles.update', $staff), ['roles' => [Role::findByName('user-reader')->uuid]])->assertForbidden();
     expect($staff->roles()->pluck('name')->all())->toBe(['user-reader']);
     expect(Activity::forSubject($staff)->where('event', 'central_roles_updated')->count())->toBe(0);
 });
 
-test('staff role replacement refuses overlaps root assignments and merchant targets', function (): void {
+test('shared profiles may reuse defaults without duplicate direct grants while root and merchants remain protected', function (): void {
     $staff = staffTestAccount();
     $merchant = User::factory()->create();
     $this->actingAs($this->admin, 'central')->put(route('central.staff.roles.update', $staff), [
         'roles' => [Role::findByName('user-reader')->uuid, Role::findByName('user-manager')->uuid],
-    ])->assertSessionHasErrors('roles');
+    ])->assertSessionHasNoErrors();
     $this->put(route('central.staff.roles.update', $staff), ['roles' => [Role::findByName('root')->uuid]])->assertSessionHasErrors('roles.0');
     $this->get(route('central.staff.roles.edit', $merchant))->assertForbidden();
-    expect($staff->roles()->pluck('name')->all())->toBe(['user-reader']);
+    expect($staff->roles()->pluck('name')->all())->toBe(['user-manager', 'user-reader']);
+    expect($staff->permissions()->where('name', 'saas.users.view')->count())->toBe(1);
 });
 
 test('removing all staff roles revokes access without deleting the central account', function (): void {
@@ -178,7 +273,7 @@ test('effective permission display matches Spatie expiry and escapes role and ac
 test('permission inspection requires its own permission and expired management rights deny writes', function (): void {
     $this->freezeTime();
     $actor = User::factory()->create();
-    $actor->assignRole(Role::createWithPermissions('short-staff-editor', ['saas.staff.update' => 1, 'saas.users.view' => 9999]));
+    $actor->assignRole(Role::createWithPermissions('short-staff-editor', ['saas.staff.update' => 1, 'saas.staff.view' => 1, 'saas.users.view' => 9999]));
     $staff = staffTestAccount();
     $this->actingAs($actor, 'central')->get(route('central.staff.index'))->assertOk();
     $this->get(route('central.staff.edit', $staff))->assertOk();
@@ -192,7 +287,7 @@ test('permission inspection requires its own permission and expired management r
 
 test('staff invitation resend has its own permission and refuses verified or suspended recipients', function (): void {
     $actor = User::factory()->create();
-    $actor->assignRole(Role::createWithPermissions('staff-invitation-resender', ['saas.staff.invite.resend' => 9999, 'saas.users.view' => 9999]));
+    $actor->assignRole(Role::createWithPermissions('staff-invitation-resender', ['saas.staff.invite.resend' => 9999, 'saas.staff.view' => 9999, 'saas.users.view' => 9999]));
     $staff = staffTestAccount(false);
     $old = Password::broker('central')->createToken($staff);
     $this->actingAs($actor, 'central')->get(route('central.staff.show', $staff))->assertOk()->assertSee('Renvoyer l’invitation');
@@ -259,6 +354,37 @@ test('staff mutations protect root self assignment and more privileged targets',
     $this->actingAs($actor, 'central')->put(route('central.staff.update', $staff), staffTestProfile($staff))->assertForbidden();
     $this->delete(route('central.staff.destroy', $this->admin))->assertForbidden();
     expect($this->admin->fresh()->trashed())->toBeFalse();
+});
+
+test('staff service actions require their own permission even when the generic user action is allowed', function (string $action): void {
+    $actor = User::factory()->create();
+    $actor->assignRole(Role::createWithPermissions('generic-user-'.$action, [
+        'saas.users.'.$action => 9999, 'saas.users.view' => 9999,
+    ]));
+    $staff = staffTestAccount();
+    expect(Gate::forUser($actor)->allows($action, $staff))->toBeTrue();
+    $service = app(\App\Services\Central\Users\StaffManagementService::class);
+
+    expect(fn () => $action === 'suspend'
+        ? $service->changeStatus($actor, $staff, StatusEnum::SUSPENDED)
+        : $service->archive($actor, $staff))->toThrow(AuthorizationException::class);
+
+    expect($staff->fresh()->status)->toBe(StatusEnum::ACTIVE)
+        ->and($staff->fresh()->trashed())->toBeFalse();
+    expect(Activity::forSubject($staff)->whereIn('event', ['central_account_status_updated', 'central_account_archived'])->count())->toBe(0);
+})->with(['suspend', 'archive']);
+
+test('role replacement keeps both audit events inside its single transaction', function (): void {
+    $staff = staffTestAccount();
+    $role = Role::findByName('user-manager', 'central');
+
+    app(\App\Services\Central\Authorization\CentralRoleAssignmentService::class)->replace($this->admin, $staff, [$role->uuid]);
+
+    expect($staff->fresh()->hasRole($role))->toBeTrue();
+    foreach (['central_roles_updated', 'central_staff_roles_replaced'] as $event) {
+        $entry = Activity::forSubject($staff)->where('event', $event)->sole();
+        expect($entry->causer_id)->toBe($this->admin->id);
+    }
 });
 
 test('renewing an existing role needs renewal permission rather than permission to assign a new role', function (): void {

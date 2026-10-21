@@ -6,6 +6,7 @@ use App\Models\Central\Media;
 use App\Models\Central\User;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -44,7 +45,7 @@ class ProfilePhotoService
             throw ValidationException::withMessages(['photo' => 'La photo n’a pas pu être enregistrée. Réessayez.']);
         }
         try {
-            $actor->getConnection()->transaction(function () use ($actor, $photo, $mime, $dimensions, $uuid, $key, $disk): void {
+            DB::transaction(function () use ($actor, $photo, $mime, $dimensions, $uuid, $key, $disk): void {
                 $user = User::whereKey($actor->id)->where('uuid', $actor->uuid)->lockForUpdate()->firstOrFail();
                 Gate::forUser($actor)->authorize('updateProfilePhoto', $user);
                 $previous = $user->profilePhoto;
@@ -62,7 +63,7 @@ class ProfilePhotoService
                 activity()->causedBy($user)->performedOn($user)->event('profile_photo_updated')
                     ->withProperties(['media_uuid' => $media->uuid])->log('Photo de profil modifiée.');
                 if ($previous !== null && $this->isProfilePhoto($previous, $user)) {
-                    $user->getConnection()->afterCommit(fn () => $this->deleteFile($disk, $previous->storage_key, $previous->uuid));
+                    DB::afterCommit(fn () => $this->deleteFile($disk, $previous->storage_key, $previous->uuid));
                 }
             });
         } catch (Throwable $exception) {
@@ -75,7 +76,7 @@ class ProfilePhotoService
     public function remove(User $actor): void
     {
         $disk = Storage::disk('local');
-        $actor->getConnection()->transaction(function () use ($actor, $disk): void {
+        DB::transaction(function () use ($actor, $disk): void {
             $user = User::whereKey($actor->id)->where('uuid', $actor->uuid)->lockForUpdate()->firstOrFail();
             Gate::forUser($actor)->authorize('updateProfilePhoto', $user);
             $photo = $user->profilePhoto;
@@ -86,7 +87,7 @@ class ProfilePhotoService
             activity()->causedBy($user)->performedOn($user)->event('profile_photo_removed')
                 ->withProperties(['media_uuid' => $photo->uuid])->log('Photo de profil retirée.');
             if ($this->isProfilePhoto($photo, $user)) {
-                $user->getConnection()->afterCommit(fn () => $this->deleteFile($disk, $photo->storage_key, $photo->uuid));
+                DB::afterCommit(fn () => $this->deleteFile($disk, $photo->storage_key, $photo->uuid));
             }
         });
         $actor->unsetRelation('profilePhoto');

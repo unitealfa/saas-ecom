@@ -2,7 +2,7 @@
     <section class="mx-auto flex max-w-2xl flex-col gap-6">
         <flux:heading size="xl" level="1">Modifier {{ $user->name }}</flux:heading>
         @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
-        <flux:text>Un changement d’e-mail demande une nouvelle vérification. Le mot de passe et les rôles ne sont pas modifiés par ce formulaire.</flux:text>
+        <flux:text>Ces modifications conservent la décision d’inscription, y compris pour les informations professionnelles. Un changement d’e-mail demande seulement de vérifier la nouvelle adresse. Le mot de passe et les rôles ne sont pas modifiés par ce formulaire.</flux:text>
         @if ($errors->any())
             <flux:callout variant="danger" role="alert">
                 @foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach

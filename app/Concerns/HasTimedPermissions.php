@@ -17,12 +17,14 @@ trait HasTimedPermissions
     use HasRoles {
         assignRole as private assignPackageRole;
         givePermissionTo as private givePackagePermissionTo;
+        getPermissionsViaRoles as private getPackagePermissionsViaRoles;
+        hasPermissionViaRole as private hasPackagePermissionViaRole;
     }
 
     public function assignRole(mixed ...$roles): static
     {
         return $this->getConnection()->transaction(function () use ($roles): static {
-            $this->newQuery()->whereKey($this->getKey())->lockForUpdate()->firstOrFail();
+            $this->newQuery()->withTrashed()->whereKey($this->getKey())->lockForUpdate()->firstOrFail();
             $requested = collect($roles)->flatten()->map(function (mixed $role): Role {
                 $stored = $this->getStoredRole($role);
                 if (! $stored instanceof Role) {
@@ -32,10 +34,11 @@ trait HasTimedPermissions
                 return $stored;
             });
             $all = $this->roles()->get()->merge($requested)->unique('id');
+            $previousRoleIds = $this->roles()->pluck('roles.id');
             $seen = [];
             foreach ($all as $role) {
-                $permissionIds = $role->permissions()->pluck('permissions.id');
-                if ($permissionIds->isEmpty() && ! $role->getAttribute('is_super_admin')) {
+                $permissionIds = $role->usesIndividualPermissions() ? collect() : $role->permissions()->pluck('permissions.id');
+                if ($role->permissionComposition()->count() === 0 && ! $role->getAttribute('is_super_admin')) {
                     throw new \LogicException('An empty role cannot be assigned.');
                 }
                 foreach ($permissionIds as $permissionId) {
@@ -54,8 +57,28 @@ trait HasTimedPermissions
             }
             $this->unsetRelation('roles');
             $this->assignPackageRole(...$roles);
+            $initialGrants = [];
+            foreach ($requested->unique('id') as $role) {
+                if (! $role->usesIndividualPermissions() || $role->getAttribute('is_super_admin') || $previousRoleIds->contains($role->id)) {
+                    continue;
+                }
+                $assignedAt = $this->roles()->whereKey($role->id)->firstOrFail()->pivot->assigned_at;
+                foreach ($role->permissionComposition()->get() as $permission) {
+                    if ($this->permissions()->whereKey($permission->id)->exists()) {
+                        continue;
+                    }
+                    $this->givePermissionTo($permission);
+                    $this->permissions()->updateExistingPivot($permission->id, [
+                        'assigned_at' => $assignedAt,
+                        'expires_at' => $assignedAt->addDays((int) $permission->pivot->duration_days),
+                    ]);
+                    $initialGrants[] = ['permission_uuid' => $permission->uuid,
+                        'assigned_at' => $assignedAt->toIso8601String(),
+                        'expires_at' => $assignedAt->addDays((int) $permission->pivot->duration_days)->toIso8601String()];
+                }
+            }
             activity()->performedOn($this)->event('roles_assigned')
-                ->withProperties(['role_uuids' => $requested->pluck('uuid')->all()])->log('Roles assigned');
+                ->withProperties(['role_uuids' => $requested->pluck('uuid')->all(), 'initial_direct_permissions' => $initialGrants])->log('Roles assigned');
 
             return $this;
         });
@@ -64,7 +87,7 @@ trait HasTimedPermissions
     public function syncRoles(mixed ...$roles): static
     {
         return $this->getConnection()->transaction(function () use ($roles): static {
-            $this->newQuery()->whereKey($this->getKey())->lockForUpdate()->firstOrFail();
+            $this->newQuery()->withTrashed()->whereKey($this->getKey())->lockForUpdate()->firstOrFail();
             $roleIds = $this->collectRoles($roles);
             $removed = $this->roles()->whereNotIn('roles.id', $roleIds)->get();
             if ($removed->isNotEmpty()) {
@@ -78,14 +101,15 @@ trait HasTimedPermissions
     public function givePermissionTo(mixed ...$permissions): static
     {
         return $this->getConnection()->transaction(function () use ($permissions): static {
-            $this->newQuery()->whereKey($this->getKey())->lockForUpdate()->firstOrFail();
+            $this->newQuery()->withTrashed()->whereKey($this->getKey())->lockForUpdate()->firstOrFail();
             $permissionIds = $this->collectPermissions($permissions);
             if ($permissionIds !== [] && $this->getMorphClass() === 'central_user'
                 && ! $this->roles()->where('guard_name', 'central')->exists()) {
                 throw new \LogicException('A merchant account cannot receive SaaS permissions.');
             }
             foreach ($this->roles()->get() as $role) {
-                if ($role->getAttribute('is_super_admin') || $role->permissions()->whereKey($permissionIds)->exists()) {
+                if ($role->getAttribute('is_super_admin')
+                    || (! $role->usesIndividualPermissions() && $role->permissions()->whereKey($permissionIds)->exists())) {
                     throw new \LogicException('A direct permission cannot overlap with an assigned role.');
                 }
             }
@@ -99,7 +123,7 @@ trait HasTimedPermissions
     public function syncPermissions(mixed ...$permissions): static
     {
         return $this->getConnection()->transaction(function () use ($permissions): static {
-            $this->newQuery()->whereKey($this->getKey())->lockForUpdate()->firstOrFail();
+            $this->newQuery()->withTrashed()->whereKey($this->getKey())->lockForUpdate()->firstOrFail();
             $permissionIds = $this->collectPermissions($permissions);
             $removed = $this->permissions()->whereNotIn('permissions.id', $permissionIds)->get();
             if ($removed->isNotEmpty()) {
@@ -157,6 +181,9 @@ trait HasTimedPermissions
             if ($role->getAttribute('is_super_admin')) {
                 return true;
             }
+            if ($role->usesIndividualPermissions()) {
+                continue;
+            }
             $grant = $role->permissions()->whereKey($permission->getKey())->first();
             if ($grant !== null && CarbonImmutable::parse($role->getRelation('pivot')->getAttribute('assigned_at'))->addDays((int) $grant->getRelation('pivot')->getAttribute('duration_days'))->isAfter($now)) {
                 return true;
@@ -164,5 +191,23 @@ trait HasTimedPermissions
         }
 
         return false;
+    }
+
+    public function getPermissionsViaRoles(): \Illuminate\Support\Collection
+    {
+        if ($this->guard_name === 'central' && config('permission.central_profiles', false)) {
+            return collect();
+        }
+
+        return $this->getPackagePermissionsViaRoles();
+    }
+
+    protected function hasPermissionViaRole(\Spatie\Permission\Contracts\Permission $permission): bool
+    {
+        if ($this->guard_name === 'central' && config('permission.central_profiles', false)) {
+            return false;
+        }
+
+        return $this->hasPackagePermissionViaRole($permission);
     }
 }

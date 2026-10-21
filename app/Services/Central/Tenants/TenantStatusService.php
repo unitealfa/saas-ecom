@@ -29,7 +29,7 @@ class TenantStatusService
 
     public function completeProvisioning(Tenant $tenant, int $deploymentId): void
     {
-        $this->mutations->run(function () use ($tenant, $deploymentId): void {
+        $this->mutations->transaction(function () use ($tenant, $deploymentId): void {
             $owner = User::withTrashed()->whereKey($tenant->user_id)->lockForUpdate()->firstOrFail();
             $shops = Tenant::where('user_id', $owner->id)->orderBy('id')->lockForUpdate()->get();
             $tenant = $shops->firstWhere('id', $tenant->id);
@@ -71,7 +71,7 @@ class TenantStatusService
     public function change(User $actor, Tenant $tenant, string $action, StatusEnum $expected, ?string $reason): void
     {
         abort_unless(in_array($action, ['suspend', 'activate', 'archive'], true), 403);
-        $this->mutations->run(function () use ($actor, $tenant, $action, $expected, $reason): void {
+        $this->mutations->transaction(function () use ($actor, $tenant, $action, $expected, $reason): void {
             $owner = User::withTrashed()->whereKey($tenant->user_id)->lockForUpdate()->firstOrFail();
             $shops = Tenant::where('user_id', $owner->id)->orderBy('id')->lockForUpdate()->get();
             $tenant = $shops->first(fn (Tenant $shop): bool => $shop->id === $tenant->id && $shop->uuid === $tenant->uuid);
@@ -121,7 +121,7 @@ class TenantStatusService
     /** @param array<string, int|string> $priorities UUID => priorité */
     public function priorities(User $actor, Tenant $tenant, array $priorities, ?string $reason): void
     {
-        $this->mutations->run(function () use ($actor, $tenant, $priorities, $reason): void {
+        $this->mutations->transaction(function () use ($actor, $tenant, $priorities, $reason): void {
             $owner = User::withTrashed()->whereKey($tenant->user_id)->lockForUpdate()->firstOrFail();
             $shops = Tenant::where('user_id', $owner->id)->orderBy('id')->lockForUpdate()->get();
             $tenant = $shops->first(fn (Tenant $shop): bool => $shop->id === $tenant->id && $shop->uuid === $tenant->uuid);

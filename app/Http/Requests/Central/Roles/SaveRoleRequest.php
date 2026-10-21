@@ -37,6 +37,7 @@ class SaveRoleRequest extends FormRequest
         $presence = $this->route('role') === null ? 'required' : 'sometimes';
 
         return [
+            'expected_version' => [$this->route('role') === null ? 'prohibited' : 'required', 'integer', 'min:1'],
             'name' => [$presence, 'required', 'string', 'max:255'], 'label' => [$presence, 'required', 'string', 'max:255'],
             'permissions' => [$presence, 'required', 'array', 'min:1'],
             'permissions.*' => ['uuid', 'distinct', Rule::exists('permissions', 'uuid')->where('guard_name', 'central')
@@ -60,6 +61,7 @@ class SaveRoleRequest extends FormRequest
         }
 
         return new RoleData($data['name'] ?? null, $data['label'] ?? null, $grants,
-            $grants === null ? array_map(intval(...), $data['durations'] ?? []) : []);
+            $grants === null ? array_map(intval(...), $data['durations'] ?? []) : [],
+            isset($data['expected_version']) ? (int) $data['expected_version'] : null);
     }
 }

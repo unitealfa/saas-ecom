@@ -9,7 +9,6 @@ use App\Models\Central\Tenant;
 use App\Models\Central\TenantSchemaDeployment;
 use App\Models\Central\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 class TenantProvisioningRetry
@@ -18,10 +17,11 @@ class TenantProvisioningRetry
 
     public function retry(User $actor, Tenant $tenant): void
     {
-        $this->mutations->run(function () use ($actor, $tenant): void {
+        $this->mutations->run($actor, 'retryProvisioning', function () use ($tenant): Tenant {
             User::whereKey($tenant->user_id)->lockForUpdate()->firstOrFail();
-            $tenant = Tenant::whereKey($tenant->id)->lockForUpdate()->firstOrFail();
-            Gate::forUser($actor)->authorize('retryProvisioning', $tenant);
+
+            return Tenant::whereKey($tenant->id)->lockForUpdate()->firstOrFail();
+        }, function (Tenant $tenant) use ($actor): void {
             $deployment = TenantSchemaDeployment::where('tenant_id', $tenant->id)->where('operation', 1)->lockForUpdate()->firstOrFail();
             if (in_array($deployment->status, [StatusEnum::PENDING, StatusEnum::RUNNING], true)) {
                 return;

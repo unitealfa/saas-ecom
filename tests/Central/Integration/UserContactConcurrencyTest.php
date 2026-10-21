@@ -28,7 +28,15 @@ function runCentralRace(array $operations): array
     try {
         $db = Illuminate\Support\Facades\DB::connection();
         if ($db->getDatabaseName() !== $database) { exit(5); }
-        if (str_starts_with($argv[5], 'shop-')) {
+        if (str_starts_with($argv[5], 'permissions:')) {
+            $actor = App\Models\User::findOrFail((int) $argv[4]);
+            $target = App\Models\User::findOrFail((int) $argv[3]);
+            $permission = App\Models\Central\Permission::findByName('saas.users.view', 'central');
+            app(App\Services\Central\Authorization\CentralPermissionAssignmentService::class)->update(
+                $actor, $target, [['permission' => $permission->uuid, 'enabled' => false, 'days' => 9999]],
+                substr($argv[5], strlen('permissions:')), null,
+            );
+        } elseif (str_starts_with($argv[5], 'shop-')) {
             $owner = App\Models\User::findOrFail((int) $argv[3]);
             $key = match ($argv[5]) {
                 'shop-first' => '8e08c067-5cce-4fb0-bb90-984f63c27f42',
@@ -50,6 +58,12 @@ function runCentralRace(array $operations): array
         }
         echo 'created';
     } catch (Illuminate\Database\UniqueConstraintViolationException|Illuminate\Validation\ValidationException) {
+        echo 'conflict';
+    } catch (Illuminate\Auth\Access\AuthorizationException $error) {
+        if (! in_array($argv[5], ['approve', 'reject'], true)) {
+            fwrite(STDERR, get_class($error)); exit(2);
+        }
+        // A committed approval can make the concurrent rejection forbidden.
         echo 'conflict';
     } catch (Throwable $error) {
         fwrite(STDERR, get_class($error)); exit(2);
@@ -113,6 +127,63 @@ test('two real approval decisions cannot overwrite each other or desynchronize a
     expect($merchant->legal_verification_status)->toBe($merchant->status === \App\Enums\Central\Users\StatusEnum::ACTIVE
         ? \App\Enums\VerificationStatusEnum::VERIFIED : \App\Enums\VerificationStatusEnum::FAILED);
     expect(\App\Models\Central\Activity::forSubject($merchant)->whereIn('event', ['central_account_approved', 'central_account_rejected'])->count())->toBe(1);
+});
+
+test('two real permission edits cannot overwrite the same displayed state', function (): void {
+    $this->seed(\Database\Seeders\Central\AuthorizationSeeder::class);
+    $admin = User::factory()->create();
+    $admin->assignRole(\App\Models\Central\Role::findByName('root', 'central'));
+    $staff = User::factory()->create();
+    $staff->assignRole(\App\Models\Central\Role::findByName('user-reader', 'central'));
+    $version = app(\App\Services\Central\Authorization\CentralPermissionAssignmentService::class)->version($staff);
+    expect(runCentralRace([[$staff->id, $admin->id, 'permissions:'.$version], [$staff->id, $admin->id, 'permissions:'.$version]]))
+        ->toBe(['conflict', 'created']);
+    expect($staff->fresh()->can('saas.users.view'))->toBeFalse()
+        ->and(\App\Models\Central\Activity::forSubject($staff)->where('event', 'central_staff_permissions_updated')->count())->toBe(1);
+});
+
+test('permission revocation locks out a concurrent user mutation and stale actor permissions are rejected after commit', function (): void {
+    $this->seed(\Database\Seeders\Central\AuthorizationSeeder::class);
+    $admin = User::factory()->create();
+    $root = \App\Models\Central\Role::findByName('root', 'central');
+    $admin->assignRole($root);
+    $actor = User::factory()->create();
+    $actor->assignRole(\App\Models\Central\Role::createWithPermissions('concurrent-suspender', ['saas.users.suspend' => 9999]));
+    $target = User::factory()->create();
+    $actor->load('roles', 'permissions');
+    \Illuminate\Support\Facades\Gate::forUser($actor)->authorize('suspend', $target);
+    $permission = \App\Models\Central\Permission::findByName('saas.users.suspend', 'central');
+    $database = DB::connection()->getDatabaseName();
+    expect($database)->toMatch('/^aydra_test_[a-f0-9]{12}_central_/');
+    $settings = config('database.connections.mysql');
+    $revoker = new PDO('mysql:host='.$settings['host'].';port='.$settings['port'].';dbname='.$database.';charset=utf8mb4',
+        $settings['username'], $settings['password'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    $timeout = (int) DB::selectOne('SELECT @@SESSION.innodb_lock_wait_timeout AS value')->value;
+    $service = app(\App\Services\Central\Users\UserManagementService::class);
+
+    try {
+        $revoker->beginTransaction();
+        $lock = $revoker->prepare('SELECT id FROM roles WHERE id = ? FOR UPDATE');
+        $lock->execute([$root->id]);
+        $revoke = $revoker->prepare('DELETE FROM model_has_permissions WHERE permission_id = ? AND model_id = ? AND model_type = ?');
+        $revoke->execute([$permission->id, $actor->id, 'central_user']);
+        DB::statement('SET SESSION innodb_lock_wait_timeout = 1');
+
+        expect(fn () => $service->changeStatus($actor, $target, \App\Enums\Central\Users\StatusEnum::SUSPENDED))
+            ->toThrow(\Illuminate\Database\QueryException::class);
+        expect($target->fresh()->status)->toBe(\App\Enums\Central\Users\StatusEnum::ACTIVE);
+        $revoker->commit();
+
+        expect(fn () => $service->changeStatus($actor, $target, \App\Enums\Central\Users\StatusEnum::SUSPENDED))
+            ->toThrow(\Illuminate\Auth\Access\AuthorizationException::class);
+        expect($target->fresh()->status)->toBe(\App\Enums\Central\Users\StatusEnum::ACTIVE);
+        expect(\App\Models\Central\Activity::forSubject($target)->where('event', 'central_account_status_updated')->count())->toBe(0);
+    } finally {
+        if ($revoker->inTransaction()) {
+            $revoker->rollBack();
+        }
+        DB::statement('SET SESSION innodb_lock_wait_timeout = '.$timeout);
+    }
 });
 
 function raceApprovedOwner(): User

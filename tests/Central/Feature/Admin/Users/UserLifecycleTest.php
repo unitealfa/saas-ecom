@@ -104,7 +104,8 @@ test('all editable professional fields are saved without changing secrets or ver
     }
     expect($updated->getAttribute('locale'))->toBe('ar');
     expect($updated->legal_profile_version)->toBe(1);
-    expect($updated->legal_verification_status)->toBe(VerificationStatusEnum::PENDING);
+    expect($updated->legal_verification_status)->toBe($target->legal_verification_status);
+    expect($updated->status)->toBe($target->status);
     expect($updated->password)->toBe($password);
     $this->get(route('central.users.show', $updated))->assertOk()->assertSee('Abonnements')
         ->assertSee('RC123')->assertDontSee($password, escape: false)->assertDontSee('Identifiant public');

@@ -27,6 +27,8 @@ Route::prefix('staff')->name('staff.')->group(function (): void {
         Route::post('{role}/renew', 'renew')->name('renew');
     });
 
-    Route::get('{user}/permissions', [StaffPermissionController::class, 'index'])
-        ->withTrashed()->name('permissions.index');
+    Route::controller(StaffPermissionController::class)->prefix('{user}/permissions')->name('permissions.')->group(function (): void {
+        Route::get('/', 'index')->withTrashed()->name('index');
+        Route::put('/', 'update')->name('update');
+    });
 });

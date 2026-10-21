@@ -43,7 +43,7 @@ test('legacy action names can change without losing their uuid grants or role si
     $this->seed(AuthorizationSeeder::class);
     expect(Permission::where('name', 'saas.users.activate')->value('uuid'))->toBe($uuid);
     expect($role->fresh()->getAttribute('permission_signature'))->toBe($signature);
-    expect($role->permissions()->firstOrFail()->uuid)->toBe($uuid);
+    expect($role->permissionComposition()->firstOrFail()->uuid)->toBe($uuid);
 });
 
 test('ordinary consultation cannot read the professional dossier or administrative history', function (): void {
@@ -233,7 +233,7 @@ test('an expired approval permission cannot consult or decide pending requests',
 test('reactivation role assignment and shop creation cannot bypass the approval decision', function (StatusEnum $status): void {
     $target = User::factory()->create(['status' => $status]);
     $this->actingAs($this->admin, 'central')->patch(route('central.users.status', $target), ['status' => StatusEnum::ACTIVE->value])->assertForbidden();
-    $this->get(route('central.users.roles.edit', $target))->assertForbidden();
+    $this->get(route('central.staff.roles.edit', $target))->assertForbidden();
     $this->get(route('central.users.tenants.create', $target))->assertForbidden();
     expect($target->fresh()->status)->toBe($status);
 })->with([StatusEnum::PENDING, StatusEnum::REJECTED]);

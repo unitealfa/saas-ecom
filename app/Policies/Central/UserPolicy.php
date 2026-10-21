@@ -13,7 +13,7 @@ class UserPolicy
 
     public function viewAny(User $actor): bool
     {
-        return $this->access->allows($actor, 'saas.users.view', listing: true);
+        return $this->access->allows($actor, 'saas.users.view');
     }
 
     public function updateProfilePhoto(User $actor, User $target): bool
@@ -37,7 +37,7 @@ class UserPolicy
 
     public function view(User $actor, User $target): bool
     {
-        return $this->access->allows($actor, 'saas.users.view', $target);
+        return $this->access->allows($actor, 'saas.users.view');
     }
 
     public function create(User $actor): bool
@@ -55,12 +55,12 @@ class UserPolicy
             return false;
         }
         if ($this->access->isStaff($target)) {
-            return ($this->access->allows($actor, 'saas.users.update', $target)
-                || $this->access->allows($actor, 'saas.staff.update', $target))
+            return ($this->access->allows($actor, 'saas.users.update')
+                || $this->access->allows($actor, 'saas.staff.update'))
                 && $this->access->mayManageStaff($actor, $target);
         }
 
-        return $this->access->allows($actor, 'saas.users.update', $target);
+        return $this->access->allows($actor, 'saas.users.update');
     }
 
     public function createStaff(User $actor): bool
@@ -76,7 +76,7 @@ class UserPolicy
             && ! $target->roles()->where('guard_name', 'central')->where('is_super_admin', true)->exists()
             && ! in_array($target->status, [StatusEnum::PENDING, StatusEnum::REJECTED], true)
             && ($actor->id !== $target->id || $this->access->isSuperAdmin($actor))
-            && $this->access->allows($actor, 'saas.users.roles.assign', $target)
+            && $this->access->allows($actor, 'saas.users.roles.assign')
             && $this->access->mayManageStaff($actor, $target);
     }
 
@@ -98,12 +98,21 @@ class UserPolicy
 
     public function assignStaffRoles(User $actor, User $target): bool
     {
-        return $this->access->isStaff($target) && $this->assignRoles($actor, $target);
+        return $this->assignRoles($actor, $target);
     }
 
     public function viewStaffPermissions(User $actor, User $target): bool
     {
-        return $this->access->isStaff($target) && $this->access->allows($actor, 'saas.staff.permissions.view');
+        return $this->access->isStaff($target) && ($this->access->allows($actor, 'saas.staff.permissions.view')
+            || $this->updateStaffPermissions($actor, $target));
+    }
+
+    public function updateStaffPermissions(User $actor, User $target): bool
+    {
+        return (bool) config('permission.central_profiles', false)
+            && ! in_array($target->status, [StatusEnum::PENDING, StatusEnum::REJECTED, StatusEnum::DELETED], true)
+            && ! $target->tenants()->withTrashed()->exists()
+            && $this->manageStaff($actor, $target, 'saas.staff.permissions.update');
     }
 
     public function resendStaffInvitation(User $actor, User $target): bool
@@ -214,10 +223,10 @@ class UserPolicy
 
         $legacy = ['activate' => 'restore', 'archive' => 'delete'][$action] ?? $action;
 
-        return ($this->access->allows($actor, 'saas.users.'.$action, $target)
-                || ($legacy !== $action && $this->access->allows($actor, 'saas.users.'.$legacy, $target))
-                || ($staff && $this->access->allows($actor, 'saas.staff.'.$action, $target))
-                || ($staff && $this->access->allows($actor, 'saas.staff.'.$legacy, $target)))
+        return ($this->access->allows($actor, 'saas.users.'.$action)
+                || ($legacy !== $action && $this->access->allows($actor, 'saas.users.'.$legacy))
+                || ($staff && $this->access->allows($actor, 'saas.staff.'.$action))
+                || ($staff && $this->access->allows($actor, 'saas.staff.'.$legacy)))
             && (! $staff || $this->access->mayManageStaff($actor, $target));
     }
 }

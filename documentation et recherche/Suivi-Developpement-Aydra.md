@@ -1513,3 +1513,254 @@ Contrôles réalisés : 17 vérifications positives, dont équivalence SQL/param
 Demande : documenter progressivement les pratiques comme les caches et les scopes, pour les réappliquer lorsqu'elles sont nécessaires. Rappel ajouté dans « Avant chaque tâche » d'AGENTS.md et procédure détaillée en architecture §38, reliée aux sections existantes injection/routes/cache/scopes. Déclencheur, portée, limites, règles remplacées, distinction décision/proposition et résultats de contrôles doivent être maintenus au fil du travail. Application directe dans les prochaines tâches pertinentes, sans nouvelle confirmation de principe, en préservant les autorisations particulières et sans optimisation automatique hors besoin.
 
 Changements documentaires uniquement ; chemins et diff vérifiés. Aucun code, cache, BDD ou réglage global modifié pour cette consigne.
+
+
+## 20 octobre 2026 — Audit et simplification des utilisateurs centraux
+
+### Décision finale confirmée pendant la mission
+
+L'acceptation concerne l'inscription, pas les éditions ultérieures. Modifier nom, e-mail, téléphone, pays ou informations professionnelles conserve le statut, la décision du dossier, son auteur et sa date. Aucun retour devant un administrateur. Le nouvel e-mail doit être vérifié ; le nouveau téléphone perd ses anciennes preuves. Un refus ou une suspension ne disparaît pas par une édition. La version du dossier augmente pour refuser les anciens formulaires de décision. Les règles remplacées sont actualisées dans AGENTS.md, architecture §24/§39 et schéma principal.
+
+### Problèmes confirmés et corrections
+
+UserManagementService.update remettait ACTIVE/REJECTED en PENDING après toute identité/contact/champ professionnel modifié et effaçait la validation. Cette logique est retirée ; les valeurs par défaut et mutators du modèle n'étaient pas la cause. fillProfile regroupe liste blanche, pays, normalisation et validation professionnelle ; la détection du personnel est calculée une seule fois. LegalVerificationService.versionChangedProfile versionne sans décider. update garde transaction, compte verrouillé, Policy, sauvegarde, audit et notifications après commit.
+
+UserApprovalService.decide gérait déjà les deux décisions : aucun nouveau UserStatusService parallèle créé. Approve/reject gardent leurs différences, motif obligatoire, états/version attendus, approbation après refus et protections root/système. Les Controllers d'approbation et de compatibilité legal utilisent une propriété injectée plutôt que réinjecter le même service par action ; UserApprovalRequest expose les données validées typées. Les deux événements historiques compte/dossier restent présents ; leur écriture commune est mutualisée dans une boucle, sans double décision.
+
+AuthorizationMutation reste utile : transaction centrale, mutex du rôle root système/protégé pour sérialiser droits et décisions, trois tentatives et invalidation Spatie après commit. Policies contrôlées dans le Request puis à nouveau sous verrou, verrous du modèle et interdiction du contexte Tenant conservés. Le catch générique avec rethrow est remplacé par UniqueConstraintViolationException ; les exceptions sans rapport remontent normalement. Suspension/réactivation et archivage ne sont pas fusionnés avec l'approbation.
+
+Interface : confirmation Flux/Tailwind ajoutée à Approuver dans lifecycle-actions, refus motivé et protections @can conservés. users/edit précise l'absence de nouvelle approbation ; le profil Livewire retire sa redirection devenue inutile vers un nouvel examen.
+
+### Fichiers et flux
+
+Services : app/Services/Central/Users/{UserManagementService,UserApprovalService,LegalVerificationService}.php et app/Services/Central/Authorization/AuthorizationMutation.php. Entrées : app/Http/Controllers/Central/Admin/Users/{UserApprovalController,LegalVerificationController}.php et app/Http/Requests/Central/Users/UserApprovalRequest.php. Vues : resources/views/central/pages/admin/users/{edit,lifecycle-actions}.blade.php et profil Livewire personnel existant. Tests adaptés dans Admin/Users, Settings et Integration/UserContactConcurrencyTest.php. Routes, modèle User, enums, Policies et middlewares analysés et conservés sans changement de contrat public. Aucun nouveau service, migration ou couche ajouté.
+
+Décision : View/modal → route centrale → auth/verified/compte actif → Form Request + Policy → Controller → UserApprovalService.decide → transaction/mutex root → User verrouillé + nouvelle Policy + état/version contrôlés → attributs de décision → sauvegarde et audits Spatie → commit → Controller → Redirect → View. Les anciennes routes legal gardent show, approve/reject gardent pending.
+
+Édition : View → route/middleware → UpdateUserRequest/Policy ou validation Livewire → Controller/composant → UserManagementService.update → compte verrouillé et Policy → fillProfile/versionChangedProfile → preuves de contact adaptées → save et audit → notification après commit → résultat → Redirect/View ou confirmation du profil. Aucune création automatique de boutique ; RegistrationJourney conserve e-mail, attente/refus et première boutique obligatoire.
+
+### Tests réellement exécutés
+
+Tests demandés explicitement pour ce lot, sur les seules bases MySQL temporaires de tests/TestCase.php avec e-mails simulés. Aucune donnée existante ni migration réelle modifiée.
+
+| Lot | Résultat observé |
+|---|---|
+| MerchantApprovalWorkflowTest + UserAccountManagementTest + ProfileUpdateTest avant le dernier nouveau cas | 44/44 tests, 340 assertions, réussis. |
+| MerchantJourneyTest | 22 scénarios réussis dans le lot de 28 arrêté ensuite sur l'ancienne assertion du sixième UserLifecycleTest ; ce lot n'est pas annoncé globalement vert. |
+| Reprise UserLifecycleTest + ProfileUpdateTest | Les six cas de cycle de vie et les six cas personnels existants réussissent ; le nouveau treizième cas échoue d'abord sur une fixture VERIFIED sans auteur, correctement refusée par le CHECK SQL. |
+| Nouveau profil personnel, fixture complétée avec son auteur | 1/1, 7 assertions, réussi : identité modifiée, approbation conservée, nouvelle preuve d'e-mail requise. |
+| Deux décisions réellement simultanées | 1/1, 12 assertions, réussi : un succès, un conflit/refus, une seule décision auditée et états synchronisés. |
+| Personnel : suspension et cibles protégées | 2/2, 27 assertions, réussis. |
+
+Couverture : permissions manquantes, root/système protégé, refus motivé, approbation après refus, invitation et création administrative, anciennes routes legal, formulaires obsolètes, conservation des cinq états éditables après modification de tous les champs, unicité et preuves des contacts, rollback complet sur échec d'audit, absence de boutique automatique et première boutique. Les assertions ne sont pas retirées : les attentes de remise en attente sont adaptées à la nouvelle règle ; les instantanés comparent des lignes rechargées pour inclure les valeurs par défaut SQL.
+
+Reprises : le premier test recevait 419 car le cache local masquait APP_ENV=testing. APP_CONFIG_CACHE/APP_ROUTES_CACHE sont isolés dans les processus des tests vers des chemins temporaires inexistants ; cache du site conservé et aucune protection CSRF de l'application désactivée. Le test concurrent reconnaît une AuthorizationException uniquement pour approve/reject : une première approbation peut rendre le refus concurrent interdit. Aucune Policy affaiblie ; un seul succès et un seul audit restent exigés.
+
+Syntaxe des 16 fichiers PHP modifiés vérifiée, diff final relu, GET /login HTTP 200. Pas de Pint, PHPStan, build, suite complète, SMTP réel ou interaction navigateur annoncés. Les vues/modales sont rendues par les tests HTTP/Livewire. Aucun gain de vitesse chiffré revendiqué. Aucun ancien compte déjà en attente n'est approuvé automatiquement ; les états réels et l'historique restent conservés.
+
+## 21 octobre 2026 — Spatie : corrections sûres et transition proposée
+
+Source autorisée : spatie modiff.txt. Phases 1–3 uniquement ; le fichier autorise les tests sur bases isolées et interdit toute conversion sensible réelle avant validation. Les modifications déjà présentes avant ce lot (profil/approbation) sont conservées. Aucune attribution, table ou migration réelle modifiée ; aucune intervention dans les bases existantes des boutiques, aucun seeder central exécuté.
+
+### Résultat et fichiers de ce lot
+
+| Fichier | Correction et raison | Vérification |
+|---|---|---|
+| app/Services/Central/Authorization/AuthorizationMutation.php | Connexion du modèle central à la place de la connexion inexistante central ; transaction, mutex et afterCommit sur la même connexion | Mutations HTTP, rollback de droits/audit |
+| app/Services/Central/Users/UserManagementService.php | Fusion des rôles non délégables conservés avant syncRoles ; retrait seulement des rôles éditables | Deux entrées Personnel/Utilisateurs ; dates et droits directs préservés |
+| app/Services/Central/Roles/RoleManager.php | Comparaison de version sous verrou ; incrément pour toute vraie modification, y compris identité | Ancien formulaire refusé sans écrasement ni deuxième audit ; no-op préservé |
+| app/Http/Requests/Central/Roles/SaveRoleRequest.php | expected_version obligatoire en modification, sans autoriser permission_version en entrée | Validation HTTP et champs forgés |
+| app/DTOs/Central/Roles/RoleData.php | Transport de la version attendue jusqu'au service | Tests HTTP via le DTO |
+| app/Services/Central/Authorization/CentralPermissionResolver.php | Délégation du résultat effectif à Gate, sources/dates historiques conservées | Comparaison avec can pour droits directs valides/expirés et compte suspendu |
+| app/Services/Central/Authorization/CentralUserAccess.php | Une lecture fresh par allows, réutilisée dans ses branches dérivées | Matrices de permissions/délégation existantes |
+| resources/views/central/pages/admin/roles/form.blade.php | Champ caché expected_version, gardé lors d'une erreur de validation | Rendu HTTP du formulaire et scénario obsolète |
+| resources/views/central/pages/admin/staff/permissions.blade.php | Explication de l'héritage, lecture seule et distinction des consultations dérivées | Rendu dans les tests Personnel |
+| resources/views/central/pages/admin/{staff,users}/roles.blade.php | Indication que les rôles non affichés sont conservés | Modifications de texte ; les deux routes sont testées |
+| tests/Central/Feature/Admin/{Roles/RoleManagementTest,Staff/StaffManagementTest}.php | Cas de régression et nouveaux contrats de version | Exécutés, sans échec dans ces deux fichiers |
+| tests/Central/Feature/CentralManagementTest.php | Ajout de expected_version aux deux requêtes de modification autorisée existantes | Deux scénarios passent ; trois autres défauts historiques ci-dessous |
+| AGENTS.md, architecture §40, Diagramme-BDD-Centrale-Complet.md, ce suivi | Rappel durable, plan avant/après, documentation de la version centrale | Relecture et diff sans erreur d'espacement |
+
+La duplication du calcul d'autorisation entre le trait et le resolver est retirée ; les sources historiques restent calculées pour l'affichage, sans décider d'un accès. Les transactions imbriquées sont conservées pour protéger l'audit avant/après et l'entrée autonome Utilisateurs ; pas de couche supplémentaire. Aucun gain de performance chiffré annoncé.
+
+### État réel et proposition non exécutée
+
+La relecture MySQL confirme mysql comme connexion centrale chargée, sans alias central, et les versions Laravel 13.34.0 / Spatie 8.3.0 / Stancl 3.10.1. PHP utilisé : exécutable Herd PHP 8.5.10 demandé. Cinq rôles, quarante-six permissions, cinq attributions de rôle, zéro permission directe ; profils/versions/bénéficiaires identiques à l'audit précédent. Neuf droits ordinaires hérités sur trois comptes, tous encore valides ; root reste à part. Les UUID et coordonnées personnelles ne sont pas publiés dans le rapport.
+
+Approche recommandée : profils partagés avec modèles de départ, autorisations métier directes Spatie. L'architecture §40 contient la comparaison A/B, la matrice anonymisée actuelle/cible, le schéma proposé de role_permission_templates, les contraintes et la signature, les neuf conversions à échéance constante, la nouvelle capacité d'édition proposée, les effets sur les seeders et les nouveaux membres, les cas d'intervalles incompatibles et la procédure d'idempotence/retour arrière. Il n'y a encore ni migration de cette structure, ni route d'édition individuelle active, ni conversion réelle.
+
+Décision supplémentaire requise : supprimer la consultation dérivée pour rendre les consultations individuellement révocables. La comparaison réellement exécutée trouve un seul écart : Personnel 3 consulte les utilisateurs par dérivation de create/update, sans permission Spatie users.view. Le plan §40 propose soit une dixième attribution directe users.view à la même échéance (changement explicite de can et de la possession délégable), soit neuf attributions seulement avec perte approuvée de cette consultation. Aucun choix implicite. Préserver l'accès actuel et garantir la révocation totale sont incompatibles si la dérivation continue de fournir l'accès retiré. Les règles centrales de rôles vides/compositions et la conservation des modèles doivent être approuvées avant de changer les traits. Ne pas appliquer ces modifications aux rôles Tenant. Le catalogue des permissions reste consultatif.
+
+### Tests réellement exécutés
+
+Commandes avec le PHP 8.5 demandé, vendor/bin/pest et uniquement les fichiers cités. APP_CONFIG_CACHE et APP_ROUTES_CACHE dirigés vers des chemins temporaires inexistants dans le processus, sans vider les caches du site. Bases créées et nettoyées uniquement par les protections de tests/TestCase.php ; e-mails simulés.
+
+| Lot | Résultat réel |
+|---|---|
+| RoleManagementTest + StaffManagementTest + CentralManagementTest | 76 tests : 73 réussis, 3 échoués ; 514 assertions ; environ 230 secondes |
+| PermissionCatalogTest + UserAccountManagementTest + SpatieIntegrationTest | 33 tests réussis sur 33 ; 315 assertions ; environ 172 secondes |
+| Syntaxe des 10 fichiers PHP concernés par ce lot | Aucune erreur |
+| git diff --check | Aucune erreur d'espacement ; avertissements Git préexistants de fin de ligne CRLF/LF |
+
+Total : 106 réussites et 3 échecs sur 109 tests, 829 assertions. Les trois échecs sont dans CentralManagementTest, hors des nouveaux scénarios :
+
+1. Ligne 53 : l'ancien test attend 200 pour l'attribution SaaS à un commerçant ; la Policy actuelle la refuse avec 403, conformément à la séparation validée des comptes.
+2. Ligne 167 : l'ancien test exige le texte Créer un compte dans le dashboard actuel, qui propose le lien Consulter les utilisateurs. L'attente ne correspond plus au rendu existant.
+3. Ligne 306 : l'ancien test appelle ProvisionTenantDatabase.handle avec un seul argument ; le job exige depuis avant ce lot TenantProvisioner et TenantStatusService. ArgumentCountError précède donc la LogicException attendue.
+
+Ces assertions ne sont pas supprimées, la production n'est pas modifiée pour satisfaire des attentes obsolètes. Pas de Pint/PHPStan/build/suite complète exécutés. L'obsolescence est testée par deux soumissions successives d'un même état : pas de nouveau test de deux processus réellement simultanés annoncé pour ce lot. Les scénarios de conversion Ahmed/Mohamed/Karim et du nouveau formulaire restent non exécutés jusqu'à approbation et implémentation de cette transition ; ils ne sont pas présentés comme réussis.
+
+### Point de reprise
+
+Travail compatible effectué et vérifié ; attendre l'accord structurel du §40 demandé dans spatie modiff.txt. Après accord : implémenter et tester la structure additive et les profils centraux, le service/Request/Policy de droits directs raccordés au contrôleur existant, la suppression validée des dérivations, les seeders et la conversion avec aperçu complet récent. La conversion réelle doit conserver toutes les dates et demander un nouvel accord si la matrice diffère de l'aperçu validé. Ne pas interpréter un simple continue comme l'approbation de changements sensibles non encore présentés.
+
+## 21 octobre 2026 — Phase 4 Spatie approuvée, réalisée et déployée
+
+### Accord et résultat
+
+Après présentation du plan §40 et des deux décisions, l'utilisateur répond « oui asy poursuis », puis demande de continuer. Cet accord couvre la transition présentée et la matérialisation de la seule consultation dérivée identifiée. Les tests MySQL isolés restent autorisés par spatie modiff.txt. Le point de reprise précédent est donc réalisé, et non toujours en attente.
+
+La centrale utilise désormais les profils partagés comme modèles de départ, avec permissions métier effectives directes Spatie. Une révocation individuelle conserve le profil et ne touche pas les autres membres. Root reste privilégié/protégé ; les comptes commerçants restent exclus des attributions SaaS. Aucune migration/conversion des bases Tenant existantes, aucun package ajouté ou fichier vendor modifié.
+
+### Fichiers de cette phase
+
+| Fichier | Réalisation |
+|---|---|
+| database/migrations/central/2026_10_21_000000_create_role_permission_templates_table.php | Nouvelle table centrale, PK composite, vraies FK RESTRICT et CHECK 1..9999 ; rollback de schéma interdit si les modèles existent |
+| app/Models/Central/Role.php | Relation templates et permissionComposition ; relation native permissions conservée pour le vrai héritage, sans pointer vers les modèles |
+| app/Concerns/HasRoleMetadata.php | Compositions de modèles centrales et compositions natives Tenant, signatures/durées/caches conservés |
+| app/Concerns/HasTimedPermissions.php | Attribution native du profil puis copie native des droits absents, sans renouveler/recréer les droits d'un profil conservé ; audit des dates initiales ; verrou capable de conserver les comptes archivés lors de la conversion |
+| config/permission.php | Mode central_profiles actif après conversion et rechargement ; aucune option Teams ajoutée |
+| app/Services/Central/Authorization/CentralPermissionAssignmentService.php | Lots individuels, contrôle d'état et de délégation sous verrou, dates conservées, renouvellement explicite et audit atomique |
+| app/Http/Requests/Central/Users/UpdateStaffPermissionsRequest.php | UUID, booléens, durées, motif et empreinte attendue validés ; aucun ID interne ou date libre |
+| app/Http/Controllers/Central/Admin/Staff/StaffPermissionController.php et routes/central/admin/staff.php | GET existant enrichi et PUT ajouté dans le même module |
+| app/Policies/Central/UserPolicy.php | Consultation/édition distinctes, pas d'auto-attribution, root/commerçant/boutique/cible protégés ; suspension indépendante des droits |
+| app/Services/Central/Authorization/CentralPermissionResolver.php | Catalogue administrable, sources/dates et résultat Gate, sans second moteur d'autorisation |
+| app/Services/Central/Authorization/CentralRoleAssignmentService.php | Renouvellement explicite des seuls droits directs encore présents dans le modèle, avec dates auditées |
+| app/Services/Central/Authorization/{CentralUserAccess,AuthorizationMutation}.php | Fin des lectures dérivées en mode courant ; invalidation du registrar aussi en cas de rollback |
+| app/Services/Central/Roles/{RoleManager,CentralRoleCatalog}.php | Modèles initiaux, suppression sûre, capacité saas.staff.permissions.update ajoutée au catalogue sans enrichir les profils |
+| app/Services/Central/Users/UserManagementService.php et app/Http/Controllers/Central/Admin/Roles/RoleController.php | Sélection/délégation et édition des compositions initiales, droits effectifs individuels conservés |
+| app/Services/Central/Authorization/CentralPermissionTransition.php et app/Console/Commands/Central/ConvertPermissionProfiles.php | Aperçu, empreinte, sauvegarde chiffrée, conversion atomique/idempotente et retour arrière contrôlé |
+| resources/views/central/pages/admin/staff/{permissions,roles,show}.blade.php et admin/users/roles.blade.php | Cases individuelles, dates/expiration, renouvellement motivé, textes de profils et protection des rôles masqués |
+| resources/views/central/pages/admin/roles/{form,index,show}.blade.php | Composition du modèle affichée sans promettre une modification de tous les membres |
+| Tests Admin/Staff/DirectPermissionManagementTest.php, Admin/Roles, Admin/Staff, Admin/Permissions, Admin/Users/CentralUserModuleTest.php, CentralManagementTest.php, Tenant/Tenancy/SpatieIntegrationTest.php et Integration/UserContactConcurrencyTest.php | Couverture de la nouvelle règle et attentes historiques adaptées sans suppression des tests |
+| AGENTS.md, instructionn.txt, architecture §40–41, schéma et diagramme central | Règles actives, références et nouvelle table documentées ; cible centrale passe à 28 tables |
+
+### Déploiement réel et contrôles des données
+
+Inventaire source contrôlé avant écriture : 5 rôles avec noms/versions/protections identiques au plan approuvé ; 46 permissions, 9 compositions effectives, 5 attributions de rôle et 0 droit direct. La nouvelle table est créée par la seule migration additive demandée, après les tests isolés. L'aperçu retrouve 10 droits directs, conformément au plan : neuf droits convertis et une lecture auparavant dérivée.
+
+Maintenance brève pendant l'application : down, migration centrale additive, commande aydra:convert-permission-profiles --apply avec l'empreinte revue, config:cache, route:cache, queue:restart puis up. La commande sauvegarde les six tables d'autorisation dans un fichier chiffré du disque local privé, sous authorization-transitions, exclu de Git. Son chemin exact et ses empreintes sont conservés dans l'activité central_permissions_converted ; aucun compte ou secret publié. La sauvegarde reste disponible et aucune purge n'est effectuée.
+
+État après commit vérifié par lecture réelle : 5 rôles, 5 attributions, 9 modèles, 0 héritage effectif ordinaire, 10 droits directs et 47 codes de permission. Les deux FK de modèles sont présentes. Identités, signatures, versions, protections et dates des rôles sont contrôlées avant commit et inchangées. Les neuf échéances antérieures sont conservées ; la lecture matérialisée reprend sa période exacte. Root ne reçoit aucune ligne directe et conserve tous les codes existants, y compris le nouveau code de gestion.
+
+Matrice d'accès relue avec can : Personnel 2 garde users.view/update ; Personnel 3 garde countries.view et users.create/update, avec users.view désormais explicite ; Personnel 4 garde ses quatre droits ; root reconnaît les 47 codes stockés. Les intitulés abrégés commencent par saas. Une seule activité de conversion, sauvegarde présente et empreinte finale identique à l'état réel. Mode central_profiles=true chargé, nouvelle route présente et maintenance désactivée. Les modèles/données des bases boutique n'ont pas été modifiés.
+
+### Tests réellement exécutés et reprises
+
+| Contrôle | Résultat |
+|---|---|
+| Nouveau DirectPermissionManagementTest initial | 10 réussites et une erreur sur 11 : le retour arrière tentait de vider les droits du root, correctement bloqué ; corrigé pour exclure root |
+| Reprise conversion/idempotence/retour arrière | 1/1 réussi, 10 assertions |
+| Premier lot Rôles/Personnel/Catalogue/Spatie | 49 réussites sur 71 ; attentes d'héritage/dérivation remplacées par les nouvelles règles, deux fixtures sélectionnant la mauvaise ligne directe corrigées |
+| Lot actualisé avec les nouveaux tests directs | 81 réussites sur 82, 581 assertions ; un test Spatie retenait la date de la première permission au lieu du droit ciblé |
+| Reprise du cas daté corrigé + expiration de la gestion + cache après rollback | 3/3 réussis, 17 assertions |
+| UserAccountManagementTest | 19/19 réussis, 195 assertions |
+| Deux clients MySQL réellement concurrents sur les permissions | 1/1 réussi, 12 assertions : un succès, un conflit, un seul audit |
+| CentralManagementTest, quatre scénarios concernés par les profils/lectures explicites | 4/4 réussis, 36 assertions ; profils partagés, durées futures et création sans lecture expirée |
+| Reprise du contrôle de délégation après filtrage du catalogue individuel | 1/1 réussi, 6 assertions : les droits non attribués et non administrables ne sont pas proposés, un lot interdit reste entièrement annulé |
+| Syntaxe PHP des 18 fichiers techniques principaux | Aucune erreur |
+| git diff --check | Aucune erreur ; seuls avertissements CRLF/LF préexistants |
+
+La couverture finale réunit 108 scénarios distincts exécutés avec succès après les corrections, répartis entre ces lots et reprises ; aucune suite globale de 108 tests en une commande n'est revendiquée. Les scénarios des deux dernières modifications mineures (audit enrichi et présentation conditionnelle de la page lors du déploiement) sont relus ; le rendu réel de la page après déploiement est vérifié séparément. Pas de Pint, PHPStan, compilation, suite complète ou e-mail réel exécutés. Les autres scénarios historiques de CentralManagementTest ne sont pas annoncés validés : le défaut préexistant d'appel de job décrit dans le lot précédent reste hors périmètre.
+
+Les tests vérifient Ahmed/Mohamed/Karim, retrait et réattribution réels avec can, profils conservés sans réactivation, droits distincts, échéances, refus de délégation, protection root/soi-même/commerçant, inspection seule, ancien formulaire, rollback d'un lot, évolution des profils pour les futurs membres, transition/retour arrière, cache et isolation de deux boutiques. Les tests Tenant continuent de vérifier l'héritage natif et la séparation des caches/activités locales ; aucune table de modèles locale n'est créée.
+
+### HTTP, rendu et limites
+
+PowerShell ne résout pas aydra.localhost dans cet environnement. Contrôle local effectué avec http://127.0.0.1/login et Host: aydra.localhost : HTTP 200 HTML. Aucun hosts, DNS ou paramètre Windows modifié. Ce contrôle confirme le service local mais ne prouve pas la résolution DNS du navigateur de l'utilisateur.
+
+La page Permissions du personnel réel est rendue localement avec le guard central et un contexte de vue initialisé : catalogue, jeton d'état et contrôles d'enregistrement présents. Le premier rendu CLI manquait du sac d'erreurs normalement fourni par le middleware ; le contrôle est repris avec ce contexte, sans modifier l'application pour contourner l'erreur. Aucun clic navigateur ou mutation de droits réelle n'est effectué pour la vérification visuelle. Les mutations sont testées uniquement sur les bases MySQL temporaires.
+
+Pour utiliser : Personnel SaaS → Permissions → cocher/décocher → Enregistrer les permissions. Seul un acteur habilité voit les contrôles ; les lectures nécessaires à une navigation doivent maintenant être sélectionnées explicitement. Le catalogue global reste consultatif. Aucun gain de performance chiffré revendiqué.
+
+### Retour arrière
+
+La commande --rollback exige le chemin privé associé à l'activité et refuse tout état modifié après conversion ; elle n'est pas exécutée sur les données réelles. Le retour exact à l'empreinte initiale est testé sur base isolée. Remettre ensuite permission.central_profiles=false et reconstruire la configuration avant de rouvrir le site, selon §41. Si des utilisateurs ont depuis été personnalisés, comparer et faire approuver un nouveau plan ; aucune restauration automatique qui écraserait ces changements.
+
+## 21 octobre 2026 — Accès visible aux permissions individuelles
+
+Problème confirmé : la page de modification existait, mais les actions du Personnel SaaS la nommaient uniquement « Permissions effectives ». La liste et la fiche Utilisateurs ne proposaient aucun lien vers cette page.
+
+Correction : bouton « Modifier les permissions » soumis à updateStaffPermissions dans les actions du personnel et dans la liste/fiche Utilisateurs. Si seule la consultation est autorisée, conserver « Permissions effectives ». Réutilisation de la page, de la route, du service Spatie et des protections existants ; aucune modification de rôle, de permission ou de données réelles.
+
+Fichiers : resources/views/central/pages/admin/staff/actions.blade.php ; resources/views/central/pages/admin/users/index.blade.php ; resources/views/central/pages/admin/users/show.blade.php. Convention d'accès précisée au §41 de l'architecture.
+
+Contrôles exécutés sans mutation métier : routes GET/PUT chargées ; rendu local du bouton pour un personnel existant et du formulaire complet (cases, bouton d'enregistrement, expected_state) ; refus d'édition pour root et pour un commerçant ; compilation Blade et analyse syntaxique PHP des deux vues Utilisateurs. Tous ces contrôles sont positifs. Aucun test MySQL avec écriture ni clic navigateur exécuté ; aucune attribution réelle modifiée.
+
+## 21 octobre 2026 — Consolidation dans le pivot Spatie natif et retrait de la page Rôles de Utilisateurs
+
+### Décisions et périmètre
+
+Demande explicite : transférer la composition de role_permission_templates dans role_has_permissions et supprimer la table supplémentaire, sans perdre les permissions individuelles. Complément pendant la tâche : retirer le bouton Rôles de Utilisateurs et sa page « Rôles de… ». Les rôles restent gérés dans Personnel SaaS ; saas.users.roles.assign reste une permission nécessaire à cette gestion.
+
+### Réalisation
+
+- Central/Role et HasRoleMetadata : permissionComposition lit le pivot natif ; suppression de la relation templates et renommage du prédicat en usesIndividualPermissions. Aucun modèle de table supplémentaire.
+- HasTimedPermissions : attribution initiale individuelle conservée ; les contrôles de recoupement et l'héritage restent propres aux rôles Tenant. Au central, hasPermissionTo et les points d'entrée natifs hasPermissionViaRole/getPermissionsViaRoles excluent les compositions du rôle des droits effectifs. getAllPermissions ne réintroduit pas un droit retiré.
+- CentralPermissionResolver, CentralPermissionAssignmentService, RoleManager, CentralRoleAssignmentService et UserManagementService adaptés : affichage, édition individuelle, signatures, durée, renouvellement et suppression d'un profil inutilisé continuent avec le pivot natif.
+- Migration centrale 2026_10_21_051638_consolidate_central_role_permissions : sauvegarde privée chiffrée des six tables avant copie, refus des durées contradictoires, copie des paires absentes, contrôle exact et suppression de la source. Relance sans effet si la source a disparu ; down refuse une destruction aveugle. Ancienne migration déployée conservée pour une installation reproductible. Aucun reset et aucune migration Tenant.
+- Ancien service CentralPermissionTransition et commande ConvertPermissionProfiles retirés ; sauvegardes et audits historiques conservés. Leur ancien retour arrière ne s'applique plus à ce schéma.
+- Retrait de UserRoleController, resources/views/central/pages/admin/users/roles.blade.php, des routes central.users.roles.edit/update et des boutons Rôles dans la liste/fiche Utilisateurs. Les routes staff.roles et le lien depuis Permissions restent présents. AssignRolesRequest reste le parent utilisé par AssignStaffRolesRequest.
+- Schéma principal, diagramme central, instructionn.txt, architecture et AGENTS.md actualisés. Diagramme central : 27 tables, sans doublon ni table supplémentaire. Les anciennes notes et migrations restent explicitement historiques.
+
+### Vérifications exécutées
+
+| Contrôle | Résultat réel |
+|---|---|
+| DirectPermissionManagementTest, premier lot | 12/14 réussis ; deux défauts de fixture/assertion corrigés : ordre de colonnes/lignes dans la comparaison d'instantanés, et DDL MySQL sous transaction de test |
+| Reprise des deux scénarios de consolidation | Refus des conflits réussi ; dernière comparaison de sauvegarde nécessitait une comparaison explicite des triplets rôle/permission/durée |
+| Reprise finale de la consolidation avec sauvegarde et relance | 1/1 réussi, 12 assertions ; avec le lot précédent, les 14 scénarios individuels sont validés par lots |
+| RoleManagementTest + StaffManagementTest + SpatieIntegrationTest | 62/62 réussis, 539 assertions ; gestion des profils/personnel, héritage local et isolation de deux boutiques temporaires |
+| Retrait de la page Utilisateurs et sauvegarde du formulaire de rôles Staff | 2/2 réussis, 15 assertions : anciennes URL GET/PUT en 404, liens retirés, page Staff conservée et droits préservés |
+| Syntaxe PHP des fichiers principaux, routes et tests modifiés | Aucune erreur |
+| Rendu local réel de la page Permissions | Cases individuelles, bouton d'enregistrement et lien vers Rôles du personnel présents ; ancienne vue Utilisateurs absente |
+| HTTP local /login avec Host aydra.localhost | 200 |
+
+Les tests MySQL temporaires sont explicitement autorisés pour ce lot et restent isolés des bases réelles. Aucun Pint, PHPStan, compilation, suite complète ou e-mail réel lancé. Les scénarios d'ancienne conversion retirée sont remplacés par la vérification de la nouvelle consolidation et de sa sauvegarde ; aucune assertion de sécurité n'est retirée pour masquer un échec.
+
+### Application et comparaison MySQL réelles
+
+Brève maintenance, migration limitée au fichier de consolidation, signal queue:restart et remise en ligne. La sauvegarde privée est présente et déchiffrable ; son contenu n'est pas publié.
+
+Résultat relu dans MySQL : source absente ; neuf associations copiées exactement dans role_has_permissions. Comparaison avec la sauvegarde : roles, permissions, model_has_roles et model_has_permissions sont identiques, dates comprises. Les 893 résultats can() relevés avant la migration ont exactement la même empreinte après. Les boutiques existantes ne sont pas modifiées.
+
+Cache des routes régénéré après suppression : anciennes routes Utilisateurs absentes, routes Rôles du personnel conservées ; application hors maintenance. Les mutations réelles de droits ne sont pas utilisées comme tests. Pas de parcours complet au navigateur revendiqué.
+
+Contrôle final après suppression des anciennes routes : 8/8 scénarios concernés réussis, 58 assertions (attribution après expiration de la lecture, délégation limitée, dates conservées, Super Admin protégé, commerçants exclus et impossibilité de contourner l'approbation). Les références des anciens tests sont dirigées vers les routes Staff conservées ; aucun appel aux routes supprimées ne subsiste dans le code actif.
+
+## 21 octobre 2026 — Transactions et autorisations centrales simplifiées (§42)
+
+Décision : utiliser DB::transaction directement. La configuration effective était déjà mysql hors tenancy, avec la base centrale aydra ; aucune correction du .env réel ni des configurations database/tenancy n’était nécessaire. Seul .env.example abandonnait encore SQLite et est aligné sur MySQL. Stancl reste responsable du basculement tenant et du retour central ; les traits de connexion des modèles restent inchangés.
+
+AuthorizationMutation.run reçoit Actor, action, chargeur de cible et traitement ; Gate applique la Policy dans la transaction avant écriture. Les services conservent leurs règles métier, cibles verrouillées, versions et audits. Les enveloppes Staff/Users imbriquées sont retirées. RolePolicy.assign et PermissionPolicy.delegate contrôlent les droits encore possédés ; aucun nouveau code de permission n’est ajouté en base. Le mutex sur la ligne root reste nécessaire pour sérialiser une révocation et une mutation concurrentes ; ce verrou n’est pas une autorisation. Les opérations groupées et les jobs gardent leurs contrôles adaptés.
+
+Correction explicite demandée : suppression de la méthode publique assertCentralContext, de tous ses appels et des dépendances ajoutées uniquement pour cette méthode. Aucune comparaison répétée du nom de connexion dans les services. La garde tenant déjà présente dans les opérations centrales reste conservée ; les éditions personnelles et photos restent contrôlées par leurs Policies. Les catalogues, abonnements et transactions tenant utilisent DB::transaction dans leur contexte existant.
+
+Cache : invalidation globale supplémentaire après commit uniquement pour les définitions de rôles ; nettoyage du registrar après rollback conservé. Les méthodes natives Spatie restent utilisées. Aucun cache de décision, aucune migration ou écriture sur les bases réelles pendant cette intervention.
+
+Contrôles exécutés sur bases MySQL temporaires explicitement autorisées :
+
+- Rôles, personnel et droits individuels : 74 scénarios, 568 assertions réussies avant le dernier retrait de la méthode de garde.
+- Pays, boutiques, approbation, profil et photos : 62 scénarios, 530 assertions réussies avant ce dernier retrait.
+- Concurrence réelle MySQL et séparation Spatie entre deux bases tenant : 4 scénarios, 64 assertions réussies ; révocation concurrente bloquante, refus après commit malgré un Actor déjà chargé, transactions centrale/tenant et rollback vérifiés.
+- Après retrait final de la garde publique : 21 scénarios ciblés réussis, 182 assertions, couvrant notamment les mutations, l’autorisation avant écriture et les photos.
+- Syntaxe PHP des fichiers modifiés vérifiée, diff sans erreur de whitespace. Le chemin historique du composant profil contenant un caractère technique a nécessité une sélection PowerShell par fichier plutôt que le chemin échappé par Git ; syntaxe vérifiée ensuite.
+
+Anomalies corrigées pendant la vérification : SearchTenantsRequest imposait le droit de consultation à l’action de création/choix du propriétaire ; il utilise désormais la Policy create pour cette action et viewAny pour la liste. Trois anciennes attentes de tests supposaient une lecture dérivée des permissions de modification ; elles vérifient désormais le refus sans lecture explicite, puis l’accès après attribution. La fixture d’une permission au mauvais guard utilise un modèle non enregistré pour respecter la contrainte SQL réelle.
+
+Limites : pas de suite complète, Pint, PHPStan, compilation, envoi réel d’e-mail ni mutation des comptes existants. Les grandes séries précèdent le dernier retrait de la garde publique ; seuls les 21 scénarios pertinents ont été relancés après cette correction. Aucun gain de performance chiffré revendiqué.
+## 21 octobre 2026 — Retour à Utilisateurs après approbation/refus
+
+Cause confirmée : UserApprovalController.decide redirigeait systématiquement vers central.users.pending, quel que soit le formulaire utilisé. Correction : retour natif Laravel à la page d'origine, avec repli sur central.users.index. Les filtres et la pagination de la liste restent dans l'URL de retour. Aucun statut ni contrôle métier modifié.
+
+Fichiers : UserApprovalController.php et MerchantApprovalWorkflowTest.php ; architecture complétée. Six scénarios de régression ajoutés pour les deux décisions depuis la liste, les inscriptions en attente et la fiche ; l'attente sans origine utilise désormais la liste en repli. Syntaxe PHP vérifiée ; mécanisme Redirector exécuté sans accès BDD pour les retours à la liste filtrée et aux inscriptions en attente, résultats conformes. Tests MySQL ajoutés mais non exécutés pour cette demande, sans nouvel accord d'écriture de test ; aucune base réelle modifiée.

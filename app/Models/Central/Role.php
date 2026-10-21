@@ -19,6 +19,11 @@ class Role extends PackageRole
 
     protected $fillable = ['name', 'label'];
 
+    public function usesIndividualPermissions(): bool
+    {
+        return (bool) config('permission.central_profiles', false);
+    }
+
     /**
      * @param Builder<static> $query
      * @return Builder<static>
@@ -27,7 +32,7 @@ class Role extends PackageRole
     {
         return $query->where('guard_name', 'central');
     }
-
+    
     /** @return array<string, string> */
     protected function casts(): array
     {

@@ -6,6 +6,7 @@ use App\Models\Central\Tenant;
 use App\Models\Central\User;
 use App\Models\Tenant\Shop;
 use App\Models\Tenant\User as ShopUser;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 
@@ -36,7 +37,7 @@ class TenantProfileProjection
             throw new LogicException('The tenant database is not ready for profile projection.');
         }
         $tenant->run(function () use ($tenant): void {
-            (new Shop)->getConnection()->transaction(function () use ($tenant): void {
+            DB::transaction(function () use ($tenant): void {
                 $shop = Shop::where('singleton', 1)->lockForUpdate()->firstOrFail();
                 if ($shop->tenant_uuid !== $tenant->uuid) {
                     throw new LogicException('The shop profile belongs to another tenant.');

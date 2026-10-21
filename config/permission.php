@@ -6,6 +6,9 @@ use Spatie\Permission\DefaultTeamResolver;
 
 return [
 
+    // Enable only after converting an existing central database; Tenant keeps native role inheritance.
+    'central_profiles' => true,
+
     'models' => [
 
         /*

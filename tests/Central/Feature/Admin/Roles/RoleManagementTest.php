@@ -38,12 +38,12 @@ function module03Payload(string $name, array $grants): array
         'durations' => $permissions->mapWithKeys(fn (Permission $permission): array => [$permission->uuid => $grants[$permission->name]])->all()];
 }
 
-test('each role action opens its necessary consultation without granting another mutation', function (string $permission, string $ability): void {
+test('each role action is independent from the explicit list permission and other mutations', function (string $permission, string $ability): void {
     module03Admin();
     $actor = module03Actor([$permission => 9999, 'saas.users.view' => 9999]);
     $role = Role::createWithPermissions('consulted-role', ['saas.users.view' => 12]);
     $gate = Gate::forUser($actor);
-    expect($gate->allows('viewAny', Role::class))->toBeTrue();
+    expect($gate->allows('viewAny', Role::class))->toBe($permission === 'saas.roles.view');
     expect($gate->allows($ability, $ability === 'create' ? Role::class : $role))->toBeTrue();
     foreach (['update', 'updatePermissions', 'updateDurations', 'delete'] as $other) {
         if ($other !== $ability) {
@@ -78,7 +78,7 @@ test('assignments consultation includes archived accounts without exposing their
     $member = User::factory()->create();
     $member->assignRole($role);
     $member->delete();
-    $viewer = module03Actor(['saas.roles.assignments.view' => 9999]);
+    $viewer = module03Actor(['saas.roles.view' => 9999, 'saas.roles.assignments.view' => 9999]);
     $this->actingAs($viewer, 'central')->get(route('central.roles.show', $role))->assertOk()
         ->assertSee($member->email)->assertSee('Archivé')->assertDontSee($member->uuid)
         ->assertDontSee($member->getRawOriginal('password'))->assertDontSee('Permissions et durées');
@@ -93,12 +93,12 @@ test('metadata editing preserves permissions durations identity and assignment d
     $assignedAt = $member->roles()->first()->pivot->assigned_at;
     $this->actingAs($actor, 'central')->get(route('central.roles.edit', $role))->assertOk()
         ->assertSee('Nom unique du rôle')->assertDontSee('name="permissions[]"', false)->assertDontSee('name="durations[', false);
-    $this->put(route('central.roles.update', $role), ['name' => ' after-name ', 'label' => 'Nouveau libellé'])
+    $this->put(route('central.roles.update', $role), ['expected_version' => 1, 'name' => ' after-name ', 'label' => 'Nouveau libellé'])
         ->assertSessionHasNoErrors()->assertRedirect(route('central.roles.index'));
     $updated = $role->fresh();
     expect($updated->name)->toBe('after-name')->and($updated->uuid)->toBe($role->uuid)
-        ->and($updated->permission_signature)->toBe($role->permission_signature)->and($updated->permission_version)->toBe(1);
-    expect($updated->permissions()->first()->pivot->duration_days)->toBe(6);
+        ->and($updated->permission_signature)->toBe($role->permission_signature)->and($updated->permission_version)->toBe(2);
+    expect($updated->permissionComposition()->first()->pivot->duration_days)->toBe(6);
     expect($member->roles()->first()->pivot->assigned_at)->toEqual($assignedAt);
     expect(Activity::where('event', 'role_updated')->where('subject_id', $role->id)->exists())->toBeTrue();
 });
@@ -108,11 +108,11 @@ test('metadata permission cannot change composition or durations through a forge
     $actor = module03Actor(['saas.roles.update' => 9999, 'saas.users.view' => 9999, 'saas.countries.view' => 9999]);
     $role = Role::createWithPermissions('metadata-only', ['saas.users.view' => 12]);
     $this->actingAs($actor, 'central')->put(route('central.roles.update', $role),
-        module03Payload('metadata-only', ['saas.users.view' => 12, 'saas.countries.view' => 9999]))->assertForbidden();
-    $this->put(route('central.roles.update', $role), module03Payload('metadata-only', ['saas.users.view' => 2]))->assertForbidden();
+        ['expected_version' => 1, ...module03Payload('metadata-only', ['saas.users.view' => 12, 'saas.countries.view' => 9999])])->assertForbidden();
+    $this->put(route('central.roles.update', $role), ['expected_version' => 1, ...module03Payload('metadata-only', ['saas.users.view' => 2])])->assertForbidden();
     expect($role->fresh()->permission_version)->toBe(1);
-    expect($role->permissions()->pluck('name')->all())->toBe(['saas.users.view']);
-    expect($role->permissions()->first()->pivot->duration_days)->toBe(12);
+    expect($role->permissionComposition()->pluck('name')->all())->toBe(['saas.users.view']);
+    expect($role->permissionComposition()->first()->pivot->duration_days)->toBe(12);
 });
 
 test('composition editing preserves retained durations and gives new permissions the documented default', function (): void {
@@ -123,15 +123,15 @@ test('composition editing preserves retained durations and gives new permissions
     unset($payload['name'], $payload['label'], $payload['durations']);
     $this->actingAs($actor, 'central')->get(route('central.roles.edit', $role))->assertOk()
         ->assertSee('name="permissions[]"', false)->assertDontSee('name="durations[', false);
-    $this->put(route('central.roles.update', $role), $payload)->assertSessionHasNoErrors();
-    expect($role->permissions()->where('name', 'saas.users.view')->first()->pivot->duration_days)->toBe(12);
-    expect($role->permissions()->where('name', 'saas.countries.view')->first()->pivot->duration_days)->toBe(9999);
+    $this->put(route('central.roles.update', $role), ['expected_version' => 1, ...$payload])->assertSessionHasNoErrors();
+    expect($role->permissionComposition()->where('name', 'saas.users.view')->first()->pivot->duration_days)->toBe(12);
+    expect($role->permissionComposition()->where('name', 'saas.countries.view')->first()->pivot->duration_days)->toBe(9999);
     $payload = module03Payload('composition-only', ['saas.users.view' => 3]);
-    $this->put(route('central.roles.update', $role), $payload)->assertForbidden();
+    $this->put(route('central.roles.update', $role), ['expected_version' => 2, ...$payload])->assertForbidden();
     expect($role->fresh()->permission_version)->toBe(2);
 });
 
-test('duration editing keeps composition and assignment dates and expiration is enforced', function (): void {
+test('profile duration editing keeps existing individual dates and does not change their expiration', function (): void {
     $this->freezeTime();
     module03Admin();
     $actor = module03Actor(['saas.roles.durations.update' => 9999, 'saas.users.view' => 9999]);
@@ -139,15 +139,17 @@ test('duration editing keeps composition and assignment dates and expiration is 
     $member = User::factory()->create();
     $member->assignRole($role);
     $assignedAt = $member->roles()->first()->pivot->assigned_at;
-    $uuid = $role->permissions()->first()->uuid;
+    $uuid = $role->permissionComposition()->first()->uuid;
     $this->travel(2)->days();
     $this->actingAs($actor, 'central')->get(route('central.roles.edit', $role))->assertOk()
         ->assertDontSee('name="permissions[]"', false)->assertSee('name="durations[', false);
-    $this->put(route('central.roles.update', $role), ['durations' => [$uuid => 1]])->assertSessionHasNoErrors();
+    $this->put(route('central.roles.update', $role), ['expected_version' => 1, 'durations' => [$uuid => 1]])->assertSessionHasNoErrors();
     expect($member->roles()->first()->pivot->assigned_at)->toEqual($assignedAt);
+    expect($member->fresh()->checkPermissionTo('saas.users.view', 'central'))->toBeTrue();
+    $this->travel(1)->days();
     expect($member->fresh()->checkPermissionTo('saas.users.view', 'central'))->toBeFalse();
     expect($role->fresh()->permission_version)->toBe(2);
-    $this->put(route('central.roles.update', $role), ['name' => 'forbidden-rename'])->assertForbidden();
+    $this->put(route('central.roles.update', $role), ['expected_version' => 2, 'name' => 'forbidden-rename'])->assertForbidden();
     expect($role->fresh()->name)->toBe('duration-only');
 });
 
@@ -161,7 +163,7 @@ test('delegated role creation offers only owned permissions and refuses derived 
     $this->post(route('central.roles.store'), module03Payload('derived-denied', ['saas.users.view' => 5]))->assertForbidden();
     $this->post(route('central.roles.store'), module03Payload('expired-denied', ['saas.countries.view' => 5]))->assertForbidden();
     $this->post(route('central.roles.store'), module03Payload('allowed-role', ['saas.users.create' => 20]))->assertSessionHasNoErrors();
-    expect(Role::where('name', 'allowed-role')->first()->permissions()->first()->pivot->duration_days)->toBe(20);
+    expect(Role::where('name', 'allowed-role')->first()->permissionComposition()->first()->pivot->duration_days)->toBe(20);
     $this->assertDatabaseMissing('roles', ['name' => 'derived-denied']);
     $this->assertDatabaseMissing('roles', ['name' => 'expired-denied']);
 });
@@ -179,7 +181,7 @@ test('an expired module action refuses the page and mutation at its exact expira
 test('unused custom role deletion removes only its composition and retains an audit snapshot', function (): void {
     $admin = module03Admin();
     $role = Role::createWithPermissions('unused-role', ['saas.users.view' => 7]);
-    $permission = $role->permissions()->first();
+    $permission = $role->permissionComposition()->first();
     $this->actingAs($admin, 'central')->delete(route('central.roles.destroy', $role))
         ->assertSessionHasNoErrors()->assertRedirect(route('central.roles.index'));
     $this->assertDatabaseMissing('roles', ['id' => $role->id]);
@@ -251,22 +253,24 @@ test('role duration changes reject identical compositions without changing eithe
     $admin = module03Admin();
     $role = Role::createWithPermissions('first-composition', ['saas.users.view' => 4]);
     Role::createWithPermissions('second-composition', ['saas.users.view' => 8]);
-    $uuid = $role->permissions()->first()->uuid;
-    $this->actingAs($admin, 'central')->put(route('central.roles.update', $role), ['durations' => [$uuid => 8]])->assertSessionHasErrors('name');
-    expect($role->permissions()->first()->pivot->duration_days)->toBe(4);
+    $uuid = $role->permissionComposition()->first()->uuid;
+    $this->actingAs($admin, 'central')->put(route('central.roles.update', $role), ['expected_version' => 1, 'durations' => [$uuid => 8]])->assertSessionHasErrors('name');
+    expect($role->permissionComposition()->first()->pivot->duration_days)->toBe(4);
     expect($role->fresh()->permission_version)->toBe(1);
 });
 
-test('role updates reject overlaps with direct permissions of any existing recipient', function (): void {
+test('profile updates do not overwrite an existing recipients direct permission', function (): void {
     $admin = module03Admin();
     $role = Role::createWithPermissions('role-before-direct-conflict', ['saas.users.view' => 4]);
     $member = User::factory()->create();
     $member->assignRole($role);
     $member->givePermissionTo('saas.countries.view');
     $payload = module03Payload('role-before-direct-conflict', ['saas.users.view' => 4, 'saas.countries.view' => 8]);
-    $this->actingAs($admin, 'central')->put(route('central.roles.update', $role), $payload)->assertSessionHasErrors('permissions');
-    expect($role->permissions()->pluck('name')->all())->toBe(['saas.users.view']);
-    expect($role->fresh()->permission_version)->toBe(1);
+    $end = $member->permissions()->where('name', 'saas.countries.view')->first()->pivot->expires_at;
+    $this->actingAs($admin, 'central')->put(route('central.roles.update', $role), ['expected_version' => 1, ...$payload])->assertSessionHasNoErrors();
+    expect($role->permissionComposition()->pluck('name')->all())->toBe(['saas.users.view', 'saas.countries.view']);
+    expect($role->fresh()->permission_version)->toBe(2);
+    expect($member->permissions()->where('name', 'saas.countries.view')->first()->pivot->expires_at)->toEqual($end);
 });
 
 test('guests and merchants cannot access or mutate SaaS roles', function (): void {
@@ -285,7 +289,7 @@ test('role deletion refuses an existing business reference without silently dele
     $role = Role::createWithPermissions('referenced-role', ['saas.users.view' => 5]);
     $reference = (string) Str::uuid();
     DB::connection($role->getConnectionName())->table('admin_restrictions')->insert([
-        'uuid' => $reference, 'admin_id' => $admin->id, 'permission_id' => $role->permissions()->first()->id,
+        'uuid' => $reference, 'admin_id' => $admin->id, 'permission_id' => $role->permissionComposition()->first()->id,
         'target_role_id' => $role->id, 'created_by_id' => $admin->id, 'effect' => 1, 'status' => 1, 'started_at' => now(),
     ]);
     $this->actingAs($admin, 'central')->delete(route('central.roles.destroy', $role))->assertSessionHasErrors('role');
@@ -306,11 +310,11 @@ test('role mutation and deletion cannot target a composition stronger than the d
 test('duration-only updates reject unrelated permissions and retries do not bump the version', function (): void {
     $admin = module03Admin();
     $role = Role::createWithPermissions('unchanged-role', ['saas.users.view' => 12]);
-    $uuid = $role->permissions()->first()->uuid;
+    $uuid = $role->permissionComposition()->first()->uuid;
     $other = Permission::findByName('saas.users.create', 'central');
-    $this->actingAs($admin, 'central')->put(route('central.roles.update', $role), ['durations' => [$other->uuid => 5]])
+    $this->actingAs($admin, 'central')->put(route('central.roles.update', $role), ['expected_version' => 1, 'durations' => [$other->uuid => 5]])
         ->assertSessionHasErrors('durations');
-    $this->put(route('central.roles.update', $role), ['durations' => [$uuid => 12]])->assertSessionHasNoErrors();
+    $this->put(route('central.roles.update', $role), ['expected_version' => 1, 'durations' => [$uuid => 12]])->assertSessionHasNoErrors();
     expect($role->fresh()->permission_version)->toBe(1);
     expect(Activity::where('event', 'role_updated')->where('subject_id', $role->id)->exists())->toBeFalse();
 });
@@ -327,5 +331,26 @@ test('role catalogue seeding preserves historical permission identities and exis
     expect(Permission::whereIn('name', array_column($historical, 'name'))->orderBy('id')->get(['id', 'uuid', 'name'])->toArray())->toBe($historical);
     expect(Permission::where('guard_name', 'central')->where('name', 'like', 'saas.roles.%')->count())->toBe(8);
     expect($member->roles()->first()->pivot->assigned_at)->toEqual($assignedAt);
-    expect($role->fresh()->permissions()->pluck('name')->all())->toBe(['saas.users.view']);
+    expect($role->fresh()->permissionComposition()->pluck('name')->all())->toBe(['saas.users.view']);
+});
+
+test('an obsolete role form cannot overwrite identity composition or durations', function (): void {
+    $admin = module03Admin();
+    $role = Role::createWithPermissions('concurrent-role', ['saas.users.view' => 17]);
+    $member = User::factory()->create();
+    $member->assignRole($role);
+    $assignedAt = $member->roles()->first()->pivot->assigned_at;
+    $url = route('central.roles.update', $role);
+    $this->actingAs($admin, 'central')->get(route('central.roles.edit', $role))
+        ->assertOk()->assertSee('name="expected_version" value="1"', false);
+    $this->put($url, ['expected_version' => 1, 'label' => 'Latest label'])->assertSessionHasNoErrors();
+    $this->put($url, ['expected_version' => 1, ...module03Payload('stale-name', ['saas.users.view' => 8])])
+        ->assertSessionHasErrors('expected_version');
+    $this->put($url, ['label' => 'Missing version'])->assertSessionHasErrors('expected_version');
+    expect($role->fresh()->label)->toBe('Latest label')
+        ->and($role->fresh()->name)->toBe('concurrent-role')
+        ->and($role->fresh()->permission_version)->toBe(2)
+        ->and($role->permissionComposition()->first()->pivot->duration_days)->toBe(17)
+        ->and($member->roles()->first()->pivot->assigned_at)->toEqual($assignedAt)
+        ->and(Activity::forSubject($role)->where('event', 'role_updated')->count())->toBe(1);
 });

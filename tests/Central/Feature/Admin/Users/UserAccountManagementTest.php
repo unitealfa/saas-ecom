@@ -49,11 +49,9 @@ test('merchants cannot receive SaaS roles or direct permissions through either a
     expect(Gate::forUser($this->admin)->allows('assignRoles', $merchant))->toBeFalse()
         ->and(Gate::forUser($this->admin)->allows('assignStaffRoles', $merchant))->toBeFalse();
     $this->actingAs($this->admin, 'central')->get(route('central.users.show', $merchant))->assertOk()
-        ->assertDontSee('id="saas-roles"', false)->assertDontSee(route('central.users.roles.edit', $merchant), false);
-    foreach (['central.users.roles', 'central.staff.roles'] as $module) {
-        $this->get(route($module.'.edit', $merchant))->assertForbidden();
-        $this->put(route($module.'.update', $merchant), ['roles' => [$role->uuid]])->assertForbidden();
-    }
+        ->assertDontSee('id="saas-roles"', false)->assertDontSee('/admin/users/'.$merchant->uuid.'/roles', false);
+    $this->get(route('central.staff.roles.edit', $merchant))->assertForbidden();
+    $this->put(route('central.staff.roles.update', $merchant), ['roles' => [$role->uuid]])->assertForbidden();
     expect(fn () => app(UserManagementService::class)->assignRoles($this->admin, $merchant, [$role->uuid]))
         ->toThrow(AuthorizationException::class);
     expect(fn () => app(CentralRoleAssignmentService::class)->replace($this->admin, $merchant, [$role->uuid]))
@@ -161,7 +159,8 @@ test('merchant edits preserve the real identifiers password and roles and invali
     expect($updated->phone_verified_at)->toBeNull();
     expect($updated->whatsapp_verified_at)->toBeNull();
     expect($updated->legal_profile_version)->toBe(2);
-    expect($updated->legal_verification_status)->toBe(VerificationStatusEnum::PENDING);
+    expect($updated->legal_verification_status)->toBe(VerificationStatusEnum::VERIFIED);
+    expect($updated->status)->toBe($target->status);
     expect($updated->roles()->exists())->toBeFalse();
     expect(Activity::where('event', 'central_profile_updated')->count())->toBe(1);
     Notification::assertNothingSent();
@@ -214,7 +213,7 @@ test('changing the email removes the old password token and requires verificatio
     Notification::assertSentTo(User::findOrFail($target->id), VerifyEmail::class);
 });
 
-test('editing an unverified account sends a fresh invitation and requests a new professional review', function (): void {
+test('editing an unverified account sends a fresh invitation without changing its administrative decision', function (): void {
     $target = User::factory()->unverified()->create();
     $target->forceFill(['legal_profile_version' => 1, 'legal_verification_status' => VerificationStatusEnum::INCOMPLETE])->save();
     Password::broker('central')->createToken($target);
@@ -222,13 +221,14 @@ test('editing an unverified account sends a fresh invitation and requests a new 
         ...editableCentralProfile($target), 'email' => 'new-invited@example.test',
     ])->assertSessionHasNoErrors();
     $updated = $target->fresh();
-    expect($updated->legal_verification_status)->toBe(VerificationStatusEnum::PENDING);
+    expect($updated->legal_verification_status)->toBe(VerificationStatusEnum::INCOMPLETE);
+    expect($updated->status)->toBe($target->status);
     expect($updated->legal_profile_version)->toBe(2);
     expect(DB::table('password_reset_tokens')->where('email', $target->email)->exists())->toBeFalse();
     Notification::assertSentTo(User::findOrFail($target->id), AccountInvitation::class);
 });
 
-test('optional professional fields can all be cleared and the dossier validated again', function (): void {
+test('optional professional fields can all be cleared without another administrative approval', function (): void {
     $target = User::factory()->create([
         'legal_form' => 'SARL', 'activity_nature' => 'Vente', 'legal_address' => 'Alger',
         'nif' => '00123', 'nis' => '00456', 'registration_number' => 'RC-TEST', 'artisan_card_number' => 'ART-TEST',
@@ -247,13 +247,12 @@ test('optional professional fields can all be cleared and the dossier validated 
         expect($updated->getAttribute($field))->toBeNull();
     }
     expect($updated->legal_profile_version)->toBe(2)
-        ->and($updated->legal_verification_status)->toBe(VerificationStatusEnum::PENDING)
-        ->and($updated->legal_verified_at)->toBeNull()
-        ->and($updated->getAttribute('legal_verified_by_id'))->toBeNull();
-    $this->post(route('central.users.legal.validate', $target), ['expected_status' => $updated->status->value, 'legal_profile_version' => 1])
-        ->assertSessionHasErrors('legal_profile_version');
+        ->and($updated->status)->toBe($target->status)
+        ->and($updated->legal_verification_status)->toBe(VerificationStatusEnum::VERIFIED)
+        ->and($updated->legal_verified_at)->toEqual($target->legal_verified_at)
+        ->and($updated->getAttribute('legal_verified_by_id'))->toBe($this->admin->id);
     $this->post(route('central.users.legal.validate', $target), ['expected_status' => $updated->status->value, 'legal_profile_version' => 2])
-        ->assertSessionHasNoErrors();
+        ->assertForbidden();
     expect($target->fresh()->legal_verification_status)->toBe(VerificationStatusEnum::VERIFIED);
 });
 
@@ -301,4 +300,55 @@ test('an authorized invitation retry renews the token and verified accounts cann
     expect(Activity::where('event', 'account_invitation_requested')->count())->toBe(1);
     $verified = User::factory()->create();
     $this->post(route('central.users.invitation', $verified))->assertSessionHasErrors('invitation');
+});
+
+test('editing profile and professional details preserves the existing administrative decision', function (\App\Enums\Central\Users\StatusEnum $status): void {
+    $this->seed(CountrySeeder::class);
+    $country = Country::where('code', 'FR')->firstOrFail();
+    $country->update(['is_active' => true]);
+    $legalStatus = match ($status) {
+        \App\Enums\Central\Users\StatusEnum::PENDING => VerificationStatusEnum::PENDING,
+        \App\Enums\Central\Users\StatusEnum::REJECTED => VerificationStatusEnum::FAILED,
+        default => VerificationStatusEnum::VERIFIED,
+    };
+    $target = User::factory()->create(['status' => $status, 'legal_profile_version' => 1,
+        'legal_verification_status' => $legalStatus,
+        'legal_verified_at' => $legalStatus === VerificationStatusEnum::VERIFIED ? now() : null,
+        'legal_verified_by_id' => $legalStatus === VerificationStatusEnum::VERIFIED ? $this->admin->id : null]);
+    $this->actingAs($this->admin, 'central')->put(route('central.users.update', $target), [
+        ...editableCentralProfile($target), 'last_name' => 'Nom corrigé',
+        'email' => 'new-identity@example.test', 'phone' => '0612345678',
+        'country_uuid' => $country->uuid, 'phone_country_uuid' => $country->uuid,
+        'legal_form' => 'SARL', 'legal_address' => 'Nouvelle adresse professionnelle',
+    ])->assertSessionHasNoErrors();
+    $updated = $target->fresh();
+    expect($updated->status)->toBe($status)
+        ->and($updated->legal_verification_status)->toBe($legalStatus)
+        ->and($updated->legal_verified_at)->toEqual($target->legal_verified_at)
+        ->and($updated->legal_profile_version)->toBe(2)
+        ->and($updated->email_verified_at)->toBeNull()
+        ->and($updated->phone)->toBe('+33612345678');
+    expect(Activity::forSubject($target)->where('event', 'central_profile_updated')->count())->toBe(1);
+    expect(Activity::forSubject($target)->whereIn('event', ['central_account_approved', 'central_account_rejected'])->exists())->toBeFalse();
+})->with([
+    \App\Enums\Central\Users\StatusEnum::ACTIVE,
+    \App\Enums\Central\Users\StatusEnum::INACTIVE,
+    \App\Enums\Central\Users\StatusEnum::SUSPENDED,
+    \App\Enums\Central\Users\StatusEnum::PENDING,
+    \App\Enums\Central\Users\StatusEnum::REJECTED,
+]);
+
+test('a profile audit failure rolls back all profile changes and preserves the decision', function (): void {
+    $target = User::factory()->create();
+    $before = $target->fresh()->getRawOriginal();
+    Activity::creating(function (Activity $activity): void {
+        if ($activity->event === 'central_profile_updated') {
+            throw new RuntimeException('Simulated audit failure');
+        }
+    });
+    expect(fn () => app(UserManagementService::class)->update($this->admin, $target,
+        new UserProfileData('Nom non enregistré', $target->first_name, $target->email,
+            $target->phone, $target->country->uuid)
+    ))->toThrow(RuntimeException::class);
+    expect($target->fresh()->getRawOriginal())->toBe($before);
 });

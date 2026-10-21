@@ -1,7 +1,7 @@
 <x-layouts::app :title="$role ? __('Modifier un rôle') : __('Créer un rôle')">
     <section class="mx-auto flex max-w-3xl flex-col gap-6">
         <flux:heading size="xl" level="1">{{ $role ? 'Modifier le rôle' : 'Créer un rôle SaaS' }}</flux:heading>
-        <flux:text>Chaque permission dure de 1 à 9 999 jours à compter de l’attribution du rôle. La valeur par défaut et le maximum sont 9 999 jours. Une modification s’applique à tous les comptes portant ce rôle.</flux:text>
+        <flux:text>Ce profil définit les droits attribués au départ, pour une durée de 1 à 9 999 jours. Modifier le profil ne change pas les droits des membres existants.</flux:text>
         @if ($errors->any())
             <flux:callout variant="danger" role="alert">
                 @foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach
@@ -10,13 +10,16 @@
         <form method="POST" action="{{ $role ? route('central.roles.update', $role) : route('central.roles.store') }}" class="flex flex-col gap-5">
             @csrf
             @if ($role) @method('PUT') @endif
+            @if ($role)
+                <input type="hidden" name="expected_version" value="{{ old('expected_version', $role->permission_version) }}">
+            @endif
             @if ($role === null || auth('central')->user()->can('update', $role))
                 <flux:input name="name" label="Nom unique du rôle" :value="old('name', $role?->name)" required />
                 <flux:input name="label" label="Nom affiché" :value="old('label', $role?->label)" required />
             @else
                 <flux:text>{{ $role->label }} ({{ $role->name }})</flux:text>
             @endif
-            <flux:text>Un droit de gestion donne aussi accès à la consultation nécessaire de son module pendant sa validité. Il ne donne aucun autre droit de modification ni de délégation.</flux:text>
+            <flux:text>Les consultations sont des permissions explicites. Sélectionnez les lectures nécessaires au parcours souhaité.</flux:text>
             @foreach ($permissionGroups as $groupLabel => $permissionNames)
             @if ($permissions->whereIn('name', $permissionNames)->isNotEmpty())
             <fieldset class="flex flex-col gap-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">

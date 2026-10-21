@@ -40,7 +40,7 @@ trait HasRoleMetadata
             }
             $role->setAttribute('permission_signature', hash('sha256', json_encode($parts, JSON_THROW_ON_ERROR)));
             $role->save();
-            $role->permissions()->attach($grants);
+            $role->permissionComposition()->attach($grants);
             $role->forgetCachedPermissions();
 
             return $role;
@@ -61,11 +61,25 @@ trait HasRoleMetadata
         return parent::permissions()->withPivot('duration_days');
     }
 
+    public function usesIndividualPermissions(): bool
+    {
+        return false;
+    }
+
+    public function permissionComposition(): BelongsToMany
+    {
+        return $this->permissions();
+    }
+
     /** @param string|int|Permission|\BackedEnum|array<array-key, mixed>|Collection<array-key, mixed> ...$permissions */
     public function givePermissionTo(mixed ...$permissions): static
     {
         return $this->getConnection()->transaction(function () use ($permissions): static {
-            $this->givePackagePermissionTo(...$permissions);
+            if ($this->usesIndividualPermissions()) {
+                $this->permissionComposition()->syncWithoutDetaching($this->collectPermissions($permissions));
+            } else {
+                $this->givePackagePermissionTo(...$permissions);
+            }
             $this->refreshPermissionSignature();
 
             return $this;
@@ -77,6 +91,12 @@ trait HasRoleMetadata
     {
         return $this->getConnection()->transaction(function () use ($permissions): static {
             $permissionIds = $this->collectPermissions($permissions);
+            if ($this->usesIndividualPermissions()) {
+                $this->permissionComposition()->sync($permissionIds);
+                $this->refreshPermissionSignature();
+
+                return $this;
+            }
             $removed = $this->permissions()->whereNotIn('permissions.id', $permissionIds)->get();
             if ($removed->isNotEmpty()) {
                 $this->revokePackagePermissionTo($removed);
@@ -92,7 +112,11 @@ trait HasRoleMetadata
     public function revokePermissionTo(mixed $permission): static
     {
         return $this->getConnection()->transaction(function () use ($permission): static {
-            $this->revokePackagePermissionTo($permission);
+            if ($this->usesIndividualPermissions()) {
+                $this->permissionComposition()->detach($this->collectPermissions([$permission]));
+            } else {
+                $this->revokePackagePermissionTo($permission);
+            }
             $this->refreshPermissionSignature();
 
             return $this;
@@ -105,21 +129,24 @@ trait HasRoleMetadata
             throw new \InvalidArgumentException('Permission duration must be between 1 and 9999 days.');
         }
         $this->getConnection()->transaction(function () use ($permissionName, $days): void {
-            $permission = $this->permissions()->where('name', $permissionName)->firstOrFail();
-            $this->permissions()->updateExistingPivot($permission->getKey(), ['duration_days' => $days]);
+            $permission = $this->permissionComposition()->where('name', $permissionName)->firstOrFail();
+            $this->permissionComposition()->updateExistingPivot($permission->getKey(), ['duration_days' => $days]);
             $this->refreshPermissionSignature();
         });
     }
 
     private function refreshPermissionSignature(): void
     {
-        $parts = $this->permissions()->orderBy('permissions.id')->get()
+        $parts = $this->permissionComposition()->orderBy('permissions.id')->get()
             ->map(fn (Model $permission): array => [(int) $permission->getKey(), (int) $permission->getRelation('pivot')->getAttribute('duration_days')])->all();
-        $this->assertNoAssignedPermissionOverlap(array_column($parts, 0));
+        if (! $this->usesIndividualPermissions()) {
+            $this->assertNoAssignedPermissionOverlap(array_column($parts, 0));
+        }
         $this->setAttribute('permission_signature', hash('sha256', json_encode($parts, JSON_THROW_ON_ERROR)));
         $this->setAttribute('permission_version', ((int) $this->getAttribute('permission_version')) + 1);
         $this->save();
         $this->unsetRelation('permissions');
+        $this->unsetRelation('permissionComposition');
         $this->forgetCachedPermissions();
     }
 

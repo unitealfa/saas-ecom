@@ -17,7 +17,7 @@
                                 @if ($role->is_super_admin)
                                     Super Admin protégé
                                 @elseif (auth('central')->user()->can('viewPermissions', $role))
-                                    @foreach ($role->permissions as $permission)
+                                    @foreach ($role->permissionComposition as $permission)
                                         <p>{{ $permission->label }} : {{ $permission->pivot->duration_days }} jours</p>
                                     @endforeach
                                 @else

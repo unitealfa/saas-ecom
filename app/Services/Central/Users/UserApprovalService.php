@@ -7,6 +7,7 @@ use App\Models\Central\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -29,19 +30,22 @@ class UserApprovalService
 
     public function decide(User $actor, User $target, bool $approved, ?string $reason, int $version, StatusEnum $expectedStatus): void
     {
-        $this->mutations->run(function () use ($actor, $target, $approved, $reason, $version, $expectedStatus): void {
-            $target = User::whereKey($target->id)->lockForUpdate()->firstOrFail();
-            Gate::forUser($actor)->authorize($approved ? 'approve' : 'reject', $target);
-            if ($target->status !== $expectedStatus) {
-                throw ValidationException::withMessages(['expected_status' => 'Une autre décision a déjà modifié ce compte. Rechargez sa fiche.']);
-            }
-            $this->recordDecision($actor, $target, $approved, $reason, $version);
-        });
+        $this->mutations->run(
+            actor: $actor,
+            ability: $approved ? 'approve' : 'reject',
+            loadTarget: fn () => User::whereKey($target->id)->lockForUpdate()->firstOrFail(),
+            mutation: function (User $target) use ($actor, $approved, $reason, $version, $expectedStatus): void {
+                if ($target->status !== $expectedStatus) {
+                    throw ValidationException::withMessages(['expected_status' => 'Une autre décision a déjà modifié ce compte. Rechargez sa fiche.']);
+                }
+                $this->recordDecision($actor, $target, $approved, $reason, $version);
+            },
+        );
     }
 
     public function approveCreatedMerchant(User $actor, User $target): void
     {
-        if (tenancy()->initialized || ! $target->wasRecentlyCreated || $target->getConnection()->transactionLevel() === 0) {
+        if (tenancy()->initialized || ! $target->wasRecentlyCreated || DB::transactionLevel() === 0) {
             throw new LogicException('Initial approval requires the merchant creation transaction.');
         }
         Gate::forUser($actor)->authorize('create', User::class);
@@ -73,11 +77,16 @@ class UserApprovalService
             'legal_profile_version' => $target->legal_profile_version, 'reason' => $reason,
             'source' => $creation ? 'admin_creation' : 'admin_decision',
         ];
-        activity()->causedBy($actor)->performedOn($target)
-            ->event($approved ? 'central_account_approved' : 'central_account_rejected')
-            ->withProperties($properties)->log($approved ? 'Compte et dossier professionnel approuvés.' : 'Compte et dossier professionnel refusés.');
-        activity()->causedBy($actor)->performedOn($target)
-            ->event($approved ? 'central_legal_validated' : 'central_legal_rejected')
-            ->withProperties($properties)->log($approved ? 'Dossier validé avec l’approbation du compte.' : 'Dossier rejeté avec le refus du compte.');
+        $events = $approved ? [
+            'central_account_approved' => 'Compte et dossier professionnel approuvés.',
+            'central_legal_validated' => 'Dossier validé avec l’approbation du compte.',
+        ] : [
+            'central_account_rejected' => 'Compte et dossier professionnel refusés.',
+            'central_legal_rejected' => 'Dossier rejeté avec le refus du compte.',
+        ];
+        foreach ($events as $event => $message) {
+            activity()->causedBy($actor)->performedOn($target)
+                ->event($event)->withProperties($properties)->log($message);
+        }
     }
 }
