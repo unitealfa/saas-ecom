@@ -5,7 +5,7 @@ use App\Http\Controllers\Central\Admin\Users\UserApprovalController;
 use App\Http\Controllers\Central\Admin\Users\UserController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('auth', 'verified')->prefix('users')->name('users.')->group(function (): void {
+Route::prefix('users')->name('users.')->group(function (): void {
     Route::livewire('/', 'central::pages.admin.users.index')
         ->middleware('can:viewAny,App\\Models\\User')->name('index');
 

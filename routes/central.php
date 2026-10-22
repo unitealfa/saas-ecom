@@ -29,8 +29,7 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
             Route::post('{tenant}/reessayer', 'retry')->middleware('throttle:3,1')->name('retry');
         });
     });
-
-    require __DIR__.'/central/admin.php';
 });
 
+require __DIR__.'/central/admin.php';
 require __DIR__.'/central/settings.php';
