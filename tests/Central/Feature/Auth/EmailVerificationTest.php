@@ -18,6 +18,22 @@ test('email verification screen can be rendered', function () {
     $response->assertOk();
 });
 
+test('verification resend reports SMTP failure without verifying or disconnecting the account', function (): void {
+    $user = User::factory()->unverified()->create(['status' => \App\Enums\Central\Users\StatusEnum::PENDING]);
+    $transport = Mockery::mock(\Symfony\Component\Mailer\Transport\TransportInterface::class);
+    $transport->shouldReceive('send')->once()
+        ->andThrow(new \Symfony\Component\Mailer\Exception\TransportException('private-smtp-secret'));
+    \Illuminate\Support\Facades\Mail::mailer()->setSymfonyTransport($transport);
+    \Illuminate\Support\Facades\Log::spy();
+
+    $this->actingAs($user, 'central')->postJson(route('verification.send'))
+        ->assertStatus(503)->assertJsonPath('message', 'L’e-mail n’a pas pu être envoyé. Réessayez dans quelques instants.')
+        ->assertDontSee('private-smtp-secret');
+
+    expect($user->fresh()->hasVerifiedEmail())->toBeFalse();
+    $this->assertAuthenticatedAs($user, 'central');
+});
+
 test('unverified users are redirected to the email verification prompt', function () {
     $user = User::factory()->unverified()->create();
 
@@ -43,6 +59,36 @@ test('email can be verified', function () {
 
     expect($user->fresh()->hasVerifiedEmail())->toBeTrue();
     $response->assertRedirect(route('login'));
+    $this->assertGuest('central');
+});
+
+test('verified email responses preserve the native staff session', function (bool $json): void {
+    $user = User::factory()->unverified()->create();
+    $role = new \App\Models\Central\Role(['name' => 'root']);
+    $role->forceFill(['is_system' => true, 'is_protected' => true, 'is_super_admin' => true])->save();
+    $user->assignRole($role);
+    $url = URL::temporarySignedRoute('verification.verify', now()->addMinutes(30),
+        ['id' => $user->id, 'hash' => sha1($user->email)]);
+
+    $this->actingAs($user, 'central');
+    $response = $json ? $this->getJson($url) : $this->get($url);
+    if ($json) {
+        $response->assertNoContent();
+    } else {
+        $response->assertRedirect(route('dashboard').'?verified=1');
+    }
+    expect($user->fresh()->hasVerifiedEmail())->toBeTrue();
+    $this->assertAuthenticatedAs($user, 'central');
+})->with(['web staff response' => [false], 'JSON staff response' => [true]]);
+
+test('verified email JSON responses disconnect merchants after proving email ownership', function (): void {
+    $user = User::factory()->unverified()->create(['status' => \App\Enums\Central\Users\StatusEnum::PENDING]);
+    $url = URL::temporarySignedRoute('verification.verify', now()->addMinutes(30),
+        ['id' => $user->id, 'hash' => sha1($user->email)]);
+
+    $this->actingAs($user, 'central')->getJson($url)->assertNoContent();
+    expect($user->fresh()->hasVerifiedEmail())->toBeTrue();
+    $this->assertGuest('central');
 });
 
 test('email is not verified with invalid hash', function () {

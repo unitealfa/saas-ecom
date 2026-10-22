@@ -3,11 +3,13 @@
 use App\Enums\Central\Users\StatusEnum;
 use App\Models\Central\Role;
 use App\Models\User;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Fortify\Features;
 use Laravel\Passkeys\Passkey;
 use Laravel\Passkeys\Passkeys;
+use Stancl\Tenancy\Events\TenantCreated;
 
 function approvedAuthenticationMerchant(array $attributes = []): User
 {
@@ -39,6 +41,58 @@ test('users can authenticate using the login screen', function () {
 
     $this->assertAuthenticatedAs($user, 'central');
     $this->assertGuest('tenant');
+});
+
+test('login responses only resume intended URLs allowed by the account journey', function (string $state, string $target, string $expected): void {
+    $user = in_array($state, ['pending', 'rejected'], true)
+        ? User::factory()->create(['status' => $state === 'pending' ? StatusEnum::PENDING : StatusEnum::REJECTED])
+        : approvedAuthenticationMerchant();
+    if ($state === 'ready') {
+        Event::fake([TenantCreated::class]);
+        \App\Models\Central\Tenant::factory()->create(['user_id' => $user->id,
+            'status' => \App\Enums\Central\Tenants\StatusEnum::ACTIVE,
+            'schema_version' => 'completed-schema', 'provisioned_at' => now()]);
+        Event::assertDispatched(TenantCreated::class);
+    }
+    $intended = match ($target) {
+        'internal' => route('appearance.edit'),
+        'external' => 'https://outside.example/path',
+        'lookalike' => 'http://aydra.localhost.outside.example/path',
+        'tenant' => 'http://boutique.aydra.localhost/',
+        'verification' => \Illuminate\Support\Facades\URL::temporarySignedRoute('verification.verify', now()->addMinutes(30),
+            ['id' => $user->id, 'hash' => sha1($user->email)]),
+    };
+
+    $this->withSession(['url.intended' => $intended])->postJson(route('login.store'), [
+        'email' => $user->email, 'password' => 'password',
+    ])->assertOk()->assertJsonPath('two_factor', false)
+        ->assertJsonPath('redirect', $expected === 'intended' ? $intended : route($expected));
+    $this->assertAuthenticatedAs($user, 'central');
+})->with([
+    'ready account resumes an internal URL' => ['ready', 'internal', 'intended'],
+    'first shop cannot be skipped' => ['setup', 'internal', 'owner.first-shop'],
+    'pending account stays limited' => ['pending', 'internal', 'registration.status'],
+    'rejected account stays limited' => ['rejected', 'internal', 'registration.status'],
+    'external URL is ignored' => ['ready', 'external', 'dashboard'],
+    'lookalike central host is ignored' => ['ready', 'lookalike', 'dashboard'],
+    'tenant URL is ignored' => ['ready', 'tenant', 'dashboard'],
+    'limited account resumes verification' => ['pending', 'verification', 'intended'],
+]);
+
+test('login computes the merchant journey once when an internal URL was remembered', function (): void {
+    $user = approvedAuthenticationMerchant();
+    $connection = $user->getConnection();
+    $connection->enableQueryLog();
+    try {
+        $this->withSession(['url.intended' => route('appearance.edit')])->postJson(route('login.store'), [
+            'email' => $user->email, 'password' => 'password',
+        ])->assertOk()->assertJsonPath('redirect', route('owner.first-shop'));
+        $queries = $connection->getQueryLog();
+    } finally {
+        $connection->disableQueryLog();
+        $connection->flushQueryLog();
+    }
+    expect(collect($queries)->filter(fn (array $query): bool => str_contains($query['query'], 'from `tenants`')))->toHaveCount(1);
 });
 
 test('the central super admin can log in and open the dashboard', function (): void {

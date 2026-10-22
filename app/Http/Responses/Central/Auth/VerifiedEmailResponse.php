@@ -2,6 +2,7 @@
 
 namespace App\Http\Responses\Central\Auth;
 
+use App\Models\Central\User;
 use App\Services\Central\Authorization\CentralUserAccess;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Fortify\Http\Responses\VerifyEmailResponse;
@@ -13,7 +14,9 @@ class VerifiedEmailResponse extends VerifyEmailResponse
 
     public function toResponse($request): Response
     {
-        if ($this->access->isStaff($request->user('central'))) {
+        $user = $request->user('central');
+        abort_unless($user instanceof User, 401);
+        if ($this->access->isStaff($user)) {
             return parent::toResponse($request);
         }
 

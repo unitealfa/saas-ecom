@@ -5,8 +5,12 @@ use App\Models\Central\Country;
 use App\Models\User;
 use Database\Seeders\Central\CountrySeeder;
 use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Fortify\Features;
+use Symfony\Component\Mailer\Exception\TransportException;
+use Symfony\Component\Mailer\Transport\TransportInterface;
 
 beforeEach(function () {
     $this->skipUnlessFortifyHas(Features::registration());
@@ -61,4 +65,43 @@ test('public registration cannot inject an approved status or privileged fields'
     expect($target->roles()->exists())->toBeFalse();
     expect($target->phone)->toBe('+213779107446');
     Notification::assertSentTo($target, VerifyEmail::class);
+});
+
+test('registration survives SMTP failure without claiming that verification mail was sent', function (bool $json): void {
+    $this->seed(CountrySeeder::class);
+    $transport = Mockery::mock(TransportInterface::class);
+    $transport->shouldReceive('send')->once()->andThrow(new TransportException('private-smtp-secret'));
+    Mail::mailer()->setSymfonyTransport($transport);
+    Log::spy();
+    $payload = [
+        'last_name' => 'Pending', 'email' => 'mail-failure@example.test', 'phone' => '0779107446',
+        'password' => 'password', 'password_confirmation' => 'password',
+        'country_uuid' => Country::where('code', 'DZ')->firstOrFail()->uuid,
+    ];
+
+    $response = $json ? $this->postJson(route('register.store'), $payload) : $this->post(route('register.store'), $payload);
+    if ($json) {
+        $response->assertCreated()->assertJsonPath('status', StatusEnum::PENDING->value)
+            ->assertJsonPath('email_sent', false)->assertJsonPath('redirect', route('verification.notice'));
+    } else {
+        $response->assertRedirect(route('verification.notice'))->assertSessionHasNoErrors()
+            ->assertSessionHas('registration_created', true)->assertSessionHas('registration_email_sent', false);
+    }
+    $response->assertDontSee('private-smtp-secret');
+    $user = User::where('email', $payload['email'])->firstOrFail();
+    expect($user->status)->toBe(StatusEnum::PENDING)->and($user->hasVerifiedEmail())->toBeFalse();
+    $this->assertAuthenticatedAs($user, 'central');
+    Log::shouldHaveReceived('warning')->once()->with('Central account email delivery failed.', [
+        'user_uuid' => $user->uuid, 'exception_class' => TransportException::class,
+    ]);
+})->with(['web form' => [false], 'JSON registration' => [true]]);
+
+test('registered notifications skip verified central accounts', function (): void {
+    $user = User::factory()->create();
+    Notification::fake();
+
+    app(\App\Services\Central\Auth\RegistrationVerificationNotification::class)
+        ->handle(new \Illuminate\Auth\Events\Registered($user));
+
+    Notification::assertNothingSent();
 });

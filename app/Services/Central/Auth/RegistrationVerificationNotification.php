@@ -12,16 +12,23 @@ class RegistrationVerificationNotification extends SendEmailVerificationNotifica
 
     public function handle(Registered $event): void
     {
-        if (! $event->user instanceof User) {
+        $user = $event->user;
+
+        if (! $user instanceof User) {
             parent::handle($event);
 
             return;
         }
-        if (! $event->user->hasVerifiedEmail()) {
-            $sent = $this->mail->verification($event->user);
-            if (request()->hasSession()) {
-                request()->session()->flash('registration_email_sent', $sent);
-            }
+
+        if ($user->hasVerifiedEmail()) {
+            return;
+        }
+
+        $sent = $this->mail->verification($user);
+
+        $request = request();
+        if ($request->hasSession()) {
+            $request->session()->flash('registration_email_sent', $sent);
         }
     }
 }
