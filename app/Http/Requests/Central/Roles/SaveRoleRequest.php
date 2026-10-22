@@ -20,32 +20,54 @@ class SaveRoleRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $name = $this->input('name');
-        $label = $this->input('label');
-
-        if ($this->has('name')) {
-            $this->merge(['name' => is_string($name) ? trim($name) : $name]);
+        foreach (['name', 'label'] as $field) {
+            $value = $this->input($field);
+            if (is_string($value)) {
+                $this->merge([$field => trim($value)]);
+            }
         }
-        if ($this->has('label')) {
-            $this->merge(['label' => is_string($label) ? trim($label) : $label]);
+
+        $permissions = $this->input('permissions');
+        if (is_array($permissions)) {
+            $this->merge(['permissions' => array_map(
+                fn (mixed $uuid): mixed => is_string($uuid) ? strtolower($uuid) : $uuid,
+                $permissions,
+            )]);
+        }
+
+        $durations = $this->input('durations');
+        if (is_array($durations)) {
+            $this->merge(['durations' => array_change_key_case($durations)]);
         }
     }
 
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        $presence = $this->route('role') === null ? 'required' : 'sometimes';
+        $creating = $this->route('role') === null;
+        $presence = $creating ? 'required' : 'sometimes';
 
         return [
-            'expected_version' => [$this->route('role') === null ? 'prohibited' : 'required', 'integer', 'min:1'],
-            'name' => [$presence, 'required', 'string', 'max:255'], 'label' => [$presence, 'required', 'string', 'max:255'],
+            'expected_version' => [$creating ? 'prohibited' : 'required', 'integer', 'min:1'],
+            'name' => [$presence, 'required', 'string', 'max:255'],
+            'label' => [$presence, 'required', 'string', 'max:255'],
             'permissions' => [$presence, 'required', 'array', 'min:1'],
-            'permissions.*' => ['uuid', 'distinct', Rule::exists('permissions', 'uuid')->where('guard_name', 'central')
-                ->whereIn('name', array_keys(CentralRoleCatalog::PERMISSIONS))],
-            'durations' => ['sometimes', 'array'], 'durations.*' => ['required', 'integer', 'between:1,9999'],
-            'is_super_admin' => ['prohibited'], 'is_protected' => ['prohibited'], 'is_system' => ['prohibited'],
-            'guard_name' => ['prohibited'], 'uuid' => ['prohibited'], 'id' => ['prohibited'],
-            'permission_signature' => ['prohibited'], 'permission_version' => ['prohibited'], 'assigned_at' => ['prohibited'],
+            'permissions.*' => [
+                'uuid', 'distinct',
+                Rule::exists('permissions', 'uuid')->where('guard_name', 'central')
+                    ->whereIn('name', array_keys(CentralRoleCatalog::PERMISSIONS)),
+            ],
+            'durations' => ['sometimes', 'array'],
+            'durations.*' => ['required', 'integer', 'between:1,9999'],
+            'is_super_admin' => ['prohibited'],
+            'is_protected' => ['prohibited'],
+            'is_system' => ['prohibited'],
+            'guard_name' => ['prohibited'],
+            'uuid' => ['prohibited'],
+            'id' => ['prohibited'],
+            'permission_signature' => ['prohibited'],
+            'permission_version' => ['prohibited'],
+            'assigned_at' => ['prohibited'],
         ];
     }
 
@@ -53,6 +75,7 @@ class SaveRoleRequest extends FormRequest
     {
         $data = $this->validated();
         $grants = null;
+
         if (isset($data['permissions'])) {
             $grants = [];
             foreach ($data['permissions'] as $uuid) {
@@ -60,8 +83,12 @@ class SaveRoleRequest extends FormRequest
             }
         }
 
-        return new RoleData($data['name'] ?? null, $data['label'] ?? null, $grants,
-            $grants === null ? array_map(intval(...), $data['durations'] ?? []) : [],
-            isset($data['expected_version']) ? (int) $data['expected_version'] : null);
+        return new RoleData(
+            name: $data['name'] ?? null,
+            label: $data['label'] ?? null,
+            permissionDurations: $grants,
+            durations: $grants === null ? array_map(intval(...), $data['durations'] ?? []) : [],
+            expectedVersion: isset($data['expected_version']) ? (int) $data['expected_version'] : null,
+        );
     }
 }

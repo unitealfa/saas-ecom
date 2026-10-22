@@ -401,6 +401,14 @@ Le Request sert uniquement à vérifier les données reçues.
 
 Il ne doit pas contenir la logique métier principale.
 
+Conventions de maintenance des Form Requests, audit du 22 octobre 2026 :
+
+- Garder `authorize()` relié à la Policy de l'action réelle ; les services conservent leurs contrôles métier sous transaction et verrou. Les classes Staff et propriétaire peuvent réutiliser les règles d'une Request existante en adaptant uniquement leur autorisation.
+- Présenter les tableaux de validation avec un champ par ligne. Pour un DTO contenant plusieurs champs, les arguments nommés rendent explicite la correspondance avec les données validées ; ne pas ajouter de DTO ou de classe de base sans besoin réel.
+- Dans `prepareForValidation()`, normaliser seulement les types attendus et laisser les autres valeurs échouer à la validation. Tester explicitement `=== ''` pour convertir une chaîne vide en `null` : `?: null` supprimerait aussi la chaîne non vide `"0"`.
+- Dans `SaveRoleRequest`, normaliser en minuscules les UUID de permissions et les clés UUID des durées avant validation et construction du DTO. Cela garde la même référence lors d'une recherche SQL, d'un contrôle de doublon et d'une lecture de durée par clé ; les règles de délégation, les dates et les versions restent inchangées. Cette normalisation locale ne modifie ni les UUID stockés ni les conventions propres aux packages.
+- Vérifier chaque Request et ses appelants avant de la modifier ; conserver telle quelle une classe déjà correcte. Les changements de présentation ne constituent pas un gain de performance mesuré.
+
 ---
 
 # 10. Utiliser des Services

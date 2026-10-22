@@ -22,6 +22,9 @@ class ChangeTenantStatusRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return ['expected_status' => ['required', Rule::enum(StatusEnum::class)], 'reason' => ['nullable', 'string', 'max:1000']];
+        return [
+            'expected_status' => ['required', Rule::enum(StatusEnum::class)],
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ];
     }
 }

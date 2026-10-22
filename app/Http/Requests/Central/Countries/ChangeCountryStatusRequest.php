@@ -7,15 +7,12 @@ use Illuminate\Support\Facades\Gate;
 
 class ChangeCountryStatusRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return Gate::forUser($this->user('central'))->allows('activate', $this->route('country'));
     }
 
-
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [

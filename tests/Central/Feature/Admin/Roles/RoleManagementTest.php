@@ -354,3 +354,40 @@ test('an obsolete role form cannot overwrite identity composition or durations',
         ->and($member->roles()->first()->pivot->assigned_at)->toEqual($assignedAt)
         ->and(Activity::forSubject($role)->where('event', 'role_updated')->count())->toBe(1);
 });
+
+test('role forms accept uppercase permission uuids without losing their durations', function (): void {
+    $admin = module03Admin();
+    $permission = Permission::findByName('saas.users.view', 'central');
+    $uuid = strtoupper($permission->uuid);
+
+    $this->actingAs($admin, 'central')->post(route('central.roles.store'), [
+        'name' => 'uppercase-permissions', 'label' => 'Uppercase permissions',
+        'permissions' => [$uuid], 'durations' => [$uuid => 23],
+    ])->assertSessionHasNoErrors()->assertRedirect();
+
+    $role = Role::findByName('uppercase-permissions', 'central');
+    expect($role->permissionComposition()->first()->pivot->duration_days)->toBe(23);
+
+    $this->put(route('central.roles.update', $role), [
+        'expected_version' => 1, 'durations' => [$uuid => 31],
+    ])->assertSessionHasNoErrors();
+    expect($role->permissionComposition()->first()->pivot->duration_days)->toBe(31);
+
+    $this->put(route('central.roles.update', $role), [
+        'expected_version' => 2, 'permissions' => [$uuid],
+    ])->assertSessionHasNoErrors();
+    expect($role->permissionComposition()->first()->pivot->duration_days)->toBe(31)
+        ->and($role->fresh()->permission_version)->toBe(2);
+});
+
+test('role forms reject a permission repeated with different uuid casing', function (): void {
+    $admin = module03Admin();
+    $permission = Permission::findByName('saas.users.view', 'central');
+
+    $this->actingAs($admin, 'central')->post(route('central.roles.store'), [
+        'name' => 'duplicate-casing', 'label' => 'Duplicate casing',
+        'permissions' => [$permission->uuid, strtoupper($permission->uuid)],
+    ])->assertSessionHasErrors('permissions.0');
+
+    expect(Role::where('name', 'duplicate-casing')->exists())->toBeFalse();
+});

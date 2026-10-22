@@ -1818,3 +1818,45 @@ La nouvelle structure shouldFollowIntended de LoginResponse est conservée, mais
 Tests MySQL temporaires explicitement autorisés et e-mails simulés : 35 scénarios réussis, 206 assertions, dans les tests ciblés AuthenticationTest, EmailVerificationTest et RegistrationTest. Ajouts : reprise d'URL interne pour compte prêt ; absence de contournement pour première boutique/attente/refus ; rejet des URL externes, hôtes ressemblants et domaines tenant ; reprise du lien de vérification ; un seul chargement des boutiques dans une réponse de connexion concernée ; vérification web/JSON du personnel sans déconnexion et vérification JSON du commerçant avec déconnexion. Les tests existants couvrent aussi inscription, vérification et échec SMTP. Le parcours complet 2FA n'a pas été rejoué ; son binding partagé est préservé.
 
 Syntaxe des trois réponses et deux fichiers de tests valide ; déclarations uniques et références de cases enum contrôlées ; diff sans erreur. Documentation d'architecture complétée. Aucune migration, donnée existante, configuration, route ou vrai e-mail modifié/envoyé. Modifications utilisateur des middlewares conservées. Pas de suite complète, Pint, PHPStan ou compilation.
+
+## 22 octobre 2026 — Audit individuel des 25 Form Requests centrales
+
+Demande : appliquer la même revue et les corrections utiles à tous les fichiers de `app/Http/Requests/Central`, un par un. État Git initial propre. Lecture des 25 classes, de leurs héritages et des appelants concernés : contrôleurs, DTO, Policies, services et routes. Les contrôles métier restent dans les services existants ; aucune nouvelle couche, règle de permission ou migration.
+
+Deux cas limites reproduits avant correction : `StoreUserRequest` convertissait le prénom non vide `"0"` en `null` avec `?: null` ; `SaveRoleRequest` refusait un UUID de permission valide en majuscules lors de la recherche SQL. La normalisation des UUID et des clés de durées est désormais cohérente avant validation. Deux écritures différentes du même UUID sont reconnues comme un doublon. Les durées omises, versions, contrôles de délégation et protections système sont conservés. Les autres changements améliorent uniquement la présentation des règles et la lecture des arguments de DTO.
+
+Chemins ci-dessous relatifs à `app/Http/Requests/Central/` :
+
+| Fichier examiné | Résultat de la revue |
+|---|---|
+| `Countries/ChangeCountryStatusRequest.php` | Autorisation d'activation et booléen conservés ; présentation nettoyée. |
+| `Countries/StoreCountryRequest.php` | Code ISO normalisé, pays supportés, unicité et noms vérifiés ; règle du code présentée sur plusieurs lignes et import explicite. |
+| `Permissions/SearchPermissionsRequest.php` | Consultation seule, recherche et pagination conservées ; un champ par ligne. |
+| `Roles/DeleteRoleRequest.php` | Conservé : Policy sur la cible réelle ; contrôles de suppression dans RoleManager. |
+| `Roles/SaveRoleRequest.php` | UUID et clés de durées normalisés ; doublons reconnus avant le DTO ; règles et arguments nommés plus lisibles. |
+| `Tenants/ChangeTenantStatusRequest.php` | Actions autorisées, état attendu et motif conservés ; règles plus lisibles. |
+| `Tenants/SearchTenantsRequest.php` | Distinction choix du propriétaire/création et consultation conservée ; règles plus lisibles. |
+| `Tenants/StoreFirstTenantRequest.php` | Conservé : héritage de validation et Policy createFirst du propriétaire. |
+| `Tenants/StoreOwnedTenantRequest.php` | Conservé : mêmes règles de données avec Policy createOwned distincte. |
+| `Tenants/StoreTenantRequest.php` | Conservé : nom, slug technique, clé d'idempotence, clés autorisées des réglages et DTO ; quota/unicité vérifiés dans TenantCreator. |
+| `Tenants/UpdateTenantPrioritiesRequest.php` | Entiers distincts et motif conservés ; contrôle de l'ensemble exact des boutiques sous verrou dans le service. Présentation clarifiée. |
+| `Tenants/UpdateTenantRequest.php` | Identité, statut, propriétaire et champs techniques restent interdits ; version attendue conservée. Présentation clarifiée. |
+| `Users/AssignRolesRequest.php` | Base de validation réutilisée par Staff ; guard, doublons et exclusion root conservés. Présentation clarifiée. |
+| `Users/AssignStaffRolesRequest.php` | Conservé : autorisation spécifique assignStaffRoles, sans conversion d'un commerçant. |
+| `Users/ChangeStaffStatusRequest.php` | Conservé : autorisations activateStaff/suspendStaff et règles de statuts héritées. |
+| `Users/ChangeUserStatusRequest.php` | Conservé : seules activation et suspension sont saisissables ; transitions revérifiées dans le service. |
+| `Users/LegalVerificationRequest.php` | Conservé : adaptateur des anciennes routes vers les mêmes règles d'approbation/refus. |
+| `Users/RenewStaffAssignmentRequest.php` | Motif obligatoire et date attendue conservés ; comparaison effective sous verrou dans le service. Présentation clarifiée. |
+| `Users/StoreStaffRequest.php` | Conservé : spécialisation de StoreUserRequest, création explicitement personnel et mêmes normalisations. |
+| `Users/StoreUserRequest.php` | Prénom `"0"` conservé ; distinction commerçant/personnel et champs administratifs interdits maintenus ; DTO à arguments nommés. |
+| `Users/UpdateProfilePhotoRequest.php` | Conservé : Policy personnelle, image, MIME, taille et dimensions conformes au service photo. |
+| `Users/UpdateStaffPermissionsRequest.php` | Conservé : état attendu, clés autorisées, permissions centrales, booléens et durées ; délégation/renouvellement vérifiés dans le service. |
+| `Users/UpdateStaffRequest.php` | Conservé : Policy spécifique et interdiction des champs professionnels du personnel. |
+| `Users/UpdateUserRequest.php` | Unicité excluant le compte modifié, pays historiques, champs professionnels facultatifs et attributs sensibles vérifiés ; présentation et DTO clarifiés. Aucune décision administrative changée. |
+| `Users/UserApprovalRequest.php` | Conservé : Policy approve/reject, état/version attendus, motif obligatoire au refus et interdit à l'approbation. |
+
+Bilan des fichiers applicatifs : 25 examinés, 12 ajustés dont 2 avec correction de normalisation, 13 conservés sans modification. Conventions réutilisables consignées au §9 de l'architecture. Contrôles PHP 8.5 : syntaxe et chargement PSR-4/héritage valides pour les 25 classes ; syntaxe valide pour les deux fichiers de tests modifiés ; diff sans erreur.
+
+Tests MySQL temporaires explicitement autorisés pour cette tâche : **168 scénarios réussis, 1 390 assertions**, en 323 secondes. Exécution des neuf fichiers CountryManagementTest, PermissionCatalogTest, RoleManagementTest, StaffManagementTest, DirectPermissionManagementTest, TenantManagementTest, UserAccountManagementTest, MerchantApprovalWorkflowTest et ProfilePhotoTest. Les trois nouveaux scénarios HTTP ont d'abord échoué avant correction, puis réussi dans cette sélection : conservation du prénom `"0"`, UUID de permissions en majuscules avec durées conservées à la création et à la modification, refus du même UUID répété avec une casse différente. Les scénarios existants vérifient notamment les autorisations, les comptes protégés, les champs interdits, les versions obsolètes, les décisions d'approbation/refus, l'absence de nouvelle approbation après édition, les attributions et leurs dates, les quotas et les photos privées.
+
+Configuration et routes de test isolées par APP_CONFIG_CACHE/APP_ROUTES_CACHE temporaires ; cache du site préservé. Aucune écriture dans les bases existantes, aucun véritable e-mail envoyé, aucune modification de migration, de route, de service ou de Policy. Les Requests propriétaires de création de boutiques ont été relues avec leurs contrôleurs et TenantCreator ; aucun nouveau provisionnement réel ni test de concurrence parallèle n'a été exécuté pour cet audit. Pas de suite complète, Pint, PHPStan ou compilation.

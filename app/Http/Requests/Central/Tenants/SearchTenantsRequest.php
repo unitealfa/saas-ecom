@@ -27,7 +27,10 @@ class SearchTenantsRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return ['search' => ['nullable', 'string', 'max:255'], 'status' => ['nullable', Rule::enum(StatusEnum::class)],
-            'page' => ['sometimes', 'integer', 'min:1']];
+        return [
+            'search' => ['nullable', 'string', 'max:255'],
+            'status' => ['nullable', Rule::enum(StatusEnum::class)],
+            'page' => ['sometimes', 'integer', 'min:1'],
+        ];
     }
 }

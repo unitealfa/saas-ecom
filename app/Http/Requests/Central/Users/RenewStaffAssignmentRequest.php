@@ -14,6 +14,9 @@ class RenewStaffAssignmentRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['reason' => ['required', 'string', 'max:1000'], 'expected_assigned_at' => ['required', 'date']];
+        return [
+            'reason' => ['required', 'string', 'max:1000'],
+            'expected_assigned_at' => ['required', 'date'],
+        ];
     }
 }

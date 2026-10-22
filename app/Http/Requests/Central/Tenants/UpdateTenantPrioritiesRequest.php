@@ -18,8 +18,10 @@ class UpdateTenantPrioritiesRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return ['priorities' => ['required', 'array', 'min:1'],
+        return [
+            'priorities' => ['required', 'array', 'min:1'],
             'priorities.*' => ['required', 'integer', 'min:1', 'max:2147483647', 'distinct'],
-            'reason' => ['nullable', 'string', 'max:1000']];
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ];
     }
 }

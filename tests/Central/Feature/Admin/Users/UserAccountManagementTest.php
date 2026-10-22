@@ -43,6 +43,16 @@ function editableCentralProfile(User $user): array
     ];
 }
 
+test('administrative account creation preserves a nonempty first name equal to zero', function (): void {
+    $this->actingAs($this->admin, 'central')->post(route('central.users.store'), [
+        'last_name' => 'Zero', 'first_name' => '0', 'email' => 'zero-name@example.test',
+        'account_kind' => 'merchant',
+        'country_uuid' => Country::where('code', 'DZ')->firstOrFail()->uuid,
+    ])->assertSessionHasNoErrors();
+
+    expect(User::where('email', 'zero-name@example.test')->firstOrFail()->first_name)->toBe('0');
+});
+
 test('merchants cannot receive SaaS roles or direct permissions through either administration module', function (): void {
     $merchant = User::factory()->create();
     $role = Role::findByName('user-reader', 'central');

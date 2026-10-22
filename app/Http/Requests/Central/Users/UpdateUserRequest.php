@@ -55,13 +55,22 @@ class UpdateUserRequest extends FormRequest
             ...LegalVerificationService::profileRules(),
             'country_uuid' => ['required', 'uuid', Rule::exists('countries', 'uuid')->whereNull('deleted_at')
                 ->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $user->country_id))],
-            'password' => ['prohibited'], 'roles' => ['prohibited'], 'status' => ['prohibited'],
-            'permissions' => ['prohibited'], 'account_kind' => ['prohibited'], 'guard_name' => ['prohibited'],
-            'email_verified_at' => ['prohibited'], 'is_super_admin' => ['prohibited'],
-            'phone_verified_at' => ['prohibited'], 'whatsapp_verified_at' => ['prohibited'],
-            'legal_profile_version' => ['prohibited'], 'legal_verification_status' => ['prohibited'],
-            'legal_verified_at' => ['prohibited'], 'legal_verified_by_id' => ['prohibited'],
-            'last_login_at' => ['prohibited'], 'two_factor_secret' => ['prohibited'],
+            'password' => ['prohibited'],
+            'roles' => ['prohibited'],
+            'status' => ['prohibited'],
+            'permissions' => ['prohibited'],
+            'account_kind' => ['prohibited'],
+            'guard_name' => ['prohibited'],
+            'email_verified_at' => ['prohibited'],
+            'is_super_admin' => ['prohibited'],
+            'phone_verified_at' => ['prohibited'],
+            'whatsapp_verified_at' => ['prohibited'],
+            'legal_profile_version' => ['prohibited'],
+            'legal_verification_status' => ['prohibited'],
+            'legal_verified_at' => ['prohibited'],
+            'legal_verified_by_id' => ['prohibited'],
+            'last_login_at' => ['prohibited'],
+            'two_factor_secret' => ['prohibited'],
         ];
     }
 
@@ -69,9 +78,15 @@ class UpdateUserRequest extends FormRequest
     {
         $data = $this->validated();
 
-        return new UserProfileData($data['last_name'], $data['first_name'] ?? null, $data['email'],
-            $data['phone'] ?? null, $data['country_uuid'],
-            array_intersect_key($data, array_flip(['locale', ...UserProfileData::PROFESSIONAL_FIELDS])), $data['phone_country_uuid'] ?? null);
+        return new UserProfileData(
+            lastName: $data['last_name'],
+            firstName: $data['first_name'] ?? null,
+            email: $data['email'],
+            phone: $data['phone'] ?? null,
+            countryUuid: $data['country_uuid'],
+            attributes: array_intersect_key($data, array_flip(['locale', ...UserProfileData::PROFESSIONAL_FIELDS])),
+            phoneCountryUuid: $data['phone_country_uuid'] ?? null,
+        );
     }
 
     public function messages(): array

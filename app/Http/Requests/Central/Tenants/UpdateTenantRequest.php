@@ -27,12 +27,25 @@ class UpdateTenantRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return ['shop_name' => ['required', 'string', 'max:255'], 'internal_label' => ['required', 'string', 'max:255'],
+        return [
+            'shop_name' => ['required', 'string', 'max:255'],
+            'internal_label' => ['required', 'string', 'max:255'],
             'expected_profile_version' => ['required', 'integer', 'min:1'],
-            'slug' => ['prohibited'], 'user_id' => ['prohibited'], 'uuid' => ['prohibited'], 'id' => ['prohibited'],
-            'status' => ['prohibited'], 'data' => ['prohibited'], 'document_prefix' => ['prohibited'],
-            'creation_key' => ['prohibited'], 'creation_hash' => ['prohibited'], 'profile_version' => ['prohibited'],
-            'is_primary' => ['prohibited'], 'activation_priority' => ['prohibited'], 'schema_version' => ['prohibited'],
-            'provisioned_at' => ['prohibited'], 'deleted_at' => ['prohibited']];
+            'slug' => ['prohibited'],
+            'user_id' => ['prohibited'],
+            'uuid' => ['prohibited'],
+            'id' => ['prohibited'],
+            'status' => ['prohibited'],
+            'data' => ['prohibited'],
+            'document_prefix' => ['prohibited'],
+            'creation_key' => ['prohibited'],
+            'creation_hash' => ['prohibited'],
+            'profile_version' => ['prohibited'],
+            'is_primary' => ['prohibited'],
+            'activation_priority' => ['prohibited'],
+            'schema_version' => ['prohibited'],
+            'provisioned_at' => ['prohibited'],
+            'deleted_at' => ['prohibited'],
+        ];
     }
 }
