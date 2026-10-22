@@ -15,11 +15,7 @@ class ChangeCountryStatusRequest extends FormRequest
         return Gate::forUser($this->user('central'))->allows('activate', $this->route('country'));
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, mixed>
-     */
+
     public function rules(): array
     {
         return [

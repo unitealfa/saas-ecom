@@ -21,11 +21,6 @@ class PermissionPolicy
         return $permission->guard_name === 'central' && $this->viewAny($actor);
     }
 
-    public function update(User $actor, Permission $permission): bool
-    {
-        return false;
-    }
-
     public function delegate(User $actor, Permission $permission): bool
     {
         return $permission->guard_name === 'central'

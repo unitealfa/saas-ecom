@@ -21,9 +21,6 @@ class SearchPermissionsRequest extends FormRequest
         }
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     public function rules(): array
     {
         return ['search' => ['nullable', 'string', 'max:255'], 'page' => ['sometimes', 'integer', 'min:1']];
