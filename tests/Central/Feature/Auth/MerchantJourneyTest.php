@@ -1,15 +1,18 @@
 <?php
 
 use App\Enums\Central\Tenants\StatusEnum as TenantStatus;
+use App\Enums\Central\Users\JourneyState;
 use App\Enums\Central\Users\StatusEnum;
 use App\Jobs\Central\ProvisionTenantDatabase;
 use App\Models\Central\Activity;
 use App\Models\Central\Role;
 use App\Models\Central\Tenant;
 use App\Models\User;
+use App\Services\Central\Auth\RegistrationJourney;
 use App\Services\Central\Users\UserApprovalService;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Stancl\Tenancy\Events\TenantCreated;
@@ -39,9 +42,13 @@ test('merchant authentication follows email approval and shop readiness', functi
     $this->post(route('login.store'), ['email' => $merchant->email, 'password' => 'password'])
         ->assertSessionHasNoErrors()->assertRedirect(route($destination));
     $this->assertAuthenticatedAs($merchant, 'central');
-    $this->getJson(route('registration.status'))->assertOk()
+    $progress = $this->getJson(route('registration.status'))->assertOk()
         ->assertJsonPath('state', $state)->assertJsonPath('redirect', route($destination))
         ->assertJsonMissingPath('user_id')->assertJsonMissingPath('password');
+    expect(app(RegistrationJourney::class)->state($merchant))->toBe(JourneyState::from($state))
+        ->and($progress->json('version'))->toBe(hash('sha256', json_encode([
+            $state, $progress->json('reason'), $progress->json('shops'),
+        ], JSON_THROW_ON_ERROR)));
     if ($state === 'ready') {
         $this->get(route('dashboard'))->assertOk();
     } else {
@@ -62,6 +69,66 @@ test('merchant authentication follows email approval and shop readiness', functi
     'suspended shop' => [StatusEnum::ACTIVE, true, TenantStatus::SUSPENDED, true, 'preparing', 'registration.status'],
     'over quota shop' => [StatusEnum::ACTIVE, true, TenantStatus::OVER_QUOTA, true, 'preparing', 'registration.status'],
 ]);
+
+test('a destination for a rejected account does not load its refusal history', function (): void {
+    $merchant = journeyMerchant(['status' => StatusEnum::REJECTED]);
+    $journey = app(RegistrationJourney::class);
+    $connection = $merchant->getConnection();
+    $connection->enableQueryLog();
+    try {
+        expect($journey->destination($merchant))->toBe(route('registration.status'));
+        $destinationQueries = $connection->getQueryLog();
+        $connection->flushQueryLog();
+        expect($journey->progress($merchant)['state'])->toBe('rejected');
+        $progressQueries = $connection->getQueryLog();
+    } finally {
+        $connection->disableQueryLog();
+        $connection->flushQueryLog();
+    }
+
+    expect(collect($destinationQueries)->contains(fn (array $query): bool => str_contains($query['query'], 'activity_log')))->toBeFalse()
+        ->and(collect($progressQueries)->contains(fn (array $query): bool => str_contains($query['query'], 'activity_log')))->toBeTrue();
+});
+
+test('a destination with a failed shop does not check retry permissions and loads shops once', function (): void {
+    $merchant = journeyMerchant();
+    Event::fake([TenantCreated::class]);
+    Tenant::factory()->create(['user_id' => $merchant->id, 'status' => TenantStatus::PROVISIONING_FAILED]);
+    Event::assertDispatched(TenantCreated::class);
+    Gate::partialMock()->shouldReceive('forUser')->never();
+    $connection = $merchant->getConnection();
+    $connection->enableQueryLog();
+    try {
+        expect(app(RegistrationJourney::class)->destination($merchant))->toBe(route('registration.status'));
+        $queries = $connection->getQueryLog();
+    } finally {
+        $connection->disableQueryLog();
+        $connection->flushQueryLog();
+    }
+
+    expect(collect($queries)->filter(fn (array $query): bool => str_contains($query['query'], 'from `tenants`')))->toHaveCount(1);
+});
+
+test('progress retains the failed shop payload and only includes shops owned by the account', function (): void {
+    $merchant = journeyMerchant();
+    $other = journeyMerchant();
+    Event::fake([TenantCreated::class]);
+    $failed = Tenant::factory()->create(['user_id' => $merchant->id, 'status' => TenantStatus::PROVISIONING_FAILED]);
+    Tenant::factory()->create(['user_id' => $other->id, 'status' => TenantStatus::ACTIVE,
+        'schema_version' => 'completed-schema', 'provisioned_at' => now()]);
+    Event::assertDispatched(TenantCreated::class);
+
+    $progress = app(RegistrationJourney::class)->progress($merchant);
+    expect($progress['state'])->toBe('preparing')
+        ->and($progress['shops'])->toBe([[
+            'name' => $failed->shop_name,
+            'status' => $failed->status->label(),
+            'prepared' => false,
+            'failed' => true,
+            'ready' => false,
+            'retry_url' => route('owner.shops.retry', $failed),
+        ]]);
+});
 
 test('pending credentials errors remain generic when the password is wrong', function (): void {
     $merchant = journeyMerchant(['status' => StatusEnum::PENDING]);

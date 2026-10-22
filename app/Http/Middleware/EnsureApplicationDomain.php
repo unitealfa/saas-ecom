@@ -9,11 +9,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureApplicationDomain
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  Closure(Request): (Response)  $next
-     */
     public function handle(Request $request, Closure $next): Response
     {
         if (! in_array($request->getHost(), config('tenancy.central_domains'), true)) {
