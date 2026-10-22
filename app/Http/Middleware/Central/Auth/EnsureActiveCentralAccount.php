@@ -14,7 +14,7 @@ use Symfony\Component\HttpFoundation\Response;
 class EnsureActiveCentralAccount
 {
     private const GUARD = 'central';
-    private const GUEST_ROUTES = [
+    private const LIMITED_ACCESS_ROUTES = [
         'login', 'login.store', 'register', 'register.store', 'logout',
         'verification.*', 'registration.status', '*.registration.status',
     ];
@@ -58,7 +58,7 @@ class EnsureActiveCentralAccount
             return;
         }
 
-        if ($allowGuest && $request->routeIs(...self::GUEST_ROUTES)) {
+        if ($allowGuest && $request->routeIs(...self::LIMITED_ACCESS_ROUTES)) {
             return;
         }
 
