@@ -6,13 +6,13 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:central', EnsureActiveCentralAccount::class])->group(function () {
     Route::prefix('settings')->group(function (): void {
-        Route::redirect('/', 'settings/profile');
+        Route::redirect('/', '/settings/profile');
         Route::livewire('profile', 'pages::settings.profile')->name('profile.edit');
     });
 
     Route::controller(ProfilePhotoController::class)->name('central.profile-photo.')->group(function (): void {
         Route::get('profile-photos/{user}', 'show')
-            ->withTrashed()->middleware('signed:relative')->name('show');
+            ->whereUuid('user')->withTrashed()->middleware('signed:relative')->name('show');
 
         Route::prefix('settings/profile/photo')->group(function (): void {
             Route::post('/', 'update')->name('update');

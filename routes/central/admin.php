@@ -4,7 +4,8 @@ use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class])
-    ->prefix('admin')->name('central.')->group(function (): void {
+    ->prefix('admin')->name('central.')
+    ->whereUuid(['user', 'role', 'country', 'tenant'])->group(function (): void {
         require __DIR__.'/admin/users.php';
         require __DIR__.'/admin/staff.php';
         require __DIR__.'/admin/tenants.php';
