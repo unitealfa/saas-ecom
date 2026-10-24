@@ -17,10 +17,6 @@ use Stancl\Tenancy\Database\Models\Domain as BaseDomain;
 #[Hidden(['id', 'tenant_id', 'primary_slot'])]
 class Domain extends BaseDomain
 {
-    /** @use HasFactory<DomainFactory> */
-    use HasFactory, HasPublicUuid, SoftDeletes;
-
-    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
