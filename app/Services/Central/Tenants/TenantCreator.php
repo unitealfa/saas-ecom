@@ -23,6 +23,18 @@ use Stancl\Tenancy\Exceptions\DomainOccupiedByOtherTenantException;
 
 class TenantCreator
 {
+    private const string SHOPS_FEATURE = 'shops';
+
+    private const string EVENT_REQUESTED = 'provisioning_requested';
+
+    private const string DEPLOYMENT_KEY_PREFIX = 'provision:';
+
+    private const int PRIMARY_DOMAIN_TYPE = 1;
+
+    private const int MAX_SLUG_LENGTH = 55;
+
+    private const int MAX_DOMAIN_LENGTH = 253;
+
     public function __construct(private AuthorizationMutation $mutations, private DefaultSubscription $subscriptions) {}
 
     public function create(User $actor, User $owner, TenantData $data): Tenant
@@ -48,91 +60,177 @@ class TenantCreator
             loadTarget: fn () => [Tenant::class, User::whereKey($owner->id)->lockForUpdate()->firstOrFail()],
             mutation: function (array $arguments) use ($actor, $data, $first, $owned): Tenant {
                 [, $owner] = $arguments;
+
                 if ($owner->status !== StatusEnum::ACTIVE) {
                     throw ValidationException::withMessages(['shop_name' => 'Le compte propriétaire doit être actif.']);
                 }
-                $fingerprint = $data->fingerprint($owner->uuid);
-                $existing = Tenant::withTrashed()->where('user_id', $owner->id)
-                    ->where('creation_key', $data->creationKey)->lockForUpdate()->first();
-                if ($existing !== null) {
-                    if ($existing->creation_hash !== $fingerprint || $existing->trashed()) {
-                        throw ValidationException::withMessages(['creation_key' => 'Cette demande de création a déjà été utilisée autrement.']);
-                    }
 
+                $fingerprint = $data->fingerprint($owner->uuid);
+
+                if ($existing = $this->replayOf($owner, $data, $fingerprint)) {
                     return $existing;
                 }
 
-                if ($first && Tenant::where('user_id', $owner->id)->exists()) {
-                    throw ValidationException::withMessages(['shop_name' => 'Votre première boutique est déjà configurée.']);
-                }
-                if ($owned && ! Tenant::where('user_id', $owner->id)->exists()) {
-                    throw ValidationException::withMessages(['shop_name' => 'Configurez d’abord votre première boutique.']);
-                }
+                $this->assertPosition($owner, $first, $owned);
+                $this->assertQuota($owner, $actor);
 
-                $subscription = $this->subscriptions->ensure($owner, $actor);
-                $quotaFeature = Feature::where('code', 'shops')->active()->firstOrFail();
-                $quota = PlanFeature::where('plan_id', $subscription->plan_id)->where('feature_id', $quotaFeature->id)
-                    ->lockForUpdate()->first();
-                if ($quota === null || ! $quota->is_active) {
-                    throw ValidationException::withMessages(['shop_name' => 'L’offre actuelle ne permet pas de créer de boutique.']);
-                }
-                $count = Tenant::where('user_id', $owner->id)->orderBy('id')->lockForUpdate()->get(['id'])->count();
-                if ($quota->limit !== null && $count >= $quota->limit) {
-                    throw ValidationException::withMessages(['shop_name' => 'Le nombre maximum de boutiques de cette offre est atteint.']);
-                }
+                $domain = $this->domainFor($data);
+                $this->assertProvisioningReady($owner);
 
-                $domain = $data->slug.'.'.config('tenancy.saas_base_domain');
-                if (strlen($data->slug) > 55 || strlen($domain) > 253) {
-                    throw ValidationException::withMessages(['slug' => 'Ce slug dépasse la limite technique du nom de base ou du domaine.']);
-                }
-                $queueConnection = config('queue.connections.central-provisioning.connection');
-                if ($queueConnection !== $owner->getConnectionName()) {
-                    throw new LogicException('The provisioning queue must use the same central database connection.');
-                }
-                $versions = glob(database_path('migrations/tenant/*.php'));
-                if ($versions === false || $versions === []) {
-                    throw new LogicException('Tenant migrations are missing.');
-                }
-                sort($versions);
-                $uuid = (string) Str::uuid();
-                $tenant = new Tenant([
-                    'shop_name' => $data->shopName, 'slug' => $data->slug, 'internal_label' => $data->shopName,
-                ]);
-                $tenant->forceFill([
-                    'uuid' => $uuid, 'user_id' => $owner->id, 'document_prefix' => strtoupper(str_replace('-', '', $uuid)),
-                    'creation_key' => $data->creationKey, 'creation_hash' => $fingerprint,
-                ]);
-                $tenant->configureShopForProvisioning($data->settings->toArray());
-                try {
-                    $tenant->save();
-                } catch (UniqueConstraintViolationException $exception) {
-                    throw ValidationException::withMessages(['slug' => 'Cette adresse de boutique est déjà réservée.']);
-                } catch (LogicException $exception) {
-                    throw ValidationException::withMessages(['slug' => 'Ce slug ou ce nom de base est réservé ou indisponible.']);
-                }
-                try {
-                    $tenantDomain = $tenant->domains()->make([
-                        'domain' => $domain, 'type' => 1, 'is_primary' => true,
-                    ]);
-                    $tenantDomain->forceFill([
-                        'verification_status' => VerificationStatusEnum::VERIFIED, 'verified_at' => now(),
-                    ])->save();
-                } catch (UniqueConstraintViolationException|DomainOccupiedByOtherTenantException) {
-                    throw ValidationException::withMessages(['slug' => 'Ce domaine de boutique est déjà utilisé.']);
-                }
-                $deployment = TenantSchemaDeployment::create([
-                    'tenant_id' => $tenant->id, 'target_version' => pathinfo(end($versions), PATHINFO_FILENAME),
-                    'operation' => OperationEnum::PROVISIONING, 'status' => DeploymentStatus::PENDING, 'attempt_number' => 1,
-                    'operation_key' => 'provision:'.$tenant->uuid, 'correlation_id' => (string) Str::uuid(),
-                    'runtime_versions' => ['php' => PHP_VERSION, 'laravel' => app()->version()],
-                ]);
-                ProvisionTenantDatabase::dispatch($deployment->id)->beforeCommit();
-                activity()->causedBy($actor)->performedOn($tenant)->event('provisioning_requested')
+                $tenant = $this->reserve($owner, $data, $fingerprint);
+                $this->attachDomain($tenant, $domain);
+                $deployment = $this->requestProvisioning($tenant);
+
+                activity()->causedBy($actor)->performedOn($tenant)->event(self::EVENT_REQUESTED)
                     ->withProperties(['owner_uuid' => $owner->uuid, 'deployment_uuid' => $deployment->uuid])
                     ->log('Boutique réservée et création de sa base demandée.');
 
                 return $tenant;
             },
         );
+    }
+
+    private function replayOf(User $owner, TenantData $data, string $fingerprint): ?Tenant
+    {
+        $existing = Tenant::withTrashed()->where('user_id', $owner->id)
+            ->where('creation_key', $data->creationKey)->lockForUpdate()->first();
+
+        if ($existing === null) {
+            return null;
+        }
+
+        if ($existing->creation_hash !== $fingerprint || $existing->trashed()) {
+            throw ValidationException::withMessages(['creation_key' => 'Cette demande de création a déjà été utilisée autrement.']);
+        }
+
+        return $existing;
+    }
+
+    private function assertPosition(User $owner, bool $first, bool $owned): void
+    {
+        $hasShop = Tenant::where('user_id', $owner->id)->exists();
+
+        if ($first && $hasShop) {
+            throw ValidationException::withMessages(['shop_name' => 'Votre première boutique est déjà configurée.']);
+        }
+
+        if ($owned && ! $hasShop) {
+            throw ValidationException::withMessages(['shop_name' => 'Configurez d’abord votre première boutique.']);
+        }
+    }
+
+    private function assertQuota(User $owner, User $actor): void
+    {
+        $subscription = $this->subscriptions->ensure($owner, $actor);
+        $feature = Feature::where('code', self::SHOPS_FEATURE)->active()->firstOrFail();
+        $quota = PlanFeature::where('plan_id', $subscription->plan_id)->where('feature_id', $feature->id)
+            ->lockForUpdate()->first();
+
+        if ($quota === null || ! $quota->is_active) {
+            throw ValidationException::withMessages(['shop_name' => 'L’offre actuelle ne permet pas de créer de boutique.']);
+        }
+
+        // get() et non count() SQL : le verrou doit porter sur les lignes.
+        $count = Tenant::where('user_id', $owner->id)->orderBy('id')->lockForUpdate()->get(['id'])->count();
+
+        if ($quota->limit !== null && $count >= $quota->limit) {
+            throw ValidationException::withMessages(['shop_name' => 'Le nombre maximum de boutiques de cette offre est atteint.']);
+        }
+    }
+
+    private function domainFor(TenantData $data): string
+    {
+        $domain = $data->slug.'.'.config('tenancy.saas_base_domain');
+
+        if (strlen($data->slug) > self::MAX_SLUG_LENGTH || strlen($domain) > self::MAX_DOMAIN_LENGTH) {
+            throw ValidationException::withMessages(['slug' => 'Ce slug dépasse la limite technique du nom de base ou du domaine.']);
+        }
+
+        return $domain;
+    }
+
+    private function assertProvisioningReady(User $owner): void
+    {
+        if (config('queue.connections.central-provisioning.connection') !== $owner->getConnectionName()) {
+            throw new LogicException('The provisioning queue must use the same central database connection.');
+        }
+
+        if ($this->migrationFiles() === []) {
+            throw new LogicException('Tenant migrations are missing.');
+        }
+    }
+
+    /** @return list<string> */
+    private function migrationFiles(): array
+    {
+        $files = glob(database_path('migrations/tenant/*.php')) ?: [];
+        sort($files);
+
+        return $files;
+    }
+
+    private function reserve(User $owner, TenantData $data, string $fingerprint): Tenant
+    {
+        $uuid = (string) Str::uuid();
+        $tenant = new Tenant([
+            'shop_name' => $data->shopName,
+            'slug' => $data->slug,
+            'internal_label' => $data->shopName,
+        ]);
+        $tenant->forceFill([
+            'uuid' => $uuid,
+            'user_id' => $owner->id,
+            'document_prefix' => strtoupper(str_replace('-', '', $uuid)),
+            'creation_key' => $data->creationKey,
+            'creation_hash' => $fingerprint,
+        ]);
+        $tenant->configureShopForProvisioning($data->settings->toArray());
+
+        try {
+            $tenant->save();
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages(['slug' => 'Cette adresse de boutique est déjà réservée.']);
+        } catch (LogicException) {
+            throw ValidationException::withMessages(['slug' => 'Ce slug ou ce nom de base est réservé ou indisponible.']);
+        }
+
+        return $tenant;
+    }
+
+    private function attachDomain(Tenant $tenant, string $domain): void
+    {
+        try {
+            $tenantDomain = $tenant->domains()->make([
+                'domain' => $domain,
+                'type' => self::PRIMARY_DOMAIN_TYPE,
+                'is_primary' => true,
+            ]);
+            $tenantDomain->forceFill([
+                'verification_status' => VerificationStatusEnum::VERIFIED,
+                'verified_at' => now(),
+            ])->save();
+        } catch (UniqueConstraintViolationException|DomainOccupiedByOtherTenantException) {
+            throw ValidationException::withMessages(['slug' => 'Ce domaine de boutique est déjà utilisé.']);
+        }
+    }
+
+    private function requestProvisioning(Tenant $tenant): TenantSchemaDeployment
+    {
+        $files = $this->migrationFiles();
+
+        $deployment = TenantSchemaDeployment::create([
+            'tenant_id' => $tenant->id,
+            'target_version' => pathinfo($files[array_key_last($files)], PATHINFO_FILENAME),
+            'operation' => OperationEnum::PROVISIONING,
+            'status' => DeploymentStatus::PENDING,
+            'attempt_number' => 1,
+            'operation_key' => self::DEPLOYMENT_KEY_PREFIX.$tenant->uuid,
+            'correlation_id' => (string) Str::uuid(),
+            'runtime_versions' => ['php' => PHP_VERSION, 'laravel' => app()->version()],
+        ]);
+
+        ProvisionTenantDatabase::dispatch($deployment->id)->beforeCommit();
+
+        return $deployment;
     }
 }

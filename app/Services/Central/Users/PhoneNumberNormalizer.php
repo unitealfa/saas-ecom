@@ -9,25 +9,34 @@ use libphonenumber\PhoneNumberUtil;
 
 class PhoneNumberNormalizer
 {
+    private const int MAX_LENGTH = 255;
+
+    private const string ALLOWED_CHARACTERS = '/^[+\p{Nd}\s().\/-]+$/uD';
+
+    private const string INVALID_MESSAGE = 'Saisissez un numéro valide pour le pays choisi.';
+
+    private const string MISMATCH_MESSAGE = 'Ce numéro ne correspond pas au pays choisi.';
+
     public function normalize(string $value, string $countryCode, string $field = 'phone'): string
     {
         $value = trim($value);
-        $countryCode = strtoupper(trim($countryCode));
+        $region = $this->region($countryCode);
         $util = PhoneNumberUtil::getInstance();
 
-        if (strlen($value) > 255 || ! preg_match('/^[+\p{Nd}\s().\/-]+$/uD', $value)
-            || ! in_array($countryCode, $util->getSupportedRegions(), true)) {
-            throw ValidationException::withMessages([$field => 'Saisissez un numéro valide pour le pays choisi.']);
+        if (strlen($value) > self::MAX_LENGTH
+            || ! preg_match(self::ALLOWED_CHARACTERS, $value)
+            || ! in_array($region, $util->getSupportedRegions(), true)) {
+            throw $this->error($field, self::INVALID_MESSAGE);
         }
 
         try {
-            $number = $util->parse($value, $countryCode);
+            $number = $util->parse($value, $region);
         } catch (NumberParseException) {
-            throw ValidationException::withMessages([$field => 'Saisissez un numéro valide pour le pays choisi.']);
+            throw $this->error($field, self::INVALID_MESSAGE);
         }
 
-        if ($number->hasExtension() || ! $util->isValidNumberForRegion($number, $countryCode)) {
-            throw ValidationException::withMessages([$field => 'Ce numéro ne correspond pas au pays choisi.']);
+        if ($number->hasExtension() || ! $util->isValidNumberForRegion($number, $region)) {
+            throw $this->error($field, self::MISMATCH_MESSAGE);
         }
 
         return $util->format($number, PhoneNumberFormat::E164);
@@ -35,36 +44,49 @@ class PhoneNumberNormalizer
 
     public function callingCode(string $countryCode): ?string
     {
-        $code = PhoneNumberUtil::getInstance()->getCountryCodeForRegion(strtoupper(trim($countryCode)));
+        $code = PhoneNumberUtil::getInstance()->getCountryCodeForRegion($this->region($countryCode));
 
         return $code === 0 ? null : '+'.$code;
     }
 
-    /**
-     * Only for historical rows without a phone country. Shared codes are never guessed.
-     *
-     * @return array{value: string, region: string}
-     */
     public function historical(string $value, string $profileCountry): array
     {
+        $region = $this->region($profileCountry);
+
         try {
-            return ['value' => $this->normalize($value, $profileCountry), 'region' => strtoupper(trim($profileCountry))];
+            return ['value' => $this->normalize($value, $region), 'region' => $region];
         } catch (ValidationException $exception) {
-            if (! str_starts_with(trim($value), '+') && ! str_starts_with(trim($value), '00')) {
+            $trimmed = trim($value);
+
+            if (! str_starts_with($trimmed, '+') && ! str_starts_with($trimmed, '00')) {
                 throw $exception;
             }
+
             $util = PhoneNumberUtil::getInstance();
+
             try {
-                $number = $util->parse($value, strtoupper(trim($profileCountry)));
+                $number = $util->parse($value, $region);
             } catch (NumberParseException) {
                 throw $exception;
             }
+
             $regions = $util->getRegionCodesForCountryCode($number->getCountryCode());
+
             if (count($regions) !== 1 || $regions[0] === '001') {
                 throw $exception;
             }
 
             return ['value' => $this->normalize($value, $regions[0]), 'region' => $regions[0]];
         }
+    }
+
+    private function region(string $countryCode): string
+    {
+        return strtoupper(trim($countryCode));
+    }
+
+    private function error(string $field, string $message): ValidationException
+    {
+        return ValidationException::withMessages([$field => $message]);
     }
 }

@@ -15,6 +15,10 @@ use Illuminate\Support\Facades\Gate;
 
 class RegistrationJourney
 {
+    private const string EVENT_APPROVED = 'central_account_approved';
+
+    private const string EVENT_REJECTED = 'central_account_rejected';
+
     public function __construct(private CentralUserAccess $access) {}
 
     public function mayAuthenticate(User $user): bool
@@ -33,11 +37,11 @@ class RegistrationJourney
         return $this->accountState($user) ?? $this->stateFromTenants($this->loadTenants($user));
     }
 
-    /** @return array{state: string, redirect: string, reason: ?string, shops: array, version: string} */
     public function progress(User $user): array
     {
         $shops = [];
         $state = $this->accountState($user);
+
         if ($state === null) {
             $tenants = $this->loadTenants($user);
             $state = $this->stateFromTenants($tenants);
@@ -79,17 +83,16 @@ class RegistrationJourney
     private function hasVerifiedLegalProfile(User $user): bool
     {
         return $user->legal_verification_status === VerificationStatusEnum::VERIFIED
-            && $user->legal_verified_at !== null && $user->legal_profile_version !== null;
+            && $user->legal_verified_at !== null
+            && $user->legal_profile_version !== null;
     }
 
-    /** @return Collection<int, Tenant> */
     private function loadTenants(User $user): Collection
     {
         return $user->tenants()->orderBy('id')
             ->get(['id', 'uuid', 'user_id', 'shop_name', 'status', 'schema_version', 'provisioned_at']);
     }
 
-    /** @param Collection<int, Tenant> $tenants */
     private function stateFromTenants(Collection $tenants): JourneyState
     {
         if ($tenants->isEmpty()) {
@@ -97,7 +100,8 @@ class RegistrationJourney
         }
 
         return $tenants->contains(fn (Tenant $tenant): bool => $this->isReady($tenant))
-            ? JourneyState::READY : JourneyState::PREPARING;
+            ? JourneyState::READY
+            : JourneyState::PREPARING;
     }
 
     private function isPrepared(Tenant $tenant): bool
@@ -110,7 +114,6 @@ class RegistrationJourney
         return $this->isPrepared($tenant) && $tenant->status === TenantStatus::ACTIVE;
     }
 
-    /** @return array{name: string, status: string, prepared: bool, failed: bool, ready: bool, retry_url: ?string} */
     private function shopData(Tenant $tenant, User $user): array
     {
         $tenant->setRelation('owner', $user);
@@ -123,16 +126,18 @@ class RegistrationJourney
             'failed' => $failed,
             'ready' => $this->isReady($tenant),
             'retry_url' => $failed && Gate::forUser($user)->allows('retryProvisioning', $tenant)
-                ? route('owner.shops.retry', $tenant) : null,
+                ? route('owner.shops.retry', $tenant)
+                : null,
         ];
     }
 
     private function refusalReason(User $user): ?string
     {
         $decision = Activity::forSubject($user)
-            ->whereIn('event', ['central_account_approved', 'central_account_rejected'])
+            ->whereIn('event', [self::EVENT_APPROVED, self::EVENT_REJECTED])
             ->orderByDesc('id')->first(['event', 'properties']);
-        $reason = $decision?->event === 'central_account_rejected' ? $decision->getProperty('reason') : null;
+
+        $reason = $decision?->event === self::EVENT_REJECTED ? $decision->getProperty('reason') : null;
 
         return is_string($reason) && trim($reason) !== '' ? $reason : null;
     }

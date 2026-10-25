@@ -6,8 +6,11 @@ use App\Models\Central\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 
+
 class RegistrationVerificationNotification extends SendEmailVerificationNotification
 {
+    public const string FLASH_KEY = 'registration_email_sent';
+
     public function __construct(private AccountMailDelivery $mail) {}
 
     public function handle(Registered $event): void
@@ -28,7 +31,7 @@ class RegistrationVerificationNotification extends SendEmailVerificationNotifica
 
         $request = request();
         if ($request->hasSession()) {
-            $request->session()->flash('registration_email_sent', $sent);
+            $request->session()->flash(self::FLASH_KEY, $sent);
         }
     }
 }

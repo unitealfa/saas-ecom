@@ -4,12 +4,14 @@ namespace App\Services\Central\Roles;
 
 use App\Models\Central\Permission;
 use App\Models\Central\Role;
+use App\Models\PermissionAssignment;
 use Illuminate\Support\Facades\DB;
 use LogicException;
+use Spatie\Permission\Models\Permission as PackagePermission;
 
 class CentralRoleCatalog
 {
-    public const PERMISSIONS = [
+    public const array PERMISSIONS = [
         'saas.users.view' => 'Consulter les utilisateurs',
         'saas.users.create' => 'Créer des utilisateurs',
         'saas.users.update' => 'Modifier les utilisateurs',
@@ -57,7 +59,7 @@ class CentralRoleCatalog
         'saas.countries.delete' => 'Retirer des pays',
     ];
 
-    public const GROUPS = [
+    public const array GROUPS = [
         'Utilisateurs centraux' => ['saas.users.view', 'saas.users.create', 'saas.users.update', 'saas.users.approve', 'saas.users.reject', 'saas.users.suspend', 'saas.users.activate', 'saas.users.archive'],
         'Dossiers professionnels' => ['saas.users.legal.view', 'saas.users.legal.validate', 'saas.users.legal.reject'],
         'Historique des utilisateurs' => ['saas.users.history.view'],
@@ -68,7 +70,7 @@ class CentralRoleCatalog
         'Boutiques' => ['saas.tenants.view', 'saas.tenants.create', 'saas.tenants.update', 'saas.tenants.suspend', 'saas.tenants.activate', 'saas.tenants.archive', 'saas.tenants.history.view', 'saas.tenants.priority.update'],
     ];
 
-    public const VIEW_ACTIONS = [
+    public const array VIEW_ACTIONS = [
         'saas.users.view' => ['saas.users.create', 'saas.users.update', 'saas.users.approve', 'saas.users.reject', 'saas.users.suspend', 'saas.users.activate', 'saas.users.archive', 'saas.users.legal.view', 'saas.users.legal.validate', 'saas.users.legal.reject', 'saas.users.history.view', 'saas.staff.invite', 'saas.staff.update', 'saas.staff.suspend', 'saas.staff.activate', 'saas.staff.archive', 'saas.users.roles.assign'],
         'saas.staff.view' => ['saas.staff.invite', 'saas.staff.invite.resend', 'saas.staff.update', 'saas.users.roles.assign', 'saas.staff.permissions.view', 'saas.staff.assignments.renew', 'saas.staff.suspend', 'saas.staff.activate', 'saas.staff.archive'],
         'saas.users.legal.view' => ['saas.users.approve', 'saas.users.reject', 'saas.users.legal.validate', 'saas.users.legal.reject'],
@@ -78,7 +80,7 @@ class CentralRoleCatalog
         'saas.tenants.view' => ['saas.tenants.create', 'saas.tenants.update', 'saas.tenants.suspend', 'saas.tenants.activate', 'saas.tenants.archive', 'saas.tenants.history.view', 'saas.tenants.priority.update'],
     ];
 
-    public const ROLES = [
+    public const array ROLES = [
         'user-manager' => [
             'label' => 'Gestionnaire des utilisateurs',
             'permissions' => ['saas.users.view', 'saas.users.create', 'saas.users.update'],
@@ -89,53 +91,101 @@ class CentralRoleCatalog
         ],
     ];
 
+    /** Anciens noms de permissions, renommés au seed (ancien => nouveau). */
+    private const array RENAMED = [
+        'saas.users.restore' => 'saas.users.activate',
+        'saas.users.delete' => 'saas.users.archive',
+        'saas.staff.restore' => 'saas.staff.activate',
+        'saas.staff.delete' => 'saas.staff.archive',
+    ];
+
     public function seed(): void
     {
         if (tenancy()->initialized) {
             throw new LogicException('The central role catalogue requires the central context.');
         }
+
         DB::transaction(function (): void {
-            $root = Role::forCentralGuard()->where('is_super_admin', true)->first();
-            if ($root === null) {
-                $root = new Role(['name' => 'root', 'label' => 'Super Admin']);
-                $root->forceFill(['is_system' => true, 'is_protected' => true, 'is_super_admin' => true])->save();
-            }
-            $root = Role::whereKey($root->id)->lockForUpdate()->firstOrFail();
-            if (! $root->getAttribute('is_system') || ! $root->getAttribute('is_protected') || $root->guard_name !== 'central') {
-                throw new LogicException('The existing root role must remain protected.');
-            }
-
-            foreach (['saas.users.restore' => 'saas.users.activate', 'saas.users.delete' => 'saas.users.archive', 'saas.staff.restore' => 'saas.staff.activate', 'saas.staff.delete' => 'saas.staff.archive'] as $old => $new) {
-                $legacy = Permission::forCentralGuard()->where('name', $old)->first();
-                if ($legacy !== null) {
-                    if (Permission::forCentralGuard()->where('name', $new)->exists()) {
-                        throw new LogicException('Conflicting permission names require an explicit migration: '.$old.' / '.$new);
-                    }
-                    $legacy->forceFill(['name' => $new])->save();
-                }
-            }
-
-            foreach (self::PERMISSIONS as $name => $label) {
-                Permission::firstOrCreate(['name' => $name, 'guard_name' => 'central'], ['label' => $label]);
-            }
-
-            foreach (self::ROLES as $name => $definition) {
-                $expected = array_fill_keys($definition['permissions'], 9999);
-                $role = Role::where('name', $name)->forCentralGuard()->lockForUpdate()->first();
-                if ($role === null) {
-                    $role = Role::createWithPermissions($name, $expected);
-                    $role->forceFill(['label' => $definition['label'], 'is_system' => true, 'is_protected' => true])->save();
-                } else {
-                    $actual = $role->permissionComposition()->get()->mapWithKeys(fn (\Spatie\Permission\Models\Permission $permission): array => [
-                        $permission->name => (int) $permission->getRelation('pivot')->getAttribute('duration_days'),
-                    ])->all();
-                    ksort($expected);
-                    ksort($actual);
-                    if ($actual !== $expected || ! $role->getAttribute('is_system') || ! $role->getAttribute('is_protected') || $role->getAttribute('is_super_admin')) {
-                        throw new LogicException('Refusing to overwrite an existing role with a different definition: '.$name);
-                    }
-                }
-            }
+            $this->ensureRootRole();
+            $this->renameLegacyPermissions();
+            $this->ensurePermissions();
+            $this->ensureRoles();
         });
+    }
+
+    private function ensureRootRole(): void
+    {
+        $root = Role::forCentralGuard()->where('is_super_admin', true)->first();
+
+        if ($root === null) {
+            $root = new Role(['name' => 'root', 'label' => 'Super Admin']);
+            $root->forceFill(['is_system' => true, 'is_protected' => true, 'is_super_admin' => true])->save();
+        }
+
+        $root = Role::whereKey($root->id)->lockForUpdate()->firstOrFail();
+
+        if (! $root->getAttribute('is_system') || ! $root->getAttribute('is_protected') || $root->guard_name !== Role::GUARD) {
+            throw new LogicException('The existing root role must remain protected.');
+        }
+    }
+
+    private function renameLegacyPermissions(): void
+    {
+        foreach (self::RENAMED as $old => $new) {
+            $legacy = Permission::forCentralGuard()->where('name', $old)->first();
+
+            if ($legacy === null) {
+                continue;
+            }
+
+            if (Permission::forCentralGuard()->where('name', $new)->exists()) {
+                throw new LogicException('Conflicting permission names require an explicit migration: '.$old.' / '.$new);
+            }
+
+            $legacy->forceFill(['name' => $new])->save();
+        }
+    }
+
+    private function ensurePermissions(): void
+    {
+        foreach (self::PERMISSIONS as $name => $label) {
+            Permission::firstOrCreate(['name' => $name, 'guard_name' => Permission::GUARD], ['label' => $label]);
+        }
+    }
+
+    private function ensureRoles(): void
+    {
+        foreach (self::ROLES as $name => $definition) {
+            $expected = array_fill_keys($definition['permissions'], PermissionAssignment::NEVER_EXPIRES_DAYS);
+            $role = Role::where('name', $name)->forCentralGuard()->lockForUpdate()->first();
+
+            if ($role === null) {
+                $role = Role::createWithPermissions($name, $expected);
+                $role->forceFill(['label' => $definition['label'], 'is_system' => true, 'is_protected' => true])->save();
+
+                continue;
+            }
+
+            if (! $this->matchesDefinition($role, $expected)) {
+                throw new LogicException('Refusing to overwrite an existing role with a different definition: '.$name);
+            }
+        }
+    }
+
+    /** @param array<string, int> $expected nom de permission => durée en jours */
+    private function matchesDefinition(Role $role, array $expected): bool
+    {
+        $actual = $role->permissionComposition()->get()
+            ->mapWithKeys(fn (PackagePermission $permission): array => [
+                $permission->name => (int) $permission->getRelation('pivot')->getAttribute('duration_days'),
+            ])->all();
+
+        ksort($expected);
+        ksort($actual);
+
+        return $actual === $expected
+            && $role->getAttribute('is_system')
+            && $role->getAttribute('is_protected')
+            && ! $role->getAttribute('is_super_admin');
     }
 }

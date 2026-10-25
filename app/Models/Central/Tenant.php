@@ -26,9 +26,8 @@ class Tenant extends BaseTenant implements TenantWithDatabase
 
     private const array RESERVED_SLUGS = ['www', 'admin', 'api', 'app', 'mail', 'support'];
 
-    private const string SLUG_PATTERN = '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D';
+    public const string SLUG_PATTERN = '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D';
 
-    /** Colonnes qui identifient le propriétaire et la création : jamais modifiables après coup. */
     private const array IMMUTABLE_COLUMNS = ['user_id', 'document_prefix', 'creation_key', 'creation_hash'];
 
     protected $attributes = ['status' => 1, 'profile_version' => 1, 'is_primary' => false];

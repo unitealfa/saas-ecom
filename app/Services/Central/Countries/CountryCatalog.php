@@ -5,26 +5,34 @@ namespace App\Services\Central\Countries;
 use App\Models\Central\Country;
 use Illuminate\Cache\CacheManager;
 use Illuminate\Cache\Repository;
+use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
 
 class CountryCatalog
 {
+    private const int TTL_SECONDS = 43200;
+
+    private const string VERSION_KEY = 'countries:version';
+
+    private const string ROWS_PREFIX = 'countries:v2:';
+
+    private const string INITIAL_VERSION = 'initial';
+
+    private ?Repository $store = null;
+
     public function __construct(private CacheManager $cache) {}
 
-    /** @return Collection<int, Country> */
     public function active(): Collection
     {
         return $this->available();
     }
 
-    /** @return Collection<int, Country> */
     public function forProfile(?int $currentId): Collection
     {
         return $this->available($currentId);
     }
 
-    /** @return Collection<int, Country> */
     public function forPhone(?int $currentId): Collection
     {
         return $this->available($currentId, includeArchivedCurrent: true);
@@ -32,49 +40,78 @@ class CountryCatalog
 
     public function invalidate(): void
     {
-        $this->store()->forever('countries:version', (string) Str::uuid());
+        $store = $this->store();
+        $previous = $store->get(self::VERSION_KEY, self::INITIAL_VERSION);
+
+        $store->forever(self::VERSION_KEY, (string) Str::uuid());
+        $store->forget(self::ROWS_PREFIX.$previous);
     }
 
-    /** @return Collection<int, Country> */
     private function available(?int $currentId = null, bool $includeArchivedCurrent = false): Collection
     {
-        return $this->all()->filter(fn (Country $country): bool =>
-            (! $country->trashed() && ($country->is_active || $country->id === $currentId))
-            || ($includeArchivedCurrent && $country->id === $currentId)
-        )->values();
+        return $this->all()
+            ->filter(fn (Country $country): bool => $this->isVisible($country, $currentId, $includeArchivedCurrent))
+            ->values();
     }
 
-    /** @return Collection<int, Country> */
+    private function isVisible(Country $country, ?int $currentId, bool $includeArchivedCurrent): bool
+    {
+        $isCurrent = $country->id === $currentId;
+
+        if ($includeArchivedCurrent && $isCurrent) {
+            return true;
+        }
+
+        return ! $country->trashed() && ($country->is_active || $isCurrent);
+    }
+
     private function all(): Collection
     {
-        // Never publish uncommitted reference data to the shared cache.
-        if ((new Country)->getConnection()->transactionLevel() > 0) {
-            return Country::withTrashed()->orderBy('name_fr')->orderBy('id')->get();
+        if ($this->connection()->transactionLevel() > 0) {
+            return $this->fromDatabase();
         }
 
         $store = $this->store();
-        $version = $store->get('countries:version', 'initial');
+        $version = $store->get(self::VERSION_KEY, self::INITIAL_VERSION);
 
-        $rows = $store->remember('countries:v2:'.$version, 60 * 60 * 12,
-            fn (): array => Country::withTrashed()->orderBy('name_fr')->orderBy('id')->get()
-                ->map(fn (Country $country): array => $country->getAttributes())->all()
+        $rows = $store->remember(
+            self::ROWS_PREFIX.$version,
+            self::TTL_SECONDS,
+            fn (): array => $this->fromDatabase()
+                ->map(fn (Country $country): array => $country->getAttributes())
+                ->all(),
         );
 
         return Country::hydrate($rows);
     }
 
+    private function fromDatabase(): Collection
+    {
+        return Country::withTrashed()->orderBy('name_fr')->orderBy('id')->get();
+    }
+
+    private function connection(): Connection
+    {
+        return Country::query()->getConnection();
+    }
+
     private function store(): Repository
     {
-        $connection = (new Country)->getConnection();
-        $identity = json_encode([
-            $connection->getDriverName(), $connection->getConfig('host'),
-            $connection->getConfig('port'), $connection->getDatabaseName(),
-        ], JSON_THROW_ON_ERROR);
-
-        // A dedicated central store must not inherit the current tenant's cache path.
-        return $this->cache->build([
+        return $this->store ??= $this->cache->build([
             'driver' => 'file',
-            'path' => base_path('storage/framework/cache/central-reference/'.hash('sha256', $identity)),
+            'path' => storage_path('framework/cache/central-reference/'.$this->connectionIdentity()),
         ]);
+    }
+
+    private function connectionIdentity(): string
+    {
+        $connection = $this->connection();
+
+        return hash('sha256', json_encode([
+            $connection->getDriverName(),
+            $connection->getConfig('host'),
+            $connection->getConfig('port'),
+            $connection->getDatabaseName(),
+        ], JSON_THROW_ON_ERROR));
     }
 }

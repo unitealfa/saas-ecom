@@ -4,15 +4,19 @@ namespace App\Services\Central\Authorization;
 
 use App\Models\Central\User;
 use Closure;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Spatie\Permission\PermissionRegistrar;
 use Throwable;
 
+
 class AuthorizationMutation
 {
-    public function __construct(private PermissionRegistrar $permissions) {}
+    private const int ATTEMPTS = 3;
 
+    public function __construct(private PermissionRegistrar $permissions) {}
 
     public function run(
         User $actor,
@@ -28,14 +32,27 @@ class AuthorizationMutation
         });
     }
 
-    
     public function transaction(Closure $mutation): mixed
     {
+        $connection = $this->connection();
+
         try {
-            return DB::transaction($mutation, 3);
+            $result = $connection->transaction($mutation, self::ATTEMPTS);
+        } catch (AuthorizationException $exception) {
+            throw $exception;
         } catch (Throwable $exception) {
             $this->permissions->forgetCachedPermissions();
+
             throw $exception;
         }
+
+        $connection->afterCommit(fn () => $this->permissions->forgetCachedPermissions());
+
+        return $result;
+    }
+
+    private function connection(): Connection
+    {
+        return DB::connection(config('tenancy.database.central_connection'));
     }
 }
