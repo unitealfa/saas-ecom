@@ -7,27 +7,38 @@ use Illuminate\Database\Schema\ColumnDefinition;
 
 class SchemaBlueprint extends Blueprint
 {
-    /**
-     * Preserve the documented amount range and cent precision on every connection.
-     *
-     * @param  string  $column
-     * @param  int  $total
-     * @param  int  $places
-     */
-    public function decimal(mixed $column, mixed $total = 14, mixed $places = 2): ColumnDefinition
+    private const int AMOUNT_PRECISION = 14;
+
+    private const int AMOUNT_SCALE = 2;
+
+    private const string PUBLIC_UUID_COLUMN = 'uuid';
+
+    private const string UUID_CHARSET = 'ascii';
+
+    private const string UUID_COLLATION = 'ascii_bin';
+
+    public function decimal(mixed $column, mixed $total = self::AMOUNT_PRECISION, mixed $places = self::AMOUNT_SCALE): ColumnDefinition
     {
         return parent::decimal($column, $total, $places);
     }
 
-    /** @param string $column */
-    public function uuid(mixed $column = 'uuid'): ColumnDefinition
+    public function uuid(mixed $column = self::PUBLIC_UUID_COLUMN): ColumnDefinition
     {
-        $definition = parent::uuid($column)->charset('ascii')->collation('ascii_bin');
+        $definition = parent::uuid($column);
 
-        if ($column === 'uuid') {
+        if ($this->usesMysqlCollations()) {
+            $definition->charset(self::UUID_CHARSET)->collation(self::UUID_COLLATION);
+        }
+
+        if ($column === self::PUBLIC_UUID_COLUMN) {
             $definition->unique();
         }
 
         return $definition;
+    }
+
+    private function usesMysqlCollations(): bool
+    {
+        return in_array($this->connection->getDriverName(), ['mysql', 'mariadb'], true);
     }
 }

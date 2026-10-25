@@ -16,16 +16,9 @@ class Dashboard
 
     public function forUser(User $user): DashboardData
     {
-        $tenant = $this->tenancy->tenant;
+        $tenant = $this->currentTenant();
 
-        abort_unless($this->tenancy->initialized && $tenant instanceof Tenant, 403);
-        abort_unless(
-            $user->status === StatusEnum::ACTIVE
-            && $user->membership_status === MembershipStatusEnum::ACTIVE
-            && $user->getAttribute('joined_at') !== null
-            && $user->getAttribute('email_verified_at') !== null,
-            403,
-        );
+        abort_unless($this->isActiveMember($user), 403);
 
         $shop = Shop::query()->sole(['shop_name', 'tenant_uuid']);
 
@@ -33,7 +26,24 @@ class Dashboard
 
         return new DashboardData(
             shopName: (string) $shop->getAttribute('shop_name'),
-            userName: trim((string) $user->getAttribute('first_name').' '.(string) $user->getAttribute('last_name')),
+            userName: trim($user->getAttribute('first_name').' '.$user->getAttribute('last_name')),
         );
+    }
+
+    private function currentTenant(): Tenant
+    {
+        $tenant = $this->tenancy->tenant;
+
+        abort_unless($this->tenancy->initialized && $tenant instanceof Tenant, 403);
+
+        return $tenant;
+    }
+
+    private function isActiveMember(User $user): bool
+    {
+        return $user->status === StatusEnum::ACTIVE
+            && $user->membership_status === MembershipStatusEnum::ACTIVE
+            && $user->getAttribute('joined_at') !== null
+            && $user->getAttribute('email_verified_at') !== null;
     }
 }
