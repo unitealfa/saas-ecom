@@ -3,13 +3,16 @@
 namespace App\Services\Central\Authorization;
 
 use App\Enums\Central\Users\StatusEnum;
+use App\Models\Central\Permission;
 use App\Models\Central\Role;
 use App\Models\Central\User;
 use App\Services\Central\Roles\CentralRoleCatalog;
+use Illuminate\Support\Collection;
 
 class CentralUserAccess
 {
     private const string GUARD = 'central';
+
     private const string ROOT_ROLE_NAME = 'root';
 
     public function isSuperAdmin(User $user): bool
@@ -43,6 +46,40 @@ class CentralUserAccess
         $actor = $this->activeUser($actor);
 
         return $actor !== null && $this->hasPermission($actor, $permission);
+    }
+
+    /**
+     * Lecture groupée pour le formulaire ; les écritures conservent leurs contrôles actuels.
+     *
+     * @return Collection<int, Permission>
+     */
+    public function ownedPermissions(User $actor): Collection
+    {
+        $actor = $this->activeUser($actor);
+        if ($actor === null) {
+            return collect();
+        }
+
+        $roles = $actor->roles()->where('guard_name', self::GUARD)->get();
+        if ($roles->isEmpty()) {
+            return collect();
+        }
+
+        $permissions = Permission::forCentralGuard()
+            ->whereIn('name', array_keys(CentralRoleCatalog::PERMISSIONS))->orderBy('id');
+        $now = now();
+        if ($roles->contains(fn (Role $role): bool => $role->is_super_admin && $role->pivot->assigned_at <= $now)) {
+            return $permissions->get();
+        }
+
+        if (! config('permission.central_profiles', false)) {
+            return $permissions->get()->filter(fn (Permission $permission): bool => $this->hasPermission($actor, $permission->name));
+        }
+
+        $ids = $actor->permissions()->wherePivot('assigned_at', '<=', $now)
+            ->wherePivot('expires_at', '>', $now)->pluck('permissions.id');
+
+        return $permissions->whereIn('id', $ids)->get();
     }
 
     public function isStaff(User $user): bool
@@ -94,6 +131,7 @@ class CentralUserAccess
             ->where('is_protected', true)
             ->wherePivot('assigned_at', '<=', now())->exists();
     }
+
     private function hasAbility(User $actor, string $ability): bool
     {
         if ($this->hasPermission($actor, $ability)) {

@@ -61,6 +61,7 @@ class UserManagementService
         private LegalVerificationService $legal,
     ) {}
 
+    /** @return LengthAwarePaginator<int, User> */
     public function search(User $actor, string $search, ?StatusEnum $status = null): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize('viewAny', User::class);
@@ -78,6 +79,7 @@ class UserManagementService
             ->paginate(self::PER_PAGE);
     }
 
+    /** @return LengthAwarePaginator<int, Activity> */
     public function history(User $actor, User $target): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize('viewHistory', $target);
@@ -262,6 +264,7 @@ class UserManagementService
         );
     }
 
+    /** @param list<string> $roleUuids */
     public function assignRoles(User $actor, User $target, array $roleUuids): void
     {
         $this->mutations->run(
@@ -297,6 +300,7 @@ class UserManagementService
         );
     }
 
+    /** @return Collection<int, Role> */
     public function availableRoles(User $actor): Collection
     {
         $gate = Gate::forUser($actor);
@@ -310,6 +314,7 @@ class UserManagementService
             ->values();
     }
 
+    /** @param Builder<User> $query */
     private function applySearch(Builder $query, string $search): void
     {
         $pattern = '%'.trim($search).'%';
@@ -327,6 +332,7 @@ class UserManagementService
         });
     }
 
+    /** @return Collection<int, Role> */
     private function rolesForCreation(User $actor, UserData $data): Collection
     {
         if (! $data->staff && $data->roleUuids !== []) {
@@ -431,6 +437,7 @@ class UserManagementService
         }
     }
 
+    /** @return array{phone: string|null, phone_country_id: int|null} */
     private function phoneAttributes(?string $value, ?string $countryUuid, Country $profileCountry, ?User $user = null): array
     {
         if ($value === null || trim($value) === '') {
@@ -450,7 +457,7 @@ class UserManagementService
         $normalized = $this->phones->normalize($value, $country->code);
         $inactive = ! $country->is_active || $country->trashed();
 
-        if ($inactive && ($currentCountryId !== $country->id || $normalized !== $user?->phone)) {
+        if ($inactive && ($currentCountryId !== $country->id || $normalized !== $user->phone)) {
             throw ValidationException::withMessages([
                 'phone_country_uuid' => 'Choisissez un pays actif pour un nouveau numéro.',
             ]);
@@ -487,6 +494,10 @@ class UserManagementService
         $target->getConnection()->table('sessions')->where('user_id', $target->id)->delete();
     }
 
+    /**
+     * @param  list<string>  $roleUuids
+     * @return Collection<int, Role>
+     */
     private function rolesToAssign(User $actor, User $target, array $roleUuids): Collection
     {
         $roles = $this->delegableRoles($actor, $roleUuids);
@@ -498,6 +509,7 @@ class UserManagementService
         return $roles->merge($preserved)->unique('id');
     }
 
+    /** @return array<int, array{role_uuid: string, assigned_at: string}> */
     private function roleAssignments(User $target): array
     {
         return $target->roles()->orderBy('roles.id')->get()
@@ -516,6 +528,10 @@ class UserManagementService
             );
     }
 
+    /**
+     * @param  list<string>  $uuids
+     * @return Collection<int, Role>
+     */
     private function delegableRoles(User $actor, array $uuids): Collection
     {
         $roles = Role::forCentralGuard()->whereIn('uuid', $uuids)->orderBy('id')->lockForUpdate()->get();
@@ -552,6 +568,7 @@ class UserManagementService
         return $roles;
     }
 
+    /** @param Collection<int, Role> $roles */
     private function applyRoles(User $user, Collection $roles): void
     {
         try {

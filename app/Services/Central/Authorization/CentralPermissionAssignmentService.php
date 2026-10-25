@@ -7,6 +7,10 @@ use App\Models\Central\User;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * @phpstan-type Grant array{permission: string, enabled: bool|int|string, days: int|string, renew?: bool|int|string}
+ * @phpstan-type Snapshot array<int, array{permission_uuid: string, assigned_at: string, expires_at: string}>
+ */
 class CentralPermissionAssignmentService
 {
     private const string ABILITY = 'updateStaffPermissions';
@@ -24,7 +28,7 @@ class CentralPermissionAssignmentService
         return $this->stateHash($target, $this->snapshot($target));
     }
 
-
+    /** @param list<Grant> $grants */
     public function update(User $actor, User $target, array $grants, string $expectedState, ?string $reason): void
     {
         $this->mutations->run(
@@ -55,6 +59,10 @@ class CentralPermissionAssignmentService
         );
     }
 
+    /**
+     * @param  list<Grant>  $grants
+     * @return list<array{permission: Permission, days: int|null}>
+     */
     private function plan(User $actor, User $target, array $grants, ?string $reason): array
     {
         $permissions = Permission::forCentralGuard()
@@ -134,9 +142,12 @@ class CentralPermissionAssignmentService
 
     private function grantedDays(Permission $permission): int
     {
-        return (int) $permission->pivot->assigned_at->diffInDays($permission->pivot->expires_at);
+        $pivot = $permission->getRelation('pivot');
+
+        return (int) $pivot->getAttribute('assigned_at')->diffInDays($pivot->getAttribute('expires_at'));
     }
 
+    /** @param Snapshot $snapshot */
     private function stateHash(User $target, array $snapshot): string
     {
         return hash('sha256', json_encode([
@@ -149,13 +160,13 @@ class CentralPermissionAssignmentService
         ], JSON_THROW_ON_ERROR));
     }
 
-    /** @return list<array{permission_uuid: string, assigned_at: string, expires_at: string}> */
+    /** @return Snapshot */
     private function snapshot(User $target): array
     {
         return $target->permissions()->orderBy('permissions.id')->get()->map(fn ($permission) => [
             'permission_uuid' => $permission->uuid,
-            'assigned_at' => $permission->pivot->assigned_at->toIso8601String(),
-            'expires_at' => $permission->pivot->expires_at->toIso8601String(),
-        ])->all();
+            'assigned_at' => (string) $permission->getRelation('pivot')->getAttribute('assigned_at')->toIso8601String(),
+            'expires_at' => (string) $permission->getRelation('pivot')->getAttribute('expires_at')->toIso8601String(),
+        ])->values()->all();
     }
 }

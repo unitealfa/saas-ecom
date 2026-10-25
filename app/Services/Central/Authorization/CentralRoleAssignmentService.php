@@ -21,6 +21,7 @@ class CentralRoleAssignmentService
         private CentralUserAccess $access,
     ) {}
 
+    /** @param list<string> $roleUuids */
     public function replace(User $actor, User $target, array $roleUuids): void
     {
         $this->users->assignRoles($actor, $target, $roleUuids);
@@ -90,6 +91,7 @@ class CentralRoleAssignmentService
         }
     }
 
+    /** @return list<array{permission_uuid: string, previous_assigned_at: string, previous_expires_at: string, assigned_at: string, expires_at: string}> */
     private function renewDirectPermissions(User $target, Role $role, CarbonImmutable $assignedAt): array
     {
         $direct = $target->permissions()->get()->keyBy('id');
@@ -102,12 +104,13 @@ class CentralRoleAssignmentService
                 continue;
             }
 
-            $expiresAt = $assignedAt->copy()->addDays((int) $permission->pivot->duration_days);
+            $expiresAt = $assignedAt->copy()->addDays((int) $permission->getRelation('pivot')->getAttribute('duration_days'));
 
+            $pivot = $current->getRelation('pivot');
             $renewed[] = [
                 'permission_uuid' => $permission->uuid,
-                'previous_assigned_at' => $current->pivot->assigned_at->toIso8601String(),
-                'previous_expires_at' => $current->pivot->expires_at->toIso8601String(),
+                'previous_assigned_at' => (string) $pivot->getAttribute('assigned_at')->toIso8601String(),
+                'previous_expires_at' => (string) $pivot->getAttribute('expires_at')->toIso8601String(),
                 'assigned_at' => $assignedAt->toIso8601String(),
                 'expires_at' => $expiresAt->toIso8601String(),
             ];

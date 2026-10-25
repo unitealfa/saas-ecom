@@ -17,10 +17,10 @@ class EnsureLocalDiagnostics
         return $next($request);
     }
 
-    private function isAllowed(Request $request): bool
+    public function isAllowed(Request $request): bool
     {
         return app()->environment(['local', 'testing'])
             && config('app.debug')
-            && in_array($request->ip(), self::LOOPBACK_IPS, true);
+            && in_array($request->server('REMOTE_ADDR'), self::LOOPBACK_IPS, true);
     }
 }

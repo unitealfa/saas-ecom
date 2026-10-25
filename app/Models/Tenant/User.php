@@ -8,6 +8,7 @@ use App\Concerns\HasTimedPermissions;
 use App\Concerns\LogsSafeActivity;
 use App\Enums\Tenant\Users\MembershipStatusEnum;
 use App\Enums\Tenant\Users\StatusEnum;
+use Database\Factories\Tenant\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,13 +18,24 @@ use Illuminate\Notifications\Notifiable;
 use LogicException;
 use Stancl\Tenancy\Database\Concerns\TenantConnection;
 
-
+/**
+ * @property StatusEnum $status
+ * @property MembershipStatusEnum $membership_status
+ */
 #[Fillable(['last_name', 'first_name', 'email', 'phone', 'password', 'locale'])]
 #[Hidden(['id', 'password', 'remember_token', 'central_user_uuid'])]
 class User extends Authenticatable
 {
+    /** @use HasFactory<UserFactory> */
     use HasFactory, HasPublicUuid, Notifiable, SoftDeletes, TenantConnection;
-    use HasProfilePhoto, HasTimedPermissions, LogsSafeActivity;
+
+    /** @use HasProfilePhoto<Media> */
+    use HasProfilePhoto;
+
+    /** @use HasTimedPermissions<Role, Permission> */
+    use HasTimedPermissions;
+
+    use LogsSafeActivity;
 
     protected string $guard_name = 'tenant';
 

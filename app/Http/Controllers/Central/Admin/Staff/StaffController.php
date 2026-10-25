@@ -34,7 +34,7 @@ class StaffController extends Controller
     public function store(StoreStaffRequest $request, StaffManagementService $staff): RedirectResponse
     {
         $result = $staff->create($this->centralActor(), $request->toDto());
-        $redirect = redirect()->route('central.staff.index');
+        $redirect = redirect()->route(Gate::allows('viewAnyStaff', User::class) ? 'central.staff.index' : 'dashboard');
 
         return $result->emailSent === true
             ? $redirect->with('status', 'Compte personnel créé pour '.$result->user->name.'. L’invitation a été envoyée.')
@@ -62,18 +62,17 @@ class StaffController extends Controller
     public function update(UpdateStaffRequest $request, User $user, StaffManagementService $staff): RedirectResponse
     {
         $result = $staff->update($this->centralActor(), $user, $request->toDto());
-        $redirect = redirect()->route('central.staff.show', $user)
-            ->with('status', 'Informations du personnel enregistrées.');
+        $redirect = $this->afterAction($user);
 
         return $result->emailSent === false
             ? $redirect->with('warning', 'Les informations sont enregistrées, mais l’e-mail n’a pas pu être envoyé. Vérifiez le SMTP.')
-            : $redirect;
+            : $redirect->with('status', 'Informations du personnel enregistrées.');
     }
 
     public function resendInvitation(User $user, StaffInvitationService $invitations): RedirectResponse
     {
         $result = $invitations->resend($this->centralActor(), $user);
-        $redirect = redirect()->route('central.staff.show', $user);
+        $redirect = $this->afterAction($user);
 
         return $result->emailSent === true
             ? $redirect->with('status', 'L’invitation a été envoyée.')
@@ -85,7 +84,7 @@ class StaffController extends Controller
         $status = StatusEnum::from((int) $request->validated('status'));
         $staff->changeStatus($this->centralActor(), $user, $status);
 
-        return redirect()->route('central.staff.show', $user)->with('status', match ($status) {
+        return $this->afterAction($user)->with('status', match ($status) {
             StatusEnum::SUSPENDED => 'Administrateur suspendu.',
             default => 'Administrateur réactivé.',
         });
@@ -95,7 +94,14 @@ class StaffController extends Controller
     {
         $staff->archive($this->centralActor(), $user);
 
-        return redirect()->route('central.staff.index')
+        return redirect()->route(Gate::allows('viewAnyStaff', User::class) ? 'central.staff.index' : 'dashboard')
             ->with('status', 'Administrateur archivé. Les données historiques sont conservées.');
+    }
+
+    private function afterAction(User $user): RedirectResponse
+    {
+        return Gate::allows('viewStaff', $user)
+            ? redirect()->route('central.staff.show', $user)
+            : redirect()->route('dashboard');
     }
 }

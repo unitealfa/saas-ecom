@@ -13,6 +13,7 @@ class PermissionCatalogService
 {
     private const int PER_PAGE = 20;
 
+    /** @return LengthAwarePaginator<int, Permission> */
     public function paginate(User $actor, ?string $search = null): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize('viewAny', Permission::class);
@@ -27,6 +28,7 @@ class PermissionCatalogService
             ->appends($search === '' ? [] : ['search' => $search]);
     }
 
+    /** @return array<string, string> */
     public function groups(): array
     {
         return collect(CentralRoleCatalog::GROUPS)
@@ -34,6 +36,10 @@ class PermissionCatalogService
             ->all();
     }
 
+    /**
+     * @param  Builder<Permission>  $query
+     * @return Builder<Permission>
+     */
     private function matching(Builder $query, string $search): Builder
     {
         $pattern = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';

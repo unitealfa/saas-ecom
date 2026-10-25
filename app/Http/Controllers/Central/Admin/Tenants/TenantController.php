@@ -95,9 +95,11 @@ class TenantController extends Controller
 
     public function update(UpdateTenantRequest $request, Tenant $tenant): RedirectResponse
     {
-        $this->tenants->update($this->centralActor(), $tenant, $request->validated());
+        /** @var array{shop_name: string, internal_label: string, expected_profile_version: int|string} $data */
+        $data = $request->validated();
+        $this->tenants->update($this->centralActor(), $tenant, $data);
 
-        return redirect()->route('central.tenants.show', $tenant)
+        return $this->afterAction($tenant)
             ->with('status', 'Informations enregistrées. Le nom sera synchronisé avec la boutique par la file centrale.');
     }
 
@@ -136,7 +138,7 @@ class TenantController extends Controller
         $owner = $tenant->owner;
         $redirect = $owner !== null && Gate::allows('update', $owner)
             ? redirect()->route('central.users.edit', $owner)
-            : redirect()->route('central.tenants.show', $tenant);
+            : $this->afterAction($tenant);
 
         return $redirect->with('status', 'Priorités enregistrées et boutiques éligibles recalculées sous quota.');
     }
@@ -151,6 +153,13 @@ class TenantController extends Controller
             $request->validated('reason'),
         );
 
-        return redirect()->route('central.tenants.show', $tenant)->with('status', $message);
+        return $this->afterAction($tenant)->with('status', $message);
+    }
+
+    private function afterAction(Tenant $tenant): RedirectResponse
+    {
+        return Gate::allows('view', $tenant)
+            ? redirect()->route('central.tenants.show', $tenant)
+            : redirect()->route('dashboard');
     }
 }

@@ -14,6 +14,7 @@ class DatabaseDiagnostics
 
     private const int RECENT_ORDERS = 20;
 
+    /** @return array<string, mixed> */
     public function read(): array
     {
         if (! tenancy()->initialized) {
@@ -47,6 +48,7 @@ class DatabaseDiagnostics
         ];
     }
 
+    /** @return array<string, int> */
     private function tableCounts(Connection $db): array
     {
         $tables = [];
@@ -69,6 +71,7 @@ class DatabaseDiagnostics
             ->select(['o.id', 'o.uuid', 'o.number', 'o.commercial_status', 'r.order_total', 'r.currency']);
     }
 
+    /** @return list<object|null> */
     private function oneQueryPerOrder(Connection $db): array
     {
         $rows = [];
@@ -80,6 +83,7 @@ class DatabaseDiagnostics
         return $rows;
     }
 
+    /** @return array<int, object> */
     private function findOrderByUuid(Connection $db): array
     {
         $uuid = $db->table('orders')->orderBy('id')->value('uuid');
@@ -87,6 +91,10 @@ class DatabaseDiagnostics
         return $db->table('orders')->where('uuid', $uuid)->get(['id', 'uuid', 'number'])->all();
     }
 
+    /**
+     * @param  Closure(): array<array-key, mixed>  $operation
+     * @return array{name: string, queries: int, rows: int, sql_ms: float, elapsed_ms: float}
+     */
     private function measure(Connection $db, string $name, Closure $operation): array
     {
         $wasLogging = $db->logging();

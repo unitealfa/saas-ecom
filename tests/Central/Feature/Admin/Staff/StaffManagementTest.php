@@ -2,16 +2,20 @@
 
 use App\Enums\Central\Users\StatusEnum;
 use App\Models\Central\Activity;
+use App\Models\Central\Permission;
 use App\Models\Central\Role;
 use App\Models\User;
 use App\Notifications\Central\Auth\AccountInvitation;
 use App\Services\Central\Auth\AccountMailDelivery;
+use App\Services\Central\Authorization\AuthorizationMutation;
 use App\Services\Central\Authorization\CentralPermissionResolver;
+use App\Services\Central\Authorization\CentralRoleAssignmentService;
+use App\Services\Central\Users\StaffManagementService;
 use App\Services\Central\Users\UserManagementService;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -26,7 +30,7 @@ beforeEach(function (): void {
 
 test('saving staff roles preserves roles excluded from the delegable catalogue and direct grants', function (): void {
     $this->freezeTime();
-    $legacy = \App\Models\Central\Permission::create(['name' => 'saas.legacy.operation', 'label' => 'Legacy']);
+    $legacy = Permission::create(['name' => 'saas.legacy.operation', 'label' => 'Legacy']);
     $hiddenRole = Role::createWithPermissions('legacy-profile', [$legacy->name => 7]);
     $staff = staffTestAccount();
     $staff->assignRole($hiddenRole);
@@ -84,14 +88,14 @@ test('central mutations roll back permissions and audit on the actual model conn
         ->and(DB::connection())->toBe($connection);
     $events = Activity::count();
     try {
-        app(\App\Services\Central\Authorization\AuthorizationMutation::class)->transaction(function () use ($staff, $connection): void {
+        app(AuthorizationMutation::class)->transaction(function () use ($staff, $connection): void {
             expect($connection->transactionLevel())->toBeGreaterThan(0);
             $staff->givePermissionTo('saas.countries.view');
             activity()->performedOn($staff)->event('rollback_probe')->log('Isolated rollback test');
-            throw new \RuntimeException('rollback');
+            throw new RuntimeException('rollback');
         });
         $this->fail('The mutation must fail.');
-    } catch (\RuntimeException $exception) {
+    } catch (RuntimeException $exception) {
         expect($exception->getMessage())->toBe('rollback');
     }
     expect($staff->fresh()->can('saas.countries.view'))->toBeFalse()
@@ -104,7 +108,7 @@ test('central mutation authorizes the actor and target before executing the writ
     $actor = staffTestAccount();
     $staff = staffTestAccount();
     $executed = false;
-    expect(fn () => app(\App\Services\Central\Authorization\AuthorizationMutation::class)->run(
+    expect(fn () => app(AuthorizationMutation::class)->run(
         actor: $actor,
         ability: 'updateStaff',
         loadTarget: fn (): User => User::whereKey($staff->id)->lockForUpdate()->firstOrFail(),
@@ -130,6 +134,34 @@ function staffTestProfile(User $user): array
     return ['first_name' => $user->first_name, 'last_name' => $user->last_name, 'email' => $user->email,
         'phone' => $user->phone, 'country_uuid' => $user->country->uuid, 'locale' => 'fr'];
 }
+
+test('controller corrections renew roles with renewal permission alone', function (): void {
+    $actor = User::factory()->create();
+    $actor->assignRole(Role::createWithPermissions('renewal-only', [
+        'saas.staff.assignments.renew' => 9999, 'saas.users.view' => 9999,
+    ]));
+    $staff = staffTestAccount();
+    $role = $staff->roles()->firstOrFail();
+    $original = $role->pivot->assigned_at->toIso8601String();
+    $this->travel(1)->days();
+
+    $this->actingAs($actor, 'central')->post(route('central.staff.roles.renew', [$staff, $role]), [
+        'reason' => 'Renouvellement autorisé.', 'expected_assigned_at' => $original,
+    ])->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
+    expect(Activity::forSubject($staff)->where('event', 'central_role_assignment_renewed')->count())->toBe(1);
+    $this->get(route('central.staff.roles.edit', $staff))->assertForbidden();
+});
+
+test('controller corrections report a single warning after an email update fails', function (string $context): void {
+    $target = $context === 'staff' ? staffTestAccount() : User::factory()->create();
+    $payload = [...staffTestProfile($target), 'email' => 'updated-contact@example.test'];
+    $this->mock(AccountMailDelivery::class)->shouldReceive('verification')->once()->andReturn(false);
+
+    $this->actingAs($this->admin, 'central')->put(route('central.'.$context.'.update', $target), $payload)
+        ->assertSessionHasNoErrors()->assertSessionHas('warning')->assertSessionMissing('status');
+    expect($target->fresh()->email)->toBe($payload['email'])
+        ->and($target->fresh()->status)->toBe(StatusEnum::ACTIVE);
+})->with(['users', 'staff']);
 
 test('staff listing separates merchants archived accounts and protected root without exposing secrets', function (): void {
     $staff = staffTestAccount();
@@ -363,7 +395,7 @@ test('staff service actions require their own permission even when the generic u
     ]));
     $staff = staffTestAccount();
     expect(Gate::forUser($actor)->allows($action, $staff))->toBeTrue();
-    $service = app(\App\Services\Central\Users\StaffManagementService::class);
+    $service = app(StaffManagementService::class);
 
     expect(fn () => $action === 'suspend'
         ? $service->changeStatus($actor, $staff, StatusEnum::SUSPENDED)
@@ -378,7 +410,7 @@ test('role replacement keeps both audit events inside its single transaction', f
     $staff = staffTestAccount();
     $role = Role::findByName('user-manager', 'central');
 
-    app(\App\Services\Central\Authorization\CentralRoleAssignmentService::class)->replace($this->admin, $staff, [$role->uuid]);
+    app(CentralRoleAssignmentService::class)->replace($this->admin, $staff, [$role->uuid]);
 
     expect($staff->fresh()->hasRole($role))->toBeTrue();
     foreach (['central_roles_updated', 'central_staff_roles_replaced'] as $event) {

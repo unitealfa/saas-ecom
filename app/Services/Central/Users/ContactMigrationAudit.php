@@ -4,6 +4,8 @@ namespace App\Services\Central\Users;
 
 use App\Models\Central\Country;
 use App\Models\Central\User;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 
@@ -13,6 +15,7 @@ class ContactMigrationAudit
 
     public function __construct(private PhoneNumberNormalizer $phones) {}
 
+    /** @return array{invalid: list<string>, duplicates: list<list<string>>, changed: int} */
     public function inspect(): array
     {
         if (tenancy()->initialized) {
@@ -53,14 +56,15 @@ class ContactMigrationAudit
         ];
     }
 
+    /** @param array<string, int> $regions */
     private function normalizedPhone(User $user, bool $hasPhoneCountry, array $regions): ?string
     {
         try {
             if ($hasPhoneCountry && $user->phone_country_id !== null) {
-                return $this->phones->normalize($user->phone, $user->phoneCountry?->code ?? '');
+                return $this->phones->normalize($user->phone, $user->phoneCountry->code ?? '');
             }
 
-            $historical = $this->phones->historical($user->phone, $user->country?->code ?? '');
+            $historical = $this->phones->historical($user->phone, $user->country->code ?? '');
 
             return isset($regions[$historical['region']]) ? $historical['value'] : null;
         } catch (ValidationException) {
@@ -68,6 +72,7 @@ class ContactMigrationAudit
         }
     }
 
+    /** @return array<string, int> */
     private function knownRegions(): array
     {
         return Country::withTrashed()->pluck('code')
@@ -81,11 +86,12 @@ class ContactMigrationAudit
         return (new User)->getConnection()->getSchemaBuilder()->hasColumn('users', 'phone_country_id');
     }
 
-    private function users(bool $hasPhoneCountry)
+    /** @return Builder<User> */
+    private function users(bool $hasPhoneCountry): Builder
     {
         return User::withTrashed()
             ->select(['id', 'uuid', 'country_id', 'phone', ...($hasPhoneCountry ? ['phone_country_id'] : [])])
-            ->with(['country' => fn ($query) => $query->withTrashed()])
+            ->with(['country' => fn ($query) => $query->withoutGlobalScope(SoftDeletingScope::class)])
             ->when($hasPhoneCountry, fn ($query) => $query->with('phoneCountry'));
     }
 }

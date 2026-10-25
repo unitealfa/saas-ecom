@@ -25,7 +25,7 @@ class LegalVerificationController extends Controller
 
     private function decide(LegalVerificationRequest $request, User $user, bool $approved): RedirectResponse
     {
-        Gate::authorize('decideLegalVerification', $user); // adaptez au nom de votre policy
+        Gate::forUser($this->centralActor())->authorize($approved ? 'approve' : 'reject', $user);
 
         $this->approvals->decide(
             $this->centralActor(),
@@ -36,7 +36,11 @@ class LegalVerificationController extends Controller
             $request->expectedStatus(),
         );
 
-        return redirect()->route('central.users.show', $user)->with(
+        $redirect = Gate::forUser($this->centralActor())->allows('view', $user)
+            ? redirect()->route('central.users.show', $user)
+            : redirect()->route('dashboard');
+
+        return $redirect->with(
             'status',
             $approved ? 'Compte approuvé et dossier validé.' : 'Compte refusé et dossier rejeté.',
         );

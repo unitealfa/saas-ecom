@@ -10,7 +10,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Spatie\Permission\Models\Permission as PackagePermission;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
-
+/**
+ * @property int $id
+ * @property string $label
+ */
 #[Fillable(['name', 'label', 'feature_code'])]
 class Permission extends PackagePermission
 {
@@ -22,7 +25,9 @@ class Permission extends PackagePermission
 
     protected $attributes = ['guard_name' => self::GUARD];
 
-    
+    /** @param Builder<static> $query
+     * @return Builder<static>
+     */
     public function scopeForCentralGuard(Builder $query): Builder
     {
         return $query->where('guard_name', self::GUARD);

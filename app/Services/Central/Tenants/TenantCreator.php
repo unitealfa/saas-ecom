@@ -131,7 +131,8 @@ class TenantCreator
         }
 
         // get() et non count() SQL : le verrou doit porter sur les lignes.
-        $count = Tenant::where('user_id', $owner->id)->orderBy('id')->lockForUpdate()->get(['id'])->count();
+        $shops = Tenant::where('user_id', $owner->id)->orderBy('id')->lockForUpdate()->get(['id']);
+        $count = $shops->count();
 
         if ($quota->limit !== null && $count >= $quota->limit) {
             throw ValidationException::withMessages(['shop_name' => 'Le nombre maximum de boutiques de cette offre est atteint.']);
@@ -217,6 +218,9 @@ class TenantCreator
     private function requestProvisioning(Tenant $tenant): TenantSchemaDeployment
     {
         $files = $this->migrationFiles();
+        if ($files === []) {
+            throw new LogicException('Tenant migrations are missing.');
+        }
 
         $deployment = TenantSchemaDeployment::create([
             'tenant_id' => $tenant->id,

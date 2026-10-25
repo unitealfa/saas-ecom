@@ -27,6 +27,7 @@ class TenantManagementService
 
     public function __construct(private AuthorizationMutation $mutations) {}
 
+    /** @return LengthAwarePaginator<int, Tenant> */
     public function search(User $actor, ?string $search, ?StatusEnum $status): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize('viewAny', Tenant::class);
@@ -57,6 +58,7 @@ class TenantManagementService
             ->appends(['search' => $search === '' ? null : $search, 'status' => $status?->value]);
     }
 
+    /** @return LengthAwarePaginator<int, User> */
     public function owners(User $actor, ?string $search): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize('create', Tenant::class);
@@ -74,6 +76,10 @@ class TenantManagementService
             ->appends(['search' => $search === '' ? null : $search]);
     }
 
+    /**
+     * @param  Collection<int, Tenant>  $tenants
+     * @return Collection<int, Subscription>
+     */
     public function subscriptions(Collection $tenants): Collection
     {
         return Subscription::whereIn('user_id', $tenants->pluck('user_id')->unique())
@@ -83,6 +89,7 @@ class TenantManagementService
             ->with('plan')->orderByDesc('id')->get()->unique('user_id')->keyBy('user_id');
     }
 
+    /** @return LengthAwarePaginator<int, Activity> */
     public function history(User $actor, Tenant $tenant): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize('viewHistory', $tenant);
@@ -90,6 +97,7 @@ class TenantManagementService
         return Activity::forSubject($tenant)->with('causer')->orderByDesc('id')->paginate(self::PER_PAGE);
     }
 
+    /** @param array{shop_name: string, internal_label: string|null, expected_profile_version: int|string} $data */
     public function update(User $actor, Tenant $tenant, array $data): void
     {
         $this->mutations->run($actor, 'update', function () use ($tenant): Tenant {
@@ -138,6 +146,10 @@ class TenantManagementService
         return '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
     }
 
+    /**
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
     private function matchesPerson(Builder $query, string $pattern): Builder
     {
         return $query->where('first_name', 'like', $pattern)

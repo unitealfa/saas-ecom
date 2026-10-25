@@ -8,6 +8,7 @@ use Illuminate\Support\Collection;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Traits\HasPermissions;
 
+/** @template TPermission of Permission */
 trait HasRoleMetadata
 {
     use HasPermissions {
@@ -55,7 +56,7 @@ trait HasRoleMetadata
         });
     }
 
-    /** @return BelongsToMany<Permission, $this> */
+    /** @return BelongsToMany<TPermission, $this> */
     public function permissions(): BelongsToMany
     {
         return parent::permissions()->withPivot('duration_days');
@@ -66,6 +67,7 @@ trait HasRoleMetadata
         return false;
     }
 
+    /** @return BelongsToMany<TPermission, $this> */
     public function permissionComposition(): BelongsToMany
     {
         return $this->permissions();

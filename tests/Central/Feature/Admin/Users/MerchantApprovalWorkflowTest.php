@@ -41,6 +41,37 @@ test('approval validates the account and dossier atomically without verifying em
     $this->get(route('central.users.pending'))->assertDontSee($updated->email);
 });
 
+test('controller corrections refuse external decision redirects', function (): void {
+    $merchant = User::factory()->create(['status' => StatusEnum::PENDING]);
+    $this->actingAs($this->admin, 'central')->from('https://external.example/admin/users')
+        ->post(route('central.users.approve', $merchant), merchantDecisionSnapshot($merchant))
+        ->assertSessionHasNoErrors()->assertRedirect(route('central.users.index'));
+});
+
+test('controller corrections approve without requiring user listing access', function (): void {
+    $actor = User::factory()->create();
+    $actor->assignRole(Role::createWithPermissions('approval-only', ['saas.users.approve' => 9999]));
+    $merchant = User::factory()->create(['status' => StatusEnum::PENDING]);
+
+    $this->actingAs($actor, 'central')->from(route('central.users.pending'))
+        ->post(route('central.users.approve', $merchant), merchantDecisionSnapshot($merchant))
+        ->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
+    expect($merchant->fresh()->status)->toBe(StatusEnum::ACTIVE);
+    $this->get(route('central.users.index'))->assertForbidden();
+});
+
+test('controller corrections preserve legacy legal decisions under the current policy', function (): void {
+    $merchant = User::factory()->create(['status' => StatusEnum::PENDING]);
+    $this->actingAs($this->admin, 'central')->post(route('central.users.legal.reject', $merchant), [
+        ...merchantDecisionSnapshot($merchant), 'reason' => 'Vérification administrative.',
+    ])->assertSessionHasNoErrors()->assertRedirect(route('central.users.show', $merchant));
+    $merchant->refresh();
+    $this->post(route('central.users.legal.validate', $merchant), merchantDecisionSnapshot($merchant))
+        ->assertSessionHasNoErrors()->assertRedirect(route('central.users.show', $merchant));
+    expect($merchant->fresh()->status)->toBe(StatusEnum::ACTIVE)
+        ->and($merchant->fresh()->legal_verification_status)->toBe(VerificationStatusEnum::VERIFIED);
+});
+
 test('merchant decisions return to the page that submitted the form', function (string $action, string $origin): void {
     $merchant = User::factory()->unverified()->create(['status' => StatusEnum::PENDING]);
     $previousUrl = $origin === 'show'

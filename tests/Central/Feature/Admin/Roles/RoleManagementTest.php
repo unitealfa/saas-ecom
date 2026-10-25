@@ -4,6 +4,7 @@ use App\Models\Central\Activity;
 use App\Models\Central\Permission;
 use App\Models\Central\Role;
 use App\Models\User;
+use App\Services\Central\Authorization\CentralUserAccess;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,40 @@ function module03Admin(): User
 
     return $admin;
 }
+
+test('controller corrections prepare owned permissions with bounded queries and respect revocations and expiry', function (): void {
+    $this->freezeTime();
+    $admin = module03Admin();
+    $actor = module03Actor(['saas.roles.create' => 9999, 'saas.users.view' => 1, 'saas.countries.view' => 9999]);
+    $access = app(CentralUserAccess::class);
+    $connection = DB::connection();
+    $connection->enableQueryLog();
+    $connection->flushQueryLog();
+    try {
+        $owned = $access->ownedPermissions($actor)->pluck('name')->sort()->values()->all();
+        $queryCount = count($connection->getQueryLog());
+    } finally {
+        $connection->disableQueryLog();
+        $connection->flushQueryLog();
+    }
+
+    expect($owned)->toBe(collect(['saas.roles.create', 'saas.users.view', 'saas.countries.view'])->sort()->values()->all())
+        ->and($queryCount)->toBeLessThanOrEqual(5);
+    $actor->revokePermissionTo('saas.countries.view');
+    $this->travel(1)->days();
+    expect($access->ownedPermissions($actor)->pluck('name')->all())->toBe(['saas.roles.create']);
+    expect($access->ownedPermissions($admin)->count())->toBe(Permission::forCentralGuard()->count());
+    $this->actingAs($actor, 'central')->get(route('central.roles.create'))->assertOk()
+        ->assertViewHas('permissions', fn ($permissions): bool => $permissions->pluck('name')->all() === ['saas.roles.create']);
+});
+
+test('controller corrections redirect role writers without listing access to the dashboard', function (): void {
+    module03Admin();
+    $actor = module03Actor(['saas.roles.create' => 9999, 'saas.users.view' => 9999]);
+    $this->actingAs($actor, 'central')->post(route('central.roles.store'), module03Payload('New role', ['saas.users.view' => 10]))
+        ->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
+    $this->get(route('central.roles.index'))->assertForbidden();
+});
 
 /** @param array<string, int> $grants */
 function module03Actor(array $grants): User

@@ -34,12 +34,13 @@ class StaffRoleController extends Controller
 
         $this->assignments->replace($this->centralActor(), $user, $request->validated('roles', []));
 
-        return redirect()->route('central.staff.index')->with('status', 'Rôles du personnel enregistrés.');
+        return redirect()->route(Gate::allows('viewAnyStaff', User::class) ? 'central.staff.index' : 'dashboard')
+            ->with('status', 'Rôles du personnel enregistrés.');
     }
 
     public function renew(RenewStaffAssignmentRequest $request, User $user, Role $role): RedirectResponse
     {
-        Gate::authorize('assignStaffRoles', $user);
+        Gate::authorize('renewStaffAssignments', $user);
 
         $this->assignments->renewRole(
             $this->centralActor(),
@@ -49,7 +50,10 @@ class StaffRoleController extends Controller
             $request->validated('expected_assigned_at'),
         );
 
-        return redirect()->route('central.staff.show', $user)
-            ->with('status', 'Attribution renouvelée. Les durées du rôle repartent de maintenant.');
+        $redirect = Gate::allows('viewStaff', $user)
+            ? redirect()->route('central.staff.show', $user)
+            : redirect()->route('dashboard');
+
+        return $redirect->with('status', 'Attribution renouvelée. Les durées du rôle repartent de maintenant.');
     }
 }

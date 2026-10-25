@@ -7,6 +7,7 @@ use Illuminate\Cache\CacheManager;
 use Illuminate\Cache\Repository;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class CountryCatalog
@@ -23,16 +24,19 @@ class CountryCatalog
 
     public function __construct(private CacheManager $cache) {}
 
+    /** @return Collection<int, Country> */
     public function active(): Collection
     {
         return $this->available();
     }
 
+    /** @return Collection<int, Country> */
     public function forProfile(?int $currentId): Collection
     {
         return $this->available($currentId);
     }
 
+    /** @return Collection<int, Country> */
     public function forPhone(?int $currentId): Collection
     {
         return $this->available($currentId, includeArchivedCurrent: true);
@@ -47,6 +51,7 @@ class CountryCatalog
         $store->forget(self::ROWS_PREFIX.$previous);
     }
 
+    /** @return Collection<int, Country> */
     private function available(?int $currentId = null, bool $includeArchivedCurrent = false): Collection
     {
         return $this->all()
@@ -65,6 +70,7 @@ class CountryCatalog
         return ! $country->trashed() && ($country->is_active || $isCurrent);
     }
 
+    /** @return Collection<int, Country> */
     private function all(): Collection
     {
         if ($this->connection()->transactionLevel() > 0) {
@@ -85,6 +91,7 @@ class CountryCatalog
         return Country::hydrate($rows);
     }
 
+    /** @return Collection<int, Country> */
     private function fromDatabase(): Collection
     {
         return Country::withTrashed()->orderBy('name_fr')->orderBy('id')->get();
@@ -92,7 +99,7 @@ class CountryCatalog
 
     private function connection(): Connection
     {
-        return Country::query()->getConnection();
+        return DB::connection((new Country)->getConnectionName());
     }
 
     private function store(): Repository

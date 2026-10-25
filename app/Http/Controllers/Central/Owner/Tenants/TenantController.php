@@ -6,6 +6,7 @@ use App\DTOs\Tenant\Shop\ShopSettings;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Tenants\StoreOwnedTenantRequest;
 use App\Models\Central\Tenant;
+use App\Models\Central\User;
 use App\Services\Central\Tenants\TenantCreator;
 use App\Services\Central\Tenants\TenantProvisioningRetry;
 use Illuminate\Contracts\View\View;
@@ -19,6 +20,7 @@ class TenantController extends Controller
     public function create(Request $request): View|RedirectResponse
     {
         $owner = $this->centralActor()->fresh();
+        abort_unless($owner instanceof User, 403);
         Gate::forUser($owner)->authorize('createOwned', [Tenant::class, $owner]);
 
         if (! $owner->tenants()->exists()) {
@@ -50,6 +52,7 @@ class TenantController extends Controller
 
         $retry->retry($this->centralActor(), $tenant);
 
-        return back()->with('status', 'La reprise a été demandée. Les informations de votre boutique sont conservées.');
+        return redirect()->route('registration.status')
+            ->with('status', 'La reprise a été demandée. Les informations de votre boutique sont conservées.');
     }
 }

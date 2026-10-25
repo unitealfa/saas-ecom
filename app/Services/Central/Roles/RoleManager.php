@@ -9,13 +9,16 @@ use App\Models\Central\User;
 use App\Models\PermissionAssignment;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use Illuminate\Contracts\Auth\Access\Gate as GateContract;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * @phpstan-type Durations array<string, int>
+ * @phpstan-type Grants array<int, array{duration_days: int}>
+ */
 class RoleManager
 {
     private const int NEVER = PermissionAssignment::NEVER_EXPIRES_DAYS;
@@ -106,6 +109,10 @@ class RoleManager
         return $this->store($actor, $role, $name, $label, $signature, $grants, $oldGrants, $durations);
     }
 
+    /**
+     * @param  Durations  $oldGrants
+     * @return Durations
+     */
     private function resolveDurations(RoleData $data, array $oldGrants): array
     {
         $durations = $data->permissionDurations ?? $oldGrants;
@@ -125,6 +132,7 @@ class RoleManager
         return $durations;
     }
 
+    /** @return array{string, string} */
     private function resolveIdentity(RoleData $data, ?Role $role): array
     {
         $name = $data->name ?? $role?->name;
@@ -137,6 +145,10 @@ class RoleManager
         return [trim($name), trim($label)];
     }
 
+    /**
+     * @param  Durations  $oldGrants
+     * @param  Durations  $durations
+     */
     private function authorizeChanges(GateContract $gate, Role $role, string $name, string $label, array $oldGrants, array $durations): void
     {
         if ($name !== $role->name || $label !== $role->label) {
@@ -156,6 +168,10 @@ class RoleManager
         }
     }
 
+    /**
+     * @param  Durations  $durations
+     * @return array{Grants, string}
+     */
     private function resolveGrants(GateContract $gate, array $durations): array
     {
         $permissions = Permission::forCentralGuard()
@@ -186,6 +202,7 @@ class RoleManager
         return [$grants, hash('sha256', json_encode($parts, JSON_THROW_ON_ERROR))];
     }
 
+    /** @param list<int> $permissionIds */
     private function assertNoDuplicate(?Role $role, string $name, string $signature, array $permissionIds): void
     {
         $duplicates = Role::forCentralGuard()->where(function ($query) use ($name, $signature): void {
@@ -205,6 +222,11 @@ class RoleManager
         }
     }
 
+    /**
+     * @param  Grants  $grants
+     * @param  Durations  $oldGrants
+     * @param  Durations  $durations
+     */
     private function store(User $actor, ?Role $role, string $name, string $label, string $signature, array $grants, array $oldGrants, array $durations): Role
     {
         $created = $role === null;
@@ -259,12 +281,13 @@ class RoleManager
         }
     }
 
+    /** @return Durations */
     private function grantsOf(Role $role): array
     {
         $permissions = $role->permissionComposition()->get();
 
         return $permissions->mapWithKeys(fn ($permission): array => [
-            $permission->uuid => (int) $permission->pivot->duration_days,
+            $permission->uuid => (int) $permission->getRelation('pivot')->getAttribute('duration_days'),
         ])->all();
     }
 
@@ -273,6 +296,7 @@ class RoleManager
         return Role::whereKey($role->id)->lockForUpdate()->firstOrFail();
     }
 
+    /** @param list<int> $permissionIds */
     private function assertRecipientsRemainDisjoint(Role $role, array $permissionIds): void
     {
         $db = $role->getConnection();

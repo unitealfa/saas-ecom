@@ -9,6 +9,7 @@ use App\Concerns\LogsSafeActivity;
 use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
 use App\Services\Central\Users\PhoneNumberNormalizer;
+use Carbon\CarbonImmutable;
 use Database\Factories\Central\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -29,13 +30,37 @@ use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
-
+/**
+ * @property StatusEnum $status
+ * @property VerificationStatusEnum|null $legal_verification_status
+ * @property int|null $legal_profile_version
+ * @property int|null $country_id
+ * @property int|null $phone_country_id
+ * @property CarbonImmutable|null $legal_verified_at
+ * @property string|null $remember_token
+ * @property string $name
+ * @property string|null $legal_form
+ * @property string|null $activity_nature
+ * @property string|null $legal_address
+ * @property CarbonImmutable|null $phone_verified_at
+ * @property CarbonImmutable|null $whatsapp_verified_at
+ * @property-read Country|null $country
+ * @property-read Country|null $phoneCountry
+ */
 #[Fillable(['name', 'last_name', 'first_name', 'email', 'password'])]
 #[Hidden(['id', 'country_id', 'phone_country_id', 'legal_verified_by_id', 'password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
+    /** @use HasFactory<UserFactory> */
     use CentralConnection, HasFactory, HasPublicUuid, Notifiable, PasskeyAuthenticatable, SoftDeletes, TwoFactorAuthenticatable;
-    use HasProfilePhoto, HasTimedPermissions, LogsSafeActivity;
+
+    /** @use HasProfilePhoto<Media> */
+    use HasProfilePhoto;
+
+    /** @use HasTimedPermissions<Role, Permission> */
+    use HasTimedPermissions;
+
+    use LogsSafeActivity;
 
     /** Message de validation par champ unique (index users_<champ>_unique). */
     private const array UNIQUE_MESSAGES = [
@@ -46,7 +71,6 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     protected string $guard_name = 'central';
 
     protected $attributes = ['locale' => 'fr', 'status' => StatusEnum::ACTIVE->value];
-
 
     protected function casts(): array
     {
@@ -85,7 +109,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return UserFactory::new();
     }
 
-
+    /** @return Attribute<string, string> */
     protected function name(): Attribute
     {
         return Attribute::make(
@@ -99,12 +123,13 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return 'central_user';
     }
 
-
+    /** @param Builder<static> $query
+     * @return Builder<static>
+     */
     public function scopeWithStatus(Builder $query, StatusEnum $status): Builder
     {
         return $query->where('status', $status->value);
     }
-
 
     public function save(array $options = []): bool
     {
@@ -128,26 +153,31 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         }
     }
 
+    /** @return BelongsTo<Country, $this> */
     public function country(): BelongsTo
     {
         return $this->belongsTo(Country::class);
     }
 
+    /** @return BelongsTo<Country, $this> */
     public function phoneCountry(): BelongsTo
     {
         return $this->belongsTo(Country::class, 'phone_country_id')->withTrashed();
     }
 
+    /** @return HasMany<Tenant, $this> */
     public function tenants(): HasMany
     {
         return $this->hasMany(Tenant::class);
     }
 
+    /** @return HasMany<Subscription, $this> */
     public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class);
     }
 
+    /** @return BelongsTo<self, $this> */
     public function legalVerifier(): BelongsTo
     {
         return $this->belongsTo(self::class, 'legal_verified_by_id')->withTrashed();

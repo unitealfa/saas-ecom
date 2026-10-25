@@ -20,7 +20,7 @@ class StaffPermissionController extends Controller
 
     public function index(User $user): View
     {
-        Gate::authorize('updateStaffPermissions', $user); // adaptez au nom de votre policy
+        Gate::authorize('viewStaffPermissions', $user);
 
         return view('central.pages.admin.staff.permissions', [
             'user' => $user,
@@ -40,7 +40,7 @@ class StaffPermissionController extends Controller
             $user,
             $data['grants'],
             $data['expected_state'],
-            $data['reason'],
+            $request->validated('reason'),
         );
 
         return redirect()

@@ -29,11 +29,13 @@ class Media extends Model
         ];
     }
 
+    /** @return MorphTo<Model, $this> */
     public function model(): MorphTo
     {
         return $this->morphTo();
     }
 
+    /** @return BelongsTo<User, $this> */
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_id')->withTrashed();

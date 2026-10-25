@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
+/** @property MediaVisibilityEnum $visibility */
 #[Hidden(['id', 'model_id', 'created_by_id'])]
 class Media extends Model
 {
@@ -30,11 +31,13 @@ class Media extends Model
         ];
     }
 
+    /** @return MorphTo<Model, $this> */
     public function model(): MorphTo
     {
         return $this->morphTo();
     }
 
+    /** @return BelongsTo<User, $this> */
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_id')->withTrashed();

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Storefront;
 
 use App\Enums\VerificationStatusEnum;
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\EnsureLocalDiagnostics;
 use App\Models\Central\Domain;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -11,7 +12,7 @@ use Stancl\Tenancy\Resolvers\DomainTenantResolver;
 
 class StorefrontController extends Controller
 {
-    public function __invoke(Request $request): Response
+    public function __invoke(Request $request, EnsureLocalDiagnostics $diagnostics): Response
     {
         $domain = DomainTenantResolver::$currentDomain;
 
@@ -22,7 +23,7 @@ class StorefrontController extends Controller
 
         $message = 'Cette boutique est en préparation.';
 
-        if ($this->isLocalDebug($request)) {
+        if ($diagnostics->isAllowed($request)) {
             $message .= "\nID de la boutique : ".tenant('id')
                 ."\nID du propriétaire (compte central) : ".tenant('user_id');
         }
@@ -32,12 +33,5 @@ class StorefrontController extends Controller
             'Cache-Control' => 'no-store',
             'Retry-After' => '3600',
         ]);
-    }
-
-    private function isLocalDebug(Request $request): bool
-    {
-        return app()->environment(['local', 'testing'])
-            && config('app.debug')
-            && in_array($request->ip(), ['127.0.0.1', '::1', '::ffff:127.0.0.1'], true);
     }
 }

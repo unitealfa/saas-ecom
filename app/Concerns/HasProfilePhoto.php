@@ -9,11 +9,13 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 
+/** @template TMedia of CentralMedia|TenantMedia */
 trait HasProfilePhoto
 {
-    /** @return MorphOne<CentralMedia|TenantMedia, $this> */
+    /** @return MorphOne<TMedia, $this> */
     public function profilePhoto(): MorphOne
     {
+        /** @var class-string<TMedia> $model */
         $model = $this->getMorphClass() === 'central_user' ? CentralMedia::class : TenantMedia::class;
 
         return $this->morphOne($model, 'model', 'model_type', 'model_id')

@@ -5,6 +5,10 @@ namespace App\Models;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\MorphPivot;
 
+/**
+ * @property CarbonImmutable $assigned_at
+ * @property CarbonImmutable|null $expires_at
+ */
 class PermissionAssignment extends MorphPivot
 {
     /** « Sans expiration » est représenté par une date très lointaine (environ 27 ans), jamais par null. */

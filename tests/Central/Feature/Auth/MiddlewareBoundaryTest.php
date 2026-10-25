@@ -1,9 +1,12 @@
 <?php
 
 use App\Enums\Central\Users\StatusEnum;
+use App\Enums\VerificationStatusEnum;
+use App\Http\Controllers\Storefront\StorefrontController;
 use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
 use App\Http\Middleware\EnsureApplicationDomain;
 use App\Http\Middleware\EnsureLocalDiagnostics;
+use App\Models\Central\Domain;
 use App\Models\User;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
@@ -11,6 +14,7 @@ use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Testing\TestResponse;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
+use Stancl\Tenancy\Resolvers\DomainTenantResolver;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -150,6 +154,29 @@ test('forwarded loopback addresses cannot expose diagnostics through a trusted r
         expect(fn () => app(EnsureLocalDiagnostics::class)->handle($request, fn () => response('diagnostics')))
             ->toThrow(NotFoundHttpException::class);
     } finally {
+        Request::setTrustedProxies($proxies, $headers);
+    }
+});
+
+test('controller corrections hide storefront diagnostics from a forwarded loopback address', function (): void {
+    $this->app['env'] = 'local';
+    config(['app.debug' => true]);
+    $previousDomain = DomainTenantResolver::$currentDomain;
+    $proxies = Request::getTrustedProxies();
+    $headers = Request::getTrustedHeaderSet();
+    Request::setTrustedProxies(['192.0.2.10'], Request::HEADER_X_FORWARDED_FOR);
+    DomainTenantResolver::$currentDomain = (new Domain)
+        ->forceFill(['verification_status' => VerificationStatusEnum::VERIFIED]);
+
+    try {
+        $request = Request::create('/', server: [
+            'REMOTE_ADDR' => '192.0.2.10', 'HTTP_X_FORWARDED_FOR' => '127.0.0.1',
+        ]);
+        $response = app()->call([app(StorefrontController::class), '__invoke'], ['request' => $request]);
+        expect($response->getStatusCode())->toBe(503)
+            ->and($response->getContent())->toBe('Cette boutique est en préparation.');
+    } finally {
+        DomainTenantResolver::$currentDomain = $previousDomain;
         Request::setTrustedProxies($proxies, $headers);
     }
 });

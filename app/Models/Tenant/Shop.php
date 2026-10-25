@@ -10,11 +10,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Stancl\Tenancy\Database\Concerns\TenantConnection;
 
-
 #[Fillable(['business_type', 'theme_code', 'colors', 'cart_lifetime_days'])]
 #[Hidden(['id', 'tenant_uuid', 'singleton'])]
 class Shop extends Model
 {
+    /** @use HasFactory<ShopFactory> */
     use HasFactory, HasPublicUuid, TenantConnection;
 
     protected $table = 'shop';

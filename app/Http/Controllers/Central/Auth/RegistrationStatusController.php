@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Central\Auth;
 
+use App\Enums\Central\Users\JourneyState;
 use App\Http\Controllers\Controller;
 use App\Models\Central\User;
 use App\Services\Central\Auth\RegistrationJourney;
@@ -23,8 +24,9 @@ class RegistrationStatusController extends Controller
             return response()->json($progress, 200, self::NO_STORE);
         }
 
-        if ($progress['redirect'] !== route('registration.status')) {
-            return redirect()->to($progress['redirect']);
+        $state = JourneyState::from($progress['state']);
+        if (! in_array($state, [JourneyState::PENDING, JourneyState::REJECTED, JourneyState::PREPARING], true)) {
+            return redirect()->route($state->routeName());
         }
 
         return response()->view(

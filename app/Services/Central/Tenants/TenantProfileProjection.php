@@ -18,7 +18,7 @@ class TenantProfileProjection
 
     public function assertPrepared(Tenant $tenant, User $owner): void
     {
-        if ($tenant->schema_version === null || $tenant->provisioned_at === null || ! $this->databaseExists($tenant)) {
+        if (! filled($tenant->schema_version) || $tenant->provisioned_at === null || ! $this->databaseExists($tenant)) {
             throw ValidationException::withMessages(['tenant' => 'La base de cette boutique doit être préparée avant son activation.']);
         }
 
@@ -40,7 +40,7 @@ class TenantProfileProjection
 
         $tenant = Tenant::whereKey($tenant->id)->where('uuid', $tenant->uuid)->firstOrFail();
 
-        if ($tenant->schema_version === null || ! $this->databaseExists($tenant)) {
+        if (! filled($tenant->schema_version) || $tenant->provisioned_at === null || ! $this->databaseExists($tenant)) {
             throw new LogicException('The tenant database is not ready for profile projection.');
         }
 

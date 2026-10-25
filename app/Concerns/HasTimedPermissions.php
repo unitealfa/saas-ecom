@@ -8,10 +8,15 @@ use App\Enums\Tenant\Users\StatusEnum;
 use App\Models\PermissionAssignment;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Collection;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Traits\HasRoles;
 
+/**
+ * @template TRole of Role
+ * @template TPermission of Permission
+ */
 trait HasTimedPermissions
 {
     use HasRoles {
@@ -25,10 +30,12 @@ trait HasTimedPermissions
     {
         return $this->getConnection()->transaction(function () use ($roles): static {
             $this->newQuery()->withTrashed()->whereKey($this->getKey())->lockForUpdate()->firstOrFail();
-            $requested = collect($roles)->flatten()->map(function (mixed $role): Role {
+            $roleClass = $this->getRoleClass();
+            /** @var Collection<int, TRole> $requested */
+            $requested = collect($roles)->flatten()->map(function (mixed $role) use ($roleClass): Role {
                 $stored = $this->getStoredRole($role);
-                if (! $stored instanceof Role) {
-                    throw new \LogicException('Configured roles must extend the Spatie role model.');
+                if (! $stored instanceof $roleClass) {
+                    throw new \LogicException('Configured roles must use the current authorization model.');
                 }
 
                 return $stored;
@@ -70,11 +77,11 @@ trait HasTimedPermissions
                     $this->givePermissionTo($permission);
                     $this->permissions()->updateExistingPivot($permission->id, [
                         'assigned_at' => $assignedAt,
-                        'expires_at' => $assignedAt->addDays((int) $permission->pivot->duration_days),
+                        'expires_at' => $assignedAt->addDays((int) $permission->getRelation('pivot')->getAttribute('duration_days')),
                     ]);
                     $initialGrants[] = ['permission_uuid' => $permission->uuid,
                         'assigned_at' => $assignedAt->toIso8601String(),
-                        'expires_at' => $assignedAt->addDays((int) $permission->pivot->duration_days)->toIso8601String()];
+                        'expires_at' => $assignedAt->addDays((int) $permission->getRelation('pivot')->getAttribute('duration_days'))->toIso8601String()];
                 }
             }
             activity()->performedOn($this)->event('roles_assigned')
@@ -134,26 +141,32 @@ trait HasTimedPermissions
         });
     }
 
-    /** @return class-string<Role> */
+    /** @return class-string<TRole> */
     public function getRoleClass(): string
     {
-        return $this->guard_name === 'central' ? \App\Models\Central\Role::class : \App\Models\Tenant\Role::class;
+        /** @var class-string<TRole> $model */
+        $model = $this->guard_name === 'central' ? \App\Models\Central\Role::class : \App\Models\Tenant\Role::class;
+
+        return $model;
     }
 
-    /** @return class-string<Permission> */
+    /** @return class-string<TPermission> */
     public function getPermissionClass(): string
     {
-        return $this->guard_name === 'central' ? \App\Models\Central\Permission::class : \App\Models\Tenant\Permission::class;
+        /** @var class-string<TPermission> $model */
+        $model = $this->guard_name === 'central' ? \App\Models\Central\Permission::class : \App\Models\Tenant\Permission::class;
+
+        return $model;
     }
 
-    /** @return BelongsToMany<Role, $this, PermissionAssignment> */
+    /** @return BelongsToMany<TRole, $this, PermissionAssignment> */
     public function roles(): BelongsToMany
     {
         return $this->morphToMany($this->getRoleClass(), 'model', config('permission.table_names.model_has_roles'), 'model_id', 'role_id')
             ->using(PermissionAssignment::class)->withPivot('assigned_at');
     }
 
-    /** @return BelongsToMany<Permission, $this, PermissionAssignment> */
+    /** @return BelongsToMany<TPermission, $this, PermissionAssignment> */
     public function permissions(): BelongsToMany
     {
         return $this->morphToMany($this->getPermissionClass(), 'model', config('permission.table_names.model_has_permissions'), 'model_id', 'permission_id')
@@ -193,7 +206,8 @@ trait HasTimedPermissions
         return false;
     }
 
-    public function getPermissionsViaRoles(): \Illuminate\Support\Collection
+    /** @return Collection<int, Permission> */
+    public function getPermissionsViaRoles(): Collection
     {
         if ($this->guard_name === 'central' && config('permission.central_profiles', false)) {
             return collect();

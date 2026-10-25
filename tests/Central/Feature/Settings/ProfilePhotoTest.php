@@ -173,6 +173,15 @@ test('the photo service also rejects non-image input before attempting storage',
     expect(Storage::disk('local')->allFiles('profile-photos'))->toBe([]);
 });
 
+test('service audit rejects a truncated JPEG with a validation error before storage', function (): void {
+    $user = User::factory()->create();
+    $photo = UploadedFile::fake()->createWithContent('truncated.jpg', "\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00");
+
+    expect($photo->getMimeType())->toBe('image/jpeg');
+    expect(fn () => app(ProfilePhotoService::class)->update($user, $photo))->toThrow(ValidationException::class);
+    expect(Media::count())->toBe(0);
+});
+
 test('private photo URLs reject a missing or modified signature', function (): void {
     $user = User::factory()->create();
     app(ProfilePhotoService::class)->update($user, UploadedFile::fake()->image('portrait.png'));

@@ -10,11 +10,13 @@ use App\Models\Central\Role;
 use App\Models\Central\Tenant;
 use App\Models\Central\TenantSchemaDeployment;
 use App\Models\User;
+use App\Services\Central\Tenants\TenantProfileProjection;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Stancl\Tenancy\Events\TenantCreated;
 
 function module05Admin(): User
@@ -43,6 +45,29 @@ function module05Shop(User $owner, array $attributes = []): Tenant
 
     return $shop;
 }
+
+test('service audit rejects an incomplete preparation marker before opening a tenant database', function (string $version, bool $prepared): void {
+    $owner = User::factory()->create();
+    $shop = module05Shop($owner, ['schema_version' => $version, 'provisioned_at' => $prepared ? now() : null]);
+
+    expect(fn () => app(TenantProfileProjection::class)->assertPrepared($shop, $owner))
+        ->toThrow(ValidationException::class);
+    expect(fn () => app(TenantProfileProjection::class)->sync($shop))
+        ->toThrow(LogicException::class, 'The tenant database is not ready for profile projection.');
+    expect(tenancy()->initialized)->toBeFalse();
+})->with([['', true], ['prepared-schema', false]]);
+
+test('controller corrections redirect tenant writers without listing access to the dashboard', function (): void {
+    module05Admin();
+    $owner = User::factory()->create();
+    $shop = module05Shop($owner);
+    $actor = module05Actor('saas.tenants.update');
+    $this->actingAs($actor, 'central')->put(route('central.tenants.update', $shop), [
+        'shop_name' => 'Updated shop', 'internal_label' => 'Updated', 'expected_profile_version' => 1,
+    ])->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
+    expect($shop->fresh()->shop_name)->toBe('Updated shop');
+    $this->get(route('central.tenants.show', $shop))->assertForbidden();
+});
 
 test('unavailable shops retain the public preparation response without opening a database or exposing identifiers', function (): void {
     $owner = User::factory()->create();

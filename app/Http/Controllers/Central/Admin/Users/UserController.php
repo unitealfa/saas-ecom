@@ -80,7 +80,6 @@ class UserController extends Controller
             'user' => $user,
             'ownerShops' => $ownerShops,
             'phoneCountries' => $this->countries->forPhone($user->phone_country_id),
-            'phoneCountriesA' => $this->countries->active(),
             'countries' => $this->countries->forProfile($user->country_id),
         ]);
     }
@@ -96,11 +95,11 @@ class UserController extends Controller
     public function update(UpdateUserRequest $request, User $user): RedirectResponse
     {
         $result = $this->userServices->update($this->centralActor(), $user, $request->toDto());
-        $redirect = $this->afterAction($user)->with('status', 'Informations du compte enregistrées.');
+        $redirect = $this->afterAction($user);
 
         return $result->emailSent === false
             ? $redirect->with('warning', 'Les informations sont enregistrées, mais l’e-mail n’a pas pu être envoyé. Vérifiez le SMTP puis renvoyez l’invitation.')
-            : $redirect;
+            : $redirect->with('status', 'Informations du compte enregistrées.');
     }
 
     public function resendInvitation(User $user): RedirectResponse
@@ -126,14 +125,14 @@ class UserController extends Controller
             default => 'Compte réactivé.',
         };
 
-        return redirect()->route('central.users.show', $user)->with('status', $message);
+        return $this->afterAction($user)->with('status', $message);
     }
 
     public function destroy(User $user): RedirectResponse
     {
         $this->userServices->archive($this->centralActor(), $user);
 
-        return redirect()->route('central.users.index')
+        return redirect()->route(Gate::allows('viewAny', User::class) ? 'central.users.index' : 'dashboard')
             ->with('status', 'Compte archivé. Les données historiques et les boutiques sont conservées.');
     }
 

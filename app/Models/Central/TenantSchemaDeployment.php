@@ -5,7 +5,6 @@ namespace App\Models\Central;
 use App\Concerns\HasPublicUuid;
 use App\Enums\Central\Deployments\OperationEnum;
 use App\Enums\Central\Deployments\StatusEnum;
-use Carbon\CarbonImmutable;
 use Database\Factories\Central\TenantSchemaDeploymentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +13,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
-
+/**
+ * @property OperationEnum $operation
+ * @property StatusEnum $status
+ */
 #[Fillable([
     'tenant_id', 'source_version', 'target_version', 'operation', 'status', 'attempt_number',
     'operation_key', 'started_at', 'ended_at', 'error_code', 'sanitized_error',
@@ -22,6 +24,7 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
 ])]
 class TenantSchemaDeployment extends Model
 {
+    /** @use HasFactory<TenantSchemaDeploymentFactory> */
     use CentralConnection, HasFactory, HasPublicUuid;
 
     /** Ce qui identifie un déploiement : figé après la création. */
@@ -51,6 +54,7 @@ class TenantSchemaDeployment extends Model
         });
     }
 
+    /** @return BelongsTo<Tenant, $this> */
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class)->withTrashed();

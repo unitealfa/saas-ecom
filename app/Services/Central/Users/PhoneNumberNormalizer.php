@@ -49,6 +49,7 @@ class PhoneNumberNormalizer
         return $code === 0 ? null : '+'.$code;
     }
 
+    /** @return array{value: string, region: string} */
     public function historical(string $value, string $profileCountry): array
     {
         $region = $this->region($profileCountry);

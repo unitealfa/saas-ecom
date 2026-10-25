@@ -27,7 +27,7 @@ class VerificationNotificationController extends EmailVerificationNotificationCo
         if (! $this->mail->verification($user)) {
             return $request->wantsJson()
                 ? response()->json(['message' => 'L’e-mail n’a pas pu être envoyé. Réessayez dans quelques instants.'], 503)
-                : back()->withErrors(['email' => 'L’e-mail n’a pas pu être envoyé. Votre compte est conservé ; réessayez dans quelques instants.']);
+                : redirect()->route('verification.notice')->withErrors(['email' => 'L’e-mail n’a pas pu être envoyé. Votre compte est conservé ; réessayez dans quelques instants.']);
         }
 
         return app(EmailVerificationNotificationSentResponse::class);

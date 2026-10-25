@@ -15,6 +15,15 @@ beforeEach(function (): void {
     Notification::fake();
 });
 
+test('controller corrections redirect country writers without listing access to the dashboard', function (): void {
+    $actor = User::factory()->create();
+    $actor->assignRole(Role::createWithPermissions('country-creator-only', ['saas.countries.create' => 9999]));
+    $this->actingAs($actor, 'central')->post(route('central.countries.store'), [
+        'code' => 'TN', 'name_fr' => 'Tunisie', 'name_en' => 'Tunisia',
+    ])->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
+    $this->get(route('central.countries.index'))->assertForbidden();
+});
+
 test('countries have independent creation editing activation and removal permissions', function (): void {
     $editor = User::factory()->create();
     $editor->assignRole(Role::createWithPermissions('country-editor', ['saas.countries.update' => 7]));

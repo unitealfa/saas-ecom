@@ -10,6 +10,7 @@ class DatabaseDiagnostics
 {
     private const string NOT_PROVISIONED = 'Non provisionnée';
 
+    /** @return array<string, mixed> */
     public function read(): array
     {
         $db = DB::connection(config('tenancy.database.central_connection'));
@@ -23,6 +24,7 @@ class DatabaseDiagnostics
         ];
     }
 
+    /** @return array<string, int> */
     private function tableCounts(Connection $db): array
     {
         $tables = [];
@@ -36,6 +38,7 @@ class DatabaseDiagnostics
         return $tables;
     }
 
+    /** @return array<int, array<string, mixed>> */
     private function tenants(Connection $db): array
     {
         $domains = $db->table('domains')->whereNull('deleted_at')->orderBy('id')
@@ -66,10 +69,14 @@ class DatabaseDiagnostics
         return $decoded['tenancy_db_name'] ?? self::NOT_PROVISIONED;
     }
 
+    /**
+     * @param  Collection<array-key, Collection<int, \stdClass>>  $domains
+     * @return array<int, array{id: int, tenant_id: int, domain: string}>
+     */
     private function domainsOf(Collection $domains, int $tenantId): array
     {
         return $domains->get($tenantId, collect())
-            ->map(fn (object $domain): array => [
+            ->map(fn (\stdClass $domain): array => [
                 'id' => $domain->id,
                 'tenant_id' => $domain->tenant_id,
                 'domain' => $domain->domain,

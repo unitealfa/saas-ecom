@@ -8,6 +8,7 @@ use App\Enums\Central\Users\StatusEnum as UserStatus;
 use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Feature;
 use App\Models\Central\PlanFeature;
+use App\Models\Central\Subscription;
 use App\Models\Central\Tenant;
 use App\Models\Central\TenantSchemaDeployment;
 use App\Models\Central\User;
@@ -118,6 +119,7 @@ class TenantStatusService
         });
     }
 
+    /** @param array<string, int|string> $priorities */
     public function priorities(User $actor, Tenant $tenant, array $priorities, ?string $reason): void
     {
         $this->mutations->transaction(function () use ($actor, $tenant, $priorities, $reason): void {
@@ -154,15 +156,18 @@ class TenantStatusService
         });
     }
 
+    /** @return array{User, Collection<int, Tenant>, Tenant|null} */
     private function lockOwnerShops(Tenant $tenant): array
     {
         $owner = User::withTrashed()->whereKey($tenant->user_id)->lockForUpdate()->firstOrFail();
+        /** @var Collection<int, Tenant> $shops */
         $shops = Tenant::where('user_id', $owner->id)->orderBy('id')->lockForUpdate()->get();
         $current = $shops->first(fn (Tenant $shop): bool => $shop->id === $tenant->id && $shop->uuid === $tenant->uuid);
 
         return [$owner, $shops, $current];
     }
 
+    /** @param Collection<int, TenantSchemaDeployment> $deployments */
     private function archive(Tenant $tenant, Collection $deployments): bool
     {
         foreach ($deployments as $deployment) {
@@ -174,9 +179,10 @@ class TenantStatusService
         return true;
     }
 
+    /** @param Collection<int, TenantSchemaDeployment> $deployments */
     private function suspend(Tenant $tenant, Collection $deployments): bool
     {
-        if ($deployments->isNotEmpty() || $tenant->schema_version === null || $tenant->provisioned_at === null
+        if ($deployments->isNotEmpty() || ! filled($tenant->schema_version) || $tenant->provisioned_at === null
             || in_array($tenant->status, [StatusEnum::PROVISIONING_FAILED, StatusEnum::DELETED], true)) {
             throw ValidationException::withMessages(['tenant' => 'Cette boutique n’est pas encore préparée.']);
         }
@@ -190,6 +196,10 @@ class TenantStatusService
         return true;
     }
 
+    /**
+     * @param  Collection<int, Tenant>  $shops
+     * @param  Collection<int, TenantSchemaDeployment>  $deployments
+     */
     private function activate(User $actor, User $owner, Collection $shops, Tenant $tenant, Collection $deployments, ?string $reason): bool
     {
         if (! in_array($tenant->status, [StatusEnum::INACTIVE, StatusEnum::SUSPENDED, StatusEnum::OVER_QUOTA], true)) {
@@ -218,7 +228,7 @@ class TenantStatusService
         }
     }
 
-    private function shopsGrant(\App\Models\Central\Subscription $subscription, bool $required = true): ?PlanFeature
+    private function shopsGrant(Subscription $subscription, bool $required = true): ?PlanFeature
     {
         $query = Feature::where('code', self::SHOPS_FEATURE)->active();
         $feature = $required ? $query->firstOrFail() : $query->first();
@@ -227,6 +237,7 @@ class TenantStatusService
             ->where('feature_id', $feature->id)->lockForUpdate()->first();
     }
 
+    /** @param Collection<int, Tenant> $shops */
     private function rebalance(User $actor, User $owner, Collection $shops, ?Tenant $requested, ?string $reason): void
     {
         $grant = $this->shopsGrant($this->subscriptions->ensure($owner, $actor));
@@ -239,7 +250,7 @@ class TenantStatusService
             ->whereIn('status', [DeploymentStatus::PENDING, DeploymentStatus::RUNNING])->lockForUpdate()->pluck('tenant_id');
 
         $eligible = $shops->filter(fn (Tenant $shop): bool => in_array($shop->status, [StatusEnum::ACTIVE, StatusEnum::OVER_QUOTA], true)
-            && $shop->schema_version !== null && $shop->provisioned_at !== null && ! $busy->contains($shop->id))
+            && filled($shop->schema_version) && $shop->provisioned_at !== null && ! $busy->contains($shop->id))
             ->sortBy(fn (Tenant $shop): array => [
                 $shop->activation_priority === null ? 1 : 0,
                 $shop->activation_priority ?? PHP_INT_MAX,

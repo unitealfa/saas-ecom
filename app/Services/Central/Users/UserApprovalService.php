@@ -43,6 +43,7 @@ class UserApprovalService
         private LegalVerificationService $legal,
     ) {}
 
+    /** @return LengthAwarePaginator<int, User> */
     public function pending(User $actor): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize('viewAny', User::class);

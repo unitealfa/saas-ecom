@@ -5,6 +5,7 @@ namespace App\Services\Central\Users;
 use App\DTOs\Central\Users\UserProfileData;
 use App\Enums\VerificationStatusEnum;
 use App\Models\Central\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -28,6 +29,7 @@ class LegalVerificationService
         $target->legal_profile_version = ($target->legal_profile_version ?? 0) + 1;
     }
 
+    /** @return array<string, list<string>> */
     public static function profileRules(): array
     {
         $text = ['sometimes', 'nullable', 'string', 'max:255'];
@@ -44,6 +46,7 @@ class LegalVerificationService
         ];
     }
 
+    /** @return array{legal_profile_version: int, legal_verification_status: VerificationStatusEnum, legal_verified_at: CarbonImmutable|null, legal_verified_by_id: int|null} */
     public function decisionAttributes(User $actor, User $target, int $version, bool $validated): array
     {
         $current = $target->legal_profile_version ?? 0;

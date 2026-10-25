@@ -4,6 +4,8 @@ use App\Enums\Central\Tenants\StatusEnum as TenantStatus;
 use App\Enums\Central\Users\JourneyState;
 use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
+use App\Http\Controllers\Central\Owner\Tenants\FirstTenantController;
+use App\Http\Controllers\Central\Owner\Tenants\TenantController as OwnerTenantController;
 use App\Jobs\Central\ProvisionTenantDatabase;
 use App\Models\Central\Activity;
 use App\Models\Central\Permission;
@@ -13,11 +15,13 @@ use App\Models\User;
 use App\Services\Central\Auth\RegistrationJourney;
 use App\Services\Central\Users\UserApprovalService;
 use Database\Seeders\Central\AuthorizationSeeder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Stancl\Tenancy\Events\TenantCreated;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 function journeyMerchant(array $attributes = []): User
 {
@@ -29,6 +33,20 @@ function journeyMerchant(array $attributes = []): User
 
     return User::factory()->create($attributes);
 }
+
+test('controller corrections refuse a shop form when its authenticated owner no longer exists', function (string $controller): void {
+    $owner = User::factory()->create();
+    $owner->forceDelete();
+    $this->actingAs($owner, 'central');
+    $request = Request::create('/premiere-boutique');
+
+    try {
+        app()->call([app($controller), 'create'], ['request' => $request]);
+        $this->fail('An unavailable owner must not open the shop form.');
+    } catch (HttpException $exception) {
+        expect($exception->getStatusCode())->toBe(403);
+    }
+})->with([FirstTenantController::class, OwnerTenantController::class]);
 
 test('registration journey priorities override later states and ready shops', function (StatusEnum $status, bool $emailVerified, bool $legalVerified, bool $readyShop, bool $staff, JourneyState $expected): void {
     $validator = User::factory()->create();

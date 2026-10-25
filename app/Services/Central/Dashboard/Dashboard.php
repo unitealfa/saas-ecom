@@ -8,6 +8,7 @@ use Illuminate\Support\Collection;
 
 class Dashboard
 {
+    /** @return array{shops: Collection<int, string>, staff: bool} */
     public function forUser(User $user): array
     {
         return [

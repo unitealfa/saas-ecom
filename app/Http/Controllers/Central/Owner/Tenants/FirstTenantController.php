@@ -6,6 +6,7 @@ use App\DTOs\Tenant\Shop\ShopSettings;
 use App\Enums\Central\Users\JourneyState;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Tenants\StoreFirstTenantRequest;
+use App\Models\Central\User;
 use App\Services\Central\Auth\RegistrationJourney;
 use App\Services\Central\Tenants\TenantCreator;
 use Illuminate\Contracts\View\View;
@@ -17,7 +18,9 @@ class FirstTenantController extends Controller
 {
     public function create(Request $request, RegistrationJourney $journey): View|RedirectResponse
     {
-        $state = $journey->state($this->centralActor()->fresh());
+        $owner = $this->centralActor()->fresh();
+        abort_unless($owner instanceof User, 403);
+        $state = $journey->state($owner);
 
         if ($state !== JourneyState::SETUP) {
             return redirect()->route($state->routeName());

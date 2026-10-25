@@ -4,13 +4,16 @@ use App\Models\Central\Activity;
 use App\Models\Central\Permission;
 use App\Models\Central\Role;
 use App\Models\User;
+use App\Services\Central\Authorization\AuthorizationMutation;
 use App\Services\Central\Authorization\CentralPermissionAssignmentService;
-use Illuminate\Support\Facades\Crypt;
 use Database\Seeders\Central\AuthorizationSeeder;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function (): void {
@@ -173,7 +176,7 @@ test('expired permission administration cannot delegate despite a cached package
 
 test('rollback clears a package catalogue populated with an uncommitted permission', function (): void {
     try {
-        app(\App\Services\Central\Authorization\AuthorizationMutation::class)->transaction(function (): void {
+        app(AuthorizationMutation::class)->transaction(function (): void {
             Permission::create(['name' => 'saas.test.transient', 'label' => 'Transient']);
             expect($this->admin->can('saas.test.transient'))->toBeTrue();
             throw new RuntimeException('Rollback the catalogue');
@@ -184,6 +187,33 @@ test('rollback clears a package catalogue populated with an uncommitted permissi
     }
     expect(Permission::where('name', 'saas.test.transient')->exists())->toBeFalse()
         ->and($this->admin->fresh()->can('saas.test.transient'))->toBeFalse();
+});
+
+test('authorization refusal also clears permissions cached inside a rolled back transaction', function (): void {
+    $actor = User::factory()->create();
+    $code = 'saas.services.rollback';
+
+    expect(fn () => app(AuthorizationMutation::class)->transaction(function () use ($actor, $code): void {
+        Permission::create(['name' => $code, 'label' => 'Transaction annulée']);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        Permission::findByName($code, 'central');
+        Gate::forUser($actor)->authorize('create', App\Models\Central\User::class);
+    }))->toThrow(AuthorizationException::class);
+
+    expect(Permission::where('name', $code)->exists())->toBeFalse();
+    expect(fn () => Permission::findByName($code, 'central'))
+        ->toThrow(PermissionDoesNotExist::class);
+});
+
+test('service audit refuses a package role without the configured authorization metadata', function (): void {
+    $staff = User::factory()->create();
+    $role = Role::findByName('user-reader', 'central');
+    $packageRole = Spatie\Permission\Models\Role::findOrFail($role->id);
+
+    expect(fn () => $staff->assignRole($packageRole))->toThrow(LogicException::class);
+    expect($staff->roles()->count())->toBe(0);
+    $staff->assignRole($role);
+    expect($staff->fresh()->can('saas.users.view'))->toBeTrue();
 });
 
 test('consolidation preserves role definitions individual grants and dates with a private backup', function (): void {

@@ -9,11 +9,13 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Spatie\Permission\Models\Role as PackageRole;
 use Stancl\Tenancy\Database\Concerns\TenantConnection;
 
-
 #[Fillable(['name', 'label'])]
 class Role extends PackageRole
 {
-    use HasPublicUuid, HasRoleMetadata, LogsSafeActivity, TenantConnection;
+    use HasPublicUuid, LogsSafeActivity, TenantConnection;
+
+    /** @use HasRoleMetadata<Permission> */
+    use HasRoleMetadata;
 
     public const string GUARD = 'tenant';
 

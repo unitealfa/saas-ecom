@@ -1896,3 +1896,44 @@ Demande de vérification de `app/DTOs`. État Git initial propre. Sept classes l
 Contrôles exécutés sans tests/TestCase et sans base de test : syntaxe PHP 8.5 valide pour les sept fichiers ; 32 vérifications de valeurs par défaut, types/nullabilité, conservation des champs omis, états du résultat d'e-mail, immutabilité, données du tableau de bord, empreinte et réglages invalides. Compteur de requêtes SQL pendant ces vérifications : zéro. Aucune migration, donnée, invitation ou permission modifiée ; pas de Pint, PHPStan ou suite complète.
 
 Anomalie observée, correctif non appliqué : TenantData.fingerprint encode directement l'objet colors avec json_encode. Deux réglages contenant les mêmes noms et valeurs de couleurs dans un ordre différent produisent deux hashes distincts. TenantCreator compare ce hash à tenants.creation_hash : une nouvelle soumission de la même clé peut donc être refusée uniquement pour cet ordre. Une correction devra rendre l'empreinte indépendante de l'ordre des clés tout en traitant explicitement la compatibilité des hashes historiques ; ne pas modifier aveuglément l'algorithme ou les valeurs stockées. Aucun DTO, service ou test permanent modifié pendant cette revue.
+
+## 25 octobre 2026 — Corrections après revue des contrôleurs
+
+Demande : corriger les défauts confirmés de l'audit des contrôleurs, sans modifier les règles métier ni les données existantes. Les décisions compte/dossier utilisent les capacités approve/reject existantes ; la consultation des droits du personnel utilise viewStaffPermissions, et le renouvellement utilise renewStaffAssignments. Le motif facultatif des permissions n'est plus lu comme une clé obligatoire. Les contrôles des services, transactions, verrous et versions sont conservés.
+
+Les contrôleurs concernés choisissent après écriture une page autorisée ou le dashboard. L'approbation conserve le contexte Utilisateurs/inscriptions en attente/fiche et les paramètres de recherche, après comparaison avec une liste fermée d'URL internes ; une origine externe n'est pas reprise. Les éditions de comptes affichent un seul succès ou avertissement SMTP. Le parcours compare JourneyState ; les formulaires de boutique refusent proprement un acteur supprimé. Le contrôle local/debug/REMOTE_ADDR est partagé entre le middleware de diagnostic et le storefront.
+
+RoleController réutilise centralActor(), son paginateur est typé, son argument inutilisé est retiré et le sélecteur de permissions utilise CentralUserAccess.ownedPermissions. En mode central_profiles, cette lecture groupe les requêtes sans mémoïsation ni cache des droits ; le test vérifie au maximum cinq requêtes, les révocations et l'expiration. Les mutations conservent la vérification actuelle des droits. CountryController réutilise également centralActor() ; phoneCountriesA, inutilisé par la vue d'édition, est retiré.
+
+Vérifications PHP 8.5 : deux séries Pest ciblées via artisan test, 49 tests/388 assertions puis 10 tests/39 assertions, toutes réussies, soit 59 tests et 427 assertions. Couverture : décisions publiques et anciennes routes legal, refus sans motif, retour à la page d'origine, redirection extérieure refusée, acteur sans droit de consultation, lecture seule des permissions, modification sans motif facultatif, renouvellement sous son droit propre, message SMTP unique, statut conservé après édition, protection root, délégation et expiration, formulaire obsolète, acteur disparu, parcours commerçant et diagnostic/proxy. Tests MySQL temporaires explicitement autorisés, envois simulés et aucune modification des bases existantes ; aucun worker réel du site exécuté. Syntaxe des 24 fichiers PHP modifiés valide, Pint réussi et diff vérifié. Aucun schéma, migration, nom de route ou fonctionnalité Tenant activée ; la suite complète et le navigateur n'ont pas été exécutés.
+
+## 25 octobre 2026 — Audit des services et de leurs dépendances
+
+Demande : vérifier les services après des remplacements de code externes, avec leurs appelants et les règles métier actuelles. Autorisation explicite pour les tests MySQL temporaires, les vrais jobs isolés et les e-mails simulés. Les modifications des contrôleurs déjà présentes sont conservées.
+
+Les 35 fichiers PHP de app/Services ont été examinés :
+
+| Groupe | Fichiers examinés |
+|---|---|
+| Central/Auth | AccountMailDelivery, RegistrationJourney, RegistrationVerificationNotification |
+| Central/Authorization | AuthorizationMutation, CentralPermissionAssignmentService, CentralPermissionResolver, CentralRoleAssignmentService, CentralUserAccess, PermissionCatalogService |
+| Central/Countries | CountryCatalog, CountryService |
+| Central/Dashboard et Diagnostics | Dashboard, DatabaseDiagnostics |
+| Central/Plans, Roles et Subscriptions | FreePlanCatalog, CentralRoleCatalog, RoleManager, DefaultSubscription |
+| Central/Tenants | TenantCreator, TenantDatabaseName, TenantManagementService, TenantProfileProjection, TenantProvisioner, TenantProvisioningRetry, TenantStatusService |
+| Central/Users | ContactMigrationAudit, LegalVerificationService, PhoneNumberNormalizer, ProfilePhotoService, StaffInvitationService, StaffManagementService, UserApprovalService, UserManagementService |
+| Tenant/Dashboard et Diagnostics | Dashboard, DatabaseDiagnostics |
+| Infrastructure commune | SchemaBlueprint |
+
+Corrections appliquées :
+
+- AuthorizationMutation revient à DB::transaction(..., 3), conformément à la décision existante. Le nettoyage du cache Spatie couvre aussi un refus d'autorisation qui annule la transaction. Pas de connexion centrale imposée, de contrôle tenancy, de verrou global root ou de nouvel argument de cache ; RoleManager conserve son invalidation native après commit.
+- DefaultSubscription utilise le dernier abonnement historique comme prédécesseur lorsqu'aucun actif n'est sélectionné. Une souscription gratuite déjà marquée EXPIRED ne provoque plus la réutilisation de la clé initiale. Le verrou propriétaire, les abonnements payants valables et l'idempotence sont conservés.
+- TenantProfileProjection et TenantStatusService exigent une version de schéma non vide et une date de provisionnement pour les opérations qui nécessitent une boutique préparée. TenantCreator signale explicitement une absence de migrations avant de chercher le dernier fichier.
+- ProfilePhotoService transforme une image JPEG tronquée en erreur de validation avant stockage, au lieu de laisser l'avertissement de getimagesize produire une erreur HTTP 500.
+- Les rôles passés à HasTimedPermissions doivent être des instances du modèle configuré pour leur contexte ; un modèle brut du package sans les méthodes de métadonnées est refusé proprement. Les profils centraux et les rôles Tenant gardent leurs règles distinctes.
+- CentralPermissionResolver utilise pluck('id') sur la collection retournée par Spatie. ContactMigrationAudit conserve les pays archivés avec le scope natif explicite. Les contrats de collections, relations, pivots, casts, tableaux et factories sont précisés dans les services, modèles et traits utilisés. Les types des données validées transmises par les contrôleurs concernés sont documentés ; aucune nouvelle couche n'est créée.
+
+Contrôles déjà terminés : syntaxe des 35 services valide ; analyse PHPStan/Larastan niveau 7 des services, modèles Central/Tenant et traits utilisés réussie, zéro erreur. L'analyse élargie aux chemins configurés du projet conserve 11 avertissements hors services : conditions redondantes dans deux actions Fortify, trait ProfileValidationRules inutilisé, garde de plateforme du worker, types de la commande SyncTenantProfiles, relation héritée Domain.tenant et annotations de quatre Form Requests. Aucun contrôle ni assertion n'est désactivé pour masquer ces résultats.
+
+Point de reprise : la suite complète Pest est en cours sur des bases MySQL isolées. Attendre son bilan, corriger les échecs confirmés, puis exécuter les régressions ajoutées après son lancement et les scénarios concernés. L'ancien test TenantAdministrationIsolationTest contient encore une activation initiale manuelle contraire au workflow actuel ; vérifier son résultat avant adaptation. Dernier passage Pint réussi ; le relancer après les dernières modifications PHP. Aucun schéma, migration, donnée existante, permission réelle ou configuration globale modifié ; aucun envoi SMTP réel ni navigateur testé.

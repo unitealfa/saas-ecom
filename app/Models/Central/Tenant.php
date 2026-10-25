@@ -18,10 +18,15 @@ use Stancl\Tenancy\Database\Concerns\HasDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDomains;
 use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 
+/**
+ * @property int $id
+ * @property StatusEnum $status
+ */
 #[Fillable(['internal_label', 'shop_name', 'slug'])]
 #[Hidden(['id', 'user_id', 'data', 'creation_key', 'creation_hash'])]
 class Tenant extends BaseTenant implements TenantWithDatabase
 {
+    /** @use HasFactory<TenantFactory> */
     use HasDatabase, HasDomains, HasFactory, HasPublicUuid, SoftDeletes;
 
     private const array RESERVED_SLUGS = ['www', 'admin', 'api', 'app', 'mail', 'support'];
@@ -66,16 +71,19 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         return TenantFactory::new();
     }
 
+    /** @return HasMany<Domain, $this> */
     public function domains(): HasMany
     {
         return $this->hasMany(Domain::class, 'tenant_id');
     }
 
+    /** @return BelongsTo<User, $this> */
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
     }
 
+    /** @return list<string> */
     public static function getCustomColumns(): array
     {
         return [
@@ -91,6 +99,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         return 'id';
     }
 
+    /** @param array<string, mixed> $settings */
     public function configureShopForProvisioning(array $settings): static
     {
         if ($this->exists) {

@@ -11,6 +11,7 @@ use App\Models\Central\User;
 use App\Services\Central\Authorization\CentralUserAccess;
 use App\Services\Central\Roles\CentralRoleCatalog;
 use App\Services\Central\Roles\RoleManager;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
@@ -61,26 +62,27 @@ class RoleController extends Controller
 
     public function store(SaveRoleRequest $request): RedirectResponse
     {
-        $this->roles->save($this->actor(), $request->toDto());
+        $this->roles->save($this->centralActor(), $request->toDto());
 
         return $this->back('Rôle créé.');
     }
 
     public function update(SaveRoleRequest $request, Role $role): RedirectResponse
     {
-        $this->roles->save($this->actor(), $request->toDto(), $role);
+        $this->roles->save($this->centralActor(), $request->toDto(), $role);
 
         return $this->back('Rôle enregistré.');
     }
 
     public function destroy(DeleteRoleRequest $request, Role $role): RedirectResponse
     {
-        $this->roles->delete($this->actor(), $role);
+        $this->roles->delete($this->centralActor(), $role);
 
         return $this->back('Rôle supprimé.');
     }
 
-    private function assignments(Role $role)
+    /** @return LengthAwarePaginator<int, User> */
+    private function assignments(Role $role): LengthAwarePaginator
     {
         return User::withTrashed()
             ->select(['id', 'uuid', 'first_name', 'last_name', 'email', 'status', 'deleted_at'])
@@ -92,7 +94,7 @@ class RoleController extends Controller
 
     private function form(?Role $role = null): View
     {
-        $actor = $this->actor();
+        $actor = $this->centralActor();
         $canChangePermissions = $role === null || Gate::allows('updatePermissions', $role);
         $canChangeDurations = $role === null || Gate::allows('updateDurations', $role);
 
@@ -104,7 +106,7 @@ class RoleController extends Controller
         return view('central.pages.admin.roles.form', [
             'role' => $role,
             'permissionGroups' => CentralRoleCatalog::GROUPS,
-            'permissions' => $this->selectablePermissions($actor, $role, $canChangePermissions, $canChangeDurations, $composition),
+            'permissions' => $this->selectablePermissions($actor, $canChangePermissions, $canChangeDurations, $composition),
             'canChangePermissions' => $canChangePermissions,
             'canChangeDurations' => $canChangeDurations,
             'grants' => $composition
@@ -113,13 +115,14 @@ class RoleController extends Controller
         ]);
     }
 
-    private function selectablePermissions(User $actor, ?Role $role, bool $canChangePermissions, bool $canChangeDurations, Collection $composition): Collection
+    /**
+     * @param  Collection<int, Permission>  $composition
+     * @return Collection<int, Permission>
+     */
+    private function selectablePermissions(User $actor, bool $canChangePermissions, bool $canChangeDurations, Collection $composition): Collection
     {
         if ($canChangePermissions) {
-            return Permission::forCentralGuard()
-                ->whereIn('name', array_keys(CentralRoleCatalog::PERMISSIONS))
-                ->orderBy('id')->get()
-                ->filter(fn (Permission $permission): bool => $this->access->ownsPermission($actor, $permission->name));
+            return $this->access->ownedPermissions($actor);
         }
 
         return $canChangeDurations ? $composition : collect();
@@ -127,14 +130,7 @@ class RoleController extends Controller
 
     private function back(string $status): RedirectResponse
     {
-        return redirect()->route('central.roles.index')->with('status', $status);
-    }
-
-    private function actor(): User
-    {
-        $actor = auth('central')->user();
-        abort_unless($actor instanceof User, 403);
-
-        return $actor;
+        return redirect()->route(Gate::allows('viewAny', Role::class) ? 'central.roles.index' : 'dashboard')
+            ->with('status', $status);
     }
 }

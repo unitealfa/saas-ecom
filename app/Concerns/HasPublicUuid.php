@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use LogicException;
 
+/** @property string $uuid */
 trait HasPublicUuid
 {
     public static function bootHasPublicUuid(): void

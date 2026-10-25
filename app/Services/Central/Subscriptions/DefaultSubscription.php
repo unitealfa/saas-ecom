@@ -45,7 +45,10 @@ class DefaultSubscription
                 $current->update(['status' => StatusEnum::EXPIRED, 'ended_at' => now()]);
             }
 
-            return $this->createFree($owner, $assignedBy, $current);
+            $previous = $current ?? Subscription::where('user_id', $owner->id)
+                ->orderByDesc('id')->lockForUpdate()->first();
+
+            return $this->createFree($owner, $assignedBy, $previous);
         }, self::ATTEMPTS);
     }
 

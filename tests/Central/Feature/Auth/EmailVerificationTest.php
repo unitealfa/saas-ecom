@@ -1,10 +1,19 @@
 <?php
 
+use App\Enums\Central\Users\StatusEnum;
+use App\Models\Central\Role;
 use App\Models\User;
+use App\Services\Central\Auth\AccountMailDelivery;
 use Illuminate\Auth\Events\Verified;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
 use Laravel\Fortify\Features;
+use Symfony\Component\Mailer\Exception\TransportException;
+use Symfony\Component\Mailer\Transport\TransportInterface;
 
 beforeEach(function () {
     $this->skipUnlessFortifyHas(Features::emailVerification());
@@ -18,13 +27,24 @@ test('email verification screen can be rendered', function () {
     $response->assertOk();
 });
 
+test('controller corrections return verification delivery failures to the verification page', function (): void {
+    $user = User::factory()->unverified()->create();
+    $this->mock(AccountMailDelivery::class)
+        ->shouldReceive('verification')->once()->andReturn(false);
+
+    $this->actingAs($user, 'central')->from('https://external.example/previous')
+        ->post(route('verification.send'))->assertRedirect(route('verification.notice'))
+        ->assertSessionHasErrors('email');
+    expect($user->fresh()->hasVerifiedEmail())->toBeFalse();
+});
+
 test('verification resend reports SMTP failure without verifying or disconnecting the account', function (): void {
-    $user = User::factory()->unverified()->create(['status' => \App\Enums\Central\Users\StatusEnum::PENDING]);
-    $transport = Mockery::mock(\Symfony\Component\Mailer\Transport\TransportInterface::class);
+    $user = User::factory()->unverified()->create(['status' => StatusEnum::PENDING]);
+    $transport = Mockery::mock(TransportInterface::class);
     $transport->shouldReceive('send')->once()
-        ->andThrow(new \Symfony\Component\Mailer\Exception\TransportException('private-smtp-secret'));
-    \Illuminate\Support\Facades\Mail::mailer()->setSymfonyTransport($transport);
-    \Illuminate\Support\Facades\Log::spy();
+        ->andThrow(new TransportException('private-smtp-secret'));
+    Mail::mailer()->setSymfonyTransport($transport);
+    Log::spy();
 
     $this->actingAs($user, 'central')->postJson(route('verification.send'))
         ->assertStatus(503)->assertJsonPath('message', 'L’e-mail n’a pas pu être envoyé. Réessayez dans quelques instants.')
@@ -64,7 +84,7 @@ test('email can be verified', function () {
 
 test('verified email responses preserve the native staff session', function (bool $json): void {
     $user = User::factory()->unverified()->create();
-    $role = new \App\Models\Central\Role(['name' => 'root']);
+    $role = new Role(['name' => 'root']);
     $role->forceFill(['is_system' => true, 'is_protected' => true, 'is_super_admin' => true])->save();
     $user->assignRole($role);
     $url = URL::temporarySignedRoute('verification.verify', now()->addMinutes(30),
@@ -82,7 +102,7 @@ test('verified email responses preserve the native staff session', function (boo
 })->with(['web staff response' => [false], 'JSON staff response' => [true]]);
 
 test('verified email JSON responses disconnect merchants after proving email ownership', function (): void {
-    $user = User::factory()->unverified()->create(['status' => \App\Enums\Central\Users\StatusEnum::PENDING]);
+    $user = User::factory()->unverified()->create(['status' => StatusEnum::PENDING]);
     $url = URL::temporarySignedRoute('verification.verify', now()->addMinutes(30),
         ['id' => $user->id, 'hash' => sha1($user->email)]);
 
@@ -133,10 +153,10 @@ test('an expired verification link gives guidance without verifying the address'
 });
 
 test('verification resend sends a notification and repeated requests are throttled', function (): void {
-    \Illuminate\Support\Facades\Notification::fake();
+    Notification::fake();
     $user = User::factory()->unverified()->create();
     $this->actingAs($user, 'central')->post(route('verification.send'))->assertSessionHasNoErrors();
-    \Illuminate\Support\Facades\Notification::assertSentTo($user, \Illuminate\Auth\Notifications\VerifyEmail::class);
+    Notification::assertSentTo($user, VerifyEmail::class);
     foreach (range(1, 5) as $attempt) {
         $this->post(route('verification.send'));
     }

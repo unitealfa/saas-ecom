@@ -13,6 +13,7 @@ use App\Services\Central\Authorization\CentralUserAccess;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Gate;
 
+/** @phpstan-type ShopProgress array{name: string, status: string, prepared: bool, failed: bool, ready: bool, retry_url: string|null} */
 class RegistrationJourney
 {
     private const string EVENT_APPROVED = 'central_account_approved';
@@ -37,6 +38,7 @@ class RegistrationJourney
         return $this->accountState($user) ?? $this->stateFromTenants($this->loadTenants($user));
     }
 
+    /** @return array{state: string, redirect: string, reason: string|null, shops: array<int, ShopProgress>, version: string} */
     public function progress(User $user): array
     {
         $shops = [];
@@ -87,12 +89,17 @@ class RegistrationJourney
             && $user->legal_profile_version !== null;
     }
 
+    /** @return Collection<int, Tenant> */
     private function loadTenants(User $user): Collection
     {
-        return $user->tenants()->orderBy('id')
+        /** @var Collection<int, Tenant> $tenants */
+        $tenants = $user->tenants()->orderBy('id')
             ->get(['id', 'uuid', 'user_id', 'shop_name', 'status', 'schema_version', 'provisioned_at']);
+
+        return $tenants;
     }
 
+    /** @param Collection<int, Tenant> $tenants */
     private function stateFromTenants(Collection $tenants): JourneyState
     {
         if ($tenants->isEmpty()) {
@@ -114,6 +121,7 @@ class RegistrationJourney
         return $this->isPrepared($tenant) && $tenant->status === TenantStatus::ACTIVE;
     }
 
+    /** @return ShopProgress */
     private function shopData(Tenant $tenant, User $user): array
     {
         $tenant->setRelation('owner', $user);

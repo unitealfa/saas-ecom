@@ -25,7 +25,7 @@ class StaffManagementService
 
     public function __construct(private UserManagementService $users) {}
 
-    /** @return LengthAwarePaginator<User> */
+    /** @return LengthAwarePaginator<int, User> */
     public function search(User $actor, string $search, ?StatusEnum $status = null): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize(self::ABILITY_VIEW_ANY, User::class);
@@ -63,6 +63,7 @@ class StaffManagementService
         $this->users->archive($actor, $target, staffOnly: true);
     }
 
+    /** @param Builder<User> $query */
     private function applySearch(Builder $query, string $search): void
     {
         $pattern = '%'.trim($search).'%';

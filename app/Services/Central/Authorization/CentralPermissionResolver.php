@@ -11,12 +11,17 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 
+/**
+ * @phpstan-type Source array{label: string, assigned_at: CarbonImmutable, expires_at: CarbonImmutable|null}
+ * @phpstan-type PermissionRow array{uuid: string, label: string, code: string, visible: bool, editable: bool, direct: bool, days: int, effective: bool, sources: list<Source>}
+ */
 class CentralPermissionResolver
 {
     private const int DEFAULT_DAYS = 9999;
 
     private const string DIRECT_SOURCE_LABEL = 'Attribution directe Spatie';
 
+    /** @return Collection<int, PermissionRow> */
     public function forStaff(User $actor, User $target): Collection
     {
         Gate::forUser($actor)->authorize('viewStaffPermissions', $target);
@@ -32,6 +37,7 @@ class CentralPermissionResolver
             ->values();
     }
 
+    /** @param EloquentCollection<int, Role> $roles */
     private function activeRootRole(EloquentCollection $roles): ?Role
     {
         $now = now();
@@ -41,10 +47,10 @@ class CentralPermissionResolver
         );
     }
 
-
+    /** @return EloquentCollection<int, Permission> */
     private function listedPermissions(User $target, ?Role $root, bool $canUpdate): EloquentCollection
     {
-        $assignedIds = $target->getAllPermissions()->modelKeys();
+        $assignedIds = $target->getAllPermissions()->pluck('id')->all();
 
         return Permission::forCentralGuard()
             ->when($root === null, function ($query) use ($assignedIds, $canUpdate): void {
@@ -60,6 +66,10 @@ class CentralPermissionResolver
             ->get();
     }
 
+    /**
+     * @param  EloquentCollection<int, Role>  $roles
+     * @return PermissionRow|null
+     */
     private function row(User $actor, User $target, EloquentCollection $roles, ?Role $root, bool $canUpdate, Permission $permission): ?array
     {
         $direct = $target->permissions->firstWhere('id', $permission->id);
@@ -79,12 +89,16 @@ class CentralPermissionResolver
             'direct' => $direct !== null,
             'days' => $direct === null
                 ? self::DEFAULT_DAYS
-                : (int) $direct->pivot->assigned_at->diffInDays($direct->pivot->expires_at),
+                : (int) $direct->getRelation('pivot')->getAttribute('assigned_at')->diffInDays($direct->getRelation('pivot')->getAttribute('expires_at')),
             'effective' => Gate::forUser($target)->allows($permission->name),
             'sources' => $sources,
         ];
     }
 
+    /**
+     * @param  EloquentCollection<int, Role>  $roles
+     * @return list<Source>
+     */
     private function sources(Permission $permission, EloquentCollection $roles, ?Role $root, ?Permission $direct): array
     {
         $sources = [];
@@ -108,21 +122,22 @@ class CentralPermissionResolver
             $sources[] = [
                 'label' => $role->label,
                 'assigned_at' => $assignedAt,
-                'expires_at' => $assignedAt->addDays((int) $grant->pivot->duration_days),
+                'expires_at' => $assignedAt->addDays((int) $grant->getRelation('pivot')->getAttribute('duration_days')),
             ];
         }
 
         if ($direct !== null) {
             $sources[] = [
                 'label' => self::DIRECT_SOURCE_LABEL,
-                'assigned_at' => $direct->pivot->assigned_at,
-                'expires_at' => $direct->pivot->expires_at,
+                'assigned_at' => $direct->getRelation('pivot')->getAttribute('assigned_at'),
+                'expires_at' => $direct->getRelation('pivot')->getAttribute('expires_at'),
             ];
         }
 
         return $sources;
     }
 
+    /** @param EloquentCollection<int, Role> $roles */
     private function grantedByRole(Permission $permission, EloquentCollection $roles): bool
     {
         return $roles->contains(

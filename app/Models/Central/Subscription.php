@@ -14,13 +14,18 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
-
+/**
+ * @property StatusEnum $status
+ * @property CarbonImmutable $period_starts_at
+ * @property CarbonImmutable|null $period_ends_at
+ */
 #[Fillable([
     'user_id', 'plan_id', 'assigned_by_id', 'operation_key', 'status', 'period', 'agreed_amount',
     'started_at', 'period_starts_at', 'period_ends_at', 'trial_ends_at', 'ended_at', 'auto_renew',
 ])]
 class Subscription extends Model
 {
+    /** @use HasFactory<SubscriptionFactory> */
     use CentralConnection, HasFactory, HasPublicUuid;
 
     public const int RECORD_TYPE = 1;
@@ -36,7 +41,6 @@ class Subscription extends Model
             fn (Builder $query) => $query->where('record_type', self::RECORD_TYPE),
         );
     }
-
 
     protected function casts(): array
     {
@@ -56,19 +60,19 @@ class Subscription extends Model
         ];
     }
 
-
+    /** @return BelongsTo<Plan, $this> */
     public function plan(): BelongsTo
     {
         return $this->belongsTo(Plan::class)->withTrashed();
     }
 
-
+    /** @return BelongsTo<User, $this> */
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id')->withTrashed();
     }
 
-
+    /** @return BelongsTo<User, $this> */
     public function assignedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_by_id')->withTrashed();

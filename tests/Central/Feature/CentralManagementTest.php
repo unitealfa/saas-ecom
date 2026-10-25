@@ -278,6 +278,22 @@ test('the default free plan is idempotent and preserves existing paid subscripti
     expect(Plan::where('code', 'free')->count())->toBe(1);
 });
 
+test('service audit replaces an already expired free subscription without reusing its operation key', function (): void {
+    $owner = User::factory()->create();
+    $service = app(DefaultSubscription::class);
+    $previous = $service->ensure($owner);
+    $this->travel(1)->days();
+    $previous->forceFill(['status' => StatusEnum::EXPIRED, 'period_ends_at' => now(), 'ended_at' => now()])->save();
+
+    $current = $service->ensure($owner);
+
+    expect($current->id)->not->toBe($previous->id)
+        ->and($current->operation_key)->not->toBe($previous->operation_key)
+        ->and($current->status)->toBe(StatusEnum::ACTIVE)
+        ->and($service->ensure($owner)->id)->toBe($current->id)
+        ->and(Subscription::where('user_id', $owner->id)->count())->toBe(2);
+});
+
 test('expired subscriptions fall back to the new free version without rewriting a used offer', function (): void {
     $owner = User::factory()->create();
     $feature = Feature::factory()->create(['code' => 'shops']);

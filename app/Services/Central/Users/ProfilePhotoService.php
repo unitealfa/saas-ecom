@@ -129,6 +129,7 @@ class ProfilePhotoService
         );
     }
 
+    /** @return array{string, int, int} */
     private function inspect(UploadedFile $photo): array
     {
         $mime = $photo->getMimeType();
@@ -139,7 +140,8 @@ class ProfilePhotoService
             throw $this->invalidPhoto();
         }
 
-        $dimensions = getimagesize($photo->getRealPath());
+        // Une image tronquée peut émettre un avertissement ; son échec devient l'erreur de validation ci-dessous.
+        $dimensions = @getimagesize($photo->getRealPath());
 
         if ($dimensions === false
             || $dimensions[0] > self::MAX_DIMENSION
