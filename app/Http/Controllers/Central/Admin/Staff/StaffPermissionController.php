@@ -3,34 +3,48 @@
 namespace App\Http\Controllers\Central\Admin\Staff;
 
 use App\Http\Controllers\Controller;
-use App\Models\Central\User;
-use App\Services\Central\Authorization\CentralPermissionResolver;
-use App\Services\Central\Authorization\CentralPermissionAssignmentService;
 use App\Http\Requests\Central\Users\UpdateStaffPermissionsRequest;
-use Illuminate\Http\RedirectResponse;
+use App\Models\Central\User;
+use App\Services\Central\Authorization\CentralPermissionAssignmentService;
+use App\Services\Central\Authorization\CentralPermissionResolver;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Gate;
 
 class StaffPermissionController extends Controller
 {
-    public function __construct(private CentralPermissionAssignmentService $assignments) {}
+    public function __construct(
+        private CentralPermissionAssignmentService $assignments,
+        private CentralPermissionResolver $permissions,
+    ) {}
 
-    public function index(Request $request, User $user, CentralPermissionResolver $permissions): View
+    public function index(User $user): View
     {
-        $actor = $request->user('central');
-        abort_unless($actor instanceof User, 403);
+        Gate::authorize('updateStaffPermissions', $user); // adaptez au nom de votre policy
 
         return view('central.pages.admin.staff.permissions', [
-            'user' => $user, 'permissions' => $permissions->forStaff($actor, $user),
+            'user' => $user,
+            'permissions' => $this->permissions->forStaff($this->centralActor(), $user),
             'expectedState' => $this->assignments->version($user),
         ]);
     }
 
     public function update(UpdateStaffPermissionsRequest $request, User $user): RedirectResponse
     {
-        $this->assignments->update($request->user('central'), $user, $request->validated('grants'),
-            $request->validated('expected_state'), $request->validated('reason'));
+        Gate::authorize('updateStaffPermissions', $user);
 
-        return redirect()->route('central.staff.permissions.index', $user)->with('status', 'Permissions individuelles enregistrées.');
+        $data = $request->validated();
+
+        $this->assignments->update(
+            $this->centralActor(),
+            $user,
+            $data['grants'],
+            $data['expected_state'],
+            $data['reason'],
+        );
+
+        return redirect()
+            ->route('central.staff.permissions.index', $user)
+            ->with('status', 'Permissions individuelles enregistrées.');
     }
 }

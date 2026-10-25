@@ -10,16 +10,19 @@ use App\Models\Central\User;
 use App\Services\Central\Countries\CountryService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
 class CountryController extends Controller
 {
+    public function __construct(private CountryService $countries) {}
+
     public function index(): View
     {
         Gate::authorize('viewAny', Country::class);
 
-        return view('central.pages.admin.countries.index', ['countries' => Country::orderBy('name_fr')->orderBy('id')->paginate(20)]);
+        return view('central.pages.admin.countries.index', [
+            'countries' => Country::orderBy('name_fr')->orderBy('id')->paginate(20),
+        ]);
     }
 
     public function create(): View
@@ -36,39 +39,44 @@ class CountryController extends Controller
         return view('central.pages.admin.countries.edit', compact('country'));
     }
 
-    public function store(StoreCountryRequest $request, CountryService $countries): RedirectResponse
+    public function store(StoreCountryRequest $request): RedirectResponse
     {
-        $countries->save($this->actor($request), $request->validated());
+        $this->countries->save($this->actor(), $request->validated());
 
-        return redirect()->route('central.countries.index')->with('status', 'Pays créé. Activez-le pour permettre sa sélection.');
+        return $this->back('Pays créé. Activez-le pour permettre sa sélection.');
     }
 
-    public function update(StoreCountryRequest $request, Country $country, CountryService $countries): RedirectResponse
+    public function update(StoreCountryRequest $request, Country $country): RedirectResponse
     {
-        $countries->save($this->actor($request), $request->validated(), $country);
+        $this->countries->save($this->actor(), $request->validated(), $country);
 
-        return redirect()->route('central.countries.index')->with('status', 'Pays enregistré.');
+        return $this->back('Pays enregistré.');
     }
 
-    public function activate(ChangeCountryStatusRequest $request, Country $country, CountryService $countries): RedirectResponse
+    public function activate(ChangeCountryStatusRequest $request, Country $country): RedirectResponse
     {
         Gate::authorize('activate', $country);
-        $data = $request->validated();
-        $countries->setActive($this->actor($request), $country, (bool) $data['is_active']);
+        $this->countries->setActive($this->actor(), $country, $request->boolean('is_active'));
 
-        return redirect()->route('central.countries.index')->with('status', 'Disponibilité du pays enregistrée.');
+        return $this->back('Disponibilité du pays enregistrée.');
     }
 
-    public function destroy(Request $request, Country $country, CountryService $countries): RedirectResponse
+    public function destroy(Country $country): RedirectResponse
     {
-        $countries->delete($this->actor($request), $country);
+        Gate::authorize('delete', $country);
+        $this->countries->delete($this->actor(), $country);
 
-        return redirect()->route('central.countries.index')->with('status', 'Pays retiré.');
+        return $this->back('Pays retiré.');
     }
 
-    private function actor(Request $request): User
+    private function back(string $status): RedirectResponse
     {
-        $actor = $request->user('central');
+        return redirect()->route('central.countries.index')->with('status', $status);
+    }
+
+    private function actor(): User
+    {
+        $actor = auth('central')->user();
         abort_unless($actor instanceof User, 403);
 
         return $actor;

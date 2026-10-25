@@ -14,16 +14,15 @@ use App\Services\Central\Users\StaffManagementService;
 use App\Services\Central\Users\UserManagementService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
 class StaffController extends Controller
 {
     public function __construct(private CountryCatalog $countries) {}
 
-    public function create(Request $request, UserManagementService $users): View
+    public function create(UserManagementService $users): View
     {
-        $actor = $this->actor($request);
+        $actor = $this->centralActor();
         Gate::forUser($actor)->authorize('createStaff', User::class);
 
         return view('central.pages.admin.staff.create', [
@@ -34,12 +33,12 @@ class StaffController extends Controller
 
     public function store(StoreStaffRequest $request, StaffManagementService $staff): RedirectResponse
     {
-        $result = $staff->create($this->actor($request), $request->toDto());
-        $response = redirect()->route('central.staff.index')->with('status', 'Compte personnel créé pour '.$result->user->name.'.');
+        $result = $staff->create($this->centralActor(), $request->toDto());
+        $redirect = redirect()->route('central.staff.index');
 
         return $result->emailSent === true
-            ? $response->with('status', 'Compte personnel créé. L’invitation a été envoyée.')
-            : $response->with('warning', 'Le compte est créé, mais l’invitation n’a pas pu être envoyée. Vérifiez le SMTP puis renvoyez l’invitation.');
+            ? $redirect->with('status', 'Compte personnel créé pour '.$result->user->name.'. L’invitation a été envoyée.')
+            : $redirect->with('warning', 'Le compte de '.$result->user->name.' est créé, mais l’invitation n’a pas pu être envoyée. Vérifiez le SMTP puis renvoyez l’invitation.');
     }
 
     public function show(User $user): View
@@ -62,45 +61,41 @@ class StaffController extends Controller
 
     public function update(UpdateStaffRequest $request, User $user, StaffManagementService $staff): RedirectResponse
     {
-        $result = $staff->update($this->actor($request), $user, $request->toDto());
-        $response = redirect()->route('central.staff.show', $user)->with('status', 'Informations du personnel enregistrées.');
+        $result = $staff->update($this->centralActor(), $user, $request->toDto());
+        $redirect = redirect()->route('central.staff.show', $user)
+            ->with('status', 'Informations du personnel enregistrées.');
 
         return $result->emailSent === false
-            ? $response->with('warning', 'Les informations sont enregistrées, mais l’e-mail n’a pas pu être envoyé. Vérifiez le SMTP.')
-            : $response;
+            ? $redirect->with('warning', 'Les informations sont enregistrées, mais l’e-mail n’a pas pu être envoyé. Vérifiez le SMTP.')
+            : $redirect;
     }
 
-    public function resendInvitation(Request $request, User $user, StaffInvitationService $invitations): RedirectResponse
+    public function resendInvitation(User $user, StaffInvitationService $invitations): RedirectResponse
     {
-        $result = $invitations->resend($this->actor($request), $user);
-        $response = redirect()->route('central.staff.show', $user);
+        $result = $invitations->resend($this->centralActor(), $user);
+        $redirect = redirect()->route('central.staff.show', $user);
 
         return $result->emailSent === true
-            ? $response->with('status', 'L’invitation a été envoyée.')
-            : $response->with('warning', 'L’invitation n’a pas pu être envoyée. Vérifiez le SMTP.');
+            ? $redirect->with('status', 'L’invitation a été envoyée.')
+            : $redirect->with('warning', 'L’invitation n’a pas pu être envoyée. Vérifiez le SMTP.');
     }
 
     public function changeStatus(ChangeStaffStatusRequest $request, User $user, StaffManagementService $staff): RedirectResponse
     {
         $status = StatusEnum::from((int) $request->validated('status'));
-        $staff->changeStatus($this->actor($request), $user, $status);
+        $staff->changeStatus($this->centralActor(), $user, $status);
 
-        return redirect()->route('central.staff.show', $user)
-            ->with('status', $status === StatusEnum::SUSPENDED ? 'Administrateur suspendu.' : 'Administrateur réactivé.');
+        return redirect()->route('central.staff.show', $user)->with('status', match ($status) {
+            StatusEnum::SUSPENDED => 'Administrateur suspendu.',
+            default => 'Administrateur réactivé.',
+        });
     }
 
-    public function destroy(Request $request, User $user, StaffManagementService $staff): RedirectResponse
+    public function destroy(User $user, StaffManagementService $staff): RedirectResponse
     {
-        $staff->archive($this->actor($request), $user);
+        $staff->archive($this->centralActor(), $user);
 
-        return redirect()->route('central.staff.index')->with('status', 'Administrateur archivé. Les données historiques sont conservées.');
-    }
-
-    private function actor(Request $request): User
-    {
-        $actor = $request->user('central');
-        abort_unless($actor instanceof User, 403);
-
-        return $actor;
+        return redirect()->route('central.staff.index')
+            ->with('status', 'Administrateur archivé. Les données historiques sont conservées.');
     }
 }

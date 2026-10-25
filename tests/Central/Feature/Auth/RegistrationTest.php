@@ -2,8 +2,11 @@
 
 use App\Enums\Central\Users\StatusEnum;
 use App\Models\Central\Country;
+use App\Models\Central\Tenant;
 use App\Models\User;
+use App\Services\Central\Auth\RegistrationVerificationNotification;
 use Database\Seeders\Central\CountrySeeder;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -43,10 +46,11 @@ test('new users can register', function () {
     expect($user->status)->toBe(StatusEnum::PENDING);
     expect($user->hasVerifiedEmail())->toBeFalse();
     Notification::assertSentTo($user, VerifyEmail::class);
+    Notification::assertSentTimes(VerifyEmail::class, 1);
     $this->get(route('verification.notice'))->assertOk()
         ->assertSee('registration-created', false)->assertSee('Votre compte Aydra a été créé avec succès !')
         ->assertSee('Renvoyer l’e-mail de vérification');
-    expect(\App\Models\Central\Tenant::count())->toBe(0);
+    expect(Tenant::count())->toBe(0);
 });
 
 test('public registration cannot inject an approved status or privileged fields', function (): void {
@@ -100,8 +104,8 @@ test('registered notifications skip verified central accounts', function (): voi
     $user = User::factory()->create();
     Notification::fake();
 
-    app(\App\Services\Central\Auth\RegistrationVerificationNotification::class)
-        ->handle(new \Illuminate\Auth\Events\Registered($user));
+    app(RegistrationVerificationNotification::class)
+        ->handle(new Registered($user));
 
     Notification::assertNothingSent();
 });

@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Central\Dashboard;
 
+use App\Enums\Central\Users\JourneyState;
 use App\Http\Controllers\Controller;
+use App\Models\Central\User;
 use App\Services\Central\Auth\RegistrationJourney;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -12,10 +14,13 @@ class DashboardController extends Controller
 {
     public function __invoke(Request $request, RegistrationJourney $journey): View|RedirectResponse
     {
-        $destination = $journey->destination($request->user('central')->fresh());
+        $user = $request->user('central')?->fresh();
+        abort_unless($user instanceof User, 403);
 
-        return $destination === route('dashboard')
+        $state = $journey->state($user);
+
+        return $state === JourneyState::READY
             ? view('central.dashboard')
-            : redirect()->to($destination);
+            : redirect()->route($state->routeName());
     }
 }

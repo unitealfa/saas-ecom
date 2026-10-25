@@ -13,42 +13,43 @@ use App\Services\Central\Countries\CountryCatalog;
 use App\Services\Central\Users\UserManagementService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
 class UserController extends Controller
 {
-    public function __construct(public UserManagementService $userServices, private CountryCatalog $countries) {}
+    public function __construct(
+        private UserManagementService $userServices,
+        private CountryCatalog $countries,
+    ) {}
 
-    public function create(Request $request): View
+    public function create(): View
     {
-        $actor = $request->user('central');
-        abort_unless($actor instanceof User, 403);
-        abort_unless(Gate::forUser($actor)->allows('create', User::class)
-            || Gate::forUser($actor)->allows('createStaff', User::class), 403);
+        $actor = $this->centralActor();
+        $canCreateMerchant = Gate::forUser($actor)->allows('create', User::class);
+        $canCreateStaff = Gate::forUser($actor)->allows('createStaff', User::class);
+        abort_unless($canCreateMerchant || $canCreateStaff, 403);
 
         return view('central.pages.admin.users.create', [
             'countries' => $this->countries->active(),
             'roles' => $this->userServices->availableRoles($actor),
-            'canCreateMerchant' => Gate::forUser($actor)->allows('create', User::class),
-            'canCreateStaff' => Gate::forUser($actor)->allows('createStaff', User::class),
+            'canCreateMerchant' => $canCreateMerchant,
+            'canCreateStaff' => $canCreateStaff,
         ]);
     }
 
     public function store(StoreUserRequest $request): RedirectResponse
     {
-        $actor = $request->user('central');
-        abort_unless($actor instanceof User, 403);
+        $actor = $this->centralActor();
         $result = $this->userServices->create($actor, $request->toDto());
+        $name = $result->user->name;
 
-        $destination = Gate::forUser($actor)->allows('viewAny', User::class) ? 'central.users.index' : 'dashboard';
+        $redirect = redirect()->route(
+            Gate::forUser($actor)->allows('viewAny', User::class) ? 'central.users.index' : 'dashboard'
+        );
 
-        $response = redirect()->route($destination)->with('status', 'Compte créé pour '.$result->user->name.'.');
-        if ($result->emailSent === true) {
-            return $response->with('status', 'Compte créé pour '.$result->user->name.'. L’invitation a été envoyée.');
-        }
-
-        return $response->with('warning', 'Le compte est créé, mais l’invitation n’a pas pu être envoyée. Vérifiez le SMTP puis renvoyez l’invitation depuis la fiche du compte.');
+        return $result->emailSent === true
+            ? $redirect->with('status', 'Compte créé pour '.$name.'. L’invitation a été envoyée.')
+            : $redirect->with('warning', 'Le compte de '.$name.' est créé, mais l’invitation n’a pas pu être envoyée. Vérifiez le SMTP puis renvoyez l’invitation depuis la fiche du compte.');
     }
 
     public function show(User $user): View
@@ -66,8 +67,11 @@ class UserController extends Controller
     {
         Gate::authorize('update', $user);
         $user->load(['country', 'phoneCountry', 'roles']);
-        $ownerShops = $access->isStaff($user) ? collect()
+
+        $ownerShops = $access->isStaff($user)
+            ? collect()
             : $user->tenants()->orderBy('activation_priority')->orderBy('id')->get();
+
         if ($ownerShops->isNotEmpty() && Gate::denies('updatePriorities', $ownerShops->first())) {
             $ownerShops = collect();
         }
@@ -81,61 +85,63 @@ class UserController extends Controller
         ]);
     }
 
-    public function history(Request $request, User $user): View
+    public function history(User $user): View
     {
-        $actor = $request->user('central');
-        abort_unless($actor instanceof User, 403);
-
-        return view('central.pages.admin.users.history', ['user' => $user, 'history' => $this->userServices->history($actor, $user)]);
+        return view('central.pages.admin.users.history', [
+            'user' => $user,
+            'history' => $this->userServices->history($this->centralActor(), $user),
+        ]);
     }
 
     public function update(UpdateUserRequest $request, User $user): RedirectResponse
     {
-        $actor = $request->user('central');
-        abort_unless($actor instanceof User, 403);
-        $result = $this->userServices->update($actor, $user, $request->toDto());
-        $destination = Gate::forUser($actor)->allows('view', $user) ? 'central.users.show' : 'dashboard';
-        $response = redirect()->route($destination, $destination === 'central.users.show' ? [$user] : [])
-            ->with('status', 'Informations du compte enregistrées.');
-        if ($result->emailSent === false) {
-            return $response->with('warning', 'Les informations sont enregistrées, mais l’e-mail n’a pas pu être envoyé. Vérifiez le SMTP puis renvoyez l’invitation.');
-        }
+        $result = $this->userServices->update($this->centralActor(), $user, $request->toDto());
+        $redirect = $this->afterAction($user)->with('status', 'Informations du compte enregistrées.');
 
-        return $response;
+        return $result->emailSent === false
+            ? $redirect->with('warning', 'Les informations sont enregistrées, mais l’e-mail n’a pas pu être envoyé. Vérifiez le SMTP puis renvoyez l’invitation.')
+            : $redirect;
     }
 
-    public function resendInvitation(Request $request, User $user): RedirectResponse
+    public function resendInvitation(User $user): RedirectResponse
     {
         Gate::authorize('resendInvitation', $user);
-        $actor = $request->user('central');
-        abort_unless($actor instanceof User, 403);
-        $result = $this->userServices->resendInvitation($actor, $user);
-        $destination = Gate::forUser($actor)->allows('view', $user) ? 'central.users.show' : 'dashboard';
-        $response = redirect()->route($destination, $destination === 'central.users.show' ? [$user] : []);
+
+        $result = $this->userServices->resendInvitation($this->centralActor(), $user);
+        $redirect = $this->afterAction($user);
 
         return $result->emailSent === true
-            ? $response->with('status', 'L’invitation a été envoyée.')
-            : $response->with('warning', 'L’invitation n’a pas pu être envoyée. Vérifiez la configuration SMTP.');
+            ? $redirect->with('status', 'L’invitation a été envoyée.')
+            : $redirect->with('warning', 'L’invitation n’a pas pu être envoyée. Vérifiez la configuration SMTP.');
     }
 
     public function changeStatus(ChangeUserStatusRequest $request, User $user): RedirectResponse
     {
-        $actor = $request->user('central');
-        abort_unless($actor instanceof User, 403);
         $status = StatusEnum::from((int) $request->validated('status'));
-        $this->userServices->changeStatus($actor, $user, $status);
+        $this->userServices->changeStatus($this->centralActor(), $user, $status);
 
-        return redirect()->route('central.users.show', $user)
-            ->with('status', $status === StatusEnum::SUSPENDED ? 'Compte suspendu.'
-                : ($user->fresh()->status === StatusEnum::PENDING ? 'Compte remis en attente : son dossier nécessite une nouvelle approbation.' : 'Compte réactivé.'));
+        $message = match (true) {
+            $status === StatusEnum::SUSPENDED => 'Compte suspendu.',
+            $user->refresh()->status === StatusEnum::PENDING => 'Compte remis en attente : son dossier nécessite une nouvelle approbation.',
+            default => 'Compte réactivé.',
+        };
+
+        return redirect()->route('central.users.show', $user)->with('status', $message);
     }
 
-    public function destroy(Request $request, User $user): RedirectResponse
+    public function destroy(User $user): RedirectResponse
     {
-        $actor = $request->user('central');
-        abort_unless($actor instanceof User, 403);
-        $this->userServices->archive($actor, $user);
+        $this->userServices->archive($this->centralActor(), $user);
 
-        return redirect()->route('central.users.index')->with('status', 'Compte archivé. Les données historiques et les boutiques sont conservées.');
+        return redirect()->route('central.users.index')
+            ->with('status', 'Compte archivé. Les données historiques et les boutiques sont conservées.');
+    }
+
+    /** Fiche du compte si l'acteur peut la voir, sinon tableau de bord. */
+    private function afterAction(User $user): RedirectResponse
+    {
+        return Gate::forUser($this->centralActor())->allows('view', $user)
+            ? redirect()->route('central.users.show', $user)
+            : redirect()->route('dashboard');
     }
 }

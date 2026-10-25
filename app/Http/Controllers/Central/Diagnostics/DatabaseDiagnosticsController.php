@@ -10,7 +10,11 @@ class DatabaseDiagnosticsController extends Controller
 {
     public function __invoke(DatabaseDiagnostics $diagnostics): Response
     {
-        return response()->view('central.pages.diagnostics.database-diagnostics', $diagnostics->read())
-            ->header('Cache-Control', 'private, no-store');
+        return response()->view(
+            'central.pages.diagnostics.database-diagnostics',
+            $diagnostics->read(),
+            200,
+            ['Cache-Control' => 'private, no-store'],
+        );
     }
 }

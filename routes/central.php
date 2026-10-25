@@ -7,12 +7,13 @@ use App\Http\Controllers\Central\Owner\Tenants\TenantController as OwnerTenantCo
 use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', rtrim(config('app.url'), '/').'/login')->name('home');
+Route::redirect('/', '/login')->name('home');
 
 require __DIR__.'/central/diagnostics.php';
 
 Route::get('inscription/statut', RegistrationStatusController::class)
-    ->middleware(['auth:central', EnsureActiveCentralAccount::class.':optional'])->name('registration.status');
+    ->middleware(['auth:central', EnsureActiveCentralAccount::class.':optional'])
+    ->name('registration.status');
 
 Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class])->group(function (): void {
     Route::get('dashboard', DashboardController::class)->name('dashboard');

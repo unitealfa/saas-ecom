@@ -3,8 +3,10 @@
 use App\Enums\Central\Tenants\StatusEnum as TenantStatus;
 use App\Enums\Central\Users\JourneyState;
 use App\Enums\Central\Users\StatusEnum;
+use App\Enums\VerificationStatusEnum;
 use App\Jobs\Central\ProvisionTenantDatabase;
 use App\Models\Central\Activity;
+use App\Models\Central\Permission;
 use App\Models\Central\Role;
 use App\Models\Central\Tenant;
 use App\Models\User;
@@ -22,10 +24,44 @@ function journeyMerchant(array $attributes = []): User
     if (($attributes['status'] ?? StatusEnum::ACTIVE) === StatusEnum::ACTIVE) {
         $validator = User::factory()->create();
         $attributes += ['legal_profile_version' => 1, 'legal_verified_by_id' => $validator->id,
-            'legal_verification_status' => \App\Enums\VerificationStatusEnum::VERIFIED, 'legal_verified_at' => now()];
+            'legal_verification_status' => VerificationStatusEnum::VERIFIED, 'legal_verified_at' => now()];
     }
+
     return User::factory()->create($attributes);
 }
+
+test('registration journey priorities override later states and ready shops', function (StatusEnum $status, bool $emailVerified, bool $legalVerified, bool $readyShop, bool $staff, JourneyState $expected): void {
+    $validator = User::factory()->create();
+    $user = User::factory()->create([
+        'status' => $status, 'email_verified_at' => $emailVerified ? now() : null,
+        'legal_profile_version' => 1,
+        'legal_verification_status' => $legalVerified ? VerificationStatusEnum::VERIFIED : VerificationStatusEnum::PENDING,
+        'legal_verified_at' => $legalVerified ? now() : null,
+        'legal_verified_by_id' => $legalVerified ? $validator->id : null,
+    ]);
+    if ($staff) {
+        Permission::findOrCreate('saas.users.view', 'central');
+        $user->assignRole(Role::createWithPermissions('journey-staff', ['saas.users.view' => 9999]));
+    }
+    if ($readyShop) {
+        Event::fake([TenantCreated::class]);
+        Tenant::factory()->create(['user_id' => $user->id, 'status' => TenantStatus::ACTIVE,
+            'schema_version' => 'completed-schema', 'provisioned_at' => now()]);
+        Event::assertDispatchedTimes(TenantCreated::class, 1);
+    }
+
+    $journey = app(RegistrationJourney::class);
+
+    expect($journey->state($user))->toBe($expected);
+    expect($journey->progress($user)['state'])->toBe($expected->value);
+})->with([
+    'unverified before rejection' => [StatusEnum::REJECTED, false, false, true, false, JourneyState::VERIFICATION],
+    'pending before a ready shop' => [StatusEnum::PENDING, true, true, true, false, JourneyState::PENDING],
+    'rejected before a ready shop' => [StatusEnum::REJECTED, true, false, true, false, JourneyState::REJECTED],
+    'unverified staff' => [StatusEnum::ACTIVE, false, false, false, true, JourneyState::VERIFICATION],
+    'staff needs neither legal approval nor shops' => [StatusEnum::ACTIVE, true, false, false, true, JourneyState::READY],
+    'legal approval before a ready shop' => [StatusEnum::ACTIVE, true, false, true, false, JourneyState::PENDING],
+]);
 
 test('merchant authentication follows email approval and shop readiness', function (StatusEnum $status, bool $verified, ?TenantStatus $shopStatus, bool $prepared, string $state, string $destination): void {
     $merchant = journeyMerchant(['status' => $status, 'email_verified_at' => $verified ? now() : null]);

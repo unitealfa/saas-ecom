@@ -7,6 +7,7 @@ use App\Http\Requests\Central\Users\LegalVerificationRequest;
 use App\Models\Central\User;
 use App\Services\Central\Users\UserApprovalService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Gate;
 
 class LegalVerificationController extends Controller
 {
@@ -22,14 +23,22 @@ class LegalVerificationController extends Controller
         return $this->decide($request, $user, false);
     }
 
-    private function decide(LegalVerificationRequest $request, User $user, bool $validated): RedirectResponse
+    private function decide(LegalVerificationRequest $request, User $user, bool $approved): RedirectResponse
     {
-        $actor = $request->user('central');
-        abort_unless($actor instanceof User, 403);
-        $this->approvals->decide($actor, $user, $validated, $request->validated('reason'),
-            $request->profileVersion(), $request->expectedStatus());
+        Gate::authorize('decideLegalVerification', $user); // adaptez au nom de votre policy
 
-        return redirect()->route('central.users.show', $user)
-            ->with('status', $validated ? 'Compte approuvé et dossier validé.' : 'Compte refusé et dossier rejeté.');
+        $this->approvals->decide(
+            $this->centralActor(),
+            $user,
+            $approved,
+            $request->validated('reason'),
+            $request->profileVersion(),
+            $request->expectedStatus(),
+        );
+
+        return redirect()->route('central.users.show', $user)->with(
+            'status',
+            $approved ? 'Compte approuvé et dossier validé.' : 'Compte refusé et dossier rejeté.',
+        );
     }
 }

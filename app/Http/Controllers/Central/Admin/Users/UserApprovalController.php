@@ -8,18 +8,17 @@ use App\Models\Central\User;
 use App\Services\Central\Users\UserApprovalService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class UserApprovalController extends Controller
 {
     public function __construct(private UserApprovalService $approvals) {}
 
-    public function index(Request $request): View
+    public function index(): View
     {
-        $actor = $request->user('central');
-        abort_unless($actor instanceof User, 403);
-
-        return view('central.pages.admin.users.pending', ['users' => $this->approvals->pending($actor)]);
+        return view('central.pages.admin.users.pending', [
+            'users' => $this->approvals->pending($this->centralActor()),
+        ]);
     }
 
     public function approve(UserApprovalRequest $request, User $user): RedirectResponse
@@ -34,12 +33,22 @@ class UserApprovalController extends Controller
 
     private function decide(UserApprovalRequest $request, User $user, bool $approved): RedirectResponse
     {
-        $actor = $request->user('central');
-        abort_unless($actor instanceof User, 403);
-        $this->approvals->decide($actor, $user, $approved, $request->validated('reason'),
-            $request->profileVersion(), $request->expectedStatus());
+        Gate::authorize('decideApproval', $user); // adaptez au nom de votre policy
 
-        return redirect()->back(fallback: route('central.users.index'))
-            ->with('status', $approved ? 'Compte approuvé et dossier validé. L’e-mail doit être vérifié séparément.' : 'Compte refusé et dossier rejeté.');
+        $this->approvals->decide(
+            $this->centralActor(),
+            $user,
+            $approved,
+            $request->validated('reason'),
+            $request->profileVersion(),
+            $request->expectedStatus(),
+        );
+
+        return redirect()->back(fallback: route('central.users.index'))->with(
+            'status',
+            $approved
+                ? 'Compte approuvé et dossier validé. L’e-mail doit être vérifié séparément.'
+                : 'Compte refusé et dossier rejeté.',
+        );
     }
 }

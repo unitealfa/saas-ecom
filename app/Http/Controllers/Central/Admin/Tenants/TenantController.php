@@ -11,38 +11,46 @@ use App\Http\Requests\Central\Tenants\StoreTenantRequest;
 use App\Http\Requests\Central\Tenants\UpdateTenantPrioritiesRequest;
 use App\Http\Requests\Central\Tenants\UpdateTenantRequest;
 use App\Models\Central\Tenant;
-use App\Models\Central\User as CentralUser;
-use App\Models\User;
+use App\Models\Central\User;
 use App\Services\Central\Tenants\TenantCreator;
 use App\Services\Central\Tenants\TenantManagementService;
 use App\Services\Central\Tenants\TenantStatusService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
 class TenantController extends Controller
 {
-    public function __construct(private TenantCreator $creator, private TenantManagementService $tenants, private TenantStatusService $states) {}
+    public function __construct(
+        private TenantCreator $creator,
+        private TenantManagementService $tenants,
+        private TenantStatusService $states,
+    ) {}
 
     public function index(SearchTenantsRequest $request): View
     {
-        $status = $request->validated('status');
-        $status = $status === null ? null : StatusEnum::from((int) $status);
-        $shops = $this->tenants->search($this->actor($request), $request->validated('search'), $status);
+        $search = $request->validated('search');
+        $status = StatusEnum::tryFrom((int) $request->validated('status'));
+        $shops = $this->tenants->search($this->centralActor(), $search, $status);
 
         return view('central.pages.admin.tenants.index', [
-            'shops' => $shops, 'search' => $request->validated('search'), 'status' => $status, 'statuses' => StatusEnum::cases(),
+            'shops' => $shops,
+            'search' => $search,
+            'status' => $status,
+            'statuses' => StatusEnum::cases(),
             'subscriptions' => $this->tenants->subscriptions(collect($shops->items())),
         ]);
     }
 
     public function chooseOwner(SearchTenantsRequest $request): View
     {
+        $search = $request->validated('search');
+
         return view('central.pages.admin.tenants.create', [
-            'user' => null, 'owners' => $this->tenants->owners($this->actor($request), $request->validated('search')),
-            'search' => $request->validated('search'),
+            'user' => null,
+            'owners' => $this->tenants->owners($this->centralActor(), $search),
+            'search' => $search,
         ]);
     }
 
@@ -51,15 +59,17 @@ class TenantController extends Controller
         Gate::authorize('create', [Tenant::class, $user]);
 
         return view('central.pages.admin.tenants.create', [
-            'user' => $user, 'shops' => $user->tenants()->with('domains')->orderBy('id')->paginate(20),
-            'creationKey' => (string) Str::uuid(), 'defaults' => ShopSettings::fromArray()->toArray(),
+            'user' => $user,
+            'shops' => $user->tenants()->with('domains')->orderBy('id')->paginate(20),
+            'creationKey' => (string) Str::uuid(),
+            'defaults' => ShopSettings::fromArray()->toArray(),
             'baseDomain' => config('tenancy.saas_base_domain'),
         ]);
     }
 
     public function store(StoreTenantRequest $request, User $user): RedirectResponse
     {
-        $tenant = $this->creator->create($this->actor($request), $user, $request->toDto());
+        $tenant = $this->creator->create($this->centralActor(), $user, $request->toDto());
 
         return redirect()->route('central.users.tenants.create', $user)
             ->with('status', 'Boutique '.$tenant->shop_name.' réservée. Sa base sera préparée automatiquement par la file d’attente.');
@@ -71,7 +81,8 @@ class TenantController extends Controller
         $tenant->load(['owner' => fn ($query) => $query->withTrashed(), 'domains']);
 
         return view('central.pages.admin.tenants.show', [
-            'tenant' => $tenant, 'subscription' => $this->tenants->subscriptions(collect([$tenant]))->get($tenant->user_id),
+            'tenant' => $tenant,
+            'subscription' => $this->tenants->subscriptions(collect([$tenant]))->get($tenant->user_id),
         ]);
     }
 
@@ -84,14 +95,18 @@ class TenantController extends Controller
 
     public function update(UpdateTenantRequest $request, Tenant $tenant): RedirectResponse
     {
-        $this->tenants->update($this->actor($request), $tenant, $request->validated());
+        $this->tenants->update($this->centralActor(), $tenant, $request->validated());
 
-        return redirect()->route('central.tenants.show', $tenant)->with('status', 'Informations enregistrées. Le nom sera synchronisé avec la boutique par la file centrale.');
+        return redirect()->route('central.tenants.show', $tenant)
+            ->with('status', 'Informations enregistrées. Le nom sera synchronisé avec la boutique par la file centrale.');
     }
 
-    public function history(Request $request, Tenant $tenant): View
+    public function history(Tenant $tenant): View
     {
-        return view('central.pages.admin.tenants.history', ['tenant' => $tenant, 'history' => $this->tenants->history($this->actor($request), $tenant)]);
+        return view('central.pages.admin.tenants.history', [
+            'tenant' => $tenant,
+            'history' => $this->tenants->history($this->centralActor(), $tenant),
+        ]);
     }
 
     public function suspend(ChangeTenantStatusRequest $request, Tenant $tenant): RedirectResponse
@@ -111,28 +126,31 @@ class TenantController extends Controller
 
     public function priorities(UpdateTenantPrioritiesRequest $request, Tenant $tenant): RedirectResponse
     {
-        $this->states->priorities($this->actor($request), $tenant, $request->validated('priorities'), $request->validated('reason'));
+        $this->states->priorities(
+            $this->centralActor(),
+            $tenant,
+            $request->validated('priorities'),
+            $request->validated('reason'),
+        );
 
         $owner = $tenant->owner;
-        $response = Gate::allows('update', $owner)
+        $redirect = $owner !== null && Gate::allows('update', $owner)
             ? redirect()->route('central.users.edit', $owner)
             : redirect()->route('central.tenants.show', $tenant);
 
-        return $response->with('status', 'Priorités enregistrées et boutiques éligibles recalculées sous quota.');
+        return $redirect->with('status', 'Priorités enregistrées et boutiques éligibles recalculées sous quota.');
     }
 
     private function changeState(ChangeTenantStatusRequest $request, Tenant $tenant, string $action, string $message): RedirectResponse
     {
-        $this->states->change($this->actor($request), $tenant, $action, StatusEnum::from((int) $request->validated('expected_status')), $request->validated('reason'));
+        $this->states->change(
+            $this->centralActor(),
+            $tenant,
+            $action,
+            StatusEnum::from((int) $request->validated('expected_status')),
+            $request->validated('reason'),
+        );
 
         return redirect()->route('central.tenants.show', $tenant)->with('status', $message);
-    }
-
-    private function actor(Request $request): CentralUser
-    {
-        $actor = $request->user('central');
-        abort_unless($actor instanceof CentralUser, 403);
-
-        return $actor;
     }
 }

@@ -7,7 +7,6 @@ use App\Http\Requests\Central\Permissions\SearchPermissionsRequest;
 use App\Models\Central\User;
 use App\Services\Central\Authorization\PermissionCatalogService;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\Request;
 
 class PermissionController extends Controller
 {
@@ -16,19 +15,13 @@ class PermissionController extends Controller
     public function index(SearchPermissionsRequest $request): View
     {
         $search = $request->validated('search');
-
-        return view('central.pages.admin.permissions.index', [
-            'permissions' => $this->catalog->paginate($this->actor($request), $search),
-            'search' => $search,
-            'groups' => $this->catalog->groups(),
-        ]);
-    }
-
-    private function actor(Request $request): User
-    {
         $actor = $request->user('central');
         abort_unless($actor instanceof User, 403);
 
-        return $actor;
+        return view('central.pages.admin.permissions.index', [
+            'permissions' => $this->catalog->paginate($actor, $search),
+            'search' => $search,
+            'groups' => $this->catalog->groups(),
+        ]);
     }
 }

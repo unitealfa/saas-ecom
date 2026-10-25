@@ -16,9 +16,10 @@ class DashboardController extends Controller
         abort_unless($tenancy->initialized, 403);
 
         $user = $request->user('tenant');
-
         abort_unless($user instanceof User, 401);
 
-        return view('tenant.pages.admin.dashboard.dashboard', ['dashboard' => $dashboard->forUser($user)]);
+        return view('tenant.pages.admin.dashboard.dashboard', [
+            'dashboard' => $dashboard->forUser($user),
+        ]);
     }
 }

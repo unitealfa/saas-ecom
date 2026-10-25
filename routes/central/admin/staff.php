@@ -4,10 +4,11 @@ use App\Http\Controllers\Central\Admin\Staff\StaffController;
 use App\Http\Controllers\Central\Admin\Staff\StaffPermissionController;
 use App\Http\Controllers\Central\Admin\Staff\StaffRoleController;
 use Illuminate\Support\Facades\Route;
+use App\Models\Central\User;
 
 Route::prefix('staff')->name('staff.')->group(function (): void {
     Route::livewire('/', 'central::pages.admin.staff.index')
-        ->middleware('can:viewAnyStaff,App\\Models\\User')->name('index');
+        ->middleware('can:viewAnyStaff,'.User::class)->name('index');
 
     Route::controller(StaffController::class)->group(function (): void {
         Route::get('create', 'create')->name('create');

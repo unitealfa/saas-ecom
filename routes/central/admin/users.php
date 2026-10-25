@@ -4,10 +4,11 @@ use App\Http\Controllers\Central\Admin\Users\LegalVerificationController;
 use App\Http\Controllers\Central\Admin\Users\UserApprovalController;
 use App\Http\Controllers\Central\Admin\Users\UserController;
 use Illuminate\Support\Facades\Route;
+use App\Models\Central\User;
 
 Route::prefix('users')->name('users.')->group(function (): void {
     Route::livewire('/', 'central::pages.admin.users.index')
-        ->middleware('can:viewAny,App\\Models\\User')->name('index');
+        ->middleware('can:viewAny,'.User::class)->name('index');
 
     Route::controller(UserApprovalController::class)->group(function (): void {
         Route::get('pending', 'index')->name('pending');
