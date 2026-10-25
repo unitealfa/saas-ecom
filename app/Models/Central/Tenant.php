@@ -18,7 +18,6 @@ use Stancl\Tenancy\Database\Concerns\HasDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDomains;
 use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 
-
 #[Fillable(['internal_label', 'shop_name', 'slug'])]
 #[Hidden(['id', 'user_id', 'data', 'creation_key', 'creation_hash'])]
 class Tenant extends BaseTenant implements TenantWithDatabase
@@ -60,6 +59,12 @@ class Tenant extends BaseTenant implements TenantWithDatabase
                 throw new LogicException('Tenant ownership and provisioning identity are immutable.');
             }
         });
+    }
+
+    /** L'alias App\Models\Tenant configuré dans tenancy.tenant_model hérite de cette factory. */
+    protected static function newFactory(): TenantFactory
+    {
+        return TenantFactory::new();
     }
 
     public function domains(): HasMany

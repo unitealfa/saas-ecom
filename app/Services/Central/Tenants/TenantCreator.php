@@ -6,6 +6,7 @@ use App\DTOs\Central\Tenants\TenantData;
 use App\Enums\Central\Deployments\OperationEnum;
 use App\Enums\Central\Deployments\StatusEnum as DeploymentStatus;
 use App\Enums\Central\Users\StatusEnum;
+use App\Enums\VerificationStatusEnum;
 use App\Jobs\Central\ProvisionTenantDatabase;
 use App\Models\Central\Feature;
 use App\Models\Central\PlanFeature;
@@ -14,10 +15,11 @@ use App\Models\Central\TenantSchemaDeployment;
 use App\Models\Central\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use App\Services\Central\Subscriptions\DefaultSubscription;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use LogicException;
-use Illuminate\Database\UniqueConstraintViolationException;
+use Stancl\Tenancy\Exceptions\DomainOccupiedByOtherTenantException;
 
 class TenantCreator
 {
@@ -109,11 +111,13 @@ class TenantCreator
                     throw ValidationException::withMessages(['slug' => 'Ce slug ou ce nom de base est réservé ou indisponible.']);
                 }
                 try {
-                    $tenant->domains()->create([
+                    $tenantDomain = $tenant->domains()->make([
                         'domain' => $domain, 'type' => 1, 'is_primary' => true,
-                        'verification_status' => 2, 'verified_at' => now(),
                     ]);
-                } catch (UniqueConstraintViolationException|\Stancl\Tenancy\Exceptions\DomainOccupiedByOtherTenantException) {
+                    $tenantDomain->forceFill([
+                        'verification_status' => VerificationStatusEnum::VERIFIED, 'verified_at' => now(),
+                    ])->save();
+                } catch (UniqueConstraintViolationException|DomainOccupiedByOtherTenantException) {
                     throw ValidationException::withMessages(['slug' => 'Ce domaine de boutique est déjà utilisé.']);
                 }
                 $deployment = TenantSchemaDeployment::create([

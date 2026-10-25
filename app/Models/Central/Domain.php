@@ -2,6 +2,7 @@
 
 namespace App\Models\Central;
 
+use App\Concerns\HasPublicUuid;
 use App\Enums\Central\Domains\CertificateStatusEnum;
 use App\Enums\Central\Domains\TypeEnum;
 use App\Enums\VerificationStatusEnum;
@@ -11,11 +12,12 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Str;
 use Stancl\Tenancy\Database\Models\Domain as BaseDomain;
 
-
 #[Fillable(['domain', 'type', 'is_primary'])]
 #[Hidden(['id', 'tenant_id', 'primary_slot'])]
 class Domain extends BaseDomain
 {
+    use HasPublicUuid;
+
     protected function casts(): array
     {
         return [

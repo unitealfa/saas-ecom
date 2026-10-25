@@ -3,6 +3,7 @@
 namespace Database\Seeders\Central;
 
 use App\Enums\Central\Tenants\StatusEnum;
+use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Country;
 use App\Models\Tenant;
 use App\Models\User;
@@ -62,10 +63,13 @@ class LocalDevelopmentSeeder extends LocalFixtureSeeder
             }
 
             if (! $tenant->domains()->where('is_primary', true)->exists()) {
-                $tenant->domains()->create([
+                $domain = $tenant->domains()->make([
                     'domain' => $tenant->slug.'.'.config('tenancy.saas_base_domain'), 'type' => 1,
-                    'is_primary' => true, 'verification_status' => 2, 'verified_at' => now(),
+                    'is_primary' => true,
                 ]);
+                $domain->forceFill([
+                    'verification_status' => VerificationStatusEnum::VERIFIED, 'verified_at' => now(),
+                ])->save();
             }
 
             $tenant->run(fn () => $this->call(ShopSeeder::class));
