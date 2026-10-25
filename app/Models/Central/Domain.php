@@ -2,18 +2,17 @@
 
 namespace App\Models\Central;
 
-use App\Concerns\HasPublicUuid;
 use App\Enums\Central\Domains\CertificateStatusEnum;
 use App\Enums\Central\Domains\TypeEnum;
 use App\Enums\VerificationStatusEnum;
-use Database\Factories\Central\DomainFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Str;
 use Stancl\Tenancy\Database\Models\Domain as BaseDomain;
 
-#[Fillable(['domain', 'type', 'is_primary', 'verification_status', 'verified_at', 'certificate_status'])]
+
+#[Fillable(['domain', 'type', 'is_primary'])]
 #[Hidden(['id', 'tenant_id', 'primary_slot'])]
 class Domain extends BaseDomain
 {
@@ -27,5 +26,10 @@ class Domain extends BaseDomain
             'verified_at' => 'immutable_datetime',
             'certificate_status' => CertificateStatusEnum::class,
         ];
+    }
+
+    protected function domain(): Attribute
+    {
+        return Attribute::set(fn (string $value): string => Str::lower(trim($value)));
     }
 }

@@ -18,60 +18,22 @@ use Stancl\Tenancy\Database\Concerns\HasDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDomains;
 use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 
-/**
- * @property int $id
- * @property string $uuid
- * @property int $user_id
- * @property string $shop_name
- * @property string $slug
- * @property string $creation_hash
- * @property StatusEnum $status
- * @property-read User $owner
- */
+
 #[Fillable(['internal_label', 'shop_name', 'slug'])]
 #[Hidden(['id', 'user_id', 'data', 'creation_key', 'creation_hash'])]
 class Tenant extends BaseTenant implements TenantWithDatabase
 {
-    protected $attributes = ['status' => 1, 'profile_version' => 1, 'is_primary' => false];
-
-    /** @use HasFactory<TenantFactory> */
     use HasDatabase, HasDomains, HasFactory, HasPublicUuid, SoftDeletes;
 
-    protected static function newFactory(): TenantFactory
-    {
-        return TenantFactory::new();
-    }
+    private const array RESERVED_SLUGS = ['www', 'admin', 'api', 'app', 'mail', 'support'];
 
-    /** @return HasMany<Domain, $this> */
-    public function domains(): HasMany
-    {
-        return $this->hasMany(Domain::class, 'tenant_id');
-    }
+    private const string SLUG_PATTERN = '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D';
 
-    /** @return list<string> */
-    public static function getCustomColumns(): array
-    {
-        return ['id', 'uuid', 'user_id', 'internal_label', 'shop_name', 'slug', 'profile_version', 'document_prefix', 'creation_key', 'creation_hash', 'status', 'is_primary', 'activation_priority', 'over_quota_since_at', 'schema_version', 'provisioned_at', 'created_at', 'updated_at', 'deleted_at'];
-    }
+    /** Colonnes qui identifient le propriétaire et la création : jamais modifiables après coup. */
+    private const array IMMUTABLE_COLUMNS = ['user_id', 'document_prefix', 'creation_key', 'creation_hash'];
 
-    public function getTenantKeyName(): string
-    {
-        return 'id';
-    }
+    protected $attributes = ['status' => 1, 'profile_version' => 1, 'is_primary' => false];
 
-    /** @param array<string, mixed> $settings */
-    public function configureShopForProvisioning(array $settings): static
-    {
-        if ($this->exists) {
-            throw new LogicException('Initial shop settings must be provided before tenant creation.');
-        }
-
-        $this->setInternal('shop_settings', ShopSettings::fromArray($settings)->toArray());
-
-        return $this;
-    }
-
-    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -89,33 +51,72 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     protected static function booted(): void
     {
         static::creating(function (self $tenant): void {
-            $reserved = ['www', 'admin', 'api', 'app', 'mail', 'support'];
-
-            if (! preg_match('/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D', $tenant->slug) || in_array($tenant->slug, $reserved, true)) {
-                throw new LogicException('Invalid or reserved shop slug.');
-            }
-
-            $databaseName = $tenant->database()->getName()
-                ?? throw new LogicException('The tenant database name is missing.');
-
-            if (static::withTrashed()->where('data->tenancy_db_name', $databaseName)->exists()
-                || $tenant->database()->manager()->databaseExists($databaseName)) {
-                throw new LogicException('The tenant database name is already reserved or exists.');
-            }
-
-            $tenant->setInternal('db_name', $databaseName);
+            $tenant->assertValidSlug();
+            $tenant->reserveDatabaseName();
         });
 
         static::updating(function (self $tenant): void {
-            if ($tenant->isDirty(['user_id', 'document_prefix', 'creation_key', 'creation_hash'])) {
+            if ($tenant->isDirty(self::IMMUTABLE_COLUMNS)) {
                 throw new LogicException('Tenant ownership and provisioning identity are immutable.');
             }
         });
     }
 
-    /** @return BelongsTo<User, $this> */
+    public function domains(): HasMany
+    {
+        return $this->hasMany(Domain::class, 'tenant_id');
+    }
+
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public static function getCustomColumns(): array
+    {
+        return [
+            'id', 'uuid', 'user_id', 'internal_label', 'shop_name', 'slug', 'profile_version',
+            'document_prefix', 'creation_key', 'creation_hash', 'status', 'is_primary',
+            'activation_priority', 'over_quota_since_at', 'schema_version', 'provisioned_at',
+            'created_at', 'updated_at', 'deleted_at',
+        ];
+    }
+
+    public function getTenantKeyName(): string
+    {
+        return 'id';
+    }
+
+    public function configureShopForProvisioning(array $settings): static
+    {
+        if ($this->exists) {
+            throw new LogicException('Initial shop settings must be provided before tenant creation.');
+        }
+
+        $this->setInternal('shop_settings', ShopSettings::fromArray($settings)->toArray());
+
+        return $this;
+    }
+
+    private function assertValidSlug(): void
+    {
+        $slug = (string) $this->slug;
+
+        if (! preg_match(self::SLUG_PATTERN, $slug) || in_array($slug, self::RESERVED_SLUGS, true)) {
+            throw new LogicException('Invalid or reserved shop slug.');
+        }
+    }
+
+    private function reserveDatabaseName(): void
+    {
+        $databaseName = $this->database()->getName()
+            ?? throw new LogicException('The tenant database name is missing.');
+
+        if (static::withTrashed()->where('data->tenancy_db_name', $databaseName)->exists()
+            || $this->database()->manager()->databaseExists($databaseName)) {
+            throw new LogicException('The tenant database name is already reserved or exists.');
+        }
+
+        $this->setInternal('db_name', $databaseName);
     }
 }

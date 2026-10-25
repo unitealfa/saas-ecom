@@ -7,31 +7,28 @@ use App\Enums\Central\Deployments\OperationEnum;
 use App\Enums\Central\Deployments\StatusEnum;
 use Carbon\CarbonImmutable;
 use Database\Factories\Central\TenantSchemaDeploymentFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
-/**
- * @property int $id
- * @property string $uuid
- * @property StatusEnum $status
- * @property OperationEnum $operation
- * @property CarbonImmutable|null $started_at
- */
+
+#[Fillable([
+    'tenant_id', 'source_version', 'target_version', 'operation', 'status', 'attempt_number',
+    'operation_key', 'started_at', 'ended_at', 'error_code', 'sanitized_error',
+    'correlation_id', 'runtime_versions',
+])]
 class TenantSchemaDeployment extends Model
 {
-    /** @use HasFactory<TenantSchemaDeploymentFactory> */
     use CentralConnection, HasFactory, HasPublicUuid;
 
-    protected $fillable = ['tenant_id', 'source_version', 'target_version', 'operation', 'status', 'attempt_number', 'operation_key', 'started_at', 'ended_at', 'error_code', 'sanitized_error', 'correlation_id', 'runtime_versions'];
+    /** Ce qui identifie un déploiement : figé après la création. */
+    private const array IMMUTABLE_COLUMNS = [
+        'tenant_id', 'source_version', 'target_version', 'operation', 'operation_key', 'correlation_id',
+    ];
 
-    protected static function newFactory(): TenantSchemaDeploymentFactory
-    {
-        return TenantSchemaDeploymentFactory::new();
-    }
-
-    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -45,9 +42,17 @@ class TenantSchemaDeployment extends Model
         ];
     }
 
-    /** @return BelongsTo<Tenant, $this> */
+    protected static function booted(): void
+    {
+        static::updating(function (self $deployment): void {
+            if ($deployment->isDirty(self::IMMUTABLE_COLUMNS)) {
+                throw new LogicException('Deployment identity is immutable.');
+            }
+        });
+    }
+
     public function tenant(): BelongsTo
     {
-        return $this->belongsTo(Tenant::class, 'tenant_id');
+        return $this->belongsTo(Tenant::class)->withTrashed();
     }
 }

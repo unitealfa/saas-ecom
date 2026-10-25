@@ -8,7 +8,6 @@ use App\Concerns\HasTimedPermissions;
 use App\Concerns\LogsSafeActivity;
 use App\Enums\Tenant\Users\MembershipStatusEnum;
 use App\Enums\Tenant\Users\StatusEnum;
-use Database\Factories\Tenant\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,28 +17,26 @@ use Illuminate\Notifications\Notifiable;
 use LogicException;
 use Stancl\Tenancy\Database\Concerns\TenantConnection;
 
-/**
- * @property int $id
- * @property string $uuid
- * @property string|null $central_user_uuid
- * @property string $password
- * @property StatusEnum $status
- * @property MembershipStatusEnum $membership_status
- */
+
 #[Fillable(['last_name', 'first_name', 'email', 'phone', 'password', 'locale'])]
 #[Hidden(['id', 'password', 'remember_token', 'central_user_uuid'])]
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
     use HasFactory, HasPublicUuid, Notifiable, SoftDeletes, TenantConnection;
-
     use HasProfilePhoto, HasTimedPermissions, LogsSafeActivity;
 
     protected string $guard_name = 'tenant';
 
-    public function getMorphClass(): string
+    protected function casts(): array
     {
-        return 'shop_user';
+        return [
+            'password' => 'hashed',
+            'status' => StatusEnum::class,
+            'membership_status' => MembershipStatusEnum::class,
+            'email_verified_at' => 'immutable_datetime',
+            'joined_at' => 'immutable_datetime',
+            'last_login_at' => 'immutable_datetime',
+        ];
     }
 
     protected static function booted(): void
@@ -51,16 +48,8 @@ class User extends Authenticatable
         });
     }
 
-    /** @return array<string, string> */
-    protected function casts(): array
+    public function getMorphClass(): string
     {
-        return [
-            'password' => 'hashed',
-            'status' => StatusEnum::class,
-            'membership_status' => MembershipStatusEnum::class,
-            'email_verified_at' => 'immutable_datetime',
-            'joined_at' => 'immutable_datetime',
-            'last_login_at' => 'immutable_datetime',
-        ];
+        return 'shop_user';
     }
 }

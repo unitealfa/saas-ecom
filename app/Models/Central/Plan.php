@@ -3,32 +3,20 @@
 namespace App\Models\Central;
 
 use App\Concerns\HasPublicUuid;
-use Database\Factories\Central\PlanFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
-/**
- * @property int $id
- * @property string $uuid
- * @property string $monthly_price
- * @property string $annual_price
- */
+
+#[Fillable(['code', 'version', 'name', 'description', 'monthly_price', 'annual_price', 'is_active'])]
 class Plan extends Model
 {
-    /** @use HasFactory<PlanFactory> */
     use CentralConnection, HasFactory, HasPublicUuid, SoftDeletes;
 
-    protected $fillable = ['code', 'version', 'name', 'description', 'monthly_price', 'annual_price', 'is_active'];
-
-    protected static function newFactory(): PlanFactory
-    {
-        return PlanFactory::new();
-    }
-
-    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -39,9 +27,14 @@ class Plan extends Model
         ];
     }
 
-    /** @return HasMany<PlanFeature, $this> */
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
+    }
+
     public function features(): HasMany
     {
-        return $this->hasMany(PlanFeature::class, 'plan_id');
+        return $this->hasMany(PlanFeature::class);
     }
 }

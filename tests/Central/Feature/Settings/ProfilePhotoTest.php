@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Central\Users\StatusEnum;
+use App\Enums\MediaVisibilityEnum;
 use App\Models\Central\Activity;
 use App\Models\Central\Media;
 use App\Models\Central\Role;
@@ -46,7 +47,7 @@ test('an account can upload a private photo with its real parent and read it sec
     expect($photo->model_id)->not->toBe($photo->id);
     expect($photo->created_by_id)->toBe($user->id);
     expect($photo->mime_type)->toBe($mime);
-    expect($photo->visibility)->toBe(2);
+    expect($photo->visibility)->toBe(MediaVisibilityEnum::PRIVATE);
     expect($photo->is_primary)->toBeTrue();
     expect($photo->file_hash)->toBe(hash('sha256', $contents));
     expect($user->fresh()->getAttributes())->toBe($before);

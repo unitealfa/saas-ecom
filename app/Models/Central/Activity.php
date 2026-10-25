@@ -12,7 +12,6 @@ class Activity extends PackageActivity
 {
     use CentralConnection, HasActivityMetadata, HasPublicUuid;
 
-    /** @return array<string, string> */
     protected function casts(): array
     {
         return [...parent::casts(), 'tenant_id' => 'integer', 'origin' => ActivityOriginEnum::class];

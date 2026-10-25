@@ -5,20 +5,28 @@ namespace App\Models\Tenant;
 use App\Concerns\HasPublicUuid;
 use App\Concerns\HasRoleMetadata;
 use App\Concerns\LogsSafeActivity;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Spatie\Permission\Models\Role as PackageRole;
 use Stancl\Tenancy\Database\Concerns\TenantConnection;
 
+
+#[Fillable(['name', 'label'])]
 class Role extends PackageRole
 {
     use HasPublicUuid, HasRoleMetadata, LogsSafeActivity, TenantConnection;
 
-    protected string $guard_name = 'tenant';
+    public const string GUARD = 'tenant';
 
-    protected $attributes = ['guard_name' => 'tenant', 'is_system' => false, 'is_protected' => false, 'is_super_admin' => false, 'permission_version' => 1];
+    protected string $guard_name = self::GUARD;
 
-    protected $fillable = ['name', 'label'];
+    protected $attributes = [
+        'guard_name' => self::GUARD,
+        'is_system' => false,
+        'is_protected' => false,
+        'is_super_admin' => false,
+        'permission_version' => 1,
+    ];
 
-    /** @return array<string, string> */
     protected function casts(): array
     {
         return [

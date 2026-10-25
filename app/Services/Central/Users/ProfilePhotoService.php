@@ -2,6 +2,7 @@
 
 namespace App\Services\Central\Users;
 
+use App\Enums\MediaVisibilityEnum;
 use App\Models\Central\Media;
 use App\Models\Central\User;
 use Illuminate\Filesystem\FilesystemAdapter;
@@ -57,7 +58,7 @@ class ProfilePhotoService
                     'disk' => 'local', 'storage_key' => $key, 'mime_type' => $mime,
                     'original_name' => Str::limit($photo->getClientOriginalName(), 255, ''),
                     'size_bytes' => $photo->getSize(), 'width' => $dimensions[0], 'height' => $dimensions[1],
-                    'visibility' => 2, 'position' => 0, 'is_primary' => true,
+                    'visibility' => MediaVisibilityEnum::PRIVATE, 'position' => 0, 'is_primary' => true,
                     'file_hash' => hash_file('sha256', $photo->getRealPath()),
                 ])->save();
                 activity()->causedBy($user)->performedOn($user)->event('profile_photo_updated')
@@ -111,7 +112,7 @@ class ProfilePhotoService
     {
         $extension = self::MIME_EXTENSIONS[$photo->mime_type] ?? null;
 
-        return $extension !== null && $photo->disk === 'local' && $photo->visibility === 2
+        return $extension !== null && $photo->disk === 'local' && $photo->visibility === MediaVisibilityEnum::PRIVATE
             && $photo->model_type === $user->getMorphClass() && $photo->model_id === $user->id
             && $photo->collection_name === 'profile_photo'
             && $photo->storage_key === 'profile-photos/'.$user->uuid.'/'.$photo->uuid.'.'.$extension;
