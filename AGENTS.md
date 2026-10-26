@@ -9,6 +9,7 @@
 - Simplicité (20 octobre 2026) : préférer le chemin le plus simple à lire, avec les services existants et des méthodes aux responsabilités claires ; éviter couches et abstractions supplémentaires. Édition du profil central : jamais de nouvelle approbation ni changement automatique de statut/décision, même pour les champs professionnels. Conserver la version anti-formulaire obsolète, les preuves de contact indépendantes, les contrôles de permission sous verrou, transactions et audits. Détails §39 de l’architecture.
 - Méthode permanente de revue (22 octobre 2026) : pour tout ajout ou modification de code, examiner les fichiers concernés un par un avec leurs appelants et dépendances ; corriger les problèmes confirmés et simplifier la lecture sans changer les règles métier ni affaiblir les protections. Conserver les fichiers déjà corrects, éviter les abstractions inutiles et vérifier chaque étape avant de poursuivre. Contrôles ciblés et autorisés selon le risque, sans suite longue systématique ; méthode détaillée au §38 et conventions des Form Requests au §9 de l’architecture.
 - Capitalisation continue : à chaque convention ou amélioration validée, consigner sa règle réutilisable, son déclencheur, sa portée et ses limites dans la documentation existante ; ajouter ici seulement le rappel essentiel. Pour les prochaines tâches, appliquer directement les conventions pertinentes déjà validées (groupes de routes §35, cache §36, scopes §37, injection §27), sans nouvelle confirmation de principe. Ne pas généraliser une exception ponctuelle, imposer une optimisation sans bénéfice identifié ni annoncer une performance non mesurée. Réviser les règles remplacées et vérifier le résultat avant de poursuivre ; méthode au §38 de l’architecture.
+- Conventions issues de la revue Domaines (26 octobre 2026) : appliquer aux prochains ajouts et modifications pertinents les règles réutilisables du §38 : validations partagées sans divergence, types contrôlés avant les règles personnalisées, alias de routes compatibles, redirections vérifiées par identité et contexte, appels externes bornés hors verrou avec contrôle avant écriture. Conserver les extractions lisibles et les protections utiles ; les règles DNS/HTTPS spécifiques restent au §43. Ne pas généraliser ces mécanismes aux parcours qui n'en ont pas besoin.
 - Déclencheur cache (20 octobre 2026) : avant d'intégrer ou d'utiliser les wilayas/communes, points de retrait, informations publiques des transporteurs, présentation des offres, informations publiques d'une boutique ou catégories du catalogue, rappeler brièvement à l'utilisateur la décision et intégrer directement le cache adapté dans la tâche, sans redemander confirmation. Consulter architecture §36 : isolation, expiration, invalidation après commit et contrôles métier à jour. Autorisation pour ces lectures seulement ; aucune précharge de toutes les boutiques, dépendance ou infrastructure supplémentaire implicite.
 
 ## Références selon la tâche
@@ -257,3 +258,17 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - After the feature tests pass, ask the user to run the complete suite with `php artisan test --compact`.
 
 </laravel-boost-guidelines>
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.
+
+Rules:
+- When graphify-out/graph.json exists, run `graphify query "<question>"` before your first grep, search or source-file read for a codebase question, and put this rule in every subagent prompt that explores code. Read raw files only for lines the graph or an earlier read already located. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+- A committed graphify-out/graph.json is rewritten whole on every build, so a large diff to it in a pull request is expected. Do not flag it as churn or suggest skipping the graph rebuild or its hooks.

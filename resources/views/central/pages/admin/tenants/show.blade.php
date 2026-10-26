@@ -1,6 +1,10 @@
 <x-layouts::app :title="$tenant->shop_name">
     <section class="flex flex-col gap-6">
         <flux:heading size="xl" level="1">{{ $tenant->shop_name }}</flux:heading>
+        @php($primaryDomain = $tenant->domains->firstWhere('is_primary', true))
+        @if ($primaryDomain?->isReadyAsPrimary())
+            <flux:button :href="$primaryDomain->publicUrl()" target="_blank" rel="noopener noreferrer">Ouvrir la boutique — {{ $primaryDomain->domain }}</flux:button>
+        @endif
         @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
         @if ($errors->any())<flux:callout variant="danger" role="alert">{{ $errors->first() }}</flux:callout>@endif
         <dl class="grid gap-3 rounded-xl border border-zinc-200 p-4 sm:grid-cols-2 dark:border-zinc-700">

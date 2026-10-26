@@ -45,6 +45,11 @@
                             {{ __('Pays') }}
                         </flux:sidebar.item>
                     @endcan
+                    @can('viewAny', \App\Models\Central\Domain::class)
+                        <flux:sidebar.item :href="route('central.domains.index')" :current="request()->routeIs('central.domains.*')" wire:navigate>
+                            {{ __('Domaines') }}
+                        </flux:sidebar.item>
+                    @endcan
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 

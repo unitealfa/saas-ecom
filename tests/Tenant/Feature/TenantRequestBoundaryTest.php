@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Central\Domains\CertificateStatusEnum;
 use App\Enums\Central\Tenants\StatusEnum as TenantStatus;
 use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
@@ -96,3 +97,35 @@ test('tenant requests restore the central connection after success or an excepti
     expect($connectionAfterRequest)->toBe($central);
     Event::assertDispatchedTimes(TenantCreated::class, 1);
 })->with(['normal response' => false, 'downstream exception' => true]);
+
+test('ready shop public aliases redirect only to their verified primary and always end tenancy', function (): void {
+    $owner = User::factory()->create();
+    Event::fake([TenantCreated::class]);
+    $otherTenant = Tenant::factory()->create();
+    DomainFactory::new()->create(['tenant_id' => $otherTenant->id, 'domain' => 'foreign-primary.example.com',
+        'type' => 2, 'is_primary' => true, 'verification_status' => VerificationStatusEnum::VERIFIED,
+        'verified_at' => now(), 'certificate_status' => CertificateStatusEnum::ACTIVE]);
+    $tenant = Tenant::factory()->create(['user_id' => $owner->id, 'status' => TenantStatus::ACTIVE,
+        'schema_version' => 'prepared-schema', 'provisioned_at' => now()]);
+    $alias = DomainFactory::new()->create(['tenant_id' => $tenant->id, 'domain' => 'public-alias.aydra.localhost',
+        'type' => 1, 'verification_status' => VerificationStatusEnum::VERIFIED, 'verified_at' => now()]);
+    $primary = DomainFactory::new()->create(['tenant_id' => $tenant->id, 'domain' => 'public-primary.example.com',
+        'type' => 2, 'is_primary' => true, 'verification_status' => VerificationStatusEnum::VERIFIED,
+        'verified_at' => now(), 'certificate_status' => CertificateStatusEnum::ACTIVE]);
+    $database = $tenant->database();
+    $database->manager()->createDatabase($tenant);
+    try {
+        $this->get('http://'.$alias->domain.'/')->assertRedirect('https://'.$primary->domain.'/')
+            ->assertHeader('Cache-Control', 'no-store, private');
+        expect(tenancy()->initialized)->toBeFalse()->and(DB::getDefaultConnection())->toBe('mysql');
+        $this->head('http://'.$alias->domain.'/')->assertRedirect('https://'.$primary->domain.'/');
+        $this->get('https://'.$primary->domain.'/')->assertServiceUnavailable();
+        $primary->forceFill(['certificate_status' => CertificateStatusEnum::ERROR])->save();
+        $this->get('http://'.$alias->domain.'/')->assertServiceUnavailable();
+        expect(tenancy()->initialized)->toBeFalse();
+    } finally {
+        tenancy()->end();
+        TestCase::dropIsolatedMysqlDatabase($database->getName());
+    }
+    Event::assertDispatchedTimes(TenantCreated::class, 2);
+});

@@ -11,7 +11,17 @@ use Spatie\Permission\Models\Permission as PackagePermission;
 
 class CentralRoleCatalog
 {
+    public const array DOMAIN_PERMISSIONS = [
+        'saas.domains.view' => 'Consulter les domaines des boutiques',
+        'saas.domains.create' => 'Ajouter un domaine à une boutique',
+        'saas.domains.update' => 'Modifier les informations d’un domaine',
+        'saas.domains.verify' => 'Lancer la vérification d’un domaine',
+        'saas.domains.primary.update' => 'Définir le domaine principal',
+        'saas.domains.archive' => 'Archiver un domaine',
+    ];
+
     public const array PERMISSIONS = [
+        ...self::DOMAIN_PERMISSIONS,
         'saas.users.view' => 'Consulter les utilisateurs',
         'saas.users.create' => 'Créer des utilisateurs',
         'saas.users.update' => 'Modifier les utilisateurs',
@@ -60,6 +70,7 @@ class CentralRoleCatalog
     ];
 
     public const array GROUPS = [
+        'Domaines' => ['saas.domains.view', 'saas.domains.create', 'saas.domains.update', 'saas.domains.verify', 'saas.domains.primary.update', 'saas.domains.archive'],
         'Utilisateurs centraux' => ['saas.users.view', 'saas.users.create', 'saas.users.update', 'saas.users.approve', 'saas.users.reject', 'saas.users.suspend', 'saas.users.activate', 'saas.users.archive'],
         'Dossiers professionnels' => ['saas.users.legal.view', 'saas.users.legal.validate', 'saas.users.legal.reject'],
         'Historique des utilisateurs' => ['saas.users.history.view'],

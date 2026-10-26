@@ -29,7 +29,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     /** @use HasFactory<TenantFactory> */
     use HasDatabase, HasDomains, HasFactory, HasPublicUuid, SoftDeletes;
 
-    private const array RESERVED_SLUGS = ['www', 'admin', 'api', 'app', 'mail', 'support'];
+    public const array RESERVED_SLUGS = ['www', 'admin', 'api', 'app', 'mail', 'support'];
 
     public const string SLUG_PATTERN = '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/D';
 
