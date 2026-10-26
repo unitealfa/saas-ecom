@@ -73,7 +73,8 @@ test('unavailable shops retain the public preparation response without opening a
     $owner = User::factory()->create();
     $shop = module05Shop($owner, ['status' => StatusEnum::SUSPENDED]);
     $domain = $shop->domains()->create(['domain' => 'blocked.'.config('tenancy.saas_base_domain'), 'type' => 1,
-        'is_primary' => true, 'verification_status' => 2, 'verified_at' => now()]);
+        'is_primary' => true]);
+    $domain->forceFill(['verification_status' => 2, 'verified_at' => now()])->save();
     $this->get('http://'.$domain->domain.'/')->assertServiceUnavailable()->assertContent('Cette boutique est en préparation.');
     $this->get('http://'.$domain->domain.'/_dev/database')->assertForbidden();
     $shop->status = StatusEnum::ACTIVE;
@@ -179,7 +180,7 @@ test('shop renaming retains routing database and ownership while queuing a versi
     Queue::fake([SyncTenantProfile::class]);
     $this->actingAs($actor, 'central')->get(route('central.tenants.edit', $shop))->assertOk();
     $this->put(route('central.tenants.update', $shop), ['shop_name' => 'New Name', 'internal_label' => 'Internal', 'expected_profile_version' => 1])
-        ->assertSessionHasNoErrors()->assertRedirect(route('central.tenants.show', $shop));
+        ->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
     expect($shop->fresh()->only(array_keys($before)))->toBe($before);
     expect($shop->fresh()->profile_version)->toBe(2)->and($shop->fresh()->shop_name)->toBe('New Name');
     Queue::assertPushed(SyncTenantProfile::class, fn ($job): bool => $job->tenantId === $shop->id && $job->tenantUuid === $shop->uuid);

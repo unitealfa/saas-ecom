@@ -277,8 +277,9 @@ test('an unavailable shop domain is blocked before tenant initialization', funct
     Event::assertDispatched(TenantCreated::class);
     $domain = $shop->domains()->create([
         'domain' => $shop->slug.'.'.config('tenancy.saas_base_domain'),
-        'type' => 1, 'is_primary' => true, 'verification_status' => 2, 'verified_at' => now(),
+        'type' => 1, 'is_primary' => true,
     ]);
+    $domain->forceFill(['verification_status' => 2, 'verified_at' => now()])->save();
 
     $this->get('http://'.$domain->domain)->assertStatus(503);
     expect(tenancy()->initialized)->toBeFalse();

@@ -1,7 +1,7 @@
 <?php
 
-test('example', function () {
+test('the central entry directs guests to authentication', function () {
     $response = $this->get('/');
 
-    $response->assertStatus(200);
+    $response->assertRedirect(route('login'));
 });

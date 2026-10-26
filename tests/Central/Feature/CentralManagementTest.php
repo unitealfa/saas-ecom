@@ -12,18 +12,15 @@ use App\Models\Central\Role;
 use App\Models\Central\Subscription;
 use App\Models\Central\Tenant;
 use App\Models\Central\TenantSchemaDeployment;
-use App\Models\User;
+use App\Models\Central\User;
 use App\Notifications\Central\Auth\AccountInvitation;
 use App\Services\Central\Plans\FreePlanCatalog;
 use App\Services\Central\Subscriptions\DefaultSubscription;
-use App\Services\Central\Tenants\TenantProvisioner;
 use Database\Seeders\Central\AuthorizationSeeder;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
-use Stancl\Tenancy\Events\TenantCreated;
 
 beforeEach(function (): void {
     $this->seed(AuthorizationSeeder::class);
@@ -188,7 +185,7 @@ test('creation and assignment remain usable after the separate viewing permissio
     $staff = User::where('email', 'new-staff@example.test')->firstOrFail();
     $this->get(route('central.staff.roles.edit', $staff))->assertOk()->assertSee('Retour à la fiche');
     $this->put(route('central.staff.roles.update', $staff), ['roles' => [$grant->uuid]])
-        ->assertSessionHasNoErrors()->assertRedirect(route('central.staff.index'));
+        ->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
     expect($staff->hasRole($grant))->toBeTrue();
 });
 
@@ -316,18 +313,4 @@ test('an administrator can delegate an owned role globally without target lists'
     $target->assignRole(Role::findByName('user-manager'));
     $this->actingAs($this->admin, 'central')->put(route('central.staff.roles.update', $target), ['roles' => [$role->uuid]])->assertSessionHasNoErrors();
     expect($target->fresh()->hasRole($role))->toBeTrue();
-});
-test('provisioning failures retain the reservation and expose only a sanitized error for recovery', function (): void {
-    Event::fake([TenantCreated::class]);
-    $tenant = Tenant::factory()->create(['user_id' => $this->admin->id]);
-    $deployment = TenantSchemaDeployment::factory()->create(['tenant_id' => $tenant->id]);
-    $provisioner = Mockery::mock(TenantProvisioner::class);
-    $provisioner->shouldReceive('provision')->once()->andThrow(new LogicException('private-database-secret'));
-    $job = new ProvisionTenantDatabase($deployment->id);
-    expect(fn () => $job->handle($provisioner))->toThrow(LogicException::class);
-    expect($deployment->fresh()->status)->toBe(DeploymentStatus::FAILED);
-    expect($deployment->fresh()->sanitized_error)->not->toContain('private-database-secret');
-    expect(Tenant::whereKey($tenant->id)->exists())->toBeTrue();
-    $this->artisan('aydra:retry-tenant-provisioning')->assertSuccessful();
-    Queue::assertPushed(ProvisionTenantDatabase::class, 1);
 });

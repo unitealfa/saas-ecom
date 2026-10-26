@@ -1,12 +1,13 @@
 <?php
 
 use App\DTOs\Central\Users\UserProfileData;
+use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Activity;
 use App\Models\Central\Country;
 use App\Models\Central\Role;
 use App\Models\Central\Tenant;
-use App\Models\User;
+use App\Models\Central\User;
 use App\Notifications\Central\Auth\AccountInvitation;
 use App\Services\Central\Authorization\CentralRoleAssignmentService;
 use App\Services\Central\Users\UserManagementService;
@@ -102,7 +103,7 @@ test('SMTP failure keeps the new account and shows a warning without exposing th
             && ! str_contains($message, 'private-smtp-secret'));
     $user = User::where('email', 'retained@example.test')->firstOrFail();
     Log::shouldHaveReceived('warning')->once()->with('Central account email delivery failed.', [
-        'user_uuid' => $user->uuid, 'exception_class' => TransportException::class,
+        'operation' => 'invitation', 'user_uuid' => $user->uuid, 'exception_class' => TransportException::class,
     ]);
     expect(Activity::where('event', 'account_invited')->count())->toBe(1);
     Queue::assertNothingPushed();
@@ -158,7 +159,7 @@ test('merchant edits preserve the real identifiers password and roles and invali
     $this->put(route('central.users.update', $target), [
         ...editableCentralProfile($target), 'first_name' => ' Nour ', 'last_name' => ' Newname ', 'phone' => '+213555999999',
     ])->assertSessionHasNoErrors()->assertRedirect(route('central.users.show', $target));
-    $updated = App\Models\Central\User::findOrFail($target->id);
+    $updated = User::findOrFail($target->id);
     expect($updated->uuid)->toBe($target->uuid);
     expect($updated->id)->toBe($target->id);
     expect($updated->country_id)->toBe($target->country_id);
@@ -312,13 +313,13 @@ test('an authorized invitation retry renews the token and verified accounts cann
     $this->post(route('central.users.invitation', $verified))->assertSessionHasErrors('invitation');
 });
 
-test('editing profile and professional details preserves the existing administrative decision', function (\App\Enums\Central\Users\StatusEnum $status): void {
+test('editing profile and professional details preserves the existing administrative decision', function (StatusEnum $status): void {
     $this->seed(CountrySeeder::class);
     $country = Country::where('code', 'FR')->firstOrFail();
     $country->update(['is_active' => true]);
     $legalStatus = match ($status) {
-        \App\Enums\Central\Users\StatusEnum::PENDING => VerificationStatusEnum::PENDING,
-        \App\Enums\Central\Users\StatusEnum::REJECTED => VerificationStatusEnum::FAILED,
+        StatusEnum::PENDING => VerificationStatusEnum::PENDING,
+        StatusEnum::REJECTED => VerificationStatusEnum::FAILED,
         default => VerificationStatusEnum::VERIFIED,
     };
     $target = User::factory()->create(['status' => $status, 'legal_profile_version' => 1,
@@ -341,11 +342,11 @@ test('editing profile and professional details preserves the existing administra
     expect(Activity::forSubject($target)->where('event', 'central_profile_updated')->count())->toBe(1);
     expect(Activity::forSubject($target)->whereIn('event', ['central_account_approved', 'central_account_rejected'])->exists())->toBeFalse();
 })->with([
-    \App\Enums\Central\Users\StatusEnum::ACTIVE,
-    \App\Enums\Central\Users\StatusEnum::INACTIVE,
-    \App\Enums\Central\Users\StatusEnum::SUSPENDED,
-    \App\Enums\Central\Users\StatusEnum::PENDING,
-    \App\Enums\Central\Users\StatusEnum::REJECTED,
+    StatusEnum::ACTIVE,
+    StatusEnum::INACTIVE,
+    StatusEnum::SUSPENDED,
+    StatusEnum::PENDING,
+    StatusEnum::REJECTED,
 ]);
 
 test('a profile audit failure rolls back all profile changes and preserves the decision', function (): void {

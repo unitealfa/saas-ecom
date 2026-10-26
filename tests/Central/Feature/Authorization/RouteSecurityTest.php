@@ -4,6 +4,7 @@ use App\Http\Middleware\EnsureLocalDiagnostics;
 use App\Http\Middleware\Tenant\EnsureTenantAvailable;
 use App\Http\Middleware\Tenant\FinishTenantRequest;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Support\Str;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
@@ -17,13 +18,24 @@ test('every diagnostic endpoint applies the local diagnostic boundary', function
     }
 });
 
-test('every central named route requires the central authenticated guard', function (): void {
+test('central account routes require authentication while explicit public endpoints retain their boundaries', function (): void {
     $unprotected = collect(app('router')->getRoutes()->getRoutes())
         ->filter(fn ($route): bool => str_starts_with($route->getName() ?? '', 'central.'))
+        ->reject(fn ($route): bool => Str::is([
+            'central.database-diagnostics', 'central.alias.*.home',
+            'central.alias.*.well-known.passkeys', 'central.alias.*.central.database-diagnostics',
+        ], $route->getName()))
         ->reject(fn ($route): bool => in_array('auth:central', $route->gatherMiddleware(), true))
         ->map(fn ($route): string => $route->getName())->values()->all();
 
     expect($unprotected)->toBe([]);
+});
+
+test('passkey discovery remains public and only exposes protected settings URLs', function (): void {
+    $this->get(route('well-known.passkeys'))->assertOk()->assertExactJson([
+        'enroll' => route('security.edit'), 'manage' => route('security.edit'),
+    ]);
+    $this->get(route('security.edit'))->assertRedirect(route('login'));
 });
 
 test('application HTTP routes have controller actions rather than closures', function (): void {

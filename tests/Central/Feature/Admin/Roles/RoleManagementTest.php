@@ -129,7 +129,7 @@ test('metadata editing preserves permissions durations identity and assignment d
     $this->actingAs($actor, 'central')->get(route('central.roles.edit', $role))->assertOk()
         ->assertSee('Nom unique du rôle')->assertDontSee('name="permissions[]"', false)->assertDontSee('name="durations[', false);
     $this->put(route('central.roles.update', $role), ['expected_version' => 1, 'name' => ' after-name ', 'label' => 'Nouveau libellé'])
-        ->assertSessionHasNoErrors()->assertRedirect(route('central.roles.index'));
+        ->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
     $updated = $role->fresh();
     expect($updated->name)->toBe('after-name')->and($updated->uuid)->toBe($role->uuid)
         ->and($updated->permission_signature)->toBe($role->permission_signature)->and($updated->permission_version)->toBe(2);

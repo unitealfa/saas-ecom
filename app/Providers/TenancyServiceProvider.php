@@ -8,6 +8,7 @@ use App\Models\Central\Tenant;
 use App\Models\Central\TenantSchemaDeployment;
 use App\Services\Central\Tenants\TenantDatabaseName;
 use App\Services\Central\Tenants\TenantProvisioner;
+use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Foundation\Http\Kernel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -76,7 +77,8 @@ class TenancyServiceProvider extends ServiceProvider
 
     private function prioritizeMiddleware(): void
     {
-        $kernel = $this->app->make(Kernel::class);
+        /** @var Kernel $kernel */
+        $kernel = $this->app->make(HttpKernel::class);
 
         // prepend insère en tête : on parcourt à l'envers pour obtenir l'ordre de la liste.
         foreach (array_reverse(self::MIDDLEWARE_PRIORITY) as $middleware) {

@@ -2,6 +2,7 @@
 
 use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
+use App\Models\Central\Permission;
 use App\Models\Central\Role;
 use App\Models\Central\Tenant;
 use App\Models\User;
@@ -20,23 +21,24 @@ beforeEach(function (): void {
     Queue::fake();
 });
 
-test('an editor without the read permission can list inspect and edit users until its action expires', function (): void {
+test('an editor without the read permission can edit a known user without listing or inspecting accounts', function (): void {
     $editor = User::factory()->create();
     $role = Role::createWithPermissions('edit-only', ['saas.users.update' => 1]);
     $editor->assignRole($role);
     $merchant = User::factory()->create();
-    $this->actingAs($editor, 'central')->get(route('central.users.index'))->assertOk()
-        ->assertSee(route('central.users.edit', $merchant), escape: false);
-    $this->get(route('central.users.show', $merchant))->assertOk();
+    $this->actingAs($editor, 'central')->get(route('central.users.index'))->assertForbidden();
+    $this->get(route('central.users.show', $merchant))->assertForbidden();
     $this->get(route('central.users.edit', $merchant))->assertOk();
     $this->delete(route('central.users.destroy', $merchant))->assertForbidden();
-    $editor->roles()->updateExistingPivot($role->id, ['assigned_at' => now()->subDays(2)]);
+    $permission = Permission::findByName('saas.users.update', 'central');
+    $editor->permissions()->updateExistingPivot($permission->id, ['assigned_at' => now()->subDays(2), 'expires_at' => now()->subDay()]);
+    $this->get(route('central.users.edit', $merchant))->assertForbidden();
     $this->get(route('central.users.index'))->assertForbidden();
 });
 
 test('user management actions have a global scope without target lists', function (): void {
     $editor = User::factory()->create();
-    $editor->assignRole(Role::createWithPermissions('global-editor', ['saas.users.update' => 9]));
+    $editor->assignRole(Role::createWithPermissions('global-editor', ['saas.users.update' => 9, 'saas.users.view' => 9]));
     $first = User::factory()->create();
     $other = User::factory()->create();
     $this->actingAs($editor, 'central')->get(route('central.users.index'))->assertOk()

@@ -7,7 +7,7 @@ use App\Http\Controllers\Central\Owner\Tenants\TenantController as OwnerTenantCo
 use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/login')->name('home');
+Route::redirect('/', rtrim(config('app.url'), '/').'/login')->name('home');
 
 require __DIR__.'/central/diagnostics.php';
 

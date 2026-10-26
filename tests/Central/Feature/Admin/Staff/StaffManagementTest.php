@@ -4,7 +4,7 @@ use App\Enums\Central\Users\StatusEnum;
 use App\Models\Central\Activity;
 use App\Models\Central\Permission;
 use App\Models\Central\Role;
-use App\Models\User;
+use App\Models\Central\User;
 use App\Notifications\Central\Auth\AccountInvitation;
 use App\Services\Central\Auth\AccountMailDelivery;
 use App\Services\Central\Authorization\AuthorizationMutation;
@@ -364,7 +364,7 @@ test('staff suspension invalidates central access and archive preserves roles an
     $this->patch(route('central.staff.status', $staff), ['status' => 1])->assertSessionHasNoErrors();
     expect($staff->fresh()->status)->toBe(StatusEnum::ACTIVE);
     $this->delete(route('central.staff.destroy', $staff))->assertRedirect(route('central.staff.index'));
-    $archived = App\Models\Central\User::withTrashed()->findOrFail($staff->id);
+    $archived = User::withTrashed()->findOrFail($staff->id);
     expect($archived->trashed())->toBeTrue();
     expect($archived->status)->toBe(StatusEnum::DELETED);
     expect($archived->roles()->count())->toBe(1);
@@ -431,7 +431,7 @@ test('renewing an existing role needs renewal permission rather than permission 
 
     $this->actingAs($actor, 'central')->post(route('central.staff.roles.renew', [$staff, $role]), [
         'reason' => 'Prolongation autorisée', 'expected_assigned_at' => $original,
-    ])->assertSessionHasNoErrors()->assertRedirect(route('central.staff.show', $staff));
+    ])->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
     expect($staff->roles()->firstOrFail()->pivot->assigned_at)->toEqual(now());
     expect(Activity::forSubject($staff)->where('event', 'central_role_assignment_renewed')->count())->toBe(1);
 });

@@ -141,7 +141,8 @@ test('test seeding creates two independently migrated shops with separate owner 
         expect($tenant->database()->getName())->toBe(config('tenancy.database.prefix')."boutique{$number}");
         expect(Str::isUuid($tenant->uuid, 4))->toBeTrue();
         expect($tenant->status)->toBe(StatusEnum::PROVISIONING);
-        expect($tenant->provisioned_at)->toBeNull();
+        expect($tenant->provisioned_at)->not->toBeNull();
+        expect($tenant->schema_version)->not->toBeEmpty();
         expect($tenant->domains()->firstOrFail()->domain)->toBe("boutique{$number}.aydra.localhost");
 
         tenancy()->initialize($tenant);
@@ -367,6 +368,7 @@ test('each domain selects its own database and restores the central context afte
     config(['app.debug' => true]);
     $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
     $this->seed([DatabaseSeeder::class, TenantTestSeeder::class]);
+    Tenant::query()->update(['status' => StatusEnum::ACTIVE]);
     $captured = [];
     Event::listen(TenancyBootstrapped::class, function () use (&$captured): void {
         $captured[] = [ShopUser::firstOrFail()->email, DB::connection('tenant')->getDatabaseName(), Auth::getDefaultDriver()];
@@ -507,7 +509,7 @@ test('a revoked or unverified domain does not expose the shop', function (): voi
     $this->seed([DatabaseSeeder::class, TenantTestSeeder::class]);
     $tenant = Tenant::where('slug', 'boutique1')->firstOrFail();
     $domain = $tenant->domains()->firstOrFail();
-    $domain->update(['verification_status' => 1]);
+    $domain->forceFill(['verification_status' => 1])->save();
 
     $this->get('http://boutique1.aydra.localhost/')->assertNotFound();
     $domain->delete();
@@ -537,7 +539,8 @@ test('internal tenant identifiers are not exposed in production or for disabled 
 test('a shop outside the test seeder keeps the preparation response', function (): void {
     $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
     $tenant = Tenant::factory()->create();
-    $tenant->domains()->create(['domain' => 'normal.aydra.localhost', 'type' => 1, 'is_primary' => true, 'verification_status' => 2, 'verified_at' => now()]);
+    $domain = $tenant->domains()->create(['domain' => 'normal.aydra.localhost', 'type' => 1, 'is_primary' => true]);
+    $domain->forceFill(['verification_status' => 2, 'verified_at' => now()])->save();
 
     $this->get('http://normal.aydra.localhost/')->assertServiceUnavailable()
         ->assertDontSee('The id of the current tenant');

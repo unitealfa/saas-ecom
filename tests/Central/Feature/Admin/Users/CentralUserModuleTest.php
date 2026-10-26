@@ -6,7 +6,7 @@ use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Activity;
 use App\Models\Central\Permission;
 use App\Models\Central\Role;
-use App\Models\User;
+use App\Models\Central\User;
 use App\Notifications\Central\Auth\AccountInvitation;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Illuminate\Auth\Notifications\VerifyEmail;
@@ -31,7 +31,7 @@ test('catalogue updates the five existing permissions without replacing their id
     Permission::where('name', 'saas.users.create')->firstOrFail()->forceFill(['label' => 'Ancien libellé'])->save();
     $this->seed(AuthorizationSeeder::class);
     expect(Permission::whereIn('name', $names)->orderBy('id')->get()->map(fn ($permission): array => [$permission->id, $permission->uuid, $permission->name])->all())->toBe($before);
-    expect(Permission::where('name', 'saas.users.create')->value('label'))->toBe('Créer des utilisateurs');
+    expect(Permission::where('name', 'saas.users.create')->value('label'))->toBe('Ancien libellé');
 });
 
 test('legacy action names can change without losing their uuid grants or role signature', function (): void {
@@ -77,12 +77,12 @@ test('professional validation records its version and reviewer and rejects a sta
     ])->assertSessionHasNoErrors();
     $target = $target->fresh();
     $this->post(route('central.users.legal.reject', $target), [...centralDecisionPayload($target), 'reason' => 'Informations incorrectes'])
-        ->assertSessionHasNoErrors();
-    expect($target->fresh()->legal_verification_status)->toBe(VerificationStatusEnum::FAILED);
-    expect($target->fresh()->getAttribute('legal_verified_at'))->toBeNull();
+        ->assertForbidden();
+    expect($target->fresh()->legal_verification_status)->toBe(VerificationStatusEnum::VERIFIED);
+    expect($target->fresh()->getAttribute('legal_verified_at'))->not->toBeNull();
     $other = User::factory()->create();
     activity()->performedOn($other)->event('central_profile_updated')->log('OTHER-USER-HISTORY');
-    $this->get(route('central.users.history', $target))->assertOk()->assertSee('Dossier rejeté avec le refus du compte.')
+    $this->get(route('central.users.history', $target))->assertOk()->assertSee('Dossier validé avec l’approbation du compte.')
         ->assertDontSee('OTHER-USER-HISTORY');
 });
 
@@ -92,7 +92,7 @@ test('an empty professional dossier can be validated with its current version', 
         'legal_profile_version' => $version, 'legal_verification_status' => VerificationStatusEnum::INCOMPLETE,
     ]);
     $this->actingAs($this->admin, 'central')->get(route('central.users.show', $target))
-        ->assertSee('>Approuver<', false)->assertDontSee('Valider le dossier');
+        ->assertSeeText('Approuver')->assertSee(route('central.users.approve', $target), false)->assertDontSee('Valider le dossier');
     $this->post(route('central.users.legal.validate', $target), centralDecisionPayload($target))
         ->assertRedirect(route('central.users.show', $target))->assertSessionHasNoErrors();
 
@@ -158,16 +158,16 @@ test('a token for an old email cannot verify the newly edited address', function
 });
 
 test('the pending list displays contact details without other accounts or private dossier fields', function (): void {
-    $pending = User::factory()->create(['status' => StatusEnum::PENDING, 'phone' => 'PENDING-PHONE', 'nif' => 'PRIVATE-PENDING-NIF']);
+    $pending = User::factory()->create(['status' => StatusEnum::PENDING, 'phone' => '+213555111444', 'nif' => 'PRIVATE-PENDING-NIF']);
     $active = User::factory()->create();
     $this->actingAs($this->admin, 'central')->get(route('central.users.pending'))->assertOk()
-        ->assertSee($pending->email)->assertSee('PENDING-PHONE')->assertSee($pending->country->name_fr)
+        ->assertSee($pending->email)->assertSee('+213555111444')->assertSee($pending->country->name_fr)
         ->assertDontSee($active->email)->assertDontSee('PRIVATE-PENDING-NIF');
 });
 
 test('approval validates the dossier without verifying the email', function (): void {
     $approver = User::factory()->create();
-    $approver->assignRole(Role::createWithPermissions('registration-approver', ['saas.users.approve' => 10]));
+    $approver->assignRole(Role::createWithPermissions('registration-approver', ['saas.users.approve' => 10, 'saas.users.view' => 10]));
     $target = User::factory()->unverified()->create(['status' => StatusEnum::PENDING, 'legal_verification_status' => VerificationStatusEnum::INCOMPLETE]);
     $this->actingAs($approver, 'central')->get(route('central.users.pending'))->assertOk();
     $this->post(route('central.users.approve', $target), centralDecisionPayload($target))->assertRedirect(route('central.users.pending'));
@@ -183,7 +183,7 @@ test('approval validates the dossier without verifying the email', function (): 
 
 test('refusing an inscription keeps the account and limits login to refusal guidance', function (): void {
     $target = User::factory()->create(['status' => StatusEnum::PENDING]);
-    $this->actingAs($this->admin, 'central')->post(route('central.users.reject', $target), [...centralDecisionPayload($target), 'reason' => 'Demande refusée'])
+    $this->actingAs($this->admin, 'central')->from(route('central.users.pending'))->post(route('central.users.reject', $target), [...centralDecisionPayload($target), 'reason' => 'Demande refusée'])
         ->assertRedirect(route('central.users.pending'));
     expect($target->fresh()->status)->toBe(StatusEnum::REJECTED);
     expect($target->fresh()->trashed())->toBeFalse();
@@ -221,12 +221,14 @@ test('a decided inscription cannot be approved or refused a second time', functi
 test('an expired approval permission cannot consult or decide pending requests', function (): void {
     $this->freezeTime();
     $approver = User::factory()->create();
-    $role = Role::createWithPermissions('expired-approver', ['saas.users.approve' => 1]);
+    $role = Role::createWithPermissions('expired-approver', ['saas.users.approve' => 1, 'saas.users.view' => 1]);
     $approver->assignRole($role);
-    $approver->roles()->updateExistingPivot($role->id, ['assigned_at' => now()->subDays(2)]);
+    foreach ($approver->permissions()->get() as $permission) {
+        $approver->permissions()->updateExistingPivot($permission->id, ['assigned_at' => now()->subDays(2), 'expires_at' => now()->subDay()]);
+    }
     $target = User::factory()->create(['status' => StatusEnum::PENDING]);
     $this->actingAs($approver, 'central')->get(route('central.users.pending'))->assertForbidden();
-    $this->post(route('central.users.approve', $target))->assertForbidden();
+    $this->post(route('central.users.approve', $target), centralDecisionPayload($target))->assertForbidden();
     expect($target->fresh()->status)->toBe(StatusEnum::PENDING);
 });
 

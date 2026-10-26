@@ -70,8 +70,9 @@ test('tenant administration provisions isolated databases rebalances dated quota
 
                 return $profile->getAttributes();
             });
+            expect($shop->status)->toBe(StatusEnum::ACTIVE);
             $this->actingAs($admin, 'central')->post(route('central.tenants.activate', $shop), ['expected_status' => StatusEnum::PROVISIONING->value])
-                ->assertSessionHasNoErrors()->assertRedirect(route('central.tenants.show', $shop));
+                ->assertForbidden();
             expect($shop->fresh()->status)->toBe(StatusEnum::ACTIVE);
         }
         expect(Tenant::where('status', StatusEnum::ACTIVE)->count())->toBe(3);

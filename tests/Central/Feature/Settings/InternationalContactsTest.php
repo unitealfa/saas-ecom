@@ -4,7 +4,7 @@ use App\DTOs\Central\Users\UserProfileData;
 use App\Enums\Central\Users\StatusEnum;
 use App\Models\Central\Country;
 use App\Models\Central\Role;
-use App\Models\User;
+use App\Models\Central\User;
 use App\Services\Central\Users\ContactMigrationAudit;
 use App\Services\Central\Users\PhoneNumberNormalizer;
 use App\Services\Central\Users\UserManagementService;
@@ -136,7 +136,7 @@ test('a replacement email is unverified and invalidates the former reset token',
     $user->refresh();
     expect($user->hasVerifiedEmail())->toBeFalse()->and(Password::broker('central')->tokenExists($user, $token))->toBeFalse();
     $this->assertDatabaseMissing('password_reset_tokens', ['email' => $oldEmail]);
-    Notification::assertSentTo($user, VerifyEmail::class);
+    Notification::assertSentTo(User::findOrFail($user->id), VerifyEmail::class);
     $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password'])->assertRedirect(route('verification.notice'));
 });
 
@@ -145,7 +145,7 @@ test('personal email changes immediately refresh the authenticated identity and 
     Livewire::test('pages::settings.profile')->set('email', 'new-admin@example.test')->call('updateProfileInformation')->assertHasNoErrors();
     expect(auth('central')->user()->email)->toBe('new-admin@example.test')
         ->and(auth('central')->user()->hasVerifiedEmail())->toBeFalse();
-    Notification::assertSentTo($this->admin, VerifyEmail::class);
+    Notification::assertSentTo(User::findOrFail($this->admin->id), VerifyEmail::class);
 });
 
 test('user searches support local and formatted phone input only with authorized access', function (): void {

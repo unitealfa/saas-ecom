@@ -96,7 +96,7 @@ test('registration survives SMTP failure without claiming that verification mail
     expect($user->status)->toBe(StatusEnum::PENDING)->and($user->hasVerifiedEmail())->toBeFalse();
     $this->assertAuthenticatedAs($user, 'central');
     Log::shouldHaveReceived('warning')->once()->with('Central account email delivery failed.', [
-        'user_uuid' => $user->uuid, 'exception_class' => TransportException::class,
+        'operation' => 'verification', 'user_uuid' => $user->uuid, 'exception_class' => TransportException::class,
     ]);
 })->with(['web form' => [false], 'JSON registration' => [true]]);
 

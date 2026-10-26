@@ -5,7 +5,7 @@ use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Activity;
 use App\Models\Central\Role;
 use App\Models\Central\Tenant;
-use App\Models\User;
+use App\Models\Central\User;
 use App\Notifications\Central\Auth\AccountInvitation;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Illuminate\Support\Facades\Hash;
@@ -176,7 +176,7 @@ test('an administrative merchant is approved and invited before secure password 
     $this->post(route('central.users.store'), $payload)->assertSessionHasErrors('email');
     $this->actingAs(User::factory()->create(), 'central')->post(route('central.users.store'), [...$payload, 'email' => 'not-allowed@example.test'])->assertForbidden();
     $token = null;
-    Notification::assertSentTo($merchant, AccountInvitation::class, function ($notification) use (&$token): bool {
+    Notification::assertSentTo(User::findOrFail($merchant->id), AccountInvitation::class, function ($notification) use (&$token): bool {
         $token = $notification->token;
 
         return true;
@@ -201,7 +201,7 @@ test('an expired activation invitation can be replaced without verifying the add
     ])->assertSessionHasNoErrors();
     $merchant = User::where('email', 'expired-invite@example.test')->firstOrFail();
     $oldToken = null;
-    Notification::assertSentTo($merchant, AccountInvitation::class, function ($notification) use (&$oldToken): bool {
+    Notification::assertSentTo(User::findOrFail($merchant->id), AccountInvitation::class, function ($notification) use (&$oldToken): bool {
         $oldToken = $notification->token;
 
         return true;
@@ -213,7 +213,7 @@ test('an expired activation invitation can be replaced without verifying the add
     expect($merchant->fresh()->hasVerifiedEmail())->toBeFalse();
     $this->actingAs($this->admin, 'central')->post(route('central.users.invitation', $merchant))->assertSessionHasNoErrors();
     $newToken = null;
-    Notification::assertSentTo($merchant, AccountInvitation::class, function ($notification) use ($oldToken, &$newToken): bool {
+    Notification::assertSentTo(User::findOrFail($merchant->id), AccountInvitation::class, function ($notification) use ($oldToken, &$newToken): bool {
         if ($notification->token === $oldToken) {
             return false;
         }
