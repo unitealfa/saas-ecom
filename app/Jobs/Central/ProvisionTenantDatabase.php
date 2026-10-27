@@ -183,6 +183,16 @@ class ProvisionTenantDatabase implements ShouldQueue
                 return null;
             }
 
+            // Le mutex est libre : une ancienne tentative RUNNING n'a plus de worker propriétaire.
+            if ($latest->status === StatusEnum::RUNNING) {
+                $latest->update([
+                    'status' => StatusEnum::FAILED,
+                    'ended_at' => now(),
+                    'error_code' => ErrorCodeEnum::DEPLOYMENT_EXHAUSTED->value,
+                    'sanitized_error' => self::MESSAGE_EXHAUSTED,
+                ]);
+            }
+
             if ($latest->status === StatusEnum::FAILED) {
                 $latest = $deployments->reserveRetry($latest);
             }

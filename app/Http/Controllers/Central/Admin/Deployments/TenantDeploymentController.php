@@ -8,9 +8,11 @@ use App\Enums\Central\Deployments\StatusEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Deployments\DeploymentActionRequest;
 use App\Models\Central\TenantSchemaDeployment;
+use App\Models\Central\User;
 use App\Services\Central\Tenants\TenantDeploymentService;
 use App\Services\Central\Tenants\TenantSchemaVersions;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -84,8 +86,12 @@ class TenantDeploymentController extends Controller
             ->exists();
     }
 
-    /** Tentatives de la même opération (même corrélation), de la première à la dernière. */
-    private function attempts(TenantSchemaDeployment $deployment)
+    /**
+     * Tentatives de la même opération (même corrélation), de la première à la dernière.
+     *
+     * @return Collection<int, TenantSchemaDeployment>
+     */
+    private function attempts(TenantSchemaDeployment $deployment): Collection
     {
         return TenantSchemaDeployment::where('tenant_id', $deployment->tenant_id)
             ->where('correlation_id', $deployment->correlation_id)
@@ -94,7 +100,7 @@ class TenantDeploymentController extends Controller
     }
 
     /** L'explication de l'échec n'est montrée qu'à qui a la permission d'en voir les détails. */
-    private function errorFor($actor, TenantSchemaDeployment $deployment): ?string
+    private function errorFor(User $actor, TenantSchemaDeployment $deployment): ?string
     {
         if ($deployment->status !== StatusEnum::FAILED || ! Gate::forUser($actor)->allows('viewErrors', $deployment)) {
             return null;

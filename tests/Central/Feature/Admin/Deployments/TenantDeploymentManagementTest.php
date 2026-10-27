@@ -256,3 +256,62 @@ test('the merchant provisioning retry cannot be used for an administrative migra
         'operation' => OperationEnum::MIGRATION, 'status' => StatusEnum::FAILED]);
     expect(Gate::forUser($owner)->allows('retryProvisioning', $failed->tenant))->toBeFalse();
 });
+
+test('scheduled recovery selects only aged latest candidates and respects its failed-attempt limit', function (): void {
+    Queue::fake();
+    $old = now()->subMinutes(10);
+    deploymentRecord();
+    deploymentRecord(StatusEnum::FAILED);
+    $pending = deploymentRecord();
+    $pending->forceFill(['created_at' => $old])->save();
+    $failed = deploymentRecord(StatusEnum::FAILED);
+    $failed->forceFill(['created_at' => $old, 'ended_at' => $old, 'attempt_number' => 4])->save();
+    $capped = deploymentRecord(StatusEnum::FAILED);
+    $capped->forceFill(['created_at' => $old, 'ended_at' => $old, 'attempt_number' => 5])->save();
+    $running = deploymentRecord(StatusEnum::RUNNING);
+    $running->forceFill(['created_at' => $old, 'started_at' => $old])->save();
+    $active = deploymentRecord(StatusEnum::RUNNING);
+    $active->update(['started_at' => now()]);
+    $retired = deploymentRecord(StatusEnum::FAILED);
+    $retired->forceFill(['created_at' => $old, 'ended_at' => $old])->save();
+    TenantSchemaDeployment::factory()->create(['tenant_id' => $retired->tenant_id, 'status' => StatusEnum::SUCCEEDED]);
+
+    $this->artisan('aydra:retry-tenant-provisioning', ['--scheduled' => true])->assertSuccessful();
+    Queue::assertPushed(ProvisionTenantDatabase::class, 3);
+    foreach ([$pending->id, $failed->id, $running->id] as $id) {
+        Queue::assertPushed(ProvisionTenantDatabase::class, fn ($job) => $job->deploymentId === $id);
+    }
+});
+
+test('deployment throttling has a separate counter from other six-per-minute admin actions', function (): void {
+    $admin = deploymentAdmin();
+    $deployment = deploymentRecord();
+    $domain = $deployment->tenant->domains()->make(['domain' => 'throttle-test.example.com', 'type' => 2, 'is_primary' => true]);
+    $domain->forceFill(['verification_status' => VerificationStatusEnum::PENDING])->save();
+    Queue::fake();
+    $this->actingAs($admin, 'central');
+    for ($i = 0; $i < 6; $i++) {
+        $this->postJson(route('central.domains.verify', $domain), [])->assertUnprocessable();
+    }
+    $this->postJson(route('central.domains.verify', $domain), [])->assertTooManyRequests();
+    for ($i = 0; $i < 6; $i++) {
+        $this->post(route('central.deployments.provision', $deployment), ['expected_state' => $deployment->managementState()])
+            ->assertSessionHasNoErrors()->assertRedirect();
+    }
+    $this->post(route('central.deployments.provision', $deployment), ['expected_state' => $deployment->managementState()])
+        ->assertTooManyRequests();
+    Queue::assertPushed(ProvisionTenantDatabase::class, 6);
+});
+
+test('error explanations preserve legacy codes and never expose an unknown stored error', function (?string $code, string $explanation): void {
+    $admin = deploymentAdmin();
+    $deployment = deploymentRecord(StatusEnum::FAILED);
+    $deployment->update(['error_code' => $code]);
+    $this->actingAs($admin, 'central')->get(route('central.deployments.show', $deployment))->assertOk()
+        ->assertSee($explanation)->assertDontSee('private-database-secret')->assertDontSee('private-error');
+})->with([
+    ['MIGRATION_FAILED', 'MIGRATION_FAILED :'],
+    ['DEPLOYMENT_EXHAUSTED', 'DEPLOYMENT_EXHAUSTED :'],
+    ['PROVISIONING_EXHAUSTED', 'DEPLOYMENT_EXHAUSTED :'],
+    ['private-error', 'Vérifiez les prérequis'],
+]);

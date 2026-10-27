@@ -8,7 +8,7 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::command('aydra:retry-tenant-provisioning')
+Schedule::command('aydra:retry-tenant-provisioning --scheduled')
     ->everyFiveMinutes()
     ->withoutOverlapping()
     ->onOneServer();
