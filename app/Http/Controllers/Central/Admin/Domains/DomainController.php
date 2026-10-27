@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Central\Admin\Domains;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Domains\DomainActionRequest;
 use App\Http\Requests\Central\Domains\StoreDomainRequest;
-use App\Models\Central\Domain;
+use App\Models\Central\Domains\Domain;
 use App\Services\Central\Domains\DomainDnsInspector;
 use App\Services\Central\Domains\DomainService;
 use App\Services\Central\Domains\DomainVerificationService;

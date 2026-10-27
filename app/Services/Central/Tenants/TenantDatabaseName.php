@@ -2,7 +2,7 @@
 
 namespace App\Services\Central\Tenants;
 
-use App\Models\Central\Tenant;
+use App\Models\Central\Tenants\Tenant;
 use LogicException;
 
 class TenantDatabaseName

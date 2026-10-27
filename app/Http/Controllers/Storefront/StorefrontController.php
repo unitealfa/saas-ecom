@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Storefront;
 use App\Enums\VerificationStatusEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnsureLocalDiagnostics;
-use App\Models\Central\Domain;
+use App\Models\Central\Domains\Domain;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;

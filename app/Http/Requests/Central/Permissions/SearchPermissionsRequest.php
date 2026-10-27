@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Central\Permissions;
 
-use App\Models\Central\Permission;
+use App\Models\Central\Permissions\Permission;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
 

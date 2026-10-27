@@ -3,8 +3,8 @@
 namespace App\Jobs\Central;
 
 use App\Enums\Central\Deployments\OperationEnum;
-use App\Models\Central\Tenant;
-use App\Models\Central\TenantSchemaDeployment;
+use App\Models\Central\Deployments\TenantSchemaDeployment;
+use App\Models\Central\Tenants\Tenant;
 use App\Services\Central\Tenants\TenantProvisioner;
 use App\Services\Central\Tenants\TenantStatusService;
 

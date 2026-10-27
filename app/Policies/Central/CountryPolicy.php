@@ -2,8 +2,8 @@
 
 namespace App\Policies\Central;
 
-use App\Models\Central\Country;
-use App\Models\Central\User;
+use App\Models\Central\Countries\Country;
+use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
 
 class CountryPolicy

@@ -2,7 +2,7 @@
 
 namespace App\Services\Central\Authorization;
 
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;

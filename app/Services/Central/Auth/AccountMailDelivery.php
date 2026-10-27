@@ -2,12 +2,11 @@
 
 namespace App\Services\Central\Auth;
 
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Notifications\Central\Auth\AccountInvitation;
 use Closure;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Mailer\Exception\ExceptionInterface as MailerException;
-
 
 class AccountMailDelivery
 {

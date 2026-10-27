@@ -34,7 +34,7 @@
                 @endcan
             </div>
             @if ($deployment->tenant !== null && filled($deployment->tenant->schema_version) && strcmp($deployment->tenant->schema_version, $latestVersion) < 0)
-                @can('migrate', [\App\Models\Central\TenantSchemaDeployment::class, $deployment->tenant])
+                @can('migrate', [\App\Models\Central\Deployments\TenantSchemaDeployment::class, $deployment->tenant])
                     <form method="POST" action="{{ route('central.deployments.migrate', $deployment) }}" class="flex flex-col items-start gap-3" x-data x-on:submit="if (! window.confirm('Lancer cette migration ? La boutique sera temporairement indisponible.')) $event.preventDefault()">
                         @csrf
                         <input type="hidden" name="expected_state" value="{{ $deployment->managementState() }}">

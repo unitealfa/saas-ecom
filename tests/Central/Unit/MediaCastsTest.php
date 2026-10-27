@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\MediaVisibilityEnum;
-use App\Models\Central\Media;
+use App\Models\Central\Media\Media;
 
 test('central media visibility hydrates as an enum and serializes to its documented numeric code', function (int $code, MediaVisibilityEnum $visibility): void {
     $media = new Media;

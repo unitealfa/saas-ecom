@@ -4,7 +4,7 @@ namespace App\Services\Central\Users;
 
 use App\DTOs\Central\Users\UserProfileData;
 use App\Enums\VerificationStatusEnum;
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;

@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Central\Auth;
 
 use App\Enums\Central\Users\JourneyState;
 use App\Http\Controllers\Controller;
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Auth\RegistrationJourney;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;

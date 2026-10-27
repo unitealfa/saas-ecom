@@ -2,8 +2,8 @@
 
 namespace App\Services\Central\Countries;
 
-use App\Models\Central\Country;
-use App\Models\Central\User;
+use App\Models\Central\Countries\Country;
+use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Validation\ValidationException;

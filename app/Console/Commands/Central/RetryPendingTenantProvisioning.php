@@ -5,7 +5,7 @@ namespace App\Console\Commands\Central;
 use App\Enums\Central\Deployments\OperationEnum;
 use App\Enums\Central\Deployments\StatusEnum;
 use App\Jobs\Central\ProvisionTenantDatabase;
-use App\Models\Central\TenantSchemaDeployment;
+use App\Models\Central\Deployments\TenantSchemaDeployment;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;

@@ -6,7 +6,7 @@ use App\DTOs\Central\Users\UserData;
 use App\DTOs\Central\Users\UserProfileData;
 use App\DTOs\Central\Users\UserSaveResult;
 use App\Enums\Central\Users\StatusEnum;
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;

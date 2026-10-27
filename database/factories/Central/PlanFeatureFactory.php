@@ -2,9 +2,9 @@
 
 namespace Database\Factories\Central;
 
-use App\Models\Central\Feature;
-use App\Models\Central\Plan;
-use App\Models\Central\PlanFeature;
+use App\Models\Central\Features\Feature;
+use App\Models\Central\Plans\Plan;
+use App\Models\Central\Plans\PlanFeature;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /** @extends Factory<PlanFeature> */

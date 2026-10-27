@@ -23,7 +23,7 @@ trait HasRoleMetadata
             throw new \InvalidArgumentException('A delegable role must contain at least one permission.');
         }
         $role = static::query()->newModelInstance(['name' => $name]);
-        $permissionClass = $role->getAttribute('guard_name') === 'central' ? \App\Models\Central\Permission::class : \App\Models\Tenant\Permission::class;
+        $permissionClass = $role->getAttribute('guard_name') === 'central' ? \App\Models\Central\Permissions\Permission::class : \App\Models\Tenant\Permissions\Permission::class;
 
         return $role->getConnection()->transaction(function () use ($role, $permissionClass, $permissionDurations): static {
             $grants = [];

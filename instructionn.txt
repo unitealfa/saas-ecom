@@ -33,7 +33,7 @@ saas.users.archive	Archiver un utilisateur
 saas.users.legal.view	Consulter son dossier professionnel
 saas.users.history.view	Consulter l'historique administratif d'un utilisateur
 Fichiers principaux :
-app/Models/Central/User.php
+app/Models/Central/Users/User.php
 
 app/Http/Controllers/Central/Admin/
     UserController.php
@@ -181,7 +181,7 @@ Décision du 14 octobre 2026 : catalogue consultatif uniquement, sans Actions, I
 Je recommande que la création des codes techniques de permissions se fasse dans les seeders Laravel, plutôt que de permettre à un administrateur d'inventer une permission sans contrôle dans un formulaire.
 L'ajout d'une fonctionnalité dans le code doit créer sa permission par seeder. Le panneau admin permet ensuite de la sélectionner lors de la création d'un rôle.
 Fichiers :
-app/Models/Central/Permission.php
+app/Models/Central/Permissions/Permission.php
 
 app/Http/Controllers/Central/Admin/
     PermissionController.php
@@ -211,7 +211,7 @@ saas.tenants.priority.update	Modifier la priorité d'activation des boutiques d'
 saas.tenants.view permet notamment d'afficher le nom, le slug, le propriétaire, les domaines, l'état, l'abonnement et la BDD associée.
 Cas particulier : saas.tenants.create représente une nouvelle possibilité demandée pour les administrateurs. La documentation du 11 octobre interdit actuellement au personnel SaaS de créer des boutiques. Il faudra mettre à jour cette décision avant d'activer la permission ; l'ajouter au seeder seul ne doit pas contourner cette interdiction.
 Fichiers :
-app/Models/Central/Tenant.php
+app/Models/Central/Tenants/Tenant.php
 
 app/Http/Controllers/Central/Admin/
     TenantController.php
@@ -240,7 +240,7 @@ saas.domains.verify	Lancer la vérification d'un domaine
 saas.domains.primary.update	Définir le domaine principal
 saas.domains.archive	Retirer ou archiver un domaine
 Fichiers :
-app/Models/Central/Domain.php
+app/Models/Central/Domains/Domain.php
 
 app/Http/Controllers/Central/Admin/
     DomainController.php
@@ -267,7 +267,7 @@ saas.deployments.migrate	Lancer une migration vers une version prévue
 saas.deployments.retry	Relancer un déploiement en échec
 saas.deployments.errors.view	Consulter les erreurs techniques nettoyées
 Fichiers :
-app/Models/Central/TenantSchemaDeployment.php
+app/Models/Central/Deployments/TenantSchemaDeployment.php
 
 app/Http/Controllers/Central/Admin/
     TenantDeploymentController.php
@@ -297,7 +297,7 @@ saas.features.archive	Archiver une fonctionnalité inutilisée
 Par exemple, shops est une fonctionnalité commerciale correspondant au nombre de boutiques autorisées.
 Elle est différente de saas.tenants.create, qui est une permission d'administration.
 Fichiers :
-app/Models/Central/Feature.php
+app/Models/Central/Features/Feature.php
 
 app/Http/Controllers/Central/Admin/
     FeatureController.php
@@ -420,7 +420,7 @@ saas.countries.update	Modifier les informations d'un pays
 saas.countries.activate	Activer ou désactiver un pays
 saas.countries.archive	Archiver un pays non utilisé
 Fichiers :
-app/Models/Central/Country.php
+app/Models/Central/Countries/Country.php
 
 app/Http/Controllers/Central/Admin/
     CountryController.php
@@ -548,7 +548,7 @@ saas.media.upload	Importer un fichier autorisé
 saas.media.download	Télécharger un fichier privé autorisé
 saas.media.archive	Archiver un fichier dont le retrait est permis
 Fichiers :
-app/Models/Central/Media.php
+app/Models/Central/Media/Media.php
 
 app/Http/Controllers/Central/Admin/
     CentralMediaController.php
@@ -733,7 +733,7 @@ Permission	Fonctionnalité
 saas.activity.view	Consulter et rechercher les activités centrales
 saas.activity.export	Exporter les activités autorisées
 Fichiers :
-app/Models/Central/Activity.php
+app/Models/Central/Audit/Activity.php
 
 app/Http/Controllers/Central/Admin/
     ActivityLogController.php

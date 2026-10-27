@@ -3,7 +3,7 @@
         <flux:heading size="xl" level="1">Rôles SaaS</flux:heading>
         @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
         @if ($errors->any())<flux:callout variant="danger">{{ $errors->first() }}</flux:callout>@endif
-        @can('create', \App\Models\Central\Role::class)
+        @can('create', \App\Models\Central\Roles\Role::class)
             <flux:button variant="primary" :href="route('central.roles.create')">Créer un rôle</flux:button>
         @endcan
         <div class="overflow-x-auto">

@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests\Central\Domains;
 
-use App\Models\Central\Domain;
-use App\Models\Central\Tenant;
-use App\Models\Central\User;
+use App\Models\Central\Domains\Domain;
+use App\Models\Central\Tenants\Tenant;
+use App\Models\Central\Users\User;
 use App\Services\Central\Domains\DomainService;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;

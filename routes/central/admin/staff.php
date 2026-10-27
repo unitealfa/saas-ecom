@@ -3,8 +3,8 @@
 use App\Http\Controllers\Central\Admin\Staff\StaffController;
 use App\Http\Controllers\Central\Admin\Staff\StaffPermissionController;
 use App\Http\Controllers\Central\Admin\Staff\StaffRoleController;
+use App\Models\Central\Users\User;
 use Illuminate\Support\Facades\Route;
-use App\Models\Central\User;
 
 Route::prefix('staff')->name('staff.')->group(function (): void {
     Route::livewire('/', 'central::pages.admin.staff.index')

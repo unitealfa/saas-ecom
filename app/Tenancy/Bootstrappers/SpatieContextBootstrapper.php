@@ -2,9 +2,9 @@
 
 namespace App\Tenancy\Bootstrappers;
 
-use App\Models\Tenant\Activity;
-use App\Models\Tenant\Permission;
-use App\Models\Tenant\Role;
+use App\Models\Tenant\Audit\Activity;
+use App\Models\Tenant\Permissions\Permission;
+use App\Models\Tenant\Roles\Role;
 use Spatie\Activitylog\Support\CauserResolver;
 use Spatie\Permission\PermissionRegistrar;
 use Stancl\Tenancy\Contracts\TenancyBootstrapper;

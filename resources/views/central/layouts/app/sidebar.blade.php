@@ -25,34 +25,39 @@
                             {{ __('Personnel SaaS') }}
                         </flux:sidebar.item>
                     @endcan
-                    @can('viewAny', \App\Models\Central\Role::class)
+                    @can('viewAny', \App\Models\Central\Roles\Role::class)
                         <flux:sidebar.item :href="route('central.roles.index')" :current="request()->routeIs('central.roles.*')" wire:navigate>
                             {{ __('Rôles SaaS') }}
                         </flux:sidebar.item>
                     @endcan
-                    @can('viewAny', \App\Models\Central\Permission::class)
+                    @can('viewAny', \App\Models\Central\Permissions\Permission::class)
                         <flux:sidebar.item :href="route('central.permissions.index')" :current="request()->routeIs('central.permissions.*')" wire:navigate>
                             {{ __('Permissions') }}
                         </flux:sidebar.item>
                     @endcan
-                    @can('viewAny', \App\Models\Central\Tenant::class)
+                    @can('viewAny', \App\Models\Central\Tenants\Tenant::class)
                         <flux:sidebar.item :href="route('central.tenants.index')" :current="request()->routeIs('central.tenants.*', 'central.users.tenants.*')" wire:navigate>
                             {{ __('Boutiques') }}
                         </flux:sidebar.item>
                     @endcan
-                    @can('viewAny', \App\Models\Central\Country::class)
+                    @can('viewAny', \App\Models\Central\Countries\Country::class)
                         <flux:sidebar.item :href="route('central.countries.index')" :current="request()->routeIs('central.countries.*')" wire:navigate>
                             {{ __('Pays') }}
                         </flux:sidebar.item>
                     @endcan
-                    @can('viewAny', \App\Models\Central\Domain::class)
+                    @can('viewAny', \App\Models\Central\Domains\Domain::class)
                         <flux:sidebar.item :href="route('central.domains.index')" :current="request()->routeIs('central.domains.*')" wire:navigate>
                             {{ __('Domaines') }}
                         </flux:sidebar.item>
                     @endcan
-                    @can('viewAny', \App\Models\Central\TenantSchemaDeployment::class)
+                    @can('viewAny', \App\Models\Central\Deployments\TenantSchemaDeployment::class)
                         <flux:sidebar.item :href="route('central.deployments.index')" :current="request()->routeIs('central.deployments.*')" wire:navigate>
                             {{ __('Déploiements') }}
+                        </flux:sidebar.item>
+                    @endcan
+                    @can('viewAny', \App\Models\Central\Features\Feature::class)
+                        <flux:sidebar.item :href="route('central.features.index')" :current="request()->routeIs('central.features.*')" wire:navigate>
+                            {{ __('Fonctionnalités') }}
                         </flux:sidebar.item>
                     @endcan
                 </flux:sidebar.group>

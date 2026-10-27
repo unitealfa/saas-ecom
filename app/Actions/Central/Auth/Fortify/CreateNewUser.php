@@ -5,7 +5,7 @@ namespace App\Actions\Central\Auth\Fortify;
 use App\Concerns\PasswordValidationRules;
 use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
-use App\Models\Central\Country;
+use App\Models\Central\Countries\Country;
 use App\Models\User;
 use App\Services\Central\Subscriptions\DefaultSubscription;
 use Illuminate\Support\Facades\Validator;

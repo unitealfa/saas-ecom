@@ -2,15 +2,16 @@
 
 use App\Enums\Tenant\Users\MembershipStatusEnum;
 use App\Enums\Tenant\Users\StatusEnum;
-use App\Models\Central\Activity as CentralActivity;
-use App\Models\Central\Permission as CentralPermission;
-use App\Models\Central\Role as CentralRole;
-use App\Models\Central\Tenant;
-use App\Models\Tenant\Activity as TenantActivity;
-use App\Models\Tenant\Permission as TenantPermission;
-use App\Models\Tenant\Role as TenantRole;
-use App\Models\Tenant\User as ShopUser;
+use App\Models\Central\Audit\Activity as CentralActivity;
+use App\Models\Central\Permissions\Permission as CentralPermission;
+use App\Models\Central\Roles\Role as CentralRole;
+use App\Models\Central\Tenants\Tenant;
+use App\Models\Tenant\Audit\Activity as TenantActivity;
+use App\Models\Tenant\Permissions\Permission as TenantPermission;
+use App\Models\Tenant\Roles\Role as TenantRole;
+use App\Models\Tenant\Users\User as ShopUser;
 use App\Models\User;
+use App\Services\Central\Authorization\AuthorizationMutation;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Spatie\Activitylog\Support\CauserResolver;
@@ -134,7 +135,7 @@ test('Spatie caches permissions and records activity in the correct MySQL databa
         expect(DB::getDefaultConnection())->toBe('tenant');
         expect(DB::connection()->getDatabaseName())->not->toBe($centralDatabase);
         expect((new User)->getConnectionName())->toBe(config('tenancy.database.central_connection'));
-        expect(app(\App\Services\Central\Authorization\AuthorizationMutation::class)
+        expect(app(AuthorizationMutation::class)
             ->transaction(fn () => DB::connection()->getDatabaseName()))
             ->not->toBe($centralDatabase);
         $user = ShopUser::firstOrFail();

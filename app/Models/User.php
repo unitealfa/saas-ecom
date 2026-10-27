@@ -5,4 +5,4 @@ namespace App\Models;
 /**
  * Compatibility entry point for the starter kit's central account.
  */
-class User extends Central\User {}
+class User extends Central\Users\User {}

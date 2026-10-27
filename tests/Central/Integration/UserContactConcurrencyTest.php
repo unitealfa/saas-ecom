@@ -1,8 +1,22 @@
 <?php
 
+use App\DTOs\Central\Tenants\TenantData;
+use App\DTOs\Tenant\Shop\ShopSettings;
+use App\Enums\Central\Users\StatusEnum;
+use App\Enums\VerificationStatusEnum;
+use App\Models\Central\Audit\Activity;
+use App\Models\Central\Permissions\Permission;
+use App\Models\Central\Roles\Role;
+use App\Models\Central\Tenants\Tenant;
 use App\Models\User;
+use App\Services\Central\Authorization\CentralPermissionAssignmentService;
+use App\Services\Central\Tenants\TenantCreator;
+use App\Services\Central\Users\UserManagementService;
+use Database\Seeders\Central\AuthorizationSeeder;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class);
@@ -31,7 +45,7 @@ function runCentralRace(array $operations): array
         if (str_starts_with($argv[5], 'permissions:')) {
             $actor = App\Models\User::findOrFail((int) $argv[4]);
             $target = App\Models\User::findOrFail((int) $argv[3]);
-            $permission = App\Models\Central\Permission::findByName('saas.users.view', 'central');
+            $permission = App\Models\Central\Permissions\Permission::findByName('saas.users.view', 'central');
             app(App\Services\Central\Authorization\CentralPermissionAssignmentService::class)->update(
                 $actor, $target, [['permission' => $permission->uuid, 'enabled' => false, 'days' => 9999]],
                 substr($argv[5], strlen('permissions:')), null,
@@ -96,13 +110,19 @@ function runCentralRace(array $operations): array
         }
         $processes = [];
         sort($results);
+
         return $results;
     } finally {
         foreach ($processes as [$process, $pipes]) {
             foreach ($pipes as $pipe) {
-                if (is_resource($pipe)) { fclose($pipe); }
+                if (is_resource($pipe)) {
+                    fclose($pipe);
+                }
             }
-            if (is_resource($process)) { proc_terminate($process); proc_close($process); }
+            if (is_resource($process)) {
+                proc_terminate($process);
+                proc_close($process);
+            }
         }
     }
 }
@@ -116,51 +136,51 @@ test('two real MySQL clients cannot assign the same phone to different accounts'
 });
 
 test('two real approval decisions cannot overwrite each other or desynchronize account and dossier', function (): void {
-    test()->seed(\Database\Seeders\Central\AuthorizationSeeder::class);
+    test()->seed(AuthorizationSeeder::class);
     $admin = User::factory()->create();
-    $admin->assignRole(\App\Models\Central\Role::findByName('root', 'central'));
-    $merchant = User::factory()->create(['status' => \App\Enums\Central\Users\StatusEnum::PENDING,
-        'legal_profile_version' => 1, 'legal_verification_status' => \App\Enums\VerificationStatusEnum::PENDING]);
+    $admin->assignRole(Role::findByName('root', 'central'));
+    $merchant = User::factory()->create(['status' => StatusEnum::PENDING,
+        'legal_profile_version' => 1, 'legal_verification_status' => VerificationStatusEnum::PENDING]);
     expect(runCentralRace([[$merchant->id, $admin->id, 'approve'], [$merchant->id, $admin->id, 'reject']]))
         ->toBe(['conflict', 'created']);
     $merchant->refresh();
-    expect($merchant->legal_verification_status)->toBe($merchant->status === \App\Enums\Central\Users\StatusEnum::ACTIVE
-        ? \App\Enums\VerificationStatusEnum::VERIFIED : \App\Enums\VerificationStatusEnum::FAILED);
-    expect(\App\Models\Central\Activity::forSubject($merchant)->whereIn('event', ['central_account_approved', 'central_account_rejected'])->count())->toBe(1);
+    expect($merchant->legal_verification_status)->toBe($merchant->status === StatusEnum::ACTIVE
+        ? VerificationStatusEnum::VERIFIED : VerificationStatusEnum::FAILED);
+    expect(Activity::forSubject($merchant)->whereIn('event', ['central_account_approved', 'central_account_rejected'])->count())->toBe(1);
 });
 
 test('two real permission edits cannot overwrite the same displayed state', function (): void {
-    $this->seed(\Database\Seeders\Central\AuthorizationSeeder::class);
+    $this->seed(AuthorizationSeeder::class);
     $admin = User::factory()->create();
-    $admin->assignRole(\App\Models\Central\Role::findByName('root', 'central'));
+    $admin->assignRole(Role::findByName('root', 'central'));
     $staff = User::factory()->create();
-    $staff->assignRole(\App\Models\Central\Role::findByName('user-reader', 'central'));
-    $version = app(\App\Services\Central\Authorization\CentralPermissionAssignmentService::class)->version($staff);
+    $staff->assignRole(Role::findByName('user-reader', 'central'));
+    $version = app(CentralPermissionAssignmentService::class)->version($staff);
     expect(runCentralRace([[$staff->id, $admin->id, 'permissions:'.$version], [$staff->id, $admin->id, 'permissions:'.$version]]))
         ->toBe(['conflict', 'created']);
     expect($staff->fresh()->can('saas.users.view'))->toBeFalse()
-        ->and(\App\Models\Central\Activity::forSubject($staff)->where('event', 'central_staff_permissions_updated')->count())->toBe(1);
+        ->and(Activity::forSubject($staff)->where('event', 'central_staff_permissions_updated')->count())->toBe(1);
 });
 
 test('root row locks do not block unrelated mutations and committed revocations deny subsequent actions', function (): void {
-    $this->seed(\Database\Seeders\Central\AuthorizationSeeder::class);
+    $this->seed(AuthorizationSeeder::class);
     $admin = User::factory()->create();
-    $root = \App\Models\Central\Role::findByName('root', 'central');
+    $root = Role::findByName('root', 'central');
     $admin->assignRole($root);
     $actor = User::factory()->create();
-    $actor->assignRole(\App\Models\Central\Role::createWithPermissions('concurrent-suspender', ['saas.users.suspend' => 9999]));
+    $actor->assignRole(Role::createWithPermissions('concurrent-suspender', ['saas.users.suspend' => 9999]));
     $target = User::factory()->create();
     $nextTarget = User::factory()->create();
     $actor->load('roles', 'permissions');
-    \Illuminate\Support\Facades\Gate::forUser($actor)->authorize('suspend', $target);
-    $permission = \App\Models\Central\Permission::findByName('saas.users.suspend', 'central');
+    Gate::forUser($actor)->authorize('suspend', $target);
+    $permission = Permission::findByName('saas.users.suspend', 'central');
     $database = DB::connection()->getDatabaseName();
     expect($database)->toMatch('/^aydra_test_[a-f0-9]{12}_central_/');
     $settings = config('database.connections.mysql');
     $revoker = new PDO('mysql:host='.$settings['host'].';port='.$settings['port'].';dbname='.$database.';charset=utf8mb4',
         $settings['username'], $settings['password'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
     $timeout = (int) DB::selectOne('SELECT @@SESSION.innodb_lock_wait_timeout AS value')->value;
-    $service = app(\App\Services\Central\Users\UserManagementService::class);
+    $service = app(UserManagementService::class);
 
     try {
         $revoker->beginTransaction();
@@ -170,14 +190,14 @@ test('root row locks do not block unrelated mutations and committed revocations 
         $revoke->execute([$permission->id, $actor->id, 'central_user']);
         DB::statement('SET SESSION innodb_lock_wait_timeout = 1');
 
-        $service->changeStatus($actor, $target, \App\Enums\Central\Users\StatusEnum::SUSPENDED);
-        expect($target->fresh()->status)->toBe(\App\Enums\Central\Users\StatusEnum::SUSPENDED);
+        $service->changeStatus($actor, $target, StatusEnum::SUSPENDED);
+        expect($target->fresh()->status)->toBe(StatusEnum::SUSPENDED);
         $revoker->commit();
 
-        expect(fn () => $service->changeStatus($actor, $nextTarget, \App\Enums\Central\Users\StatusEnum::SUSPENDED))
-            ->toThrow(\Illuminate\Auth\Access\AuthorizationException::class);
-        expect($nextTarget->fresh()->status)->toBe(\App\Enums\Central\Users\StatusEnum::ACTIVE);
-        expect(\App\Models\Central\Activity::forSubject($nextTarget)->where('event', 'central_account_status_updated')->count())->toBe(0);
+        expect(fn () => $service->changeStatus($actor, $nextTarget, StatusEnum::SUSPENDED))
+            ->toThrow(AuthorizationException::class);
+        expect($nextTarget->fresh()->status)->toBe(StatusEnum::ACTIVE);
+        expect(Activity::forSubject($nextTarget)->where('event', 'central_account_status_updated')->count())->toBe(0);
     } finally {
         if ($revoker->inTransaction()) {
             $revoker->rollBack();
@@ -188,12 +208,12 @@ test('root row locks do not block unrelated mutations and committed revocations 
 
 function raceApprovedOwner(): User
 {
-    test()->seed(\Database\Seeders\Central\AuthorizationSeeder::class);
+    test()->seed(AuthorizationSeeder::class);
     $admin = User::factory()->create();
-    $admin->assignRole(\App\Models\Central\Role::findByName('root', 'central'));
+    $admin->assignRole(Role::findByName('root', 'central'));
 
     return User::factory()->create(['legal_profile_version' => 1,
-        'legal_verification_status' => \App\Enums\VerificationStatusEnum::VERIFIED,
+        'legal_verification_status' => VerificationStatusEnum::VERIFIED,
         'legal_verified_at' => now(), 'legal_verified_by_id' => $admin->id]);
 }
 
@@ -201,15 +221,15 @@ test('two real first shop submissions with the same key reserve one shop and one
     $owner = raceApprovedOwner();
     expect(runCentralRace([[$owner->id, $owner->country_id, 'shop-first'], [$owner->id, $owner->country_id, 'shop-first']]))
         ->toBe(['created', 'created']);
-    expect(\App\Models\Central\Tenant::count())->toBe(1)->and(DB::table('jobs')->count())->toBe(1);
+    expect(Tenant::count())->toBe(1)->and(DB::table('jobs')->count())->toBe(1);
 });
 
 test('two real additional shop submissions cannot both take the last quota slot', function (): void {
     $owner = raceApprovedOwner();
-    app(\App\Services\Central\Tenants\TenantCreator::class)->createFirst($owner, new \App\DTOs\Central\Tenants\TenantData(
-        'Première', 'initial-shop', '8e08c067-5cce-4fb0-bb90-984f63c27f41', \App\DTOs\Tenant\Shop\ShopSettings::fromArray([]),
+    app(TenantCreator::class)->createFirst($owner, new TenantData(
+        'Première', 'initial-shop', '8e08c067-5cce-4fb0-bb90-984f63c27f41', ShopSettings::fromArray([]),
     ));
     expect(runCentralRace([[$owner->id, $owner->country_id, 'shop-add-a'], [$owner->id, $owner->country_id, 'shop-add-b']]))
         ->toBe(['conflict', 'created']);
-    expect(\App\Models\Central\Tenant::count())->toBe(2)->and(DB::table('jobs')->count())->toBe(2);
+    expect(Tenant::count())->toBe(2)->and(DB::table('jobs')->count())->toBe(2);
 });

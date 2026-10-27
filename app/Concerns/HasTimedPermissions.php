@@ -5,7 +5,7 @@ namespace App\Concerns;
 use App\Enums\Central\Users\StatusEnum as CentralUserStatus;
 use App\Enums\Tenant\Users\MembershipStatusEnum;
 use App\Enums\Tenant\Users\StatusEnum;
-use App\Models\PermissionAssignment;
+use App\Models\Shared\Authorization\PermissionAssignment;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Collection;
@@ -145,7 +145,7 @@ trait HasTimedPermissions
     public function getRoleClass(): string
     {
         /** @var class-string<TRole> $model */
-        $model = $this->guard_name === 'central' ? \App\Models\Central\Role::class : \App\Models\Tenant\Role::class;
+        $model = $this->guard_name === 'central' ? \App\Models\Central\Roles\Role::class : \App\Models\Tenant\Roles\Role::class;
 
         return $model;
     }
@@ -154,7 +154,7 @@ trait HasTimedPermissions
     public function getPermissionClass(): string
     {
         /** @var class-string<TPermission> $model */
-        $model = $this->guard_name === 'central' ? \App\Models\Central\Permission::class : \App\Models\Tenant\Permission::class;
+        $model = $this->guard_name === 'central' ? \App\Models\Central\Permissions\Permission::class : \App\Models\Tenant\Permissions\Permission::class;
 
         return $model;
     }

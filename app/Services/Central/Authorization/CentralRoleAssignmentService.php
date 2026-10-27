@@ -2,8 +2,8 @@
 
 namespace App\Services\Central\Authorization;
 
-use App\Models\Central\Role;
-use App\Models\Central\User;
+use App\Models\Central\Roles\Role;
+use App\Models\Central\Users\User;
 use App\Services\Central\Users\UserManagementService;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;

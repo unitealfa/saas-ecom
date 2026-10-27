@@ -2,7 +2,7 @@
 
 namespace Database\Seeders\Central;
 
-use App\Models\Central\Country;
+use App\Models\Central\Countries\Country;
 use Illuminate\Database\Seeder;
 
 class CountrySeeder extends Seeder

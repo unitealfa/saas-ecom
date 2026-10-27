@@ -2,7 +2,7 @@
 
 namespace App\Jobs\Central;
 
-use App\Models\Central\Tenant;
+use App\Models\Central\Tenants\Tenant;
 use App\Services\Central\Tenants\TenantProfileProjection;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;

@@ -3,7 +3,7 @@
 namespace App\Http\Responses\Central\Auth;
 
 use App\Enums\Central\Users\JourneyState;
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Auth\RegistrationJourney;
 use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
 use Laravel\Fortify\Contracts\TwoFactorLoginResponse;

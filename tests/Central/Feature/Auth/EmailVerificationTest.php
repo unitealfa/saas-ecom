@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\Central\Users\StatusEnum;
-use App\Models\Central\Role;
+use App\Models\Central\Roles\Role;
 use App\Models\User;
 use App\Services\Central\Auth\AccountMailDelivery;
 use Illuminate\Auth\Events\Verified;

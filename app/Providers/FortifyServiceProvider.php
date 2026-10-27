@@ -9,7 +9,7 @@ use App\Http\Controllers\Central\Auth\VerificationNotificationController;
 use App\Http\Responses\Central\Auth\LoginResponse as CentralLoginResponse;
 use App\Http\Responses\Central\Auth\RegistrationResponse;
 use App\Http\Responses\Central\Auth\VerifiedEmailResponse;
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Auth\RegistrationJourney;
 use App\Services\Central\Auth\RegistrationVerificationNotification;
 use App\Services\Central\Countries\CountryCatalog;

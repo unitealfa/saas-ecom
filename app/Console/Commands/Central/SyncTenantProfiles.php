@@ -3,7 +3,7 @@
 namespace App\Console\Commands\Central;
 
 use App\Jobs\Central\SyncTenantProfile;
-use App\Models\Central\Tenant;
+use App\Models\Central\Tenants\Tenant;
 use Illuminate\Console\Command;
 
 class SyncTenantProfiles extends Command

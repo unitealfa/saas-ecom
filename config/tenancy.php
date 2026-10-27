@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\Central\Domain;
+use App\Models\Central\Domains\Domain;
 use App\Models\Tenant;
 use App\Tenancy\Bootstrappers\AccountContextBootstrapper;
 use App\Tenancy\Bootstrappers\NamespacedCacheBootstrapper;

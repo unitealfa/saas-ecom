@@ -2,10 +2,10 @@
 
 namespace App\Services\Central\Tenants;
 
-use App\Models\Central\Tenant;
-use App\Models\Central\User;
-use App\Models\Tenant\Shop;
-use App\Models\Tenant\User as ShopUser;
+use App\Models\Central\Tenants\Tenant;
+use App\Models\Central\Users\User;
+use App\Models\Tenant\Shop\Shop;
+use App\Models\Tenant\Users\User as ShopUser;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use LogicException;

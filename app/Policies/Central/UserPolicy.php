@@ -4,7 +4,7 @@ namespace App\Policies\Central;
 
 use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
 
 class UserPolicy

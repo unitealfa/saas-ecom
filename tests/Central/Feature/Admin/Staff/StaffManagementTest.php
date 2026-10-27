@@ -1,10 +1,10 @@
 <?php
 
 use App\Enums\Central\Users\StatusEnum;
-use App\Models\Central\Activity;
-use App\Models\Central\Permission;
-use App\Models\Central\Role;
-use App\Models\Central\User;
+use App\Models\Central\Audit\Activity;
+use App\Models\Central\Permissions\Permission;
+use App\Models\Central\Roles\Role;
+use App\Models\Central\Users\User;
 use App\Notifications\Central\Auth\AccountInvitation;
 use App\Services\Central\Auth\AccountMailDelivery;
 use App\Services\Central\Authorization\AuthorizationMutation;

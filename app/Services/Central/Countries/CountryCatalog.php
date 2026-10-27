@@ -2,7 +2,7 @@
 
 namespace App\Services\Central\Countries;
 
-use App\Models\Central\Country;
+use App\Models\Central\Countries\Country;
 use Illuminate\Cache\CacheManager;
 use Illuminate\Cache\Repository;
 use Illuminate\Database\Connection;

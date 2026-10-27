@@ -4,8 +4,8 @@ namespace App\Services\Central\Subscriptions;
 
 use App\Enums\Central\Subscriptions\PeriodEnum;
 use App\Enums\Central\Subscriptions\StatusEnum;
-use App\Models\Central\Subscription;
-use App\Models\Central\User;
+use App\Models\Central\Subscriptions\Subscription;
+use App\Models\Central\Users\User;
 use App\Services\Central\Plans\FreePlanCatalog;
 use Illuminate\Support\Facades\DB;
 use LogicException;

@@ -2,8 +2,8 @@
 
 namespace App\Services\Central\Authorization;
 
-use App\Models\Central\Permission;
-use App\Models\Central\User;
+use App\Models\Central\Permissions\Permission;
+use App\Models\Central\Users\User;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 

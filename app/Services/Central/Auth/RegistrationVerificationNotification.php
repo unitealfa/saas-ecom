@@ -2,10 +2,9 @@
 
 namespace App\Services\Central\Auth;
 
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
-
 
 class RegistrationVerificationNotification extends SendEmailVerificationNotification
 {

@@ -7,7 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Users\ChangeStaffStatusRequest;
 use App\Http\Requests\Central\Users\StoreStaffRequest;
 use App\Http\Requests\Central\Users\UpdateStaffRequest;
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Countries\CountryCatalog;
 use App\Services\Central\Users\StaffInvitationService;
 use App\Services\Central\Users\StaffManagementService;

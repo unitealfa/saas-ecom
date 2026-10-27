@@ -4,7 +4,7 @@ namespace App\Http\Requests\Central\Tenants;
 
 use App\DTOs\Central\Tenants\TenantData;
 use App\DTOs\Tenant\Shop\ShopSettings;
-use App\Models\Central\Tenant;
+use App\Models\Central\Tenants\Tenant;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;

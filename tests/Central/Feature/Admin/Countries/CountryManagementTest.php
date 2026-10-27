@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\Central\Country;
-use App\Models\Central\Role;
+use App\Models\Central\Countries\Country;
+use App\Models\Central\Roles\Role;
 use App\Models\User;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Database\Seeders\Central\CountrySeeder;

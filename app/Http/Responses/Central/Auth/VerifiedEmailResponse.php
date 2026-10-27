@@ -2,7 +2,7 @@
 
 namespace App\Http\Responses\Central\Auth;
 
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Fortify\Http\Responses\VerifyEmailResponse;

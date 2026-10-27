@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Central\Roles;
 
-use App\Models\Central\Role;
+use App\Models\Central\Roles\Role;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
 

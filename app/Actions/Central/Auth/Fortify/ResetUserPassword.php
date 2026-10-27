@@ -3,7 +3,7 @@
 namespace App\Actions\Central\Auth\Fortify;
 
 use App\Concerns\PasswordValidationRules;
-use App\Models\Central\Activity;
+use App\Models\Central\Audit\Activity;
 use App\Models\User;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Support\Facades\Password;

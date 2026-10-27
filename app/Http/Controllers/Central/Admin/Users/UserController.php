@@ -7,7 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Users\ChangeUserStatusRequest;
 use App\Http\Requests\Central\Users\StoreUserRequest;
 use App\Http\Requests\Central\Users\UpdateUserRequest;
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
 use App\Services\Central\Countries\CountryCatalog;
 use App\Services\Central\Users\UserManagementService;

@@ -2,8 +2,8 @@
 
 namespace App\Services\Central\Tenants;
 
-use App\Models\Central\Tenant;
-use App\Models\Central\User;
+use App\Models\Central\Tenants\Tenant;
+use App\Models\Central\Users\User;
 
 class TenantProvisioningRetry
 {

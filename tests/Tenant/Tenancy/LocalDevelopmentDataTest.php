@@ -1,7 +1,7 @@
 <?php
 
 use App\Models\Tenant;
-use App\Models\Tenant\User as ShopUser;
+use App\Models\Tenant\Users\User as ShopUser;
 use App\Models\User;
 use App\Services\Tenant\Diagnostics\DatabaseDiagnostics;
 use Carbon\CarbonImmutable;

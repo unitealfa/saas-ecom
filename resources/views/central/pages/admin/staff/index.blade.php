@@ -34,7 +34,7 @@ new #[Layout('layouts::app'), Title('Personnel SaaS')] class extends Component
         $this->resetPage();
     }
 
-    /** @return \Illuminate\Contracts\Pagination\LengthAwarePaginator<\App\Models\Central\User> */
+    /** @return \Illuminate\Contracts\Pagination\LengthAwarePaginator<\App\Models\Central\Users\User> */
     #[Computed]
     public function staff(): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {

@@ -2,9 +2,9 @@
 
 use App\DTOs\Central\Users\UserProfileData;
 use App\Enums\Central\Users\StatusEnum;
-use App\Models\Central\Country;
-use App\Models\Central\Role;
-use App\Models\Central\User;
+use App\Models\Central\Countries\Country;
+use App\Models\Central\Roles\Role;
+use App\Models\Central\Users\User;
 use App\Services\Central\Users\ContactMigrationAudit;
 use App\Services\Central\Users\PhoneNumberNormalizer;
 use App\Services\Central\Users\UserManagementService;

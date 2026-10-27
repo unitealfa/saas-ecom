@@ -2,8 +2,8 @@
 
 namespace App\Services\Central\Dashboard;
 
-use App\Models\Central\Role;
-use App\Models\Central\User;
+use App\Models\Central\Roles\Role;
+use App\Models\Central\Users\User;
 use Illuminate\Support\Collection;
 
 class Dashboard

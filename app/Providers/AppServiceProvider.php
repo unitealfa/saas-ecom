@@ -3,15 +3,25 @@
 namespace App\Providers;
 
 use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
-use App\Models\Central\Country;
-use App\Models\Central\Domain;
-use App\Models\Central\Permission;
-use App\Models\Central\Role;
-use App\Models\Central\Tenant;
-use App\Models\Central\TenantSchemaDeployment;
+use App\Models\Central\Audit\Activity;
+use App\Models\Central\Countries\Country;
+use App\Models\Central\Deployments\TenantSchemaDeployment;
+use App\Models\Central\Domains\Domain;
+use App\Models\Central\Features\Feature;
+use App\Models\Central\Media\Media;
+use App\Models\Central\Permissions\Permission;
+use App\Models\Central\Plans\Plan;
+use App\Models\Central\Plans\PlanFeature;
+use App\Models\Central\Roles\Role;
+use App\Models\Central\Subscriptions\Subscription;
+use App\Models\Central\Tenants\Tenant;
+use App\Models\Examples\Test;
+use App\Models\Shared\Authorization\PermissionAssignment;
+use App\Models\Tenant\Shop\Shop;
 use App\Models\User;
 use App\Policies\Central\CountryPolicy;
 use App\Policies\Central\DomainPolicy;
+use App\Policies\Central\FeaturePolicy;
 use App\Policies\Central\PermissionPolicy;
 use App\Policies\Central\RolePolicy;
 use App\Policies\Central\TenantPolicy;
@@ -45,15 +55,35 @@ class AppServiceProvider extends ServiceProvider
     {
         Relation::morphMap([
             'central_user' => User::class,
-            'shop_user' => \App\Models\Tenant\User::class,
+            'shop_user' => \App\Models\Tenant\Users\User::class,
+            'App\\Models\\Central\\Country' => Country::class,
+            'App\\Models\\Central\\Role' => Role::class,
+            'App\\Models\\Central\\Permission' => Permission::class,
+            'App\\Models\\Central\\Tenant' => Tenant::class,
+            'App\\Models\\Central\\Domain' => Domain::class,
+            'App\\Models\\Central\\TenantSchemaDeployment' => TenantSchemaDeployment::class,
+            'App\\Models\\Central\\Plan' => Plan::class,
+            'App\\Models\\Central\\PlanFeature' => PlanFeature::class,
+            'App\\Models\\Central\\Feature' => Feature::class,
+            'App\\Models\\Central\\Subscription' => Subscription::class,
+            'App\\Models\\Central\\Media' => Media::class,
+            'App\\Models\\Central\\Activity' => Activity::class,
+            'App\\Models\\Tenant\\Role' => \App\Models\Tenant\Roles\Role::class,
+            'App\\Models\\Tenant\\Permission' => \App\Models\Tenant\Permissions\Permission::class,
+            'App\\Models\\Tenant\\Shop' => Shop::class,
+            'App\\Models\\Tenant\\Media' => \App\Models\Tenant\Media\Media::class,
+            'App\\Models\\Tenant\\Activity' => \App\Models\Tenant\Audit\Activity::class,
+            'App\\Models\\PermissionAssignment' => PermissionAssignment::class,
+            'App\\Models\\Test' => Test::class,
         ]);
         $this->loadMigrationsFrom(database_path('migrations/central'));
         Gate::policy(User::class, UserPolicy::class);
-        Gate::policy(\App\Models\Central\User::class, UserPolicy::class);
+        Gate::policy(\App\Models\Central\Users\User::class, UserPolicy::class);
         Gate::policy(Role::class, RolePolicy::class);
         Gate::policy(Permission::class, PermissionPolicy::class);
         Gate::policy(Country::class, CountryPolicy::class);
         Gate::policy(Domain::class, DomainPolicy::class);
+        Gate::policy(Feature::class, FeaturePolicy::class);
         Gate::policy(TenantSchemaDeployment::class, TenantSchemaDeploymentPolicy::class);
         Gate::policy(Tenant::class, TenantPolicy::class);
         Livewire::addPersistentMiddleware([EnsureActiveCentralAccount::class]);
@@ -72,7 +102,7 @@ class AppServiceProvider extends ServiceProvider
         );
 
         Password::defaults(fn (): ?Password => app()->isProduction()
-        
+
             ? Password::min(12)
                 ->mixedCase()
                 ->letters()

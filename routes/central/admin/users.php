@@ -3,8 +3,8 @@
 use App\Http\Controllers\Central\Admin\Users\LegalVerificationController;
 use App\Http\Controllers\Central\Admin\Users\UserApprovalController;
 use App\Http\Controllers\Central\Admin\Users\UserController;
+use App\Models\Central\Users\User;
 use Illuminate\Support\Facades\Route;
-use App\Models\Central\User;
 
 Route::prefix('users')->name('users.')->group(function (): void {
     Route::livewire('/', 'central::pages.admin.users.index')

@@ -3,12 +3,12 @@
 use App\Enums\Central\Deployments\StatusEnum;
 use App\Enums\VerificationStatusEnum;
 use App\Jobs\Central\ProvisionTenantDatabase;
-use App\Models\Central\Domain;
-use App\Models\Central\Role;
-use App\Models\Central\Tenant;
-use App\Models\Central\TenantSchemaDeployment;
-use App\Models\Tenant\Shop;
-use App\Models\Tenant\User as ShopUser;
+use App\Models\Central\Deployments\TenantSchemaDeployment;
+use App\Models\Central\Domains\Domain;
+use App\Models\Central\Roles\Role;
+use App\Models\Central\Tenants\Tenant;
+use App\Models\Tenant\Shop\Shop;
+use App\Models\Tenant\Users\User as ShopUser;
 use App\Models\User;
 use App\Policies\Central\TenantPolicy;
 use Database\Seeders\Central\AuthorizationSeeder;

@@ -1,8 +1,8 @@
 <?php
 
-use App\Models\Central\Activity;
-use App\Models\Central\Permission;
-use App\Models\Central\Role;
+use App\Models\Central\Audit\Activity;
+use App\Models\Central\Permissions\Permission;
+use App\Models\Central\Roles\Role;
 use App\Models\User;
 use App\Services\Central\Authorization\CentralUserAccess;
 use App\Services\Central\Authorization\PermissionCatalogService;

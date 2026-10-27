@@ -5,9 +5,9 @@ namespace App\Services\Tenant\Dashboard;
 use App\DTOs\Tenant\Dashboard\DashboardData;
 use App\Enums\Tenant\Users\MembershipStatusEnum;
 use App\Enums\Tenant\Users\StatusEnum;
-use App\Models\Central\Tenant;
-use App\Models\Tenant\Shop;
-use App\Models\Tenant\User;
+use App\Models\Central\Tenants\Tenant;
+use App\Models\Tenant\Shop\Shop;
+use App\Models\Tenant\Users\User;
 use Stancl\Tenancy\Tenancy;
 
 class Dashboard

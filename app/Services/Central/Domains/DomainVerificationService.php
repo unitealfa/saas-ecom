@@ -6,8 +6,8 @@ namespace App\Services\Central\Domains;
 
 use App\Enums\Central\Domains\CertificateStatusEnum;
 use App\Enums\VerificationStatusEnum;
-use App\Models\Central\Domain;
-use App\Models\Central\User;
+use App\Models\Central\Domains\Domain;
+use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use Illuminate\Support\Facades\Gate;
 

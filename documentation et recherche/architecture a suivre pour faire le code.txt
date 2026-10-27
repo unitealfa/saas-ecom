@@ -966,7 +966,7 @@ Les Models restent dans `app/Models/Central` et `app/Models/Tenant`. Storefront 
 
 `config/livewire.php` associe les alias historiques `pages::` et `layouts::` aux dossiers centraux ci-dessus ; ces alias sont réservés au central. Les alias explicites `central::`, `tenant::` et `storefront::` associent les vues à leur contexte et permettent de générer directement les prochains composants à leur emplacement. Une future page Tenant ou Storefront choisit explicitement un layout de son contexte, sans employer par défaut le layout central. Les noms techniques des fichiers Livewire existants et les noms de routes sont conservés ; les références affectées par un déplacement sont mises à jour. Lors de la création d'un nouveau dossier de tests de contexte, sa découverte doit aussi être ajoutée dans `phpunit.xml` et `tests/Pest.php` selon le besoin.
 
-Les classes d'infrastructure communes, les traits partagés, le pivot polymorphe `PermissionAssignment`, `SchemaBlueprint`, les providers, les composants visuels réutilisables et l'orchestration des tests/seeders restent partagés. Les points d'entrée `App\Models\User` et `App\Models\Tenant` conservent la compatibilité avec les implémentations centrales documentées. `app/Models/Test.php` reste un exemple technique sans contexte métier, conformément à la réponse de l'utilisateur.
+Les classes d'infrastructure communes, les traits partagés, le pivot polymorphe `PermissionAssignment`, `SchemaBlueprint`, les providers, les composants visuels réutilisables et l'orchestration des tests/seeders restent partagés. Les points d'entrée `App\Models\User` et `App\Models\Tenant` conservent la compatibilité avec les implémentations centrales documentées. `app/Models/Examples/Test.php` reste un exemple technique sans contexte métier, conformément à la réponse de l'utilisateur.
 
 Avant chaque opération sur un fichier, vérifier cette organisation et l'absence d'un équivalent. Ne pas ajouter d'emojis ; préserver uniquement les caractères techniques des frameworks. Après un déplacement, vérifier les références, la configuration chargée, les routes et les tests concernés sans changer les données existantes.
 
@@ -1066,7 +1066,7 @@ Ce chapitre consolide les consignes compatibles de l'ancien AGENTS.md ; les pré
 ## 22.1 Structure et code
 
 - Appliquer les chemins du §18 avant génération. Models et factories : Central/Tenant. Controllers, Requests, DTOs, Services, Policies, middlewares et composants métier : contexte Central, Tenant ou Storefront lorsque prévu. Actions Fortify et notifications SaaS sont centrales.
-- Providers, classes de base, traits partagés, SchemaBlueprint, PermissionAssignment, composants visuels communs et orchestration tests/seeders peuvent rester partagés. App\Models\User et App\Models\Tenant sont des entrées de compatibilité ; app/Models/Test.php est un exemple technique sans table ni fonctionnalité à inventer.
+- Providers, classes de base, traits partagés, SchemaBlueprint, PermissionAssignment, composants visuels communs et orchestration tests/seeders peuvent rester partagés. App\Models\User et App\Models\Tenant sont des entrées de compatibilité ; app/Models/Examples/Test.php est un exemple technique sans table ni fonctionnalité à inventer.
 - Vues : resources/views/{central,tenant,storefront}. Migrations et seeders : database/migrations/{central,tenant} et database/seeders/{Central,Tenant}. Tests : tests/{Central,Tenant,Storefront} ; mettre à jour phpunit.xml et tests/Pest.php seulement si un nouveau contexte de tests le nécessite.
 - Réutiliser les noms techniques, enums et conventions existantes. Accolades pour les structures de contrôle ; types des paramètres et retours ; promotion de constructeur lorsque pertinente ; pas de constructeur vide inutile. Préférer un PHPDoc utile aux commentaires paraphrasant le code, avec formes d'array documentées si nécessaires.
 - Utiliser les relations Eloquent et le route model binding lorsqu'adaptés. Éviter les requêtes dans les vues, les N+1 et les collections entières lorsqu'une pagination suffit. Générer les liens par noms de routes.
@@ -1161,7 +1161,7 @@ Finir par la relecture du diff et des fichiers réellement écrits. Distinguer v
 
 Le catalogue des permissions est dans app/Services/Central/Roles/CentralRoleCatalog.php. GROUPS organise le formulaire de rôles et VIEW_ACTIONS décrit les accès de consultation dérivés. CentralUserAccess applique cette dépendance avec les permissions Spatie réellement valides, globales par action, aussi pour la liste paginée. Les compositions, signatures, durées, attributions sans recoupement et protections des rôles existantes restent en place. Aucun booléen d’autorisation parallèle ni nouvelle table n’est introduit.
 
-Pays : app/Models/Central/Country.php ; app/Http/Controllers/Central/Admin/Countries/CountryController.php ; app/Http/Requests/Central/{StoreCountryRequest,ChangeCountryStatusRequest}.php ; app/Services/Central/Countries/CountryService.php ; app/Policies/Central/CountryPolicy.php ; resources/views/central/pages/countries/{index,create,edit,form}.blade.php. Les routes sont dans routes/central.php et la Policy est enregistrée dans AppServiceProvider. L’activation utilise un formulaire distinct pour son autorisation indépendante. La migration existante et les relations SQL countries/users/geographic_areas ne changent pas. CountrySeeder amorce les cinq pays, avec les noms arabe facultatifs, sans écraser les décisions d’activation ni recréer un pays archivé. Un pays référencé reste conservé et son code stable.
+Pays : app/Models/Central/Countries/Country.php ; app/Http/Controllers/Central/Admin/Countries/CountryController.php ; app/Http/Requests/Central/{StoreCountryRequest,ChangeCountryStatusRequest}.php ; app/Services/Central/Countries/CountryService.php ; app/Policies/Central/CountryPolicy.php ; resources/views/central/pages/countries/{index,create,edit,form}.blade.php. Les routes sont dans routes/central.php et la Policy est enregistrée dans AppServiceProvider. L’activation utilise un formulaire distinct pour son autorisation indépendante. La migration existante et les relations SQL countries/users/geographic_areas ne changent pas. CountrySeeder amorce les cinq pays, avec les noms arabe facultatifs, sans écraser les décisions d’activation ni recréer un pays archivé. Un pays référencé reste conservé et son code stable.
 
 Inscription : FortifyServiceProvider fournit les pays actifs au formulaire central. CreateNewUser valide country_uuid puis relit le pays actif sous verrou dans la transaction ; pas de pays DZ imposé ni d’ID codé en dur. Les formulaires administratifs suivent le même contrôle. Le pays déjà rattaché à un compte peut être conservé après désactivation.
 
@@ -1210,7 +1210,7 @@ La demande de refactorisation précise les §18–24 : responsabilité technique
 
 Les DTOs, Requests et Services centraux plats mélangent identité, pays, rôles, abonnements et provisionnement. Les Controllers administratifs sont regroupés dans Central/Admin/{Users,Roles,Countries,Tenants}. Les Services Users déjà organisés ne bougent pas. Auth regroupe les Actions Fortify, invitations, réponse d’inscription, middleware et action Livewire de déconnexion. Authorization porte les contrôles communs aux modules ; Roles porte le catalogue et la gestion des rôles. Plans et Subscriptions restent séparés. Tenant conserve ses seuls modules réellement préparés : Shop, Dashboard, Users et Diagnostics. Les enums tenant d’utilisateur rejoignent Tenant/Users, sans changer leurs valeurs.
 
-Les Models/Policies et factories sont conservés dans les dossiers Central/Tenant déjà documentés, comme dans la structure cible demandée. Les Models sont aussi des contrats de morph map, d’authentification et de sérialisation ; aucun déplacement artificiel n’est nécessaire. Les seeders conservent leurs chemins de contexte et commandes existantes ; les seeders de jeux d’essai orchestrent plusieurs modules. Les jobs sérialisables, Providers, bootstrappers Tenancy, traits partagés, SchemaBlueprint, PermissionAssignment et modèles de compatibilité restent à leur emplacement documenté. Les enums réellement partagés ActivityOriginEnum/VerificationStatusEnum ne sont pas dupliqués. Le modèle Test reste un exemple technique sans table métier.
+Décision actualisée le 27 octobre 2026 : les modèles suivent désormais Central/Tenant puis module métier, selon la correspondance du §46. Les Policies et factories restent dans leurs dossiers de contexte. Préserver les contrats de morph map, d’authentification et de sérialisation lors des déplacements. Les seeders conservent leurs chemins et commandes ; les jeux d’essai orchestrent plusieurs modules. Les jobs sérialisables, Providers, bootstrappers Tenancy, traits partagés et SchemaBlueprint restent à leur emplacement documenté. PermissionAssignment rejoint Models/Shared/Authorization ; les alias vides User/Tenant restent à la racine. Les enums réellement partagés ne sont pas dupliqués. Le modèle Test reste un exemple technique, rangé dans Models/Examples, sans table métier.
 
 Les layouts, composants communs et alias Livewire existants restent compatibles. Les pages d’authentification et de réglages sont déjà groupées ; settings reste le module du profil et des réglages personnels, sans nouvelle copie Owner/Profile. Storefront reste un contexte distinct sous app/Http/Controllers/Storefront et routes/storefront.php, inclus dans la protection Tenant. Les tests gardent tests/{Central,Tenant}/{Feature,Unit,...}, leur découverte Pest/PHPUnit et leurs classes de base ; les tests transversaux restent transversaux.
 
@@ -1449,27 +1449,30 @@ app/
 |       \-- Actions/
 |-- Models/
 |   |-- Central/
-|   |   |-- Activity.php
-|   |   |-- Country.php
-|   |   |-- Domain.php
-|   |   |-- Feature.php
-|   |   |-- Permission.php
-|   |   |-- Plan.php
-|   |   |-- PlanFeature.php
-|   |   |-- Role.php
-|   |   |-- Subscription.php
-|   |   |-- Tenant.php
-|   |   |-- TenantSchemaDeployment.php
-|   |   \-- User.php
+|   |   |-- Audit/Activity.php
+|   |   |-- Countries/Country.php
+|   |   |-- Deployments/TenantSchemaDeployment.php
+|   |   |-- Domains/Domain.php
+|   |   |-- Features/Feature.php
+|   |   |-- Media/Media.php
+|   |   |-- Permissions/Permission.php
+|   |   |-- Plans/
+|   |   |   |-- Plan.php
+|   |   |   \-- PlanFeature.php
+|   |   |-- Roles/Role.php
+|   |   |-- Subscriptions/Subscription.php
+|   |   |-- Tenants/Tenant.php
+|   |   \-- Users/User.php
 |   |-- Tenant/
-|   |   |-- Activity.php
-|   |   |-- Permission.php
-|   |   |-- Role.php
-|   |   |-- Shop.php
-|   |   \-- User.php
-|   |-- PermissionAssignment.php
+|   |   |-- Audit/Activity.php
+|   |   |-- Media/Media.php
+|   |   |-- Permissions/Permission.php
+|   |   |-- Roles/Role.php
+|   |   |-- Shop/Shop.php
+|   |   \-- Users/User.php
+|   |-- Shared/Authorization/PermissionAssignment.php
+|   |-- Examples/Test.php
 |   |-- Tenant.php
-|   |-- Test.php
 |   \-- User.php
 |-- Notifications/
 |   |-- Central/
@@ -2285,3 +2288,48 @@ Revue du 27 octobre 2026 : conserver les extractions de méthodes, les constante
 La commande aydra:retry-tenant-provisioning conserve la reprise manuelle immédiate des réservations en attente/échec. L'option --scheduled applique uniquement au rattrapage planifié le délai de 120 secondes pour PENDING/FAILED et la sélection des échecs dont attempt_number est inférieur à 5 ; un RUNNING perdu est sélectionné après 360 secondes. La tâche déclarée dans routes/console.php utilise ce mode toutes les cinq minutes, sans chevauchement et avec onOneServer. Cette limite de sélection des échecs ne constitue pas un plafond global de toutes les tentatives : le worker garde ses propres essais, et les demandes manuelles restent possibles. Le scheduler nécessite son propre lancement, distinct du worker de queue ; en local, artisan schedule:work, en production un mécanisme appelant schedule:run chaque minute et un cache partagé pour la coordination multi-serveurs. Déclarer la tâche ne lance pas ce mécanisme.
 
 Après acquisition du mutex MySQL commun, un ancien RUNNING qui n'a plus de worker propriétaire est clôturé FAILED/DEPLOYMENT_EXHAUSTED avec ses dates initiales conservées, puis une nouvelle tentative est réservée. Ne pas écraser son started_at pour simuler une reprise de la même ligne. Les erreurs levées avant/après cette reprise restent nettoyées ; l'opération plus récente, les succès et les annulations restent protégés.
+
+# 45. Module 08 — Fonctionnalités commerciales du SaaS
+
+Le catalogue commercial features est distinct des permissions administratives Spatie. Emplacements selon le §25 et instructionn.txt : Models/Central/Features/Feature existant ; Controller Central/Admin/Features/FeatureController ; Requests Central/Plans/StoreFeatureRequest et FeatureActionRequest ; Service Central/Plans/FeatureCatalogService ; Policy Central/FeaturePolicy ; vues central/pages/admin/features ; routes central/admin/features.php ; seeder Central/FeaturePermissionSeeder ; tests Central/Feature/Admin/Features. Réutiliser les enums Central/Features, AuthorizationMutation, le catalogue central de permissions et le layout existant. Aucun CRUD de plans, modification des quotas d'abonnement, table ou migration supplémentaire dans ce module.
+
+Les cinq permissions saas.features.view/create/update/activate/archive sont distinctes, centrales et ajoutées sans enrichir les attributions existantes. Lecture paginée/recherche, fiche et formulaires par UUID ; écritures autorisées côté serveur, sous transaction/verrou avec état attendu et audit. Aucun throttle administratif. Une création administrative commence inactive ; seule l'action d'activation peut changer cet état. L'archivage logique est réservé à une fonctionnalité inutilisée et conserve la réservation de son code. Le code est stable après création ; les caractéristiques techniques référencées ne sont pas réinterprétées. La fonctionnalité système shops conserve sa définition indispensable au plan gratuit et au quota de boutiques. Les exemples existants local.shops/local.products et leurs points doivent rester acceptés par la validation.
+
+Décision confirmée le 27 octobre 2026 : toute liaison à une offre, même inactive, bloque la désactivation globale. Une fonctionnalité anciennement inactive peut être activée sous sa permission dédiée ; shops demeure exclue de ces actions administratives. Les références plan_features, feature_usage ou permissions.feature_code bloquent l'archivage et la modification du type, de l'unité, de la portée et de la période ; le nom reste modifiable. Une ligne archivée reste consultable mais n'est ni éditable ni réactivable par ce module. Le code normalisé en minuscules reste unique, y compris parmi les lignes archivées.
+
+is_active n'est pas assignable en masse sur Feature ; la valeur initiale du modèle est false car la colonne SQL ne possède pas de défaut. L'initialisation système de FreePlanCatalog active explicitement shops seulement à sa première création, dans sa transaction existante ; une ancienne définition inactive ou incohérente n'est pas réparée silencieusement. Le quota gratuit de deux boutiques et les souscriptions existantes sont préservés. Les autorisations d'édition, d'activation et d'archivage restent indépendantes du droit de création. Une mutation autorisée sans droit de lecture revient au dashboard, sans obliger une permission de consultation supplémentaire.
+
+Le service verrouille la fonctionnalité puis compare expected_state avant l'écriture ; Policy et audit sont exécutés dans la transaction existante. Les insertions liées par FK utilisent la protection InnoDB du parent ; conserver un verrou sur cette fonctionnalité lors d'un futur traitement de liaison à une offre et revérifier sa disponibilité dans la même transaction. Aucune garantie de sérialisation globale des révocations de permissions n'est ajoutée. La consultation administrative et les décisions de disponibilité ne sont pas mises en cache ; le futur affichage public des offres relève du §36. FeaturePermissionSeeder ajoute seulement les cinq permissions absentes et invalide le cache natif Spatie après commit, sans modifier les rôles ni leurs attributions.
+
+
+# 46. Classement des modèles par module — décision du 27 octobre 2026
+
+La demande explicite remplace l'exception du §25 qui conservait les modèles à plat dans chaque contexte. Classement : Models → Central/Tenant → module métier. Les alias App\Models\User et App\Models\Tenant restent vides à la racine ; ils étendent les implémentations rangées. Le pivot partagé rejoint Shared/Authorization ; le brouillon technique Test rejoint Examples, sans table ni fonctionnalité créée. Les Policies, factories et seeders restent à leur emplacement actuel : leur déplacement n'est pas demandé.
+
+Correspondance présentée avant déplacement :
+
+| Ancien chemin | Nouveau chemin |
+|---|---|
+| `app/Models/Central/User.php` | `app/Models/Central/Users/User.php` |
+| `app/Models/Central/Country.php` | `app/Models/Central/Countries/Country.php` |
+| `app/Models/Central/Role.php` | `app/Models/Central/Roles/Role.php` |
+| `app/Models/Central/Permission.php` | `app/Models/Central/Permissions/Permission.php` |
+| `app/Models/Central/Tenant.php` | `app/Models/Central/Tenants/Tenant.php` |
+| `app/Models/Central/Domain.php` | `app/Models/Central/Domains/Domain.php` |
+| `app/Models/Central/TenantSchemaDeployment.php` | `app/Models/Central/Deployments/TenantSchemaDeployment.php` |
+| `app/Models/Central/Plan.php` | `app/Models/Central/Plans/Plan.php` |
+| `app/Models/Central/PlanFeature.php` | `app/Models/Central/Plans/PlanFeature.php` |
+| `app/Models/Central/Feature.php` | `app/Models/Central/Features/Feature.php` |
+| `app/Models/Central/Subscription.php` | `app/Models/Central/Subscriptions/Subscription.php` |
+| `app/Models/Central/Media.php` | `app/Models/Central/Media/Media.php` |
+| `app/Models/Central/Activity.php` | `app/Models/Central/Audit/Activity.php` |
+| `app/Models/Tenant/User.php` | `app/Models/Tenant/Users/User.php` |
+| `app/Models/Tenant/Role.php` | `app/Models/Tenant/Roles/Role.php` |
+| `app/Models/Tenant/Permission.php` | `app/Models/Tenant/Permissions/Permission.php` |
+| `app/Models/Tenant/Shop.php` | `app/Models/Tenant/Shop/Shop.php` |
+| `app/Models/Tenant/Media.php` | `app/Models/Tenant/Media/Media.php` |
+| `app/Models/Tenant/Activity.php` | `app/Models/Tenant/Audit/Activity.php` |
+| `app/Models/PermissionAssignment.php` | `app/Models/Shared/Authorization/PermissionAssignment.php` |
+| `app/Models/Test.php` | `app/Models/Examples/Test.php` |
+
+Préserver les connexions, tables, colonnes, règles métier, routes publiques, morph types et données. Mettre à jour les namespaces, références explicites et implicites, relations, configurations, Providers, vues, tests et factories. Lier explicitement les factories existantes avec UseFactory ou les newFactory hérités des deux alias. La morph map résout les anciens noms de classes enregistrés vers les nouvelles implémentations ; conserver les mêmes valeurs de type pour les futures écritures, sans migration des historiques. Les jobs existants de provisionnement transportent des identifiants numériques, pas les modèles déplacés. Ajouter les contrôles de contrats dans tests/Central/Unit/ModelOrganizationTest.php : alias, tables, factories, Policies, types polymorphes et séparation des connexions, sans écriture SQL. Ne pas utiliser le TestCase MySQL du projet pour ces contrôles sans autorisation spécifique.

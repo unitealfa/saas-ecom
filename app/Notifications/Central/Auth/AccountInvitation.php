@@ -2,7 +2,7 @@
 
 namespace App\Notifications\Central\Auth;
 
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;

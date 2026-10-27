@@ -3,8 +3,8 @@
 namespace Database\Factories\Tenant;
 
 use App\DTOs\Tenant\Shop\ShopSettings;
-use App\Models\Central\Tenant;
-use App\Models\Tenant\Shop;
+use App\Models\Central\Tenants\Tenant;
+use App\Models\Tenant\Shop\Shop;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use LogicException;
 
@@ -13,6 +13,8 @@ use LogicException;
  */
 class ShopFactory extends Factory
 {
+    protected $model = Shop::class;
+
     /**
      * Define the model's default state.
      *

@@ -3,11 +3,11 @@
 use App\DTOs\Central\Users\UserProfileData;
 use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
-use App\Models\Central\Activity;
-use App\Models\Central\Country;
-use App\Models\Central\Role;
-use App\Models\Central\Tenant;
-use App\Models\Central\User;
+use App\Models\Central\Audit\Activity;
+use App\Models\Central\Countries\Country;
+use App\Models\Central\Roles\Role;
+use App\Models\Central\Tenants\Tenant;
+use App\Models\Central\Users\User;
 use App\Notifications\Central\Auth\AccountInvitation;
 use App\Services\Central\Authorization\CentralRoleAssignmentService;
 use App\Services\Central\Users\UserManagementService;

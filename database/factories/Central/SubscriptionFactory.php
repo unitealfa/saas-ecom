@@ -2,8 +2,8 @@
 
 namespace Database\Factories\Central;
 
-use App\Models\Central\Plan;
-use App\Models\Central\Subscription;
+use App\Models\Central\Plans\Plan;
+use App\Models\Central\Subscriptions\Subscription;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;

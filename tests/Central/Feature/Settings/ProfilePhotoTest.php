@@ -2,9 +2,9 @@
 
 use App\Enums\Central\Users\StatusEnum;
 use App\Enums\MediaVisibilityEnum;
-use App\Models\Central\Activity;
-use App\Models\Central\Media;
-use App\Models\Central\Role;
+use App\Models\Central\Audit\Activity;
+use App\Models\Central\Media\Media;
+use App\Models\Central\Roles\Role;
 use App\Models\User;
 use App\Services\Central\Users\ProfilePhotoService;
 use Database\Seeders\Central\AuthorizationSeeder;

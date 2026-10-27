@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Central\Countries;
 
-use App\Models\Central\Country;
+use App\Models\Central\Countries\Country;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;

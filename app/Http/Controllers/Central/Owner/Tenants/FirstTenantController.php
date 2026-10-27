@@ -6,7 +6,7 @@ use App\DTOs\Tenant\Shop\ShopSettings;
 use App\Enums\Central\Users\JourneyState;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Tenants\StoreFirstTenantRequest;
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Auth\RegistrationJourney;
 use App\Services\Central\Tenants\TenantCreator;
 use Illuminate\Contracts\View\View;

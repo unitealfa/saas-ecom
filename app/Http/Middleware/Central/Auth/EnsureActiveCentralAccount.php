@@ -3,17 +3,18 @@
 namespace App\Http\Middleware\Central\Auth;
 
 use App\Enums\Central\Users\StatusEnum;
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Auth\RegistrationJourney;
 use Closure;
-use Illuminate\Http\Request;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureActiveCentralAccount
 {
     private const GUARD = 'central';
+
     private const LIMITED_ACCESS_ROUTES = [
         'login', 'login.store', 'register', 'register.store', 'logout',
         'verification.*', 'registration.status', '*.registration.status',

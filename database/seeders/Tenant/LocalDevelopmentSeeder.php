@@ -3,8 +3,8 @@
 namespace Database\Seeders\Tenant;
 
 use App\Enums\Tenant\Users\MembershipStatusEnum;
-use App\Models\Central\Tenant;
-use App\Models\Tenant\User;
+use App\Models\Central\Tenants\Tenant;
+use App\Models\Tenant\Users\User;
 use Carbon\CarbonImmutable;
 use Database\Seeders\LocalFixtureSeeder;
 use Illuminate\Database\Connection;

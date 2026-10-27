@@ -1,8 +1,8 @@
 <?php
 
 use App\Enums\Central\Users\StatusEnum;
-use App\Models\Central\Country;
-use App\Models\Central\Tenant;
+use App\Models\Central\Countries\Country;
+use App\Models\Central\Tenants\Tenant;
 use App\Models\User;
 use App\Services\Central\Auth\RegistrationVerificationNotification;
 use Database\Seeders\Central\CountrySeeder;

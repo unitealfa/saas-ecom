@@ -7,12 +7,12 @@ use App\Enums\Central\Deployments\StatusEnum as DeploymentStatus;
 use App\Enums\Central\Tenants\StatusEnum;
 use App\Enums\Central\Users\StatusEnum as UserStatus;
 use App\Enums\VerificationStatusEnum;
-use App\Models\Central\Feature;
-use App\Models\Central\PlanFeature;
-use App\Models\Central\Subscription;
-use App\Models\Central\Tenant;
-use App\Models\Central\TenantSchemaDeployment;
-use App\Models\Central\User;
+use App\Models\Central\Deployments\TenantSchemaDeployment;
+use App\Models\Central\Features\Feature;
+use App\Models\Central\Plans\PlanFeature;
+use App\Models\Central\Subscriptions\Subscription;
+use App\Models\Central\Tenants\Tenant;
+use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use App\Services\Central\Authorization\CentralUserAccess;
 use App\Services\Central\Subscriptions\DefaultSubscription;
@@ -23,7 +23,7 @@ use LogicException;
 
 class TenantStatusService
 {
-    private const string SHOPS_FEATURE = 'shops';
+    private const string SHOPS_FEATURE = Feature::SHOPS_CODE;
 
     private const array ACTIONS = ['suspend', 'activate', 'archive'];
 

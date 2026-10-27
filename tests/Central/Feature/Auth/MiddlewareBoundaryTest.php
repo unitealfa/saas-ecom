@@ -6,7 +6,7 @@ use App\Http\Controllers\Storefront\StorefrontController;
 use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
 use App\Http\Middleware\EnsureApplicationDomain;
 use App\Http\Middleware\EnsureLocalDiagnostics;
-use App\Models\Central\Domain;
+use App\Models\Central\Domains\Domain;
 use App\Models\User;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;

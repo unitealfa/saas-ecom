@@ -2,7 +2,7 @@
 
 namespace Database\Seeders\Central;
 
-use App\Models\Central\Permission;
+use App\Models\Central\Permissions\Permission;
 use App\Services\Central\Roles\CentralRoleCatalog;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;

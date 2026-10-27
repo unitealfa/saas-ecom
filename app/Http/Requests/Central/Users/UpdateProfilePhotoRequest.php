@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Central\Users;
 
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Users\ProfilePhotoService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;

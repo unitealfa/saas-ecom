@@ -2,9 +2,9 @@
 
 namespace App\Services\Central\Authorization;
 
-use App\Models\Central\Permission;
-use App\Models\Central\Role;
-use App\Models\Central\User;
+use App\Models\Central\Permissions\Permission;
+use App\Models\Central\Roles\Role;
+use App\Models\Central\Users\User;
 use App\Services\Central\Roles\CentralRoleCatalog;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;

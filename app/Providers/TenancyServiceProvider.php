@@ -4,8 +4,8 @@ namespace App\Providers;
 
 use App\Http\Middleware\Tenant\EnsureTenantAvailable;
 use App\Http\Middleware\Tenant\FinishTenantRequest;
-use App\Models\Central\Tenant;
-use App\Models\Central\TenantSchemaDeployment;
+use App\Models\Central\Deployments\TenantSchemaDeployment;
+use App\Models\Central\Tenants\Tenant;
 use App\Services\Central\Tenants\TenantDatabaseName;
 use App\Services\Central\Tenants\TenantProvisioner;
 use Illuminate\Contracts\Http\Kernel as HttpKernel;

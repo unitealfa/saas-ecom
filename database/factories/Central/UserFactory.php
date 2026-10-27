@@ -2,7 +2,7 @@
 
 namespace Database\Factories\Central;
 
-use App\Models\Central\Country;
+use App\Models\Central\Countries\Country;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;

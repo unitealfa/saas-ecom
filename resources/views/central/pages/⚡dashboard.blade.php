@@ -32,7 +32,7 @@ new class extends Component {
             </div>
         @endcan
     @else
-        @can('createOwned', [\App\Models\Central\Tenant::class, auth('central')->user()])
+        @can('createOwned', [\App\Models\Central\Tenants\Tenant::class, auth('central')->user()])
             <div><flux:button :href="route('owner.shops.create')">Créer une boutique</flux:button></div>
         @endcan
         <flux:callout>

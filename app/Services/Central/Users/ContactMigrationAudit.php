@@ -2,8 +2,8 @@
 
 namespace App\Services\Central\Users;
 
-use App\Models\Central\Country;
-use App\Models\Central\User;
+use App\Models\Central\Countries\Country;
+use App\Models\Central\Users\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Validation\ValidationException;

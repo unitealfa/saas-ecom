@@ -2,7 +2,7 @@
 
 namespace Database\Factories\Central;
 
-use App\Models\Central\Country;
+use App\Models\Central\Countries\Country;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class CountryFactory extends Factory
 {
+    protected $model = Country::class;
+
     /**
      * Define the model's default state.
      *

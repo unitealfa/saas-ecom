@@ -1,8 +1,8 @@
 <?php
 
-use App\Models\Central\Activity;
-use App\Models\Central\Permission;
-use App\Models\Central\Role;
+use App\Models\Central\Audit\Activity;
+use App\Models\Central\Permissions\Permission;
+use App\Models\Central\Roles\Role;
 use App\Models\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use App\Services\Central\Authorization\CentralPermissionAssignmentService;
@@ -197,7 +197,7 @@ test('authorization refusal also clears permissions cached inside a rolled back 
         Permission::create(['name' => $code, 'label' => 'Transaction annulée']);
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         Permission::findByName($code, 'central');
-        Gate::forUser($actor)->authorize('create', App\Models\Central\User::class);
+        Gate::forUser($actor)->authorize('create', App\Models\Central\Users\User::class);
     }))->toThrow(AuthorizationException::class);
 
     expect(Permission::where('name', $code)->exists())->toBeFalse();

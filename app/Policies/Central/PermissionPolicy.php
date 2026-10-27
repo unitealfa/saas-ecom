@@ -2,8 +2,8 @@
 
 namespace App\Policies\Central;
 
-use App\Models\Central\Permission;
-use App\Models\Central\User;
+use App\Models\Central\Permissions\Permission;
+use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
 use App\Services\Central\Roles\CentralRoleCatalog;
 

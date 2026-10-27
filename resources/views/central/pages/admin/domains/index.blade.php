@@ -4,7 +4,7 @@
         <flux:text>Chaque domaine appartient à une seule boutique. Un domaine archivé reste réservé et ne permet plus d’accéder à la boutique.</flux:text>
         @include('central.pages.admin.domains.messages')
         <div class="flex flex-wrap gap-3">
-            @can('create', \App\Models\Central\Domain::class)
+            @can('create', \App\Models\Central\Domains\Domain::class)
                 <flux:button :href="route('central.domains.create')" variant="primary">Ajouter un domaine</flux:button>
             @endcan
         </div>

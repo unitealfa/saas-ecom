@@ -8,7 +8,7 @@
                 @foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach
             </flux:callout>
         @endif
-        @can('create', \App\Models\Central\Country::class)
+        @can('create', \App\Models\Central\Countries\Country::class)
             <flux:button :href="route('central.countries.create')" variant="primary">Créer un pays</flux:button>
         @endcan
         <div class="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">

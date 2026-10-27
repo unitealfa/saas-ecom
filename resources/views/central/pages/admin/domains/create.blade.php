@@ -20,7 +20,7 @@
             <flux:button type="submit" variant="primary">Ajouter le domaine</flux:button>
         </form>
         {{ $shops->links() }}
-        @can('viewAny', \App\Models\Central\Domain::class)
+        @can('viewAny', \App\Models\Central\Domains\Domain::class)
             <flux:button :href="route('central.domains.index')">Retour aux domaines</flux:button>
         @endcan
     </section>

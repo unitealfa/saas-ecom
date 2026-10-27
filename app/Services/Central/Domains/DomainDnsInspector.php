@@ -6,7 +6,7 @@ namespace App\Services\Central\Domains;
 
 use App\Enums\Central\Domains\CertificateStatusEnum;
 use App\Enums\Central\Domains\TypeEnum;
-use App\Models\Central\Domain;
+use App\Models\Central\Domains\Domain;
 
 class DomainDnsInspector
 {

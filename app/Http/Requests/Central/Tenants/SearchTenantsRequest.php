@@ -3,7 +3,7 @@
 namespace App\Http\Requests\Central\Tenants;
 
 use App\Enums\Central\Tenants\StatusEnum;
-use App\Models\Central\Tenant;
+use App\Models\Central\Tenants\Tenant;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;

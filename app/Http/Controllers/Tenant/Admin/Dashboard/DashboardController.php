@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Tenant\Admin\Dashboard;
 
 use App\Http\Controllers\Controller;
-use App\Models\Tenant\User;
+use App\Models\Tenant\Users\User;
 use App\Services\Tenant\Dashboard\Dashboard;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;

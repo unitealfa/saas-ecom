@@ -6,7 +6,7 @@ use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
 use App\Http\Middleware\Tenant\EnsureTenantAvailable;
 use App\Http\Middleware\Tenant\FinishTenantRequest;
-use App\Models\Central\Tenant;
+use App\Models\Central\Tenants\Tenant;
 use App\Models\User;
 use Database\Factories\Central\DomainFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;

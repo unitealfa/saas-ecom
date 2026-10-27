@@ -123,7 +123,7 @@
             @elsecan('viewStaffPermissions', $user)
                 <flux:button :href="route('central.staff.permissions.index', $user)">Permissions effectives</flux:button>
             @endcan
-            @can('create', [\App\Models\Central\Tenant::class, $user])
+            @can('create', [\App\Models\Central\Tenants\Tenant::class, $user])
                 <flux:button :href="route('central.users.tenants.create', $user)">Boutiques</flux:button>
             @endcan
             @can('viewAny', \App\Models\User::class)

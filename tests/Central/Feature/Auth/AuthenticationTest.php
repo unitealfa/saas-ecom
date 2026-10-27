@@ -1,11 +1,14 @@
 <?php
 
 use App\Enums\Central\Users\StatusEnum;
-use App\Models\Central\Role;
+use App\Enums\VerificationStatusEnum;
+use App\Models\Central\Roles\Role;
+use App\Models\Central\Tenants\Tenant;
 use App\Models\User;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\URL;
 use Laravel\Fortify\Features;
 use Laravel\Passkeys\Passkey;
 use Laravel\Passkeys\Passkeys;
@@ -16,7 +19,7 @@ function approvedAuthenticationMerchant(array $attributes = []): User
     $validator = User::factory()->create();
 
     return User::factory()->create([
-        'legal_profile_version' => 1, 'legal_verification_status' => \App\Enums\VerificationStatusEnum::VERIFIED,
+        'legal_profile_version' => 1, 'legal_verification_status' => VerificationStatusEnum::VERIFIED,
         'legal_verified_at' => now(), 'legal_verified_by_id' => $validator->id, ...$attributes,
     ]);
 }
@@ -49,8 +52,8 @@ test('login responses only resume intended URLs allowed by the account journey',
         : approvedAuthenticationMerchant();
     if ($state === 'ready') {
         Event::fake([TenantCreated::class]);
-        \App\Models\Central\Tenant::factory()->create(['user_id' => $user->id,
-            'status' => \App\Enums\Central\Tenants\StatusEnum::ACTIVE,
+        Tenant::factory()->create(['user_id' => $user->id,
+            'status' => App\Enums\Central\Tenants\StatusEnum::ACTIVE,
             'schema_version' => 'completed-schema', 'provisioned_at' => now()]);
         Event::assertDispatched(TenantCreated::class);
     }
@@ -59,7 +62,7 @@ test('login responses only resume intended URLs allowed by the account journey',
         'external' => 'https://outside.example/path',
         'lookalike' => 'http://aydra.localhost.outside.example/path',
         'tenant' => 'http://boutique.aydra.localhost/',
-        'verification' => \Illuminate\Support\Facades\URL::temporarySignedRoute('verification.verify', now()->addMinutes(30),
+        'verification' => URL::temporarySignedRoute('verification.verify', now()->addMinutes(30),
             ['id' => $user->id, 'hash' => sha1($user->email)]),
     };
 

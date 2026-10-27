@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Central\Auth;
 
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Auth\AccountMailDelivery;
 use App\Services\Central\Auth\RegistrationJourney;
 use Illuminate\Http\Request;

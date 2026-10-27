@@ -2,15 +2,23 @@
 
 namespace App\Services\Central\Roles;
 
-use App\Models\Central\Permission;
-use App\Models\Central\Role;
-use App\Models\PermissionAssignment;
+use App\Models\Central\Permissions\Permission;
+use App\Models\Central\Roles\Role;
+use App\Models\Shared\Authorization\PermissionAssignment;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 use Spatie\Permission\Models\Permission as PackagePermission;
 
 class CentralRoleCatalog
 {
+    public const array FEATURE_PERMISSIONS = [
+        'saas.features.view' => 'Consulter les fonctionnalités commerciales',
+        'saas.features.create' => 'Créer une fonctionnalité',
+        'saas.features.update' => 'Modifier les paramètres d’une fonctionnalité',
+        'saas.features.activate' => 'Activer ou désactiver une fonctionnalité',
+        'saas.features.archive' => 'Archiver une fonctionnalité inutilisée',
+    ];
+
     public const array DEPLOYMENT_PERMISSIONS = [
         'saas.deployments.view' => 'Consulter les déploiements des BDD boutiques',
         'saas.deployments.provision' => 'Lancer un provisionnement autorisé',
@@ -29,6 +37,7 @@ class CentralRoleCatalog
     ];
 
     public const array PERMISSIONS = [
+        ...self::FEATURE_PERMISSIONS,
         ...self::DEPLOYMENT_PERMISSIONS,
         ...self::DOMAIN_PERMISSIONS,
         'saas.users.view' => 'Consulter les utilisateurs',
@@ -79,6 +88,7 @@ class CentralRoleCatalog
     ];
 
     public const array GROUPS = [
+        'Fonctionnalités commerciales' => ['saas.features.view', 'saas.features.create', 'saas.features.update', 'saas.features.activate', 'saas.features.archive'],
         'Déploiements' => ['saas.deployments.view', 'saas.deployments.provision', 'saas.deployments.migrate', 'saas.deployments.retry', 'saas.deployments.errors.view'],
         'Domaines' => ['saas.domains.view', 'saas.domains.create', 'saas.domains.update', 'saas.domains.verify', 'saas.domains.primary.update', 'saas.domains.archive'],
         'Utilisateurs centraux' => ['saas.users.view', 'saas.users.create', 'saas.users.update', 'saas.users.approve', 'saas.users.reject', 'saas.users.suspend', 'saas.users.activate', 'saas.users.archive'],

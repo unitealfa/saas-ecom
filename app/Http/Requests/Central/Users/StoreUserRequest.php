@@ -4,7 +4,7 @@ namespace App\Http\Requests\Central\Users;
 
 use App\DTOs\Central\Users\UserData;
 use App\DTOs\Central\Users\UserProfileData;
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Users\LegalVerificationService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;

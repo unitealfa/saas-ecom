@@ -2,7 +2,7 @@
 
 namespace Database\Factories\Central;
 
-use App\Models\Central\Tenant;
+use App\Models\Central\Tenants\Tenant;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -12,6 +12,8 @@ use Illuminate\Support\Str;
  */
 class TenantFactory extends Factory
 {
+    protected $model = Tenant::class;
+
     /**
      * Define the model's default state.
      *

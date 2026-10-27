@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Central\Admin\Countries;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Countries\ChangeCountryStatusRequest;
 use App\Http\Requests\Central\Countries\StoreCountryRequest;
-use App\Models\Central\Country;
+use App\Models\Central\Countries\Country;
 use App\Services\Central\Countries\CountryService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;

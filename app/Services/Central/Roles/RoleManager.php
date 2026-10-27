@@ -3,10 +3,10 @@
 namespace App\Services\Central\Roles;
 
 use App\DTOs\Central\Roles\RoleData;
-use App\Models\Central\Permission;
-use App\Models\Central\Role;
-use App\Models\Central\User;
-use App\Models\PermissionAssignment;
+use App\Models\Central\Permissions\Permission;
+use App\Models\Central\Roles\Role;
+use App\Models\Central\Users\User;
+use App\Models\Shared\Authorization\PermissionAssignment;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use Illuminate\Contracts\Auth\Access\Gate as GateContract;
 use Illuminate\Database\QueryException;

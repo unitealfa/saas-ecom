@@ -2,8 +2,8 @@
 
 namespace Database\Factories\Central;
 
-use App\Models\Central\Domain;
-use App\Models\Central\Tenant;
+use App\Models\Central\Domains\Domain;
+use App\Models\Central\Tenants\Tenant;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -12,6 +12,8 @@ use Illuminate\Support\Str;
  */
 class DomainFactory extends Factory
 {
+    protected $model = Domain::class;
+
     /**
      * Define the model's default state.
      *

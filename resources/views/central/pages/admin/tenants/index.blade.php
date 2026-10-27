@@ -3,7 +3,7 @@
         <flux:heading size="xl" level="1">Administration des boutiques</flux:heading>
         @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
         @if ($errors->any())<flux:callout variant="danger" role="alert">{{ $errors->first() }}</flux:callout>@endif
-        @can('create', \App\Models\Central\Tenant::class)<flux:button variant="primary" :href="route('central.tenants.create')">Créer une boutique</flux:button>@endcan
+        @can('create', \App\Models\Central\Tenants\Tenant::class)<flux:button variant="primary" :href="route('central.tenants.create')">Créer une boutique</flux:button>@endcan
         <form method="GET" action="{{ route('central.tenants.index') }}" class="flex flex-col gap-3 sm:flex-row sm:items-end">
             <flux:input name="search" label="Nom, slug, propriétaire ou domaine" :value="$search" />
             <flux:select name="status" label="État">

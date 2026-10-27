@@ -5,9 +5,9 @@ namespace App\Policies\Central;
 use App\Enums\Central\Deployments\OperationEnum;
 use App\Enums\Central\Deployments\StatusEnum;
 use App\Enums\Central\Tenants\StatusEnum as TenantStatus;
-use App\Models\Central\Tenant;
-use App\Models\Central\TenantSchemaDeployment;
-use App\Models\Central\User;
+use App\Models\Central\Deployments\TenantSchemaDeployment;
+use App\Models\Central\Tenants\Tenant;
+use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
 
 class TenantSchemaDeploymentPolicy

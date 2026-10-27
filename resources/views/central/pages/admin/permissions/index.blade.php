@@ -1,7 +1,7 @@
 <x-layouts::app :title="__('Catalogue des permissions')">
     <section class="flex flex-col gap-6">
         <flux:heading size="xl" level="1">Catalogue des permissions</flux:heading>
-        @can('create', \App\Models\Central\Role::class)
+        @can('create', \App\Models\Central\Roles\Role::class)
             <flux:button :href="route('central.roles.create')">Créer un rôle</flux:button>
         @endcan
         <flux:text>Consultez les actions disponibles et leurs libellés. Les codes techniques sont définis lors du développement ; les droits s’attribuent depuis les rôles.</flux:text>

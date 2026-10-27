@@ -1,9 +1,9 @@
 <?php
 
-use App\Models\Central\Media as CentralMedia;
+use App\Models\Central\Media\Media as CentralMedia;
 use App\Models\Tenant;
-use App\Models\Tenant\Media;
-use App\Models\Tenant\User;
+use App\Models\Tenant\Media\Media;
+use App\Models\Tenant\Users\User;
 use App\Models\User as CentralUser;
 use App\Services\Central\Users\ProfilePhotoService;
 use Database\Seeders\DatabaseSeeder;

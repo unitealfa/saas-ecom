@@ -2,7 +2,7 @@
 
 namespace Database\Factories\Central;
 
-use App\Models\Central\Plan;
+use App\Models\Central\Plans\Plan;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /** @extends Factory<Plan> */

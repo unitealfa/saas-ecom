@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Central\Dashboard;
 
 use App\Enums\Central\Users\JourneyState;
 use App\Http\Controllers\Controller;
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Auth\RegistrationJourney;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;

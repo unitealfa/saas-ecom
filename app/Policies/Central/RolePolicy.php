@@ -2,8 +2,8 @@
 
 namespace App\Policies\Central;
 
-use App\Models\Central\Role;
-use App\Models\Central\User;
+use App\Models\Central\Roles\Role;
+use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
 
 class RolePolicy

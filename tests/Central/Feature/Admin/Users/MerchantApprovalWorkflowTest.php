@@ -2,10 +2,10 @@
 
 use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
-use App\Models\Central\Activity;
-use App\Models\Central\Role;
-use App\Models\Central\Tenant;
-use App\Models\Central\User;
+use App\Models\Central\Audit\Activity;
+use App\Models\Central\Roles\Role;
+use App\Models\Central\Tenants\Tenant;
+use App\Models\Central\Users\User;
 use App\Notifications\Central\Auth\AccountInvitation;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Illuminate\Support\Facades\Hash;

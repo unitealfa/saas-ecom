@@ -1,16 +1,18 @@
 <?php
 
-use App\Models\Central\Role;
+use App\Models\Central\Roles\Role;
 use App\Models\User;
 use Database\Seeders\Central\AuthorizationSeeder;
+use Database\Seeders\Central\CountrySeeder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
+use Livewire\Livewire;
 
 beforeEach(function (): void {
-    $this->seed([\Database\Seeders\Central\CountrySeeder::class, AuthorizationSeeder::class]);
+    $this->seed([CountrySeeder::class, AuthorizationSeeder::class]);
     Notification::fake();
     $this->admin = User::factory()->create();
     $this->admin->assignRole(Role::findByName('root', 'central'));
@@ -34,15 +36,14 @@ test('public and administrative creation reject the same existing normalized ema
 
 test('profile and administrative edits keep their own contacts but reject another owners phone', function (): void {
     $this->actingAs($this->admin, 'central');
-    \Livewire\Livewire::test('pages::settings.profile')->call('updateProfileInformation')->assertHasNoErrors();
-    \Livewire\Livewire::test('pages::settings.profile')->set('phone', '0779107446')->call('updateProfileInformation')->assertHasErrors('phone');
+    Livewire::test('pages::settings.profile')->call('updateProfileInformation')->assertHasNoErrors();
+    Livewire::test('pages::settings.profile')->set('phone', '0779107446')->call('updateProfileInformation')->assertHasErrors('phone');
     $this->putJson(route('central.users.update', $this->admin), [
         'last_name' => $this->admin->last_name, 'first_name' => $this->admin->first_name,
         'email' => $this->admin->email, 'phone' => '+213779107446', 'country_uuid' => $this->admin->country->uuid,
     ])->assertUnprocessable()->assertJsonValidationErrors('phone');
     expect($this->admin->fresh()->phone)->toBeNull()->and($this->owner->fresh()->phone)->toBe('+213779107446');
 });
-
 
 test('single contact accounts use users and enforce SQL uniqueness', function (): void {
     expect(Schema::hasTable('user_contacts'))->toBeFalse();

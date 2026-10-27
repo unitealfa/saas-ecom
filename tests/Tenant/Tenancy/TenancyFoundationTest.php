@@ -2,10 +2,10 @@
 
 use App\Enums\Central\Tenants\StatusEnum;
 use App\Enums\Tenant\Users\MembershipStatusEnum;
-use App\Models\Central\Country;
+use App\Models\Central\Countries\Country;
 use App\Models\Tenant;
-use App\Models\Tenant\Shop;
-use App\Models\Tenant\User as ShopUser;
+use App\Models\Tenant\Shop\Shop;
+use App\Models\Tenant\Users\User as ShopUser;
 use App\Models\User;
 use App\Services\Central\Tenants\TenantProvisioner;
 use Database\Seeders\DatabaseSeeder;

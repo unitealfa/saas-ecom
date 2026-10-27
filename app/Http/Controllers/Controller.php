@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 
 abstract class Controller
 {

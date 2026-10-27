@@ -5,9 +5,9 @@ namespace App\Services\Central\Plans;
 use App\Enums\Central\Features\PeriodEnum;
 use App\Enums\Central\Features\QuotaScopeEnum;
 use App\Enums\Central\Features\ValueTypeEnum;
-use App\Models\Central\Feature;
-use App\Models\Central\Plan;
-use App\Models\Central\PlanFeature;
+use App\Models\Central\Features\Feature;
+use App\Models\Central\Plans\Plan;
+use App\Models\Central\Plans\PlanFeature;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 
@@ -15,7 +15,7 @@ class FreePlanCatalog
 {
     private const string PLAN_CODE = 'free';
 
-    private const string FEATURE_CODE = 'shops';
+    private const string FEATURE_CODE = Feature::SHOPS_CODE;
 
     private const string ZERO_PRICE = '0.00';
 
@@ -48,8 +48,11 @@ class FreePlanCatalog
             'value_type' => ValueTypeEnum::QUANTITY,
             'quota_scope' => QuotaScopeEnum::OWNER,
             'period' => PeriodEnum::LIFETIME,
-            'is_active' => true,
         ]);
+
+        if ($feature->wasRecentlyCreated) {
+            $feature->forceFill(['is_active' => true])->save();
+        }
 
         $feature = Feature::whereKey($feature->id)->lockForUpdate()->firstOrFail();
 

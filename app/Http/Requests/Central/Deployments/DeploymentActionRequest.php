@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\Central\Deployments;
 
-use App\Models\Central\TenantSchemaDeployment;
-use App\Models\Central\User;
+use App\Models\Central\Deployments\TenantSchemaDeployment;
+use App\Models\Central\Users\User;
 use App\Services\Central\Tenants\TenantSchemaVersions;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;

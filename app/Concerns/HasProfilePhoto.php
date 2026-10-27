@@ -2,8 +2,8 @@
 
 namespace App\Concerns;
 
-use App\Models\Central\Media as CentralMedia;
-use App\Models\Tenant\Media as TenantMedia;
+use App\Models\Central\Media\Media as CentralMedia;
+use App\Models\Tenant\Media\Media as TenantMedia;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Facades\Route;

@@ -4,7 +4,7 @@ namespace Database\Seeders\Central;
 
 use App\Enums\Central\Tenants\StatusEnum;
 use App\Enums\VerificationStatusEnum;
-use App\Models\Central\Country;
+use App\Models\Central\Countries\Country;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Central\Tenants\TenantProvisioner;

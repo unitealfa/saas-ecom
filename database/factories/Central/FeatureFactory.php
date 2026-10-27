@@ -2,7 +2,7 @@
 
 namespace Database\Factories\Central;
 
-use App\Models\Central\Feature;
+use App\Models\Central\Features\Feature;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /** @extends Factory<Feature> */

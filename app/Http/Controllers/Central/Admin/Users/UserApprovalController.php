@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Central\Admin\Users;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Users\UserApprovalRequest;
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Users\UserApprovalService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;

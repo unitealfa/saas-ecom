@@ -3,7 +3,7 @@
 namespace App\Services\Central\Users;
 
 use App\Enums\Central\Users\StatusEnum;
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;

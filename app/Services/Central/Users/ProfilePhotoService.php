@@ -3,8 +3,8 @@
 namespace App\Services\Central\Users;
 
 use App\Enums\MediaVisibilityEnum;
-use App\Models\Central\Media;
-use App\Models\Central\User;
+use App\Models\Central\Media\Media;
+use App\Models\Central\Users\User;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;

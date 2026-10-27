@@ -3,7 +3,7 @@
 namespace App\Http\Requests\Central\Roles;
 
 use App\DTOs\Central\Roles\RoleData;
-use App\Models\Central\Role;
+use App\Models\Central\Roles\Role;
 use App\Services\Central\Roles\CentralRoleCatalog;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;

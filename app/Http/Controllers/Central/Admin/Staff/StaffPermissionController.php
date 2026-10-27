@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Central\Admin\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Users\UpdateStaffPermissionsRequest;
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralPermissionAssignmentService;
 use App\Services\Central\Authorization\CentralPermissionResolver;
 use Illuminate\Contracts\View\View;

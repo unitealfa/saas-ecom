@@ -5,7 +5,7 @@
         @include('central.pages.admin.domains.messages')
         @if ($domain->is_primary)
             <flux:callout>Cette adresse est utilisée comme domaine principal. Préparez une adresse de remplacement, vérifiez-la, puis définissez-la comme principale. L’adresse actuelle reste disponible pendant la préparation.</flux:callout>
-            @can('create', \App\Models\Central\Domain::class)
+            @can('create', \App\Models\Central\Domains\Domain::class)
                 <flux:button :href="route('central.domains.create', ['tenant_uuid' => $domain->tenant->uuid])" variant="primary">Préparer une adresse de remplacement</flux:button>
             @else
                 <flux:text>Un administrateur disposant du droit d’ajouter un domaine doit préparer cette adresse.</flux:text>
@@ -22,7 +22,7 @@
         @if ($domain->type === \App\Enums\Central\Domains\TypeEnum::CUSTOM)
             @include('central.pages.admin.domains.dns')
         @endif
-        @can('viewAny', \App\Models\Central\Domain::class)
+        @can('viewAny', \App\Models\Central\Domains\Domain::class)
             <flux:button :href="route('central.domains.index')">Retour aux domaines</flux:button>
         @endcan
     </section>

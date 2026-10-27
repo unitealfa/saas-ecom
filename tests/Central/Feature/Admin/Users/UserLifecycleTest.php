@@ -2,9 +2,9 @@
 
 use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
-use App\Models\Central\Permission;
-use App\Models\Central\Role;
-use App\Models\Central\Tenant;
+use App\Models\Central\Permissions\Permission;
+use App\Models\Central\Roles\Role;
+use App\Models\Central\Tenants\Tenant;
 use App\Models\User;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Illuminate\Support\Facades\DB;

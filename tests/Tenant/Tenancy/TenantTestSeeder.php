@@ -2,9 +2,9 @@
 
 namespace Tests\Tenant\Tenancy;
 
-use App\Models\Central\Country;
+use App\Models\Central\Countries\Country;
 use App\Models\Tenant;
-use App\Models\Tenant\User as ShopUser;
+use App\Models\Tenant\Users\User as ShopUser;
 use App\Models\User;
 use App\Services\Central\Tenants\TenantProvisioner;
 use Illuminate\Database\Seeder;

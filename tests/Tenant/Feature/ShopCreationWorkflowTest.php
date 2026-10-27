@@ -6,20 +6,22 @@ use App\Enums\Central\Deployments\StatusEnum as DeploymentStatus;
 use App\Enums\Central\Tenants\StatusEnum as TenantStatus;
 use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
-use App\Models\Central\Country;
-use App\Models\Central\Role;
-use App\Models\Central\Tenant;
-use App\Models\Central\TenantSchemaDeployment;
-use App\Models\Tenant\Shop;
+use App\Models\Central\Countries\Country;
+use App\Models\Central\Deployments\TenantSchemaDeployment;
+use App\Models\Central\Roles\Role;
+use App\Models\Central\Tenants\Tenant;
+use App\Models\Tenant\Shop\Shop;
 use App\Models\User;
 use App\Services\Central\Tenants\TenantCreator;
 use App\Services\Central\Tenants\TenantProvisioner;
 use App\Services\Central\Users\UserApprovalService;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Database\Seeders\Central\CountrySeeder;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -58,9 +60,9 @@ test('a public registration completes verification approval first shop provision
         'password' => 'password', 'password_confirmation' => 'password', 'country_uuid' => $this->owner->country->uuid,
     ])->assertSessionHasNoErrors()->assertRedirect(route('verification.notice'));
     $merchant = User::where('email', 'full-journey@example.test')->firstOrFail();
-    Notification::assertSentTo($merchant, \Illuminate\Auth\Notifications\VerifyEmail::class);
+    Notification::assertSentTo($merchant, VerifyEmail::class);
     expect(Tenant::count())->toBe(0)->and($merchant->hasVerifiedEmail())->toBeFalse();
-    $url = \Illuminate\Support\Facades\URL::temporarySignedRoute('verification.verify', now()->addMinutes(60), [
+    $url = URL::temporarySignedRoute('verification.verify', now()->addMinutes(60), [
         'id' => $merchant->id, 'hash' => sha1($merchant->email),
     ]);
     $this->get($url)->assertRedirect(route('login'));
@@ -80,7 +82,7 @@ test('a public registration completes verification approval first shop provision
     expect($shop->status)->toBe(TenantStatus::ACTIVE)->and($shop->provisioned_at)->not->toBeNull();
     $shop->run(function () use ($shop, $merchant): void {
         expect(Shop::sole()->tenant_uuid)->toBe($shop->uuid);
-        expect(\App\Models\Tenant\User::where('central_user_uuid', $merchant->uuid)->count())->toBe(1);
+        expect(App\Models\Tenant\Users\User::where('central_user_uuid', $merchant->uuid)->count())->toBe(1);
     });
     $this->actingAs($merchant->fresh(), 'central')->get(route('dashboard'))->assertOk();
     expect(DB::table('jobs')->count())->toBe(0)->and(DB::table('failed_jobs')->count())->toBe(0);

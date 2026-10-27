@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Central\Admin\Permissions;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Permissions\SearchPermissionsRequest;
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\PermissionCatalogService;
 use Illuminate\Contracts\View\View;
 

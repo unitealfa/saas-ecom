@@ -8,11 +8,11 @@ use App\Enums\Central\Deployments\StatusEnum as DeploymentStatus;
 use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
 use App\Jobs\Central\ProvisionTenantDatabase;
-use App\Models\Central\Feature;
-use App\Models\Central\PlanFeature;
-use App\Models\Central\Tenant;
-use App\Models\Central\TenantSchemaDeployment;
-use App\Models\Central\User;
+use App\Models\Central\Deployments\TenantSchemaDeployment;
+use App\Models\Central\Features\Feature;
+use App\Models\Central\Plans\PlanFeature;
+use App\Models\Central\Tenants\Tenant;
+use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use App\Services\Central\Subscriptions\DefaultSubscription;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -23,7 +23,7 @@ use Stancl\Tenancy\Exceptions\DomainOccupiedByOtherTenantException;
 
 class TenantCreator
 {
-    private const string SHOPS_FEATURE = 'shops';
+    private const string SHOPS_FEATURE = Feature::SHOPS_CODE;
 
     private const string EVENT_REQUESTED = 'provisioning_requested';
 

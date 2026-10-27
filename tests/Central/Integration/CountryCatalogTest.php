@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\Central\Country;
+use App\Models\Central\Countries\Country;
 use App\Services\Central\Countries\CountryCatalog;
 use Database\Seeders\Central\CountrySeeder;
 use Illuminate\Support\Facades\Artisan;

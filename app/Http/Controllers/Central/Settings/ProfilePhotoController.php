@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Central\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Users\UpdateProfilePhotoRequest;
-use App\Models\Central\User;
+use App\Models\Central\Users\User;
 use App\Services\Central\Users\ProfilePhotoService;
 use Illuminate\Http\RedirectResponse;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;

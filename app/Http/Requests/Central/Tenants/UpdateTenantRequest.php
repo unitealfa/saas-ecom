@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Central\Tenants;
 
-use App\Models\Central\Tenant;
+use App\Models\Central\Tenants\Tenant;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
 
