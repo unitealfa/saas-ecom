@@ -5,12 +5,13 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class])
     ->prefix('admin')->name('central.')
-    ->whereUuid(['user', 'role', 'country', 'tenant', 'domain'])->group(function (): void {
+    ->whereUuid(['user', 'role', 'country', 'tenant', 'domain', 'deployment'])->group(function (): void {
         require __DIR__.'/admin/users.php';
         require __DIR__.'/admin/staff.php';
         require __DIR__.'/admin/tenants.php';
+        require __DIR__.'/admin/domains.php';
+        require __DIR__.'/admin/deployments.php';
         require __DIR__.'/admin/roles.php';
         require __DIR__.'/admin/permissions.php';
         require __DIR__.'/admin/countries.php';
-        require __DIR__.'/admin/domains.php';
     });

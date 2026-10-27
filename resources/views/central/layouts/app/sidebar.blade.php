@@ -50,6 +50,11 @@
                             {{ __('Domaines') }}
                         </flux:sidebar.item>
                     @endcan
+                    @can('viewAny', \App\Models\Central\TenantSchemaDeployment::class)
+                        <flux:sidebar.item :href="route('central.deployments.index')" :current="request()->routeIs('central.deployments.*')" wire:navigate>
+                            {{ __('Déploiements') }}
+                        </flux:sidebar.item>
+                    @endcan
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 

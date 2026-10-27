@@ -2,57 +2,15 @@
 
 namespace App\Services\Central\Tenants;
 
-use App\Enums\Central\Deployments\OperationEnum;
-use App\Enums\Central\Deployments\StatusEnum;
-use App\Enums\Central\Tenants\StatusEnum as TenantStatus;
-use App\Jobs\Central\ProvisionTenantDatabase;
 use App\Models\Central\Tenant;
-use App\Models\Central\TenantSchemaDeployment;
 use App\Models\Central\User;
-use App\Services\Central\Authorization\AuthorizationMutation;
-use Illuminate\Validation\ValidationException;
 
 class TenantProvisioningRetry
 {
-    private const string EVENT_RETRIED = 'tenant_provisioning_retried';
-
-    public function __construct(private AuthorizationMutation $mutations) {}
+    public function __construct(private TenantDeploymentService $deployments) {}
 
     public function retry(User $actor, Tenant $tenant): void
     {
-        $this->mutations->run($actor, 'retryProvisioning', function () use ($tenant): Tenant {
-            User::whereKey($tenant->user_id)->lockForUpdate()->firstOrFail();
-
-            return Tenant::whereKey($tenant->id)->lockForUpdate()->firstOrFail();
-        }, function (Tenant $tenant) use ($actor): void {
-            $deployment = TenantSchemaDeployment::where('tenant_id', $tenant->id)
-                ->where('operation', OperationEnum::PROVISIONING)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            if (in_array($deployment->status, [StatusEnum::PENDING, StatusEnum::RUNNING], true)) {
-                return;
-            }
-
-            if ($deployment->status !== StatusEnum::FAILED || $tenant->status !== TenantStatus::PROVISIONING_FAILED) {
-                throw ValidationException::withMessages(['tenant' => 'Cette boutique ne nécessite pas de reprise.']);
-            }
-
-            $deployment->update([
-                'status' => StatusEnum::PENDING,
-                'ended_at' => null,
-                'error_code' => null,
-                'sanitized_error' => null,
-            ]);
-
-            $tenant->status = TenantStatus::PROVISIONING;
-            $tenant->save();
-
-            ProvisionTenantDatabase::dispatch($deployment->id)->beforeCommit();
-
-            activity()->causedBy($actor)->performedOn($tenant)->event(self::EVENT_RETRIED)
-                ->withProperties(['deployment_uuid' => $deployment->uuid])
-                ->log('Reprise de la préparation sans nouvelle boutique.');
-        });
+        $this->deployments->retryProvisioning($actor, $tenant);
     }
 }

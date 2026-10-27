@@ -2,24 +2,30 @@
 
 namespace App\Http\Middleware\Tenant;
 
+use App\Enums\Central\Deployments\StatusEnum as DeploymentStatus;
 use App\Enums\Central\Tenants\StatusEnum as TenantStatus;
 use App\Enums\Central\Users\StatusEnum as UserStatus;
 use App\Enums\VerificationStatusEnum;
+use App\Http\Middleware\EnsureLocalDiagnostics;
 use App\Models\Central\Domain;
 use App\Models\Central\Tenant;
+use App\Models\Central\TenantSchemaDeployment;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureTenantAvailable
 {
-    private const array LOOPBACK_IPS = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
-
     private const array PROVISIONING_STATUSES = [
         TenantStatus::PROVISIONING,
         TenantStatus::PROVISIONING_FAILED,
         TenantStatus::ACTIVE,
     ];
+
+    /** Un déploiement en attente ou en cours met la boutique en maintenance. */
+    private const array DEPLOYMENT_OPEN = [DeploymentStatus::PENDING, DeploymentStatus::RUNNING];
+
+    public function __construct(private EnsureLocalDiagnostics $diagnostics) {}
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -52,7 +58,16 @@ class EnsureTenantAvailable
 
     private function isProvisioned(Tenant $tenant): bool
     {
-        return filled($tenant->schema_version) && $tenant->provisioned_at !== null;
+        return filled($tenant->schema_version)
+            && $tenant->provisioned_at !== null
+            && ! $this->hasOpenDeployment($tenant);
+    }
+
+    private function hasOpenDeployment(Tenant $tenant): bool
+    {
+        return TenantSchemaDeployment::where('tenant_id', $tenant->id)
+            ->whereIn('status', self::DEPLOYMENT_OPEN)
+            ->exists();
     }
 
     private function preparingResponse(Request $request, Tenant $tenant): Response
@@ -75,8 +90,6 @@ class EnsureTenantAvailable
     {
         return $tenant->owner?->status === UserStatus::ACTIVE
             && in_array($tenant->status, self::PROVISIONING_STATUSES, true)
-            && app()->environment(['local', 'testing'])
-            && config('app.debug')
-            && in_array($request->ip(), self::LOOPBACK_IPS, true);
+            && $this->diagnostics->isAllowed($request);
     }
 }

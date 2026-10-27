@@ -35,7 +35,7 @@ class TenantCreator
 
     private const int MAX_DOMAIN_LENGTH = 253;
 
-    public function __construct(private AuthorizationMutation $mutations, private DefaultSubscription $subscriptions) {}
+    public function __construct(private AuthorizationMutation $mutations, private DefaultSubscription $subscriptions, private TenantSchemaVersions $versions) {}
 
     public function create(User $actor, User $owner, TenantData $data): Tenant
     {
@@ -164,10 +164,7 @@ class TenantCreator
     /** @return list<string> */
     private function migrationFiles(): array
     {
-        $files = glob(database_path('migrations/tenant/*.php')) ?: [];
-        sort($files);
-
-        return $files;
+        return $this->versions->files();
     }
 
     private function reserve(User $owner, TenantData $data, string $fingerprint): Tenant
@@ -230,7 +227,7 @@ class TenantCreator
             'attempt_number' => 1,
             'operation_key' => self::DEPLOYMENT_KEY_PREFIX.$tenant->uuid,
             'correlation_id' => (string) Str::uuid(),
-            'runtime_versions' => ['php' => PHP_VERSION, 'laravel' => app()->version()],
+            'runtime_versions' => $this->versions->runtime(),
         ]);
 
         ProvisionTenantDatabase::dispatch($deployment->id)->beforeCommit();

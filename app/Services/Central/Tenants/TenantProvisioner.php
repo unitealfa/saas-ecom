@@ -28,7 +28,9 @@ class TenantProvisioner
 
     private const string DEFAULT_TIMEZONE = 'Africa/Algiers';
 
-    public function provision(Tenant $tenant): void
+    public function __construct(private TenantSchemaVersions $versions) {}
+
+    public function provision(Tenant $tenant, ?string $targetVersion = null): void
     {
         $this->assertCanRun($tenant);
 
@@ -36,9 +38,10 @@ class TenantProvisioner
 
         try {
             $this->createDatabase($tenant);
-            $this->migrate($tenant);
+            $this->migrate($tenant, $targetVersion);
 
             tenancy()->initialize($tenant);
+            $this->assertVersion($targetVersion ?? $this->versions->latest());
 
             $owner = $tenant->owner
                 ?? throw new LogicException('The tenant owner is missing.');
@@ -85,15 +88,52 @@ class TenantProvisioner
         }
     }
 
-    private function migrate(Tenant $tenant): void
+    public function migrateExisting(Tenant $tenant, string $targetVersion): void
+    {
+        if (tenancy()->initialized || DB::transactionLevel() > 0) {
+            throw new LogicException('Tenant migrations require the committed central context.');
+        }
+        if (! $tenant->database()->manager()->databaseExists($tenant->database()->getName())) {
+            throw new LogicException('The tenant database is missing.');
+        }
+        try {
+            tenancy()->initialize($tenant);
+            if (Shop::where('singleton', self::SINGLETON)->value('tenant_uuid') !== $tenant->uuid) {
+                throw new LogicException('The shop profile belongs to another tenant.');
+            }
+            tenancy()->end();
+            $this->migrate($tenant, $targetVersion);
+            tenancy()->initialize($tenant);
+            $this->assertVersion($targetVersion);
+            $tenant->schema_version = $targetVersion;
+            $tenant->save();
+        } finally {
+            tenancy()->end();
+        }
+    }
+
+    private function migrate(Tenant $tenant, ?string $targetVersion = null): void
     {
         $exitCode = Artisan::call('tenants:migrate', [
             '--tenants' => [$tenant->getTenantKey()],
+            '--path' => $this->versions->through($targetVersion ?? $this->versions->latest()),
+            '--realpath' => true,
+            '--force' => true,
             '--no-interaction' => true,
         ]);
 
         if ($exitCode !== 0) {
             throw new LogicException('Tenant migrations did not complete successfully.');
+        }
+    }
+
+    private function assertVersion(string $targetVersion): void
+    {
+        $expected = array_map(fn (string $file): string => pathinfo($file, PATHINFO_FILENAME),
+            $this->versions->through($targetVersion));
+        $applied = DB::connection(self::TENANT_CONNECTION)->table('migrations')->pluck('migration')->all();
+        if (array_diff($expected, $applied) !== []) {
+            throw new LogicException('Tenant migrations did not reach the requested version.');
         }
     }
 

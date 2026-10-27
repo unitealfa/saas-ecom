@@ -2,6 +2,7 @@
 
 namespace App\Services\Central\Tenants;
 
+use App\Enums\Central\Deployments\OperationEnum;
 use App\Enums\Central\Deployments\StatusEnum as DeploymentStatus;
 use App\Enums\Central\Tenants\StatusEnum;
 use App\Enums\Central\Users\StatusEnum as UserStatus;
@@ -73,9 +74,10 @@ class TenantStatusService
                 $this->rebalance($owner, $owner, $shops, null, null);
             }
 
-            activity()->performedOn($tenant)->event('tenant_provisioned')
-                ->withProperties(['status' => $tenant->status->value, 'deployment_uuid' => $deployment->uuid])
-                ->log('Boutique initialisée et état d’accès calculé automatiquement.');
+            activity()->performedOn($tenant)->event($deployment->operation === OperationEnum::MIGRATION ? 'tenant_schema_migrated' : 'tenant_provisioned')
+                ->withProperties(['status' => $tenant->status->value, 'deployment_uuid' => $deployment->uuid,
+                    'source_version' => $deployment->source_version, 'target_version' => $deployment->target_version])
+                ->log('Opération technique terminée et état d’accès calculé automatiquement.');
         });
     }
 

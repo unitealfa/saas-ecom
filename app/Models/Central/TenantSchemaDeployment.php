@@ -27,6 +27,25 @@ class TenantSchemaDeployment extends Model
     /** @use HasFactory<TenantSchemaDeploymentFactory> */
     use CentralConnection, HasFactory, HasPublicUuid;
 
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
+    public function managementState(): string
+    {
+        $state = $this->only(['uuid', 'tenant_id', 'source_version', 'target_version', 'operation', 'status',
+            'attempt_number', 'operation_key', 'correlation_id', 'started_at', 'ended_at', 'error_code',
+            'sanitized_error', 'runtime_versions', 'created_at', 'updated_at']);
+        foreach ($state as $key => $value) {
+            if ($value instanceof \DateTimeInterface) {
+                $state[$key] = $value->format('Y-m-d H:i:s');
+            }
+        }
+
+        return hash('sha256', json_encode($state, JSON_THROW_ON_ERROR));
+    }
+
     /** Ce qui identifie un déploiement : figé après la création. */
     private const array IMMUTABLE_COLUMNS = [
         'tenant_id', 'source_version', 'target_version', 'operation', 'operation_key', 'correlation_id',

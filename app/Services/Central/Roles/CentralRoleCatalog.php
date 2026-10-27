@@ -11,6 +11,14 @@ use Spatie\Permission\Models\Permission as PackagePermission;
 
 class CentralRoleCatalog
 {
+    public const array DEPLOYMENT_PERMISSIONS = [
+        'saas.deployments.view' => 'Consulter les déploiements des BDD boutiques',
+        'saas.deployments.provision' => 'Lancer un provisionnement autorisé',
+        'saas.deployments.migrate' => 'Lancer une migration vers une version prévue',
+        'saas.deployments.retry' => 'Relancer un déploiement en échec',
+        'saas.deployments.errors.view' => 'Consulter les erreurs techniques nettoyées',
+    ];
+
     public const array DOMAIN_PERMISSIONS = [
         'saas.domains.view' => 'Consulter les domaines des boutiques',
         'saas.domains.create' => 'Ajouter un domaine à une boutique',
@@ -21,6 +29,7 @@ class CentralRoleCatalog
     ];
 
     public const array PERMISSIONS = [
+        ...self::DEPLOYMENT_PERMISSIONS,
         ...self::DOMAIN_PERMISSIONS,
         'saas.users.view' => 'Consulter les utilisateurs',
         'saas.users.create' => 'Créer des utilisateurs',
@@ -70,6 +79,7 @@ class CentralRoleCatalog
     ];
 
     public const array GROUPS = [
+        'Déploiements' => ['saas.deployments.view', 'saas.deployments.provision', 'saas.deployments.migrate', 'saas.deployments.retry', 'saas.deployments.errors.view'],
         'Domaines' => ['saas.domains.view', 'saas.domains.create', 'saas.domains.update', 'saas.domains.verify', 'saas.domains.primary.update', 'saas.domains.archive'],
         'Utilisateurs centraux' => ['saas.users.view', 'saas.users.create', 'saas.users.update', 'saas.users.approve', 'saas.users.reject', 'saas.users.suspend', 'saas.users.activate', 'saas.users.archive'],
         'Dossiers professionnels' => ['saas.users.legal.view', 'saas.users.legal.validate', 'saas.users.legal.reject'],
