@@ -3,6 +3,7 @@
 use App\Enums\Central\Features\PeriodEnum;
 use App\Enums\Central\Features\QuotaScopeEnum;
 use App\Enums\Central\Features\ValueTypeEnum;
+use App\Enums\Central\Users\StatusEnum;
 use App\Models\Central\Audit\Activity;
 use App\Models\Central\Features\Feature;
 use App\Models\Central\Permissions\Permission;
@@ -174,6 +175,35 @@ test('the shops foundation cannot be created renamed disabled reinterpreted or a
     expect($shops->refresh()->is_active)->toBeTrue();
     expect($plan->features()->sole()->limit)->toBe(2);
 });
+
+test('initializing the free catalogue preserves mass assignment protection on other models', function (): void {
+    $status = null;
+    Feature::creating(function () use (&$status): void {
+        $status = (new User(['status' => StatusEnum::SUSPENDED]))->status;
+    });
+
+    $plan = app(FreePlanCatalog::class)->current();
+
+    expect($status)->toBe(StatusEnum::ACTIVE);
+    expect($plan->features()->sole()->limit)->toBe(2);
+    expect(Feature::where('code', Feature::SHOPS_CODE)->sole()->is_active)->toBeTrue();
+});
+
+test('the free catalogue refuses an existing inactive or incompatible shops definition', function (array $attributes): void {
+    $feature = Feature::factory()->create(['code' => Feature::SHOPS_CODE, ...$attributes]);
+    $before = $feature->only(['is_active', 'value_type', 'quota_scope', 'period']);
+
+    expect(fn () => app(FreePlanCatalog::class)->current())
+        ->toThrow(LogicException::class, 'The shops feature must be an active owner quota.');
+
+    expect($feature->refresh()->only(array_keys($before)))->toBe($before);
+    expect($feature->planFeatures()->exists())->toBeFalse();
+})->with([
+    'inactive' => [['is_active' => false]],
+    'boolean' => [['value_type' => ValueTypeEnum::BOOLEAN]],
+    'tenant scope' => [['quota_scope' => QuotaScopeEnum::TENANT]],
+    'monthly period' => [['period' => PeriodEnum::MONTHLY]],
+]);
 
 test('only activation permission changes an unused feature state and stale requests are rejected', function (): void {
     commercialFeatureAdmin();

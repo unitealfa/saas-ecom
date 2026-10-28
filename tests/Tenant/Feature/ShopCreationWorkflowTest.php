@@ -137,6 +137,7 @@ test('registration and approval never create a shop or enqueue its provisioning'
 test('a failed job can resume the same shop with its original settings and no duplicate', function (): void {
     $this->actingAs($this->owner, 'central')->post(route('owner.first-shop.store'), shopWorkflowPayload())->assertSessionHasNoErrors();
     $tenant = Tenant::firstOrFail();
+    $originalDeployment = TenantSchemaDeployment::firstOrFail();
     $realProvisioner = app(TenantProvisioner::class);
     $this->mock(TenantProvisioner::class, function ($mock): void {
         $mock->shouldReceive('provision')->once()->andThrow(new RuntimeException('Transient test failure.'));
@@ -144,13 +145,20 @@ test('a failed job can resume the same shop with its original settings and no du
     Artisan::call('queue:work', ['connection' => 'central-provisioning', '--once' => true, '--no-interaction' => true]);
     expect($tenant->fresh()->status)->toBe(TenantStatus::PROVISIONING_FAILED)
         ->and($tenant->fresh()->getInternal('shop_settings')['cart_lifetime_days'])->toBe(19);
+    expect($originalDeployment->refresh()->status)->toBe(DeploymentStatus::FAILED);
     app()->instance(TenantProvisioner::class, $realProvisioner);
     $this->get(route('registration.status'))->assertOk()->assertSee('Relancer la préparation');
     $this->post(route('owner.shops.retry', $tenant))->assertSessionHasNoErrors();
     $this->post(route('owner.shops.retry', $tenant))->assertSessionHasNoErrors();
     runShopWorkflowWorker();
-    expect(Tenant::count())->toBe(1)->and($tenant->fresh()->status)->toBe(TenantStatus::ACTIVE)
-        ->and(TenantSchemaDeployment::firstOrFail()->status)->toBe(DeploymentStatus::SUCCEEDED);
+    expect(Tenant::count())->toBe(1)->and($tenant->fresh()->status)->toBe(TenantStatus::ACTIVE);
+    $retry = TenantSchemaDeployment::latest('id')->firstOrFail();
+    expect($originalDeployment->refresh()->status)->toBe(DeploymentStatus::FAILED)
+        ->and($retry->status)->toBe(DeploymentStatus::SUCCEEDED)
+        ->and($retry->id)->not->toBe($originalDeployment->id)
+        ->and($retry->attempt_number)->toBe(2)
+        ->and($retry->correlation_id)->toBe($originalDeployment->correlation_id)
+        ->and(TenantSchemaDeployment::count())->toBe(2);
     $tenant->run(fn () => expect(Shop::sole()->cart_lifetime_days)->toBe(19));
     $this->travel(31)->seconds();
     runShopWorkflowWorker();

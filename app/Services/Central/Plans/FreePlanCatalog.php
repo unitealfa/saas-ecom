@@ -42,13 +42,16 @@ class FreePlanCatalog
     /** Retourne la fonctionnalité « boutiques » verrouillée, en la créant active si elle n'existe pas. */
     private function shopsFeature(): Feature
     {
-        $created = Feature::unguarded(fn (): Feature => Feature::firstOrCreate(['code' => Feature::SHOPS_CODE], [
+        $created = Feature::firstOrCreate(['code' => Feature::SHOPS_CODE], [
             'name' => 'Nombre de boutiques',
             'value_type' => ValueTypeEnum::QUANTITY,
             'quota_scope' => QuotaScopeEnum::OWNER,
             'period' => PeriodEnum::LIFETIME,
-            'is_active' => true,
-        ]));
+        ]);
+
+        if ($created->wasRecentlyCreated) {
+            $created->forceFill(['is_active' => true])->save();
+        }
 
         $feature = Feature::whereKey($created->id)->lockForUpdate()->firstOrFail();
 

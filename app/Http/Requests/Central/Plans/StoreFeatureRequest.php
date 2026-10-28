@@ -13,8 +13,6 @@ use Illuminate\Validation\Rule;
 
 class StoreFeatureRequest extends FormRequest
 {
-    private const array FIELDS = ['code', 'name', 'value_type', 'unit', 'quota_scope', 'period'];
-
     private const array FORBIDDEN_FIELDS = [
         'is_active', 'id', 'uuid', 'deleted_at', 'limit', 'plan_id',
     ];
@@ -54,7 +52,14 @@ class StoreFeatureRequest extends FormRequest
     /** @return array{code: string, name: string, value_type: int|string, unit: ?string, quota_scope: int|string, period: int|string} */
     public function featureData(): array
     {
-        return $this->safe()->only(self::FIELDS) + ['unit' => null];
+        return [
+            'code' => $this->validated('code'),
+            'name' => $this->validated('name'),
+            'value_type' => $this->validated('value_type'),
+            'unit' => $this->validated('unit'),
+            'quota_scope' => $this->validated('quota_scope'),
+            'period' => $this->validated('period'),
+        ];
     }
 
     protected function prepareForValidation(): void
