@@ -15,8 +15,6 @@ class FreePlanCatalog
 {
     private const string PLAN_CODE = 'free';
 
-    private const string FEATURE_CODE = Feature::SHOPS_CODE;
-
     private const string ZERO_PRICE = '0.00';
 
     private const int SHOP_LIMIT = 2;
@@ -37,35 +35,36 @@ class FreePlanCatalog
                 return $latest;
             }
 
-            return $this->createVersion($feature, $latest === null ? 1 : $latest->version + 1);
+            return $this->createVersion($feature, ($latest->version ?? 0) + 1);
         }, self::ATTEMPTS);
     }
 
+    /** Retourne la fonctionnalité « boutiques » verrouillée, en la créant active si elle n'existe pas. */
     private function shopsFeature(): Feature
     {
-        $feature = Feature::firstOrCreate(['code' => self::FEATURE_CODE], [
+        $created = Feature::unguarded(fn (): Feature => Feature::firstOrCreate(['code' => Feature::SHOPS_CODE], [
             'name' => 'Nombre de boutiques',
             'value_type' => ValueTypeEnum::QUANTITY,
             'quota_scope' => QuotaScopeEnum::OWNER,
             'period' => PeriodEnum::LIFETIME,
-        ]);
+            'is_active' => true,
+        ]));
 
-        if ($feature->wasRecentlyCreated) {
-            $feature->forceFill(['is_active' => true])->save();
-        }
+        $feature = Feature::whereKey($created->id)->lockForUpdate()->firstOrFail();
 
-        $feature = Feature::whereKey($feature->id)->lockForUpdate()->firstOrFail();
-
-        $isOwnerQuota = $feature->value_type === ValueTypeEnum::QUANTITY
-            && $feature->quota_scope === QuotaScopeEnum::OWNER
-            && $feature->period === PeriodEnum::LIFETIME
-            && $feature->is_active;
-
-        if (! $isOwnerQuota) {
+        if (! $this->isOwnerQuota($feature)) {
             throw new LogicException('The shops feature must be an active owner quota.');
         }
 
         return $feature;
+    }
+
+    private function isOwnerQuota(Feature $feature): bool
+    {
+        return $feature->value_type === ValueTypeEnum::QUANTITY
+            && $feature->quota_scope === QuotaScopeEnum::OWNER
+            && $feature->period === PeriodEnum::LIFETIME
+            && $feature->is_active;
     }
 
     private function isCurrent(Plan $plan, Feature $feature): bool

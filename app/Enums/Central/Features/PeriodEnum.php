@@ -12,8 +12,10 @@ enum PeriodEnum: int
     public function label(): string
     {
         return match ($this) {
-            self::LIFETIME => 'Toute la durée', self::DAILY => 'Par jour',
-            self::MONTHLY => 'Par mois', self::YEARLY => 'Par an',
+            self::LIFETIME => 'Toute la durée',
+            self::DAILY => 'Par jour',
+            self::MONTHLY => 'Par mois',
+            self::YEARLY => 'Par an',
         };
     }
 }

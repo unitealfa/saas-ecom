@@ -33,6 +33,13 @@ class Feature extends Model
 
     public const string SHOPS_CODE = 'shops';
 
+    /** Format du jeton `expected_state` (empreinte SHA-256 en hexadécimal). */
+    public const string STATE_PATTERN = '/^[a-f0-9]{64}$/D';
+
+    private const array STATE_FIELDS = [
+        'uuid', 'code', 'name', 'value_type', 'unit', 'quota_scope', 'period', 'is_active', 'deleted_at',
+    ];
+
     protected $attributes = ['is_active' => false];
 
     protected static function booted(): void
@@ -42,6 +49,16 @@ class Feature extends Model
                 throw new LogicException('A commercial feature code is immutable.');
             }
         });
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'value_type' => ValueTypeEnum::class,
+            'quota_scope' => QuotaScopeEnum::class,
+            'period' => PeriodEnum::class,
+            'is_active' => 'boolean',
+        ];
     }
 
     /** @return Attribute<string, string> */
@@ -61,24 +78,14 @@ class Feature extends Model
         return $this->hasMany(PlanFeature::class);
     }
 
+    /** Empreinte de l'état courant, utilisée pour détecter les modifications concurrentes. */
     public function managementState(): string
     {
-        return hash('sha256', json_encode($this->only([
-            'uuid', 'code', 'name', 'value_type', 'unit', 'quota_scope', 'period', 'is_active', 'deleted_at',
-        ]), JSON_THROW_ON_ERROR));
+        return hash('sha256', json_encode($this->only(self::STATE_FIELDS), JSON_THROW_ON_ERROR));
     }
 
-    protected function casts(): array
-    {
-        return [
-            'value_type' => ValueTypeEnum::class,
-            'quota_scope' => QuotaScopeEnum::class,
-            'period' => PeriodEnum::class,
-            'is_active' => 'boolean',
-        ];
-    }
-
-    /** @param Builder<static> $query
+    /**
+     * @param  Builder<static>  $query
      * @return Builder<static>
      */
     public function scopeActive(Builder $query): Builder

@@ -14,18 +14,22 @@ use Illuminate\Support\Facades\Gate;
 
 class FeatureController extends Controller
 {
-    public function __construct(private FeatureCatalogService $features) {}
+    public function __construct(private readonly FeatureCatalogService $features) {}
 
     public function index(Request $request): View
     {
         $actor = $this->centralActor();
         Gate::forUser($actor)->authorize('viewAny', Feature::class);
+
         $filters = $request->validate([
-            'search' => ['nullable', 'string', 'max:255'], 'archived' => ['nullable', 'boolean'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'archived' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
-        return view('central.pages.admin.features.index', ['features' => $this->features->search($actor, $filters)]);
+        return view('central.pages.admin.features.index', [
+            'features' => $this->features->search($actor, $filters),
+        ]);
     }
 
     public function create(): View
@@ -39,7 +43,10 @@ class FeatureController extends Controller
     {
         $feature = $this->features->create($this->centralActor(), $request->featureData());
 
-        return $this->result($feature, 'Fonctionnalité créée inactive. Son activation nécessite l’autorisation dédiée.');
+        return $this->redirectWithStatus(
+            $feature,
+            'Fonctionnalité créée inactive. Son activation nécessite l’autorisation dédiée.',
+        );
     }
 
     public function show(Feature $feature): View
@@ -58,29 +65,42 @@ class FeatureController extends Controller
 
     public function update(StoreFeatureRequest $request, Feature $feature): RedirectResponse
     {
-        $this->features->update($this->centralActor(), $feature, $request->featureData(), $request->validated('expected_state'));
+        $this->features->update(
+            $this->centralActor(),
+            $feature,
+            $request->featureData(),
+            $request->validated('expected_state'),
+        );
 
-        return $this->result($feature, 'Fonctionnalité enregistrée.');
+        return $this->redirectWithStatus($feature, 'Fonctionnalité enregistrée.');
     }
 
     public function activate(FeatureActionRequest $request, Feature $feature): RedirectResponse
     {
-        $this->features->setActive($this->centralActor(), $feature, $request->boolean('is_active'), $request->validated('expected_state'));
+        $this->features->setActive(
+            $this->centralActor(),
+            $feature,
+            $request->boolean('is_active'),
+            $request->validated('expected_state'),
+        );
 
-        return $this->result($feature, 'État de la fonctionnalité enregistré.');
+        return $this->redirectWithStatus($feature, 'État de la fonctionnalité enregistré.');
     }
 
     public function archive(FeatureActionRequest $request, Feature $feature): RedirectResponse
     {
         $this->features->archive($this->centralActor(), $feature, $request->validated('expected_state'));
 
-        return $this->result($feature, 'Fonctionnalité archivée. Son code reste réservé.');
+        return $this->redirectWithStatus($feature, 'Fonctionnalité archivée. Son code reste réservé.');
     }
 
-    private function result(Feature $feature, string $message): RedirectResponse
+    /** Redirige vers la fiche si l'acteur peut la voir, sinon vers le tableau de bord. */
+    private function redirectWithStatus(Feature $feature, string $message): RedirectResponse
     {
-        $canView = Gate::forUser($this->centralActor())->allows('view', $feature);
+        $redirect = Gate::forUser($this->centralActor())->allows('view', $feature)
+            ? to_route('central.features.show', $feature)
+            : to_route('dashboard');
 
-        return redirect()->route($canView ? 'central.features.show' : 'dashboard', $canView ? $feature : [])->with('status', $message);
+        return $redirect->with('status', $message);
     }
 }

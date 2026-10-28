@@ -10,7 +10,8 @@ enum ValueTypeEnum: int
     public function label(): string
     {
         return match ($this) {
-            self::BOOLEAN => 'Oui / non', self::QUANTITY => 'Quantité',
+            self::BOOLEAN => 'Oui / non',
+            self::QUANTITY => 'Quantité',
         };
     }
 }

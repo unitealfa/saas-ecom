@@ -9,27 +9,32 @@ use Illuminate\Support\Facades\Gate;
 
 class FeatureActionRequest extends FormRequest
 {
-    private const array ABILITIES = ['activate' => 'activate', 'archive' => 'archive'];
+    /** Actions du contrôleur gérées ici ; le nom de l'action est aussi celui de l'ability de la policy. */
+    private const array ACTIONS = ['activate', 'archive'];
+
+    private const array FORBIDDEN_FIELDS = [
+        'code', 'name', 'value_type', 'unit', 'quota_scope', 'period', 'id', 'uuid', 'deleted_at',
+    ];
 
     public function authorize(): bool
     {
         $actor = $this->user('central');
         $feature = $this->route('feature');
-        $ability = self::ABILITIES[$this->route()?->getActionMethod()] ?? null;
+        $action = $this->route()?->getActionMethod();
 
-        return $actor instanceof User && $feature instanceof Feature && $ability !== null
-            && Gate::forUser($actor)->allows($ability, $feature);
+        return $actor instanceof User
+            && $feature instanceof Feature
+            && in_array($action, self::ACTIONS, true)
+            && Gate::forUser($actor)->allows($action, $feature);
     }
 
     /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
-            'expected_state' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/'],
+            'expected_state' => ['required', 'string', 'regex:'.Feature::STATE_PATTERN],
             'is_active' => $this->route()?->getActionMethod() === 'activate' ? ['required', 'boolean'] : ['prohibited'],
-            'code' => ['prohibited'], 'name' => ['prohibited'], 'value_type' => ['prohibited'],
-            'quota_scope' => ['prohibited'], 'period' => ['prohibited'], 'unit' => ['prohibited'],
-            'id' => ['prohibited'], 'uuid' => ['prohibited'], 'deleted_at' => ['prohibited'],
+            ...array_fill_keys(self::FORBIDDEN_FIELDS, ['prohibited']),
         ];
     }
 }

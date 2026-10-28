@@ -10,7 +10,8 @@ enum QuotaScopeEnum: int
     public function label(): string
     {
         return match ($this) {
-            self::OWNER => 'Par propriétaire', self::TENANT => 'Par boutique',
+            self::OWNER => 'Par propriétaire',
+            self::TENANT => 'Par boutique',
         };
     }
 }

@@ -23,8 +23,6 @@ use Stancl\Tenancy\Exceptions\DomainOccupiedByOtherTenantException;
 
 class TenantCreator
 {
-    private const string SHOPS_FEATURE = Feature::SHOPS_CODE;
-
     private const string EVENT_REQUESTED = 'provisioning_requested';
 
     private const string DEPLOYMENT_KEY_PREFIX = 'provision:';
@@ -35,7 +33,11 @@ class TenantCreator
 
     private const int MAX_DOMAIN_LENGTH = 253;
 
-    public function __construct(private AuthorizationMutation $mutations, private DefaultSubscription $subscriptions, private TenantSchemaVersions $versions) {}
+    public function __construct(
+        private readonly AuthorizationMutation $mutations,
+        private readonly DefaultSubscription $subscriptions,
+        private readonly TenantSchemaVersions $versions,
+    ) {}
 
     public function create(User $actor, User $owner, TenantData $data): Tenant
     {
@@ -75,11 +77,11 @@ class TenantCreator
                 $this->assertQuota($owner, $actor);
 
                 $domain = $this->domainFor($data);
-                $this->assertProvisioningReady($owner);
+                $targetVersion = $this->targetSchemaVersion($owner);
 
                 $tenant = $this->reserve($owner, $data, $fingerprint);
                 $this->attachDomain($tenant, $domain);
-                $deployment = $this->requestProvisioning($tenant);
+                $deployment = $this->requestProvisioning($tenant, $targetVersion);
 
                 activity()->causedBy($actor)->performedOn($tenant)->event(self::EVENT_REQUESTED)
                     ->withProperties(['owner_uuid' => $owner->uuid, 'deployment_uuid' => $deployment->uuid])
@@ -90,6 +92,7 @@ class TenantCreator
         );
     }
 
+    /** Une demande déjà traitée avec la même empreinte est rejouée ; avec une empreinte différente, elle est refusée. */
     private function replayOf(User $owner, TenantData $data, string $fingerprint): ?Tenant
     {
         $existing = Tenant::withTrashed()->where('user_id', $owner->id)
@@ -122,7 +125,7 @@ class TenantCreator
     private function assertQuota(User $owner, User $actor): void
     {
         $subscription = $this->subscriptions->ensure($owner, $actor);
-        $feature = Feature::where('code', self::SHOPS_FEATURE)->active()->firstOrFail();
+        $feature = Feature::where('code', Feature::SHOPS_CODE)->active()->firstOrFail();
         $quota = PlanFeature::where('plan_id', $subscription->plan_id)->where('feature_id', $feature->id)
             ->lockForUpdate()->first();
 
@@ -132,9 +135,8 @@ class TenantCreator
 
         // get() et non count() SQL : le verrou doit porter sur les lignes.
         $shops = Tenant::where('user_id', $owner->id)->orderBy('id')->lockForUpdate()->get(['id']);
-        $count = $shops->count();
 
-        if ($quota->limit !== null && $count >= $quota->limit) {
+        if ($quota->limit !== null && $shops->count() >= $quota->limit) {
             throw ValidationException::withMessages(['shop_name' => 'Le nombre maximum de boutiques de cette offre est atteint.']);
         }
     }
@@ -150,21 +152,20 @@ class TenantCreator
         return $domain;
     }
 
-    private function assertProvisioningReady(User $owner): void
+    /** Vérifie que la création de base est possible avant toute écriture et retourne la version cible du schéma. */
+    private function targetSchemaVersion(User $owner): string
     {
         if (config('queue.connections.central-provisioning.connection') !== $owner->getConnectionName()) {
             throw new LogicException('The provisioning queue must use the same central database connection.');
         }
 
-        if ($this->migrationFiles() === []) {
+        $files = $this->versions->files();
+
+        if ($files === []) {
             throw new LogicException('Tenant migrations are missing.');
         }
-    }
 
-    /** @return list<string> */
-    private function migrationFiles(): array
-    {
-        return $this->versions->files();
+        return pathinfo($files[array_key_last($files)], PATHINFO_FILENAME);
     }
 
     private function reserve(User $owner, TenantData $data, string $fingerprint): Tenant
@@ -198,12 +199,11 @@ class TenantCreator
     private function attachDomain(Tenant $tenant, string $domain): void
     {
         try {
-            $tenantDomain = $tenant->domains()->make([
+            $tenant->domains()->make([
                 'domain' => $domain,
                 'type' => self::PRIMARY_DOMAIN_TYPE,
                 'is_primary' => true,
-            ]);
-            $tenantDomain->forceFill([
+            ])->forceFill([
                 'verification_status' => VerificationStatusEnum::VERIFIED,
                 'verified_at' => now(),
             ])->save();
@@ -212,16 +212,11 @@ class TenantCreator
         }
     }
 
-    private function requestProvisioning(Tenant $tenant): TenantSchemaDeployment
+    private function requestProvisioning(Tenant $tenant, string $targetVersion): TenantSchemaDeployment
     {
-        $files = $this->migrationFiles();
-        if ($files === []) {
-            throw new LogicException('Tenant migrations are missing.');
-        }
-
         $deployment = TenantSchemaDeployment::create([
             'tenant_id' => $tenant->id,
-            'target_version' => pathinfo($files[array_key_last($files)], PATHINFO_FILENAME),
+            'target_version' => $targetVersion,
             'operation' => OperationEnum::PROVISIONING,
             'status' => DeploymentStatus::PENDING,
             'attempt_number' => 1,
