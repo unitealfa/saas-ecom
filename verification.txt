@@ -1,0 +1,205 @@
+# CODEX — PLAN DE CORRECTION CIBLÉ DU PROJET AYDRA
+
+Tu viens de terminer un audit technique approfondi de mon projet Aydra.
+
+Je souhaite maintenant passer de l'audit à la préparation des corrections, en utilisant directement les conclusions que tu as établies.
+
+## OBJECTIF PRINCIPAL
+
+Corriger les problèmes de performance, de sécurité de connexion MySQL et de requêtes SQL répétées, tout en préservant intégralement l'architecture, les fonctionnalités et les règles métier existantes.
+
+Tu dois travailler sur les vrais fichiers du projet.
+
+Versions réellement installées selon ton audit :
+
+- Laravel 13.34.0
+- PHP 8.5.12
+- Stancl Tenancy 3.10.1
+- Spatie Laravel Permission 8.3.0
+- Livewire 4.4.7
+- MySQL local et Aiven
+
+Utilise la documentation correspondant à ces versions.
+
+## LOT 1 — CONNEXION MYSQL ET TLS
+
+Examine `config/database.php`, `.env` et la configuration de Tenancy.
+
+Prépare une correction permettant :
+
+1. D'activer TLS pour les connexions Aiven.
+2. De charger le certificat CA officiel depuis un fichier local.
+3. De vérifier le certificat du serveur, sans désactiver sa validation.
+4. De conserver le fonctionnement des connexions MySQL locales.
+5. D'assurer que les connexions tenant distantes héritent des bonnes options de sécurité.
+6. De distinguer clairement les paramètres locaux et distants.
+7. De vérifier que `Ssl_cipher` n'est plus vide après la correction.
+
+Vérifie les constantes PDO compatibles avec PHP 8.5 et le pilote réellement installé.
+
+Ne révèle aucun secret.
+
+Ne réutilise aucun mot de passe précédemment affiché dans des logs.
+
+## LOT 2 — OPTIMISATION DES RÔLES
+
+Fichiers concernés notamment :
+
+- CentralUserAccess.php
+- Dashboard.php
+- Les modèles User et Role concernés
+- Les autres classes responsables des appels répétitifs
+
+Objectifs :
+
+1. Supprimer les appels SQL redondants à `roles()->exists()`.
+2. Réutiliser les relations chargées lorsqu'elles correspondent au même utilisateur et au même contexte de lecture.
+3. Éviter les rechargements inutiles de rôles.
+4. Utiliser les fonctionnalités natives d'Eloquent et Spatie.
+5. Conserver le guard `central`.
+6. Conserver les protections du super-admin.
+7. Conserver toutes les permissions individuelles.
+8. Éviter les résultats d'autorisation mis en cache globalement entre utilisateurs.
+
+Ne considère pas les relations chargées comme une garantie de fraîcheur pour une mutation sensible.
+
+## LOT 3 — OPTIMISATION DU DASHBOARD
+
+Examine :
+
+- DashboardController.php
+- Services/Central/Dashboard/Dashboard.php
+- Les vues Blade et les composants Livewire concernés
+- Les layouts et sidebars
+
+Objectifs :
+
+1. Éviter de consulter les boutiques des membres du personnel lorsque ces données ne sont pas utilisées.
+2. Réutiliser le service CentralUserAccess existant.
+3. Supprimer les chargements répétés d'un même utilisateur lorsqu'ils sont inutiles.
+4. Supprimer les requêtes redondantes pendant le rendu.
+5. Réduire les contrôles répétés sans contourner Gates et Policies.
+6. Préserver le contenu, les menus et les droits d'accès actuels.
+
+Vérifie les effets sur le dashboard des commerçants, des administrateurs et du super-administrateur.
+
+## LOT 4 — PARCOURS D'INSCRIPTION ET MIDDLEWARE
+
+Examine :
+
+- EnsureActiveCentralAccount.php
+- RegistrationJourney.php
+- DashboardController.php
+
+Objectifs :
+
+1. Éviter de calculer plusieurs fois le même état de parcours dans une seule requête.
+2. Conserver la vérification du statut du compte.
+3. Conserver la vérification de l'adresse e-mail.
+4. Conserver les états d'approbation, de refus et d'attente.
+5. Conserver l'obligation de créer la première boutique avant l'accès au dashboard.
+6. Conserver toutes les redirections et interdictions existantes.
+7. Préserver les vérifications fraîches nécessaires à la sécurité.
+
+Ne supprime un contrôle que si tu as démontré qu'il est réellement redondant et couvert par une autre couche.
+
+## LOT 5 — PERMISSIONS TEMPORAIRES
+
+Examine précisément :
+
+- HasTimedPermissions.php
+- Les Policies et Gates concernés
+- L'intégration Spatie Permission
+- Les services d'autorisation centraux
+
+Objectifs :
+
+1. Réduire les lectures SQL répétées.
+2. Respecter les dates d'attribution et d'expiration.
+3. Respecter les permissions directes et les restrictions individuelles.
+4. Ne pas réintroduire un droit qui a été retiré.
+5. Conserver les rôles système et protégés.
+6. Préserver les règles de révocation.
+7. Conserver les autorisations natives de Laravel et Spatie.
+8. Ne pas créer un nouveau système de permissions.
+
+Vérifie particulièrement les interceptions réalisées par `Gate::before()` et la méthode personnalisée `hasPermissionTo()`.
+
+Cette partie doit faire l'objet de tests de non-régression très approfondis.
+
+## LOT 6 — SESSIONS ET CACHE
+
+Réexamine la pertinence de :
+
+- SESSION_DRIVER
+- SESSION_CONNECTION
+- CACHE_STORE
+- Cache Spatie
+- Cache des tenants
+- Scheduler et onOneServer()
+
+Prépare une configuration recommandée pour le développement local et une autre pour l'environnement distant.
+
+Ne modifie pas ces paramètres automatiquement.
+
+Explique les effets sur les sessions existantes, les tâches planifiées et l'isolation des tenants.
+
+## LOT 7 — VALIDATION
+
+Prépare ou adapte les tests automatisés nécessaires pour vérifier :
+
+- Dashboard Super Admin.
+- Dashboard administrateur ordinaire.
+- Dashboard commerçant.
+- Rôles et permissions.
+- Permissions individuelles.
+- Permissions expirées.
+- Révocation des autorisations.
+- Redirections du parcours d'inscription.
+- Isolation des bases de données.
+- Connexion centrale et connexions tenant.
+- Sécurité TLS.
+- Nombre de requêtes SQL du dashboard.
+- Absence de N+1 sur les composants concernés.
+
+Prévois une comparaison mesurable avant/après.
+
+Ne promets aucun gain chiffré qui n'a pas encore été mesuré.
+
+## CONTRAINTES ABSOLUES
+
+- Ne supprime aucune base de données.
+- Ne supprime aucune table.
+- Ne modifie aucune donnée métier.
+- Ne lance aucune migration destructive.
+- Ne refonds pas l'architecture du projet.
+- Ne modifie pas les règles d'autorisation métier.
+- Ne désactive pas les protections de sécurité.
+- N'augmente pas max_execution_time comme correction principale.
+- Ne rajoute pas de packages inutilement.
+- N'introduis pas de cache susceptible de mélanger les utilisateurs ou les tenants.
+- N'exécute pas de test impliquant des écritures sur la base Aiven existante.
+
+## MÉTHODE OBLIGATOIRE
+
+Pour chaque lot :
+
+1. Relis les vrais fichiers concernés.
+2. Compare la situation actuelle avec les résultats de ton audit.
+3. Prépare les changements exacts.
+4. Explique pourquoi chaque changement est nécessaire.
+5. Identifie les risques de régression.
+6. Définis les tests nécessaires.
+7. Distingue les changements indépendants de ceux qui dépendent des lots précédents.
+
+Je veux d'abord un tableau final des modifications :
+
+| Lot | Fichier | Méthode | Modification précise | Justification | Risque | Test associé |
+
+Puis un plan d'exécution dans l'ordre des dépendances.
+
+**Pour cette réponse, n'applique encore aucune modification.**
+
+Présente le plan de correction définitif, avec les changements exacts fondés sur mon code réel.
+
+Ensuite, attends mon autorisation pour appliquer les lots un par un, avec validation des tests entre chaque lot.

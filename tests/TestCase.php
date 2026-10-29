@@ -22,6 +22,10 @@ abstract class TestCase extends BaseTestCase
     {
         $app = parent::createApplication();
         $connection = $app['config']->get('database.connections.mysql');
+        if (! in_array($connection['host'], ['127.0.0.1', 'localhost', '::1'], true)
+            || ! empty($connection['url'])) {
+            throw new LogicException('Database tests require local MySQL without DB_URL; remote databases must not be modified.');
+        }
         if (self::$testDatabaseAdmin === null) {
             self::$testDatabasePrefix = 'aydra_test_'.bin2hex(random_bytes(6)).'_';
             self::$testDatabaseAdmin = new PDO(

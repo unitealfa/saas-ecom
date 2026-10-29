@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\Central\Deployments\OperationEnum;
+use App\Enums\Central\Deployments\StatusEnum as DeploymentStatus;
 use App\Enums\Central\Tenants\StatusEnum as TenantStatus;
 use App\Enums\Central\Users\JourneyState;
 use App\Enums\Central\Users\StatusEnum;
@@ -8,6 +10,7 @@ use App\Http\Controllers\Central\Owner\Tenants\FirstTenantController;
 use App\Http\Controllers\Central\Owner\Tenants\TenantController as OwnerTenantController;
 use App\Jobs\Central\ProvisionTenantDatabase;
 use App\Models\Central\Audit\Activity;
+use App\Models\Central\Deployments\TenantSchemaDeployment;
 use App\Models\Central\Permissions\Permission;
 use App\Models\Central\Roles\Role;
 use App\Models\Central\Tenants\Tenant;
@@ -171,6 +174,12 @@ test('progress retains the failed shop payload and only includes shops owned by 
     Tenant::factory()->create(['user_id' => $other->id, 'status' => TenantStatus::ACTIVE,
         'schema_version' => 'completed-schema', 'provisioned_at' => now()]);
     Event::assertDispatched(TenantCreated::class);
+
+    expect(app(RegistrationJourney::class)->progress($merchant)['shops'][0]['retry_url'])->toBeNull();
+    TenantSchemaDeployment::factory()->create([
+        'tenant_id' => $failed->id, 'operation' => OperationEnum::PROVISIONING,
+        'status' => DeploymentStatus::FAILED,
+    ]);
 
     $progress = app(RegistrationJourney::class)->progress($merchant);
     expect($progress['state'])->toBe('preparing')

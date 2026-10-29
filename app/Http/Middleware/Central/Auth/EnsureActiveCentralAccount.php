@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware\Central\Auth;
 
+use App\Enums\Central\Users\JourneyState;
 use App\Enums\Central\Users\StatusEnum;
 use App\Models\Central\Users\User;
 use App\Services\Central\Auth\RegistrationJourney;
@@ -51,6 +52,11 @@ class EnsureActiveCentralAccount
             $this->reject($request);
         }
 
+        if (! $allowGuest && in_array($request->method(), ['GET', 'HEAD'], true)) {
+            Auth::guard(self::GUARD)->setUser($user);
+            $request->attributes->set(User::AUTHORIZATION_READ_USER, $user);
+        }
+
         if ($user->status === StatusEnum::ACTIVE) {
             if (! $allowGuest && $request->routeIs('dashboard', '*.dashboard')) {
                 $this->ensureJourneyCompleted($request, $user);
@@ -72,10 +78,10 @@ class EnsureActiveCentralAccount
 
     private function ensureJourneyCompleted(Request $request, User $user): void
     {
-        $destination = $this->journey->destination($user);
+        $state = $this->journey->state($user);
 
-        if ($destination !== route('dashboard')) {
-            $this->redirectOrDeny($request, $user, $destination);
+        if ($state !== JourneyState::READY) {
+            $this->redirectOrDeny($request, $user, route($state->routeName()));
         }
     }
 

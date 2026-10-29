@@ -84,6 +84,9 @@ class CentralUserAccess
 
     public function isStaff(User $user): bool
     {
+        if ($user->canReuseAuthorizationRelations()) {
+            $user->loadMissing('roles');
+        }
         if ($user->relationLoaded('roles')) {
             return $user->roles->contains(fn ($role): bool => $role->guard_name === self::GUARD);
         }
@@ -117,13 +120,21 @@ class CentralUserAccess
             return null;
         }
 
-        $fresh = $user->fresh();
+        $fresh = $user->canReuseAuthorizationRelations() ? $user : $user->fresh();
 
         return $fresh !== null && $fresh->status === StatusEnum::ACTIVE && ! $fresh->trashed() ? $fresh : null;
     }
 
     private function hasSuperAdminRole(User $user): bool
     {
+        if ($user->canReuseAuthorizationRelations()) {
+            $user->loadMissing('roles');
+
+            return $user->roles->contains(fn (Role $role): bool => $role->guard_name === self::GUARD
+                && $role->name === self::ROOT_ROLE_NAME && $role->is_super_admin
+                && $role->is_system && $role->is_protected && $role->pivot->assigned_at <= now());
+        }
+
         return $user->roles()->where('guard_name', self::GUARD)
             ->where('name', self::ROOT_ROLE_NAME)
             ->where('is_super_admin', true)

@@ -9,6 +9,7 @@
 /storage/tenant_*/
 /vendor
 .env
+.env.testing
 .env.backup
 .env.production
 .phpactor.json

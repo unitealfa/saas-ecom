@@ -3,6 +3,21 @@
 use Illuminate\Support\Str;
 use Pdo\Mysql;
 
+$sslCa = env('MYSQL_ATTR_SSL_CA');
+$sslRequired = (bool) env('MYSQL_SSL_REQUIRED', false);
+
+if ($sslRequired && (! is_string($sslCa) || $sslCa === '')) {
+    throw new InvalidArgumentException('MYSQL_ATTR_SSL_CA is required when MYSQL_SSL_REQUIRED is enabled.');
+}
+
+if (is_string($sslCa) && $sslCa !== '' && (! is_file($sslCa) || ! is_readable($sslCa))) {
+    throw new InvalidArgumentException('MYSQL_ATTR_SSL_CA must reference a readable CA certificate file.');
+}
+
+$mysqlOptions = extension_loaded('pdo_mysql') && is_string($sslCa) && $sslCa !== ''
+    ? [Mysql::ATTR_SSL_CA => $sslCa, Mysql::ATTR_SSL_VERIFY_SERVER_CERT => true]
+    : [];
+
 return [
 
     /*
@@ -47,9 +62,7 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? array_filter([
-                Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-            ]) : [],
+            'options' => $mysqlOptions,
         ],
 
         'mariadb' => [
@@ -67,9 +80,7 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? array_filter([
-                Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-            ]) : [],
+            'options' => $mysqlOptions,
         ],
 
         'pgsql' => [

@@ -7,7 +7,9 @@ use App\Enums\Tenant\Users\MembershipStatusEnum;
 use App\Enums\Tenant\Users\StatusEnum;
 use App\Models\Shared\Authorization\PermissionAssignment;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -16,6 +18,9 @@ use Spatie\Permission\Traits\HasRoles;
 /**
  * @template TRole of Role
  * @template TPermission of Permission
+ *
+ * @property-read EloquentCollection<int, TRole> $roles
+ * @property-read EloquentCollection<int, TPermission> $permissions
  */
 trait HasTimedPermissions
 {
@@ -24,6 +29,20 @@ trait HasTimedPermissions
         givePermissionTo as private givePackagePermissionTo;
         getPermissionsViaRoles as private getPackagePermissionsViaRoles;
         hasPermissionViaRole as private hasPackagePermissionViaRole;
+    }
+
+    public const string AUTHORIZATION_READ_USER = 'aydra.authorization.read_user';
+
+    public function canReuseAuthorizationRelations(): bool
+    {
+        $request = app()->bound('request') ? app('request') : null;
+
+        return $this->getMorphClass() === 'central_user'
+            && ! tenancy()->initialized
+            && $request instanceof Request
+            && in_array($request->method(), ['GET', 'HEAD'], true)
+            && $request->attributes->get(self::AUTHORIZATION_READ_USER) === $this
+            && $this->getConnection()->transactionLevel() === 0;
     }
 
     public function assignRole(mixed ...$roles): static
@@ -182,15 +201,28 @@ trait HasTimedPermissions
         if ($this->getMorphClass() === 'shop_user' && $this->getAttribute('membership_status') !== MembershipStatusEnum::ACTIVE) {
             return false;
         }
-        if ($this->getMorphClass() === 'central_user' && ! $this->roles()->where('guard_name', 'central')->exists()) {
+        $reuseRelations = $this->canReuseAuthorizationRelations();
+        if ($reuseRelations) {
+            $this->loadMissing(['roles', 'permissions']);
+        }
+        if ($this->getMorphClass() === 'central_user' && ! ($reuseRelations
+            ? $this->roles->contains(fn ($role): bool => $role->guard_name === 'central')
+            : $this->roles()->where('guard_name', 'central')->exists())) {
             return false;
         }
         $permission = $this->filterPermission($permission, $guardName);
         $now = now();
-        if ($this->permissions()->whereKey($permission->getKey())->wherePivot('assigned_at', '<=', $now)->wherePivot('expires_at', '>', $now)->exists()) {
+        $directPermission = $reuseRelations
+            ? $this->permissions->contains(fn ($grant): bool => $grant->getKey() === $permission->getKey()
+                && $grant->pivot->assigned_at <= $now && $grant->pivot->expires_at > $now)
+            : $this->permissions()->whereKey($permission->getKey())->wherePivot('assigned_at', '<=', $now)->wherePivot('expires_at', '>', $now)->exists();
+        if ($directPermission) {
             return true;
         }
-        foreach ($this->roles()->wherePivot('assigned_at', '<=', $now)->get() as $role) {
+        $roles = $reuseRelations
+            ? $this->roles->filter(fn ($role): bool => $role->pivot->assigned_at <= $now)
+            : $this->roles()->wherePivot('assigned_at', '<=', $now)->get();
+        foreach ($roles as $role) {
             if ($role->getAttribute('is_super_admin')) {
                 return true;
             }
