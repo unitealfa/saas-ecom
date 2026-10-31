@@ -8,6 +8,7 @@ use App\Models\Central\Countries\Country;
 use App\Models\Central\Deployments\TenantSchemaDeployment;
 use App\Models\Central\Domains\Domain;
 use App\Models\Central\Features\Feature;
+use App\Models\Central\Geography\GeographicArea;
 use App\Models\Central\Media\Media;
 use App\Models\Central\Permissions\Permission;
 use App\Models\Central\Plans\Plan;
@@ -28,6 +29,7 @@ use App\Models\User;
 use App\Policies\Central\CountryPolicy;
 use App\Policies\Central\DomainPolicy;
 use App\Policies\Central\FeaturePolicy;
+use App\Policies\Central\GeographicAreaPolicy;
 use App\Policies\Central\PermissionPolicy;
 use App\Policies\Central\RolePolicy;
 use App\Policies\Central\TenantPolicy;
@@ -53,6 +55,7 @@ class AppServiceProvider extends ServiceProvider
         Role::class => RolePolicy::class,
         Permission::class => PermissionPolicy::class,
         Country::class => CountryPolicy::class,
+        GeographicArea::class => GeographicAreaPolicy::class,
         Domain::class => DomainPolicy::class,
         Feature::class => FeaturePolicy::class,
         TenantSchemaDeployment::class => TenantSchemaDeploymentPolicy::class,

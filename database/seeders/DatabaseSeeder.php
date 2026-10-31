@@ -2,8 +2,11 @@
 
 namespace Database\Seeders;
 
+use Database\Seeders\Central\AuthorizationSeeder;
 use Database\Seeders\Central\CountrySeeder;
 use Database\Seeders\Central\FreePlanSeeder;
+use Database\Seeders\Central\GeographicAreaSeeder;
+use Database\Seeders\Central\GeographyPermissionSeeder;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -14,6 +17,17 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(CountrySeeder::class);
+        $this->call(GeographicAreaSeeder::class);
         $this->call(FreePlanSeeder::class);
+
+        if (app()->environment(['local', 'testing'])) {
+            $this->call(LocalDevelopmentSeeder::class);
+        }
+
+        $this->call(AuthorizationSeeder::class);
+
+        if (app()->environment(['local', 'testing'])) {
+            $this->call(LocalAuthenticationSeeder::class);
+        }
     }
 }

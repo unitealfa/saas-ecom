@@ -11,6 +11,14 @@ use Spatie\Permission\Models\Permission as PackagePermission;
 
 class CentralRoleCatalog
 {
+    public const array GEOGRAPHY_PERMISSIONS = [
+        'saas.geography.view' => 'Consulter les wilayas et communes',
+        'saas.geography.create' => 'Ajouter une zone géographique',
+        'saas.geography.update' => 'Modifier une zone géographique',
+        'saas.geography.activate' => 'Activer ou désactiver une zone',
+        'saas.geography.archive' => 'Archiver une zone autorisée',
+    ];
+
     public const array FEATURE_PERMISSIONS = [
         'saas.features.view' => 'Consulter les fonctionnalités commerciales',
         'saas.features.create' => 'Créer une fonctionnalité',
@@ -37,6 +45,7 @@ class CentralRoleCatalog
     ];
 
     public const array PERMISSIONS = [
+        ...self::GEOGRAPHY_PERMISSIONS,
         ...self::FEATURE_PERMISSIONS,
         ...self::DEPLOYMENT_PERMISSIONS,
         ...self::DOMAIN_PERMISSIONS,
@@ -88,6 +97,7 @@ class CentralRoleCatalog
     ];
 
     public const array GROUPS = [
+        'Wilayas et communes' => ['saas.geography.view', 'saas.geography.create', 'saas.geography.update', 'saas.geography.activate', 'saas.geography.archive'],
         'Fonctionnalités commerciales' => ['saas.features.view', 'saas.features.create', 'saas.features.update', 'saas.features.activate', 'saas.features.archive'],
         'Déploiements' => ['saas.deployments.view', 'saas.deployments.provision', 'saas.deployments.migrate', 'saas.deployments.retry', 'saas.deployments.errors.view'],
         'Domaines' => ['saas.domains.view', 'saas.domains.create', 'saas.domains.update', 'saas.domains.verify', 'saas.domains.primary.update', 'saas.domains.archive'],
