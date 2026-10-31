@@ -9,6 +9,7 @@ use App\Models\Central\Tenants\Tenant;
 use App\Models\Central\Users\User;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -73,7 +74,7 @@ class GeographicAreaService
     /** @param array<string, mixed> $data */
     private function create(User $actor, array $data): GeographicArea
     {
-        $country = $this->lockCountry(Country::where('uuid', $data['country_uuid']));
+        $country = $this->lockCountry(Country::query()->where('uuid', $data['country_uuid']));
         Gate::forUser($actor)->authorize('create', GeographicArea::class);
 
         $type = GeoZoneTypeEnum::from((int) $data['type']);
@@ -94,9 +95,9 @@ class GeographicAreaService
     /** @param array<string, mixed> $data */
     private function update(User $actor, GeographicArea $area, array $data): GeographicArea
     {
-        $this->lockCountry(Country::whereKey($area->country_id));
+        $this->lockCountry(Country::query()->whereKey($area->country_id));
 
-        $target = GeographicArea::whereKey($area->id)->lockForUpdate()->firstOrFail();
+        $target = GeographicArea::query()->whereKey($area->id)->lockForUpdate()->firstOrFail();
         Gate::forUser($actor)->authorize('update', $target);
         $this->assertCurrent($target, $data['expected_state']);
 
@@ -133,7 +134,7 @@ class GeographicAreaService
     /** Une wilaya n'a pas de parent ; une commune exige une wilaya du même pays. */
     private function parentFor(GeoZoneTypeEnum $type, Country $country, ?string $parentUuid): ?GeographicArea
     {
-        $parent = filled($parentUuid) ? GeographicArea::where('uuid', $parentUuid)->lockForUpdate()->first() : null;
+        $parent = filled($parentUuid) ? GeographicArea::query()->where('uuid', $parentUuid)->lockForUpdate()->first() : null;
 
         $valid = $type === GeoZoneTypeEnum::PROVINCE
             ? ! filled($parentUuid)
@@ -161,8 +162,8 @@ class GeographicAreaService
         $this->assertCentralContext();
 
         DB::transaction(function () use ($actor, $area, $ability, $expectedState, $mutation): void {
-            Country::whereKey($area->country_id)->lockForUpdate()->firstOrFail();
-            $target = GeographicArea::whereKey($area->id)->lockForUpdate()->firstOrFail();
+            Country::query()->whereKey($area->country_id)->lockForUpdate()->firstOrFail();
+            $target = GeographicArea::query()->whereKey($area->id)->lockForUpdate()->firstOrFail();
 
             Gate::forUser($actor)->authorize($ability, $target);
             $this->assertCurrent($target, $expectedState);
@@ -210,7 +211,8 @@ class GeographicAreaService
     /** Parcourt toutes les boutiques préparées : si l'une est illisible, l'archivage est refusé par prudence. */
     private function hasTenantReferences(GeographicArea $area): bool
     {
-        foreach (Tenant::withTrashed()->whereNotNull('provisioned_at')->cursor() as $tenant) {
+        foreach (Tenant::query()->withTrashed()->whereNotNull('provisioned_at')->cursor() as $tenant) {
+            /** @var Tenant $tenant */
             try {
                 tenancy()->initialize($tenant);
                 $referenced = $this->isReferencedInTenant($area);
@@ -234,7 +236,7 @@ class GeographicAreaService
     {
         foreach (self::TENANT_REFERENCES as $table => $columns) {
             $found = DB::connection('tenant')->table($table)
-                ->where(function ($references) use ($columns, $area): void {
+                ->where(function (QueryBuilder $references) use ($columns, $area): void {
                     foreach ($columns as $column) {
                         $references->orWhere($column, $area->uuid);
                     }
