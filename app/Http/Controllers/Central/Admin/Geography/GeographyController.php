@@ -17,16 +17,21 @@ use Illuminate\Support\Facades\Gate;
 
 class GeographyController extends Controller
 {
-    public function __construct(private GeographicAreaService $areas) {}
+    private const int PER_PAGE = 20;
+
+    public function __construct(private readonly GeographicAreaService $areas) {}
 
     public function index(SearchGeographyRequest $request): View
     {
         $filters = $request->validated();
-        $query = GeographicArea::with(['country', 'parent'])->search($filters['search'] ?? null)
-            ->when($filters['country_uuid'] ?? null, fn (Builder $q, $uuid) => $q->whereHas('country', fn (Builder $country) => $country->where('uuid', $uuid)))
-            ->when($filters['parent_uuid'] ?? null, fn (Builder $q, $uuid) => $q->whereHas('parent', fn (Builder $parent) => $parent->where('uuid', $uuid)))
-            ->when($filters['type'] ?? null, fn (Builder $q, $type) => $q->where('type', $type));
-        match ($filters['state'] ?? 'all') {
+
+        $query = GeographicArea::with(['country', 'parent'])
+            ->search($filters['search'] ?? null)
+            ->when($filters['country_uuid'] ?? null, fn (Builder $q, string $uuid) => $q->whereRelation('country', 'uuid', $uuid))
+            ->when($filters['parent_uuid'] ?? null, fn (Builder $q, string $uuid) => $q->whereRelation('parent', 'uuid', $uuid))
+            ->when($filters['type'] ?? null, fn (Builder $q, mixed $type) => $q->where('type', $type));
+
+        $query = match ($filters['state'] ?? 'all') {
             'active' => $query->active(),
             'inactive' => $query->where('is_active', false),
             'archived' => $query->onlyTrashed(),
@@ -34,7 +39,8 @@ class GeographyController extends Controller
         };
 
         return view('central.pages.admin.geography.index', [
-            ...$this->options(), 'areas' => $query->orderBy('code')->paginate(20)->withQueryString(),
+            ...$this->options(),
+            'areas' => $query->orderBy('code')->paginate(self::PER_PAGE)->withQueryString(),
         ]);
     }
 
@@ -48,57 +54,71 @@ class GeographyController extends Controller
     public function show(GeographicArea $area): View
     {
         Gate::forUser($this->centralActor())->authorize('view', $area);
-        $area->load(['country', 'parent']);
 
-        return view('central.pages.admin.geography.show', ['area' => $area, 'communes' => $area->children()->withTrashed()->orderBy('name_fr')->paginate(20)]);
+        return view('central.pages.admin.geography.show', [
+            'area' => $area->load(['country', 'parent']),
+            'communes' => $area->children()->withTrashed()->orderBy('name_fr')->paginate(self::PER_PAGE),
+        ]);
     }
 
     public function edit(GeographicArea $area): View
     {
         Gate::forUser($this->centralActor())->authorize('update', $area);
 
-        return view('central.pages.admin.geography.edit', [...$this->options(), 'area' => $area->load(['country', 'parent'])]);
+        return view('central.pages.admin.geography.edit', [
+            'area' => $area->load(['country', 'parent']),
+        ]);
     }
 
     public function store(StoreGeographicAreaRequest $request): RedirectResponse
     {
         $this->areas->save($this->centralActor(), $request->validated());
 
-        return $this->redirect('Zone créée inactive. Activez-la pour la proposer dans les formulaires.');
+        return $this->redirectWithStatus('Zone créée inactive. Activez-la pour la proposer dans les formulaires.');
     }
 
     public function update(StoreGeographicAreaRequest $request, GeographicArea $area): RedirectResponse
     {
         $this->areas->save($this->centralActor(), $request->validated(), $area);
 
-        return $this->redirect('Zone enregistrée.');
+        return $this->redirectWithStatus('Zone enregistrée.');
     }
 
     public function activate(GeographyActionRequest $request, GeographicArea $area): RedirectResponse
     {
-        $this->areas->setActive($this->centralActor(), $area, $request->boolean('is_active'), $request->validated('expected_state'));
+        $this->areas->setActive(
+            $this->centralActor(),
+            $area,
+            $request->boolean('is_active'),
+            $request->validated('expected_state'),
+        );
 
-        return $this->redirect('Disponibilité enregistrée. Une wilaya inactive masque ses communes dans les sélecteurs.');
+        return $this->redirectWithStatus('Disponibilité enregistrée. Une wilaya inactive masque ses communes dans les sélecteurs.');
     }
 
     public function archive(GeographyActionRequest $request, GeographicArea $area): RedirectResponse
     {
         $this->areas->archive($this->centralActor(), $area, $request->validated('expected_state'));
 
-        return $this->redirect('Zone archivée.');
+        return $this->redirectWithStatus('Zone archivée.');
     }
 
     /** @return array<string, mixed> */
     private function options(): array
     {
-        return ['countries' => Country::orderBy('name_fr')->get(),
-            'provinces' => GeographicArea::where('type', GeoZoneTypeEnum::PROVINCE)->orderBy('code')->get()];
+        return [
+            'countries' => Country::orderBy('name_fr')->get(),
+            'provinces' => GeographicArea::where('type', GeoZoneTypeEnum::PROVINCE)->orderBy('code')->get(),
+        ];
     }
 
-    private function redirect(string $message): RedirectResponse
+    /** Redirige vers la liste si l'acteur peut la voir, sinon vers le tableau de bord. */
+    private function redirectWithStatus(string $message): RedirectResponse
     {
-        $route = Gate::forUser($this->centralActor())->allows('viewAny', GeographicArea::class) ? 'central.geography.index' : 'dashboard';
+        $redirect = Gate::forUser($this->centralActor())->allows('viewAny', GeographicArea::class)
+            ? to_route('central.geography.index')
+            : to_route('dashboard');
 
-        return redirect()->route($route)->with('status', $message);
+        return $redirect->with('status', $message);
     }
 }

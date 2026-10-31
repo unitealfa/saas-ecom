@@ -78,6 +78,17 @@ test('geography administrators can render management screens using UUID binding'
     $this->get(route('central.geography.show', $area->id))->assertNotFound();
 });
 
+test('geography searches treat SQL wildcard characters as literal text', function (): void {
+    $literal = geographyArea(['name_fr' => 'Zone_100%']);
+    geographyArea(['code' => '31', 'name_fr' => 'Zone X 100']);
+
+    foreach (['_', '%'] as $search) {
+        expect(GeographicArea::search($search)->pluck('uuid')->all())->toBe([$literal->uuid]);
+        $this->getJson(route('geography.lookup.index', ['search' => $search]))
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.uuid', $literal->uuid);
+    }
+});
+
 test('manual geography creation starts inactive and rejects duplicate identity', function (): void {
     $this->actingAs(geographyAdmin(), 'central');
     $this->post(route('central.geography.store'), geographyPayload())->assertSessionHasNoErrors()->assertRedirect();
