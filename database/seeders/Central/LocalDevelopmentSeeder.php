@@ -38,6 +38,7 @@ class LocalDevelopmentSeeder extends LocalFixtureSeeder
             $connection->transaction(fn () => $this->references($connection));
         }
 
+        
         foreach ([1, 2] as $number) {
             $owner = User::where('email', "boutique{$number}@example.test")->firstOrFail();
             $key = "local:boutique{$number}:v1";
