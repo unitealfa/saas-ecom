@@ -45,6 +45,11 @@
                             {{ __('Pays') }}
                         </flux:sidebar.item>
                     @endcan
+                    @can('viewAny', \App\Models\Central\Geography\GeographicArea::class)
+                        <flux:sidebar.item :href="route('central.geography.index')" :current="request()->routeIs('central.geography.*')" wire:navigate>
+                            {{ __('Wilayas et communes') }}
+                        </flux:sidebar.item>
+                    @endcan
                     @can('viewAny', \App\Models\Central\Domains\Domain::class)
                         <flux:sidebar.item :href="route('central.domains.index')" :current="request()->routeIs('central.domains.*')" wire:navigate>
                             {{ __('Domaines') }}

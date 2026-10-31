@@ -1,5 +1,3 @@
-gxshdcjkgblhnmj,mk;
-
 ## Démarrage local — Windows / PowerShell
 
 ### 1. Installer les outils

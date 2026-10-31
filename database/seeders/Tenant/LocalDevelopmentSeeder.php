@@ -56,8 +56,8 @@ class LocalDevelopmentSeeder extends LocalFixtureSeeder
         }
 
         $central = DB::connection(config('tenancy.database.central_connection'));
-        $this->province = $central->table('geographic_areas')->where('type', 1)->where('code', '16')->first() ?? throw new LogicException('Missing central province.');
-        $this->municipality = $central->table('geographic_areas')->where('parent_id', $this->province->id)->where('code', '1601')->first() ?? throw new LogicException('Missing central municipality.');
+        $this->province = $central->table('geographic_areas')->where('type', 1)->where('code', self::PROVINCE_CODE)->whereNull('deleted_at')->first() ?? throw new LogicException('Missing central province.');
+        $this->municipality = $central->table('geographic_areas')->where('parent_id', $this->province->id)->where('code', self::MUNICIPALITY_CODE)->whereNull('deleted_at')->first() ?? throw new LogicException('Missing central municipality.');
         $this->pickup = $central->table('pickup_points')->where('external_code', 'LOCAL-ALGER-01')->first() ?? throw new LogicException('Missing central pickup point.');
         $carrierUuid = (string) $central->table('shipping_carriers')->where('code', 'local-fixture')->value('uuid');
         $owner = $tenant->owner;

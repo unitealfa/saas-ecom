@@ -242,7 +242,6 @@ Les tables typed subscriptions, saas_billing_settings, saas_invoices et saas_tra
 | C-072 | 08 | M09 Plans et offres | Créer un nouveau plan — `saas.plans.create` | F-013, C-001, C-067 | Non attribué | [ ] | À faire | Non implémentée | Version d'offre immuable après utilisation ; quotas typés cohérents ; pas de suppression d'historique ni d'override utilisateur ; cache public invalidé. À compléter : interface/Policy/service de ce module non raccordés de bout en bout. | I M09 ; S C4 ; DC C4 ; app/Models/Central/Plans/Plan.php ; app/Services/Central/Plans/FreePlanCatalog.php |
 | C-096 | 08 | M13 Wilayas et communes | Ajouter une zone géographique — `saas.geography.create` | F-013, C-001, C-091 | Non attribué | [ ] | À faire | Non implémentée | Pays→wilaya→commune cohérents ; unicité de code dans sa portée ; import contrôlé sans écraser un historique ; cache et invalidation. | I M13 ; S C5 ; DC C5 ; database/migrations/central |
 | C-097 | 08 | M13 Wilayas et communes | Modifier une zone géographique — `saas.geography.update` | F-013, C-001, C-091 | Non attribué | [ ] | À faire | Non implémentée | Pays→wilaya→commune cohérents ; unicité de code dans sa portée ; import contrôlé sans écraser un historique ; cache et invalidation. | I M13 ; S C5 ; DC C5 ; database/migrations/central |
-| C-098 | 08 | M13 Wilayas et communes | Importer des wilayas et communes — `saas.geography.import` | F-013, C-001, C-091 | Non attribué | [ ] | À faire | Non implémentée | Pays→wilaya→commune cohérents ; unicité de code dans sa portée ; import contrôlé sans écraser un historique ; cache et invalidation. | I M13 ; S C5 ; DC C5 ; database/migrations/central |
 | C-124 | 08 | M18 Règles et numérotation SaaS | Activer ou désactiver une règle — `saas.billing-rules.activate` | F-013, C-001, C-016, C-122 | Non attribué | [ ] | À faire | Non implémentée | Règles/compteurs typés dans saas_billing_settings ; snapshot/version historique ; compteur réservé sous verrou, jamais éditable librement. | I M18 ; S C8.1 ; DC C8.1 ; database/migrations/central |
 | C-125 | 08 | M18 Règles et numérotation SaaS | Créer une nouvelle version de règle — `saas.billing-rules.versions.create` | F-013, C-001, C-015, C-122 | Non attribué | [ ] | À faire | Non implémentée | Règles/compteurs typés dans saas_billing_settings ; snapshot/version historique ; compteur réservé sous verrou, jamais éditable librement. | I M18 ; S C8.1 ; DC C8.1 ; database/migrations/central |
 | C-149 | 08 | M25 Dashboard administratif | Consulter le tableau de bord général — `saas.dashboard.view` | F-013, C-001, C-017, C-047, C-078 | Non attribué | [ ] | À faire | Non implémentée | Indicateurs définis avec dates/source, agrégats centraux ; droit financier distinct ; pas de requêtes sur les commandes privées Tenant ; aucune table dashboard ajoutée. À compléter : interface/Policy/service de ce module non raccordés de bout en bout. | I M25 ; S C5 ; DC C5 ; app/Services/Central/Dashboard/Dashboard.php |
@@ -274,7 +273,7 @@ Les tables typed subscriptions, saas_billing_settings, saas_invoices et saas_tra
 | C-079 | 11 | M10 Abonnements | Attribuer un abonnement à un utilisateur — `saas.subscriptions.assign` | F-013, C-001, C-076, C-075, C-018 | Non attribué | [ ] | À faire | Non implémentée | Lignes abonnement type 1/échéance type 2 ; historique et périodes sans chevauchement interdit ; offre payante attribuée explicitement par droit, pas par paiement. À compléter : interface/Policy/service de ce module non raccordés de bout en bout. Scope propriétaire/boutique et rattachement au même propriétaire ; dates/prix/renouvellement à effet prévu, pas d'écrasement historique. | I M10 ; S C4 ; DC C4 ; app/Models/Central/Subscriptions/Subscription.php ; app/Services/Central/Subscriptions/DefaultSubscription.php |
 | C-080 | 11 | M10 Abonnements | Changer le plan d'un abonnement — `saas.subscriptions.change` | F-013, C-001, C-076, C-075, C-018 | Non attribué | [ ] | À faire | Non implémentée | Lignes abonnement type 1/échéance type 2 ; historique et périodes sans chevauchement interdit ; offre payante attribuée explicitement par droit, pas par paiement. À compléter : interface/Policy/service de ce module non raccordés de bout en bout. Scope propriétaire/boutique et rattachement au même propriétaire ; dates/prix/renouvellement à effet prévu, pas d'écrasement historique. | I M10 ; S C4 ; DC C4 ; app/Models/Central/Subscriptions/Subscription.php ; app/Services/Central/Subscriptions/DefaultSubscription.php |
 | C-154 | 11 | Parcours central | Raccorder les offres commercialisées au parcours propriétaire | C-014, C-076 | Non attribué | [ ] | À faire | Non implémentée | La présentation reflète versions et prix actifs ; choix ne valide pas un paiement ni ne contourne une attribution administrative. | S C4 ; architecture §36 |
-| C-171 | 11 | Recette Central | Recette intégrée — Référentiels et fichiers | C-090, C-091, C-092, C-093, C-094, C-095, C-096, C-097, C-098, C-099, C-100, C-101, C-102, C-103, C-104, C-105, C-106, C-107, C-108, C-109, C-110, C-111, C-112, C-113, C-114, C-115, C-116, C-117, C-118, C-119, C-120, C-163 | Non attribué | [ ] | À faire | À vérifier | Scénarios §15 exécutés sur périmètre autorisé, succès/refus/conflit/rollback vérifiés ; ne pas confondre lecture statique et preuve d'exécution. | S §§6–7,13 ; I modules concernés ; tests/Central |
+| C-171 | 11 | Recette Central | Recette intégrée — Référentiels et fichiers | C-090, C-091, C-092, C-093, C-094, C-095, C-096, C-097, C-099, C-100, C-101, C-102, C-103, C-104, C-105, C-106, C-107, C-108, C-109, C-110, C-111, C-112, C-113, C-114, C-115, C-116, C-117, C-118, C-119, C-120, C-163 | Non attribué | [ ] | À faire | À vérifier | Scénarios §15 exécutés sur périmètre autorisé, succès/refus/conflit/rollback vérifiés ; ne pas confondre lecture statique et preuve d'exécution. | S §§6–7,13 ; I modules concernés ; tests/Central |
 | C-056 | 12 | M06 Domaines | Ajouter un domaine à une boutique — `saas.domains.create` | F-013, C-001, C-012 | Non attribué | [ ] | À faire | Implémentée | Hôte normalisé/unique même archivé ; expected_state, preuves séparées, appels externes bornés hors verrou ; aucun certificat généré par ce module. | I M06 ; S C1 ; DC C1 ; app/Services/Central/Domains/DomainService.php ; app/Services/Central/Domains/DomainVerificationService.php ; routes/central/admin/domains.php |
 | C-057 | 12 | M06 Domaines | Modifier les informations d'un domaine — `saas.domains.update` | F-013, C-001, C-012 | Non attribué | [ ] | À faire | Implémentée | Hôte normalisé/unique même archivé ; expected_state, preuves séparées, appels externes bornés hors verrou ; aucun certificat généré par ce module. | I M06 ; S C1 ; DC C1 ; app/Services/Central/Domains/DomainService.php ; app/Services/Central/Domains/DomainVerificationService.php ; routes/central/admin/domains.php |
 | C-058 | 12 | M06 Domaines | Lancer la vérification d'un domaine — `saas.domains.verify` | F-013, C-001, C-012 | Non attribué | [ ] | À faire | Implémentée | Hôte normalisé/unique même archivé ; expected_state, preuves séparées, appels externes bornés hors verrou ; aucun certificat généré par ce module. | I M06 ; S C1 ; DC C1 ; app/Services/Central/Domains/DomainService.php ; app/Services/Central/Domains/DomainVerificationService.php ; routes/central/admin/domains.php |
@@ -941,7 +940,7 @@ flowchart TD
 ```
 
 
-### Central — bloc 8 : C-002 à C-098
+### Central — bloc 8 : C-002 à C-097
 
 ```mermaid
 flowchart TD
@@ -971,7 +970,6 @@ flowchart TD
     C-072["C-072 · V08 · Créer un nouveau plan"]
     C-096["C-096 · V08 · Ajouter une zone géographique"]
     C-097["C-097 · V08 · Modifier une zone géographique"]
-    C-098["C-098 · V08 · Importer des wilayas et communes"]
   end
   C-001 --> C-002
   C-003 --> C-002
@@ -1004,9 +1002,6 @@ flowchart TD
   F-013 --> C-097
   C-001 --> C-097
   C-091 --> C-097
-  F-013 --> C-098
-  C-001 --> C-098
-  C-091 --> C-098
 ```
 
 
@@ -1472,7 +1467,6 @@ flowchart TD
     C-095["C-095 · Consulter les wilayas et communes"]
     C-096["C-096 · Ajouter une zone géographique"]
     C-097["C-097 · Modifier une zone géographique"]
-    C-098["C-098 · Importer des wilayas et communes"]
     C-099["C-099 · Activer ou désactiver une zone"]
     C-100["C-100 · Archiver une zone autorisée"]
     C-101["C-101 · Consulter les transporteurs"]
@@ -1508,7 +1502,6 @@ flowchart TD
   C-095 --> C-171
   C-096 --> C-171
   C-097 --> C-171
-  C-098 --> C-171
   C-099 --> C-171
   C-100 --> C-171
   C-101 --> C-171
@@ -2674,7 +2667,7 @@ Chaque code de permission ci-dessous renvoie à la ligne du §6 qui le nomme exp
 
 | M12 Pays | C1 | C-090, C-091, C-092, C-093, C-094 | 5 | Critères du groupe au §15 ; pas de nouvelle capacité technique. |
 
-| M13 Wilayas et communes | C5 | C-095, C-096, C-097, C-098, C-099, C-100 | 6 | Critères du groupe au §15 ; pas de nouvelle capacité technique. |
+| M13 Wilayas et communes | C5 | C-095, C-096, C-097, C-099, C-100 | 5 | Critères du groupe au §15 ; pas de nouvelle capacité technique. |
 
 | M14 Transporteurs communs | C10 | C-101, C-102, C-103, C-104, C-105 | 5 | Critères du groupe au §15 ; pas de nouvelle capacité technique. |
 
@@ -2740,7 +2733,7 @@ DC est contrôlé avec les sections C correspondantes de S. La couverture concer
 
 | `feature_usage` | C5 | C-087, C-088, C-089, C-156 | Règles et relations conservées selon la source. |
 
-| `geographic_areas` | C5 | C-095, C-096, C-097, C-098, C-099, C-100 | Règles et relations conservées selon la source. |
+| `geographic_areas` | C5 | C-095, C-096, C-097, C-099, C-100 | Règles et relations conservées selon la source. |
 
 | `activity_log` | C6 | C-026, C-053, C-086, C-089, C-147, C-148, F-006 | Règles et relations conservées selon la source. |
 

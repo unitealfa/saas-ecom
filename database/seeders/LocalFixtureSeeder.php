@@ -10,6 +10,10 @@ use LogicException;
 
 abstract class LocalFixtureSeeder extends Seeder
 {
+    protected const string PROVINCE_CODE = '16';
+
+    protected const string MUNICIPALITY_CODE = 'dz-16001';
+
     protected function assertLocalEnvironment(): void
     {
         if (! app()->environment(['local', 'testing'])) {

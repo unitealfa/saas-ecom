@@ -4,6 +4,7 @@ namespace App\Models\Central\Countries;
 
 use App\Concerns\HasPublicUuid;
 use App\Services\Central\Countries\CountryCatalog;
+use App\Services\Central\Geography\GeographyCatalog;
 use App\Services\Central\Users\PhoneNumberNormalizer;
 use Database\Factories\Central\CountryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -28,6 +29,9 @@ class Country extends Model
         $invalidate = static function (self $country): void {
             $country->getConnection()->afterCommit(
                 static fn () => app(CountryCatalog::class)->invalidate()
+            );
+            $country->getConnection()->afterCommit(
+                static fn () => app(GeographyCatalog::class)->invalidate()
             );
         };
 

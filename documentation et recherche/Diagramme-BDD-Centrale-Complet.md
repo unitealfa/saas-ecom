@@ -325,7 +325,7 @@ geographic_areas {
   varchar name_ar "?"
   boolean is_active
   varchar reference_source
-  date effective_at
+  date effective_at "nullable ; ? ; date inconnue autorisée"
   varchar reference_version
   timestamp created_at "?"
   timestamp updated_at "?"
@@ -1013,13 +1013,13 @@ Les wilayas et communes dans une seule table. Chaque commune est reliée à sa w
 | `type` | Indique si la ligne représente une wilaya ou une commune. Choix : 1 = wilaya ; 2 = commune. |
 | `parent_type` | Vaut automatiquement 1 pour une commune, pour imposer un parent de type wilaya. |
 | `parent_key` | Une valeur calculée pour classer les codes : le numéro de la wilaya pour une commune, ou 0 pour une wilaya. Elle aide à éviter les doublons. |
-| `code` | Le code officiel de cette wilaya ou commune. |
+| `code` | Pour une wilaya : code du JSON. Pour une commune : dz-{post_code} selon la décision du 31 octobre 2026 ; référence applicative issue du champ postal, pas certification d'un code administratif officiel. |
 | `name_fr` | Le nom affiché en français. |
 | `name_ar` | Le nom affiché en arabe. |
 | `is_active` | Indique si cette zone peut être choisie pour une nouvelle adresse. |
-| `reference_source` | Le document ou la source officielle d’où viennent les informations géographiques. |
+| `reference_source` | La source déclarée ou technique des informations géographiques ; aucune certification officielle implicite. |
 | `effective_at` | La date à partir de laquelle cette version du référentiel géographique s’applique. |
-| `reference_version` | La version du référentiel officiel utilisée pour cette zone. |
+| `reference_version` | La version déclarée ou l'empreinte SHA256 des fichiers utilisés pour cette zone. |
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 | `deleted_at` | La date où cette ligne a été retirée de l’utilisation courante tout en restant conservée dans la base. |
