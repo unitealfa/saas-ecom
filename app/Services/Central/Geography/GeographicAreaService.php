@@ -212,11 +212,14 @@ class GeographicAreaService
     {
         foreach (Tenant::withTrashed()->whereNotNull('provisioned_at')->cursor() as $tenant) {
             try {
-                $referenced = $tenant->run(fn (): bool => $this->isReferencedInTenant($area));
+                tenancy()->initialize($tenant);
+                $referenced = $this->isReferencedInTenant($area);
             } catch (Throwable $exception) {
                 report($exception);
 
                 $this->fail('area', 'Les références des boutiques ne peuvent pas être vérifiées actuellement. Archivage refusé.');
+            } finally {
+                tenancy()->end();
             }
 
             if ($referenced) {

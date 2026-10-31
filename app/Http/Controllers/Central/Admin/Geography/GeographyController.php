@@ -66,7 +66,6 @@ class GeographyController extends Controller
         Gate::forUser($this->centralActor())->authorize('update', $area);
 
         return view('central.pages.admin.geography.edit', [
-            ...$this->options(),
             'area' => $area->load(['country', 'parent']),
         ]);
     }

@@ -79,7 +79,7 @@ test('failed tenant reference checks restore central context and roll back archi
 
     try {
         $tenant = Tenant::factory()->create();
-        $tenant->run(fn () => Schema::connection('tenant')->drop('free_shipping_rules'));
+        $tenant->run(fn () => Schema::connection('tenant')->rename('free_shipping_rules', 'unavailable_free_shipping_rules'));
 
         expect(fn () => app(GeographicAreaService::class)->archive($admin, $area, $area->stateToken()))
             ->toThrow(ValidationException::class);
@@ -101,12 +101,15 @@ test('geography cache bypasses uncommitted changes and invalidates committed act
     $catalog = app(GeographyCatalog::class);
     expect($catalog->find($area->uuid)['name_fr'])->toBe('Alger');
     expect($catalog->listing([])['meta']['total'])->toBe(1);
+    $filters = ['type' => 1, 'search' => 'Alger'];
+    expect($catalog->listing($filters)['meta']['total'])->toBe(1);
     $connection = $area->getConnection();
     $connection->enableQueryLog();
     $connection->flushQueryLog();
     try {
         $catalog->find($area->uuid);
         $catalog->listing([]);
+        $catalog->listing(array_reverse($filters, true));
         expect($connection->getQueryLog())->toBe([]);
     } finally {
         $connection->disableQueryLog();

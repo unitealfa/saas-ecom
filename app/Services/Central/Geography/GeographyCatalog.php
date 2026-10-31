@@ -107,7 +107,7 @@ class GeographyCatalog
 
         return $this->cache->build([
             'driver' => 'file',
-            'path' => storage_path('framework/cache/central-geography/'.$identity),
+            'path' => base_path('storage/framework/cache/central-geography/'.$identity),
         ]);
     }
 

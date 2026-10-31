@@ -293,7 +293,7 @@ class GeographyImportService
             'country_id' => $country->id,
             'type' => $type,
             'parent_id' => $parent?->id,
-            'is_active' => $parent?->is_active ?? true,
+            'is_active' => $parent->is_active ?? true,
         ])->save();
 
         return $area;
@@ -321,10 +321,10 @@ class GeographyImportService
      */
     private function rows(array $data): array
     {
-        return [
+        return array_values([
             ...array_map(fn (array $row): array => [GeoZoneTypeEnum::PROVINCE, $row], $data['wilayas']),
             ...array_map(fn (array $row): array => [GeoZoneTypeEnum::MUNICIPALITY, $row], $data['communes']),
-        ];
+        ]);
     }
 
     private function key(GeoZoneTypeEnum $type, ?int $parentId, string $code): string
