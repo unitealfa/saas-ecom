@@ -1061,6 +1061,8 @@ Ne pas modifier la configuration globale pour installer ces règles. Vérifier l
 
 # 22. Conventions techniques et commandes utiles
 
+Peuplement par défaut (31 octobre 2026) : php artisan db:seed appelle CountrySeeder puis FreePlanSeeder. En local/testing, LocalDevelopmentSeeder crée ensuite le jeu fonctionnel central et appelle lui-même le seeder Tenant pour chaque boutique ; il exige une base centrale sans comptes/boutiques ou son marqueur de fixtures existant. AuthorizationSeeder prépare ensuite tous les rôles et permissions du catalogue, incluant Domaines, Déploiements et Fonctionnalités, sans appels redondants aux seeders spécifiques de ces modules. LocalAuthenticationSeeder ajoute enfin les comptes de démonstration en local/testing uniquement. En production et dans les autres environnements, seuls les pays, l'offre gratuite et les autorisations sont peuplés. Préserver les protections des fixtures, les dossiers Central/Tenant et les données existantes : aucune réinitialisation automatique pour contourner une base non compatible.
+
 Ce chapitre consolide les consignes compatibles de l'ancien AGENTS.md ; les préférences récentes de l'utilisateur remplacent les lancements systématiques de contrôles. Les exemples de commandes ci-dessous ne constituent pas une demande de les exécuter à chaque tâche.
 
 ## 22.1 Structure et code
