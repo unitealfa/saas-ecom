@@ -15,4 +15,5 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
         require __DIR__.'/admin/roles.php';
         require __DIR__.'/admin/permissions.php';
         require __DIR__.'/admin/countries.php';
+        require __DIR__.'/admin/geography.php';
     });

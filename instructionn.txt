@@ -441,24 +441,23 @@ Permission	Fonctionnalité
 saas.geography.view	Consulter les wilayas et communes
 saas.geography.create	Ajouter une zone géographique
 saas.geography.update	Modifier une zone géographique
-saas.geography.import	Importer des wilayas et communes
 saas.geography.activate	Activer ou désactiver une zone
 saas.geography.archive	Archiver une zone autorisée
 Fichiers :
-app/Models/Central/GeographicArea.php
+app/Models/Central/Geography/GeographicArea.php
 
-app/Http/Controllers/Central/Admin/
-    GeographicAreaController.php
+app/Http/Controllers/Central/Admin/Geography/
+    GeographyController.php
 
 app/Services/Central/Geography/
     GeographicAreaService.php
-    GeographicImportService.php
+    GeographyCatalog.php
+    GeographyImportService.php (chargement des JSON par le seeder uniquement)
 
-resources/views/central/pages/admin/geography/areas/
+resources/views/central/pages/admin/geography/
     index.blade.php
     create.blade.php
     edit.blade.php
-    import.blade.php
 
 
 Module 14 — Gestion des transporteurs communs

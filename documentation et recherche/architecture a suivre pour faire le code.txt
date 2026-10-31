@@ -2349,3 +2349,84 @@ MySQL/MariaDB : config/database.php partage les options du CA lisible et ATTR_SS
 Tests : .env.testing est privé et ignoré. L’authentification MySQL locale y reste propre à chaque poste ; APP_ENV=testing, MYSQL_SSL_REQUIRED=false, MYSQL_ATTR_SSL_CA vide, DB_URL vide, cache/session/mail=array et queue=sync pour les tests locaux concernés. Tests/TestCase refuse tout hôte autre que loopback et toute DB_URL avant ses créations isolées. Les bases de test portent toujours leur préfixe aléatoire et conservent les protections de nettoyage. Aucun test d’écriture sur Aiven. Les tests de comptage HTTP sont dans tests/Central/Integration/DashboardQueryCountTest.php, hors transaction RefreshDatabase : une transaction est précisément un cas où la lecture partagée doit rester désactivée.
 
 Sessions/cache du site : paramètres existants conservés. Recommandation de développement à décider séparément : MySQL local et éventuellement session/cache fichier sur un poste unique. Distant/multi-instance : stores partagés et verrous compatibles avec withoutOverlapping/onOneServer ; ne pas basculer automatiquement vers fichier ni ajouter Redis sans bénéfice mesuré et décision adaptée. Un changement de session peut imposer une reconnexion.
+## 49. Module 13 — Wilayas et communes (31 octobre 2026)
+
+Décision : référentiel applicatif central dans geographic_areas, sans package géographique externe ni table dans les boutiques. La source courante est database/data/geography/dz/Wilaya_Of_Algeria.json (69 lignes) et Commune_Of_Algeria.json (1541 lignes), fournie en remplacement des deux anciens JSON. Ces quantités sont des résultats de validation de ce jeu, pas des limites SQL. Aucune colonne de coordonnées ou de code postal supplémentaire n'est créée.
+
+Mapping courant validé : code wilaya = code numérique du JSON converti en chaîne, type PROVINCE=1 et parent_id=NULL. Code commune = dz-{post_code}, sans ID source ni mot « source » ; les chiffres du fichier sont conservés, sans ajout arbitraire de zéro. Le champ ar_name alimente name_ar. Les ID et wilaya_id du JSON servent uniquement à résoudre le parent via le code de la wilaya puis son vrai ID MySQL. HasPublicUuid génère les UUID publics ; aucun ID JSON n'est injecté comme PK MySQL. Les coordonnées ne sont pas utilisées. Le code basé sur post_code reste une convention applicative demandée, sans certification de code administratif officiel. L'identité des lignes existantes reste protégée dans les opérations ordinaires.
+
+Décision complémentaire du propriétaire : provenance et date d'effet facultatives dans l'interface. source/version restent renseignées techniquement par local-json:database/data/geography/dz et SHA256 des deux fichiers pour le seeder ; manual pour une création manuelle sans métadonnées. Aucun téléversement de référentiel par l'administration. Aucune origine officielle ou date n'est inventée. La migration additive 2026_10_31_101808_allow_unknown_geographic_effective_date rend uniquement effective_at nullable ; son rollback refuse de rétablir NOT NULL s'il reste des dates inconnues. Elle a été appliquée à la base centrale locale lors de la reprise décrite ci-dessous. Les fichiers JSON seuls ne permettent pas d'établir leur licence amont : aucune certification de licence ajoutée.
+
+DatabaseSeeder : CountrySeeder, GeographicAreaSeeder, FreePlanSeeder, GeographyPermissionSeeder. Les jeux fictifs et boutiques locales conservent leurs seeders spécifiques, pas de création implicite de boutique par ce module. Le seeder des permissions ajoute uniquement les cinq codes saas.geography.view/create/update/activate/archive absents ; aucun droit attribué à un compte, aucun rôle root modifié. CentralRoleCatalog conserve ces cinq actions dans le groupe Wilayas et communes. La permission de téléversement administratif est retirée par migration additive ; celle-ci refuse de supprimer silencieusement des attributions éventuelles.
+
+GeographyImportService sert uniquement au chargement par GeographicAreaSeeder : validation des JSON avant écriture, verrou du pays, transaction centrale et audit système. Deux exécutions identiques préservent PK/UUID, désactivation et archivage. Une divergence sur une identité existante (nom, code, source/version ou parent) refuse tout le seeding, sans écrasement ni suppression. Les homonymes de codes différents sont autorisés ; l'unicité du code de commune est limitée à sa wilaya, comme en SQL. post_code est obligatoire, chaîne de 4 ou 5 chiffres ; son absence ne déclenche aucun repli sur l'ID. Le chargement refuse le contexte Tenant. Décision ultérieure du 31 octobre 2026 : import administratif entièrement retiré, sans page, bouton, route, aperçu, confirmation, jeton ou autorisation d'import. Aucune perte des zones existantes ; le seeding local reste disponible.
+
+Les créations manuelles sont inactives. Une désactivation de wilaya ne modifie pas le booléen de ses communes, mais les retire effectivement de toute nouvelle sélection ; réactivation d'une commune exige pays/wilaya actifs. country/type/parent/code/ID/UUID non modifiables ; expected_state est vérifié sous verrou pour les éditions et actions. L'archivage est logique, sans cascade : il refuse tout enfant, mapping ou point de retrait, y compris historique. Il consulte aussi les UUID dans shop_addresses, order_revisions, shipping_rates et free_shipping_rules des boutiques préparées ; indisponibilité d'une base ou table attendue = refus d'archivage, sans fuite d'exception brute. Toute nouvelle table tenant portant une référence géographique devra étendre ce contrôle.
+
+Administration : routes central.geography.index/create/store/show/edit/update/activate/archive sous les middlewares centraux existants, sans throttle administratif. Chaque lecture/action est contrôlée par Policy/FormRequest et chaque mutation par le service. Affichage Blade/Flux existant, UUID publics, détail des zones archivées et pagination, filtres nom/code/type/pays/parent/état. Aucun tableau de bord tenant activé.
+
+Lecture publique : GET /reference/geography, noms geography.lookup.index et geography.lookup.show pour /reference/geography/{uuid}, sur les domaines centraux. Filtres type=1|2, parent_uuid, search et page ; 30 résultats par page. Seuls pays DZ, zones actives non archivées et parents actifs sont sélectionnables ; réponses limitées à uuid,type,code,name_fr,name_ar,parent_uuid, et pagination. Le service GeographyCatalog peut être réutilisé depuis Tenant : modèles et cache restent centraux. belongsTo vérifie la relation commune/wilaya directement en BDD, sans cache de validation.
+
+Cache du §36 appliqué : cache fichier central séparé par hôte/port/base, tableaux de présentation, TTL 12 h et namespace versionné invalidé après commit des zones ou pays. Dans une transaction : lecture BDD directe. Aucune mise en cache des décisions de permission, d'unicité ou d'archivage. Tests hors transaction : après amorçage de find/list, 0 requête SQL observée pour leur répétition ; rollback et invalidation après commit vérifiés. Aucun gain HTTP global chiffré revendiqué.
+
+Contrôles initiaux : 31 scénarios distincts réussis sur séries ciblées (validation sans SQL, seeder JSON complet, HTTP et intégration tenant/cache), bases MySQL locales temporaires uniquement. Les 21 erreurs PHPStan préexistantes sont encore présentes et aucune erreur nouvelle du module n'apparaît ; analyse ciblée module à 0 erreur. Pint, compilation Blade, route:cache et diff check réalisés. La résolution autorisée des deux anciennes zones est décrite ci-dessous.
+
+Commandes PowerShell après vérification de la connexion centrale configurée :
+~~~powershell
+$aydraPhp = 'C:\Users\habou\.config\herd\bin\php85\php.exe'
+& $aydraPhp artisan migrate --path=database/migrations/central --no-interaction
+& $aydraPhp artisan db:seed
+# Import géographique seul si les pays existent déjà :
+& $aydraPhp artisan db:seed --class='Database\Seeders\Central\GeographicAreaSeeder'
+~~~
+
+Pour les tests isolés, .env.testing doit viser MySQL loopback et aucun DB_URL. Le TestCase refuse les hôtes distants ; il crée/supprime uniquement ses bases à préfixe aléatoire. Isoler APP_CONFIG_CACHE et APP_ROUTES_CACHE dans le processus si un cache du site est actif. Commandes des contrôles ciblés :
+~~~powershell
+& $aydraPhp vendor/bin/pest tests/Central/Unit/GeographyImportValidationTest.php --compact
+& $aydraPhp vendor/bin/pest tests/Central/Feature/Admin/Geography --compact
+& $aydraPhp vendor/bin/pest tests/Central/Integration/GeographyIsolationTest.php --compact
+~~~
+
+Application autorisée du 31 octobre 2026 : sauvegarde privée des deux zones historiques et de leurs mappings/points de retrait, puis seule migration de nullabilité appliquée dans la base centrale locale aydra. Remplacement ponctuel des valeurs des lignes 1 et 2 par Alger (16) et Alger Centre (dz-source-556) issus des JSON, en conservant ID, UUID, parent, pays et liens. Le changement exceptionnel de code 1601 vers dz-source-556 est une correction de données explicitement approuvée, pas une nouvelle possibilité d'édition de l'identité du modèle. Import atomique : 1608 créations, 2 lignes conservées ; total 69 wilayas et 1541 communes, aucune source géographique local-fixture. Vérification suivante : 0 création, 1610 lignes ignorées, aucun conflit ; mappings et points de retrait inchangés. Aucun compte, abonnement ou boutique modifié.
+
+Convention des seeders : DatabaseSeeder importe le référentiel JSON. Central/LocalDevelopmentSeeder appelle le même GeographicAreaSeeder et recherche les zones existantes ; il n'insère plus de géographie fictive. Tenant/LocalDevelopmentSeeder reprend leurs UUID centraux, sans table géographique locale. Les codes de référence communs sont définis dans LocalFixtureSeeder ; les codes externes des transporteurs d'essai restent distincts du code de la zone centrale. Test LocalGeographyFixturesTest : seeding normal, seeding d'essai complet de deux boutiques puis réexécution, 1 scénario réussi et 15 assertions sur MySQL local temporaire.
+
+Inventaire des fichiers du Module 13 créés ou modifiés (les JSON et modifications README/composer.lock préexistants sont conservés) :
+- app/Enums/Central/Geography/GeoZoneTypeEnum.php
+- app/Http/Controllers/Central/Admin/Geography/GeographyController.php
+- app/Http/Controllers/Central/Geography/GeographyLookupController.php
+- app/Http/Requests/Central/Geography/GeographyActionRequest.php
+- app/Http/Requests/Central/Geography/SearchGeographyRequest.php
+- app/Http/Requests/Central/Geography/StoreGeographicAreaRequest.php
+- app/Models/Central/Countries/Country.php
+- app/Models/Central/Geography/GeographicArea.php
+- app/Policies/Central/GeographicAreaPolicy.php
+- app/Providers/AppServiceProvider.php
+- app/Services/Central/Geography/GeographicAreaService.php
+- app/Services/Central/Geography/GeographyCatalog.php
+- app/Services/Central/Geography/GeographyImportService.php
+- app/Services/Central/Roles/CentralRoleCatalog.php
+- config/geography.php
+- database/migrations/central/2026_10_31_101808_allow_unknown_geographic_effective_date.php
+- database/migrations/central/2026_10_31_174124_remove_obsolete_geography_import_permission.php
+- database/seeders/Central/GeographicAreaSeeder.php
+- database/seeders/Central/GeographyPermissionSeeder.php
+- database/seeders/DatabaseSeeder.php
+- documentation et recherche/architecture a suivre pour faire le code.txt
+- documentation et recherche/Diagramme-BDD-Centrale-Complet.md
+- documentation et recherche/Schema-BDD-SaaS-Ecommerce-UUID.md
+- documentation et recherche/Suivi-Developpement-Aydra.md
+- resources/views/central/layouts/app/sidebar.blade.php
+- resources/views/central/pages/admin/geography/create.blade.php
+- resources/views/central/pages/admin/geography/edit.blade.php
+- resources/views/central/pages/admin/geography/form.blade.php
+- resources/views/central/pages/admin/geography/index.blade.php
+- resources/views/central/pages/admin/geography/show.blade.php
+- routes/central.php
+- routes/central/admin.php
+- routes/central/admin/geography.php
+- routes/central/geography.php
+- tests/Central/Feature/Admin/Geography/GeographicAreaSeederTest.php
+- tests/Central/Feature/Admin/Geography/GeographyManagementTest.php
+- tests/Central/Integration/GeographyIsolationTest.php
+- tests/Central/Unit/GeographyImportValidationTest.php

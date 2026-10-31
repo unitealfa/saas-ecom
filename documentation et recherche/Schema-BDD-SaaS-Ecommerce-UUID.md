@@ -881,7 +881,7 @@ erDiagram
         varchar name_ar "nullable"
         boolean is_active
         varchar reference_source
-        date effective_at
+        date effective_at "nullable ; ? ; date inconnue autorisée"
         varchar reference_version
         timestamp created_at "nullable"
         timestamp updated_at "nullable"
@@ -893,9 +893,11 @@ erDiagram
 
 **Contraintes :** UNIQUE(id,country_id,type), UNIQUE(country_id,type,parent_key,code). parent_type=CASE WHEN type=2 THEN 1 ELSE NULL END, et parent_key=COALESCE(parent_id,0), deux colonnes GENERATED STORED. Pour une wilaya, parent_id=NULL ; pour une commune, parent_id et parent_type non NULL. FK(parent_id,country_id,parent_type) → geographic_areas(id,country_id,type) : une commune appartient obligatoirement à une wilaya du même pays, jamais à une autre commune. type/country_id/parent_id et identités géographiques utilisées sont immuables ; un changement administratif produit une évolution explicite et conserve les références historiques. Le contrôle de forme exige exactement ces valeurs NULL/non NULL et refuse l’auto-rattachement ; les parents d’un autre type rendent un cycle impossible.
 
-**Même sélection d’adresses :** liste des wilayas WHERE country_id=DZ et type=1 ; communes WHERE type=2 et parent_id=wilaya.id. Les champs locaux province_uuid et municipality_uuid restent lisibles et gardent leur sens métier ; ils référencent désormais geographic_areas.uuid avec contrôle du type 1/2 et de l’appartenance, sans FK SQL entre BDD. Accepter seulement les zones actives pour une nouvelle adresse ; une adresse/doc historique conserve ses noms/codes et références. Le code postal reste distinct du code de commune. Les mappings de transporteur restent locaux T11 et ne remplacent pas cette hiérarchie officielle.
+**Même sélection d’adresses :** liste des wilayas WHERE country_id=DZ et type=1 ; communes WHERE type=2 et parent_id=wilaya.id. Les champs locaux province_uuid et municipality_uuid restent lisibles et gardent leur sens métier ; ils référencent désormais geographic_areas.uuid avec contrôle du type 1/2 et de l’appartenance, sans FK SQL entre BDD. Accepter seulement les zones actives pour une nouvelle adresse ; une adresse/doc historique conserve ses noms/codes et références. Décision du 31 octobre 2026 : le code applicatif d'une commune est désormais dz-{post_code} à partir de Commune_Of_Algeria.json ; il ne certifie pas un code administratif officiel ni un code transporteur. Les mappings de transporteur restent distincts et ne remplacent pas cette hiérarchie.
 
 **Import et histoire :** seed DZ par countries.code, sans id numérique codé en dur. Utiliser les annexes officielles [S10] de la version de référentiel retenue ; aucun plafond 58/69 ni nombre de lignes figé en contrainte. Importer les wilayas avant leurs communes ; vérifier code/parent/pays et garder reference_source/reference_version/effective_at. Les noms et codes envoyés aux transporteurs suivent leur mapping vérifié, pas un code géographique deviné.
+
+Source applicative courante fournie par le propriétaire : database/data/geography/dz/Wilaya_Of_Algeria.json et Commune_Of_Algeria.json, en remplacement des anciens JSON. code wilaya numérique conservé en chaîne ; ar_name → name_ar ; post_code → code dz-{post_code}, sans utilisation de l'ID source dans le code. Les ID source servent uniquement au rattachement. Les homonymes sont possibles ; UNIQUE(country_id,type,parent_key,code) reste inchangé. Origine technique et empreinte SHA256 enregistrées ; date inconnue NULL. Aucune vérification des annexes officielles ni certification du contenu des nouveaux fichiers n'est revendiquée.
 
 **feature_usage :** UNIQUE(user_id,feature_id,tenant normalisé,period_starts_at), quantity>=0 et fin NULL ou >début ; FK(tenant_id,user_id) → tenants(id,user_id). Utilisation par propriétaire ou boutique selon features.quota_scope. Mise à jour atomique/idempotente sous le verrou de quota approprié, périodes non chevauchantes. Les compteurs ne sont pas une copie des commandes ou des comptes locaux.
 

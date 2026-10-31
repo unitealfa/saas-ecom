@@ -27,7 +27,7 @@ class LocalDevelopmentSeeder extends LocalFixtureSeeder
             throw new LogicException('Run the local seeder in the central context.');
         }
 
-        $this->call(CountrySeeder::class);
+        $this->call([CountrySeeder::class, GeographicAreaSeeder::class]);
         $connection = DB::connection(config('tenancy.database.central_connection'));
 
         if (! $connection->table('activity_log')->where('operation_key', 'local:references:v1')->exists()) {
@@ -38,7 +38,6 @@ class LocalDevelopmentSeeder extends LocalFixtureSeeder
             $connection->transaction(fn () => $this->references($connection));
         }
 
-        
         foreach ([1, 2] as $number) {
             $owner = User::where('email', "boutique{$number}@example.test")->firstOrFail();
             $key = "local:boutique{$number}:v1";
@@ -142,16 +141,13 @@ class LocalDevelopmentSeeder extends LocalFixtureSeeder
             $this->insert($db, 'plan_features', ['plan_id' => $plan, 'feature_id' => $feature, 'is_active' => true, 'limit' => $limit]);
         }
 
-        $province = $this->insert($db, 'geographic_areas', [
-            'country_id' => $country->id, 'type' => 1, 'code' => '16', 'name_fr' => 'Alger', 'name_ar' => 'الجزائر',
-            'is_active' => true, 'reference_source' => 'local-fixture', 'reference_version' => 'local-v1',
-            'effective_at' => now()->toDateString(),
-        ]);
-        $municipality = $this->insert($db, 'geographic_areas', [
-            'country_id' => $country->id, 'parent_id' => $province, 'type' => 2, 'code' => '1601',
-            'name_fr' => 'Alger Centre', 'is_active' => true, 'reference_source' => 'local-fixture',
-            'reference_version' => 'local-v1', 'effective_at' => now()->toDateString(),
-        ]);
+        $province = $db->table('geographic_areas')->where('country_id', $country->id)
+            ->where('type', 1)->where('code', self::PROVINCE_CODE)->whereNull('deleted_at')->value('id')
+            ?? throw new LogicException('The reference province must be seeded before local fixtures.');
+        $municipality = $db->table('geographic_areas')->where('country_id', $country->id)
+            ->where('type', 2)->where('parent_id', $province)->where('code', self::MUNICIPALITY_CODE)
+            ->whereNull('deleted_at')->value('id')
+            ?? throw new LogicException('The reference municipality must be seeded before local fixtures.');
         $carrier = $this->insert($db, 'shipping_carriers', [
             'code' => 'local-fixture', 'name' => 'Transporteur fictif local', 'adapter' => 'local-fixture',
             'is_active' => false, 'reference_source' => 'local-fixture', 'reference_version' => 1,
