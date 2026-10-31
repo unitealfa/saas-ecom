@@ -39,3 +39,6 @@ yarn-error.log
 /opencode.json
 /opencode.jsonc
 /instruction.txt
+/.codex
+/instructions
+/graphify-out   
