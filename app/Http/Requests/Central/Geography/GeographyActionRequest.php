@@ -14,8 +14,9 @@ class GeographyActionRequest extends FormRequest
         $actor = $this->user('central');
         $area = $this->route('area');
 
-        return $actor instanceof User && $area instanceof GeographicArea
-            && Gate::forUser($actor)->allows($this->isMethod('DELETE') ? 'archive' : 'activate', $area);
+        return $actor instanceof User
+            && $area instanceof GeographicArea
+            && Gate::forUser($actor)->allows($this->isArchive() ? 'archive' : 'activate', $area);
     }
 
     /** @return array<string, mixed> */
@@ -23,7 +24,13 @@ class GeographyActionRequest extends FormRequest
     {
         return [
             'expected_state' => ['required', 'string', 'size:64'],
-            'is_active' => [$this->isMethod('DELETE') ? 'prohibited' : 'required', 'boolean'],
+            'is_active' => $this->isArchive() ? ['prohibited'] : ['required', 'boolean'],
         ];
+    }
+
+    /** L'archivage passe par DELETE, l'activation par les autres méthodes. */
+    private function isArchive(): bool
+    {
+        return $this->isMethod('DELETE');
     }
 }

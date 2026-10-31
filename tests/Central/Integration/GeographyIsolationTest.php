@@ -12,6 +12,7 @@ use Database\Seeders\Central\CountrySeeder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class);
@@ -46,8 +47,20 @@ test('geography remains central and cached lookups remain available inside a rea
         expect(Schema::connection('tenant')->hasTable('geographic_areas'))->toBeFalse();
         expect((new GeographicArea)->getConnection()->getDatabaseName())->toBe($centralDatabase);
         expect(GeographicArea::where('uuid', $area->uuid)->firstOrFail()->name_fr)->toBe('Alger');
-        expect($catalog->find($area->uuid))->toBe($expected);
+        $central = $area->getConnection();
+        $central->enableQueryLog();
+        $central->flushQueryLog();
+        try {
+            expect($catalog->find($area->uuid))->toBe($expected);
+            expect($central->getQueryLog())->toBe([]);
+        } finally {
+            $central->disableQueryLog();
+            $central->flushQueryLog();
+        }
         expect($catalog->listing([])['data'])->toHaveCount(1);
+        $area->update(['name_fr' => 'Nom central actualisé']);
+        tenancy()->end();
+        expect($catalog->find($area->uuid)['name_fr'])->toBe('Nom central actualisé');
     } finally {
         tenancy()->end();
         if ($tenant !== null) {
@@ -55,6 +68,30 @@ test('geography remains central and cached lookups remain available inside a rea
         }
     }
     expect(tenancy()->initialized)->toBeFalse();
+});
+
+test('failed tenant reference checks restore central context and roll back archival', function (): void {
+    $area = isolatedGeographyArea();
+    $admin = User::factory()->create();
+    $admin->assignRole(Role::findByName('root', 'central'));
+    $centralConnection = DB::getDefaultConnection();
+    $tenant = null;
+
+    try {
+        $tenant = Tenant::factory()->create();
+        $tenant->run(fn () => Schema::connection('tenant')->drop('free_shipping_rules'));
+
+        expect(fn () => app(GeographicAreaService::class)->archive($admin, $area, $area->stateToken()))
+            ->toThrow(ValidationException::class);
+        expect(tenancy()->initialized)->toBeFalse()
+            ->and(DB::getDefaultConnection())->toBe($centralConnection)
+            ->and($area->refresh()->deleted_at)->toBeNull();
+    } finally {
+        tenancy()->end();
+        if ($tenant !== null) {
+            TestCase::dropIsolatedMysqlDatabase($tenant->database()->getName());
+        }
+    }
 });
 
 test('geography cache bypasses uncommitted changes and invalidates committed activation and country changes', function (): void {
