@@ -11,6 +11,14 @@ use Spatie\Permission\Models\Permission as PackagePermission;
 
 class CentralRoleCatalog
 {
+    public const array CARRIER_PERMISSIONS = [
+        'saas.carriers.view' => 'Consulter les transporteurs',
+        'saas.carriers.create' => 'Ajouter un transporteur',
+        'saas.carriers.update' => 'Modifier les informations d’un transporteur',
+        'saas.carriers.activate' => 'Activer ou désactiver un transporteur',
+        'saas.carriers.archive' => 'Archiver un transporteur autorisé',
+    ];
+
     public const array GEOGRAPHY_PERMISSIONS = [
         'saas.geography.view' => 'Consulter les wilayas et communes',
         'saas.geography.create' => 'Ajouter une zone géographique',
@@ -45,6 +53,7 @@ class CentralRoleCatalog
     ];
 
     public const array PERMISSIONS = [
+        ...self::CARRIER_PERMISSIONS,
         ...self::GEOGRAPHY_PERMISSIONS,
         ...self::FEATURE_PERMISSIONS,
         ...self::DEPLOYMENT_PERMISSIONS,
@@ -97,6 +106,7 @@ class CentralRoleCatalog
     ];
 
     public const array GROUPS = [
+        'Transporteurs' => ['saas.carriers.view', 'saas.carriers.create', 'saas.carriers.update', 'saas.carriers.activate', 'saas.carriers.archive'],
         'Wilayas et communes' => ['saas.geography.view', 'saas.geography.create', 'saas.geography.update', 'saas.geography.activate', 'saas.geography.archive'],
         'Fonctionnalités commerciales' => ['saas.features.view', 'saas.features.create', 'saas.features.update', 'saas.features.activate', 'saas.features.archive'],
         'Déploiements' => ['saas.deployments.view', 'saas.deployments.provision', 'saas.deployments.migrate', 'saas.deployments.retry', 'saas.deployments.errors.view'],
