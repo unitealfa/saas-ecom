@@ -50,6 +50,11 @@
                             {{ __('Transporteurs') }}
                         </flux:sidebar.item>
                     @endcan
+                    @can('viewAny', \App\Models\Central\Shipping\CarrierGeoMapping::class)
+                        <flux:sidebar.item :href="route('central.carrier-mappings.index')" :current="request()->routeIs('central.carrier-mappings.*')" wire:navigate>
+                            {{ __('Codes géographiques des transporteurs') }}
+                        </flux:sidebar.item>
+                    @endcan
                     @can('viewAny', \App\Models\Central\Geography\GeographicArea::class)
                         <flux:sidebar.item :href="route('central.geography.index')" :current="request()->routeIs('central.geography.*')" wire:navigate>
                             {{ __('Wilayas et communes') }}

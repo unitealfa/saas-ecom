@@ -13,6 +13,9 @@
         </dl>
         <flux:text>L’activation rend ce transporteur disponible dans le catalogue. Elle ne connecte aucun compte et ne lance aucune livraison. La connexion API sera traitée séparément.</flux:text>
         <div class="flex flex-wrap gap-3">
+            @can('viewAny', \App\Models\Central\Shipping\CarrierGeoMapping::class)
+                <flux:button :href="route('central.carrier-mappings.index', ['carrier_uuid' => $carrier->uuid])">Correspondances géographiques</flux:button>
+            @endcan
             @can('update', $carrier)<flux:button :href="route('central.carriers.edit', $carrier)">Modifier</flux:button>@endcan
             @can('activate', $carrier)
                 <form method="POST" action="{{ route('central.carriers.activate', $carrier) }}">
