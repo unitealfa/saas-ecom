@@ -12,6 +12,7 @@ use App\Http\Responses\Central\Auth\VerifiedEmailResponse;
 use App\Models\Central\Users\User;
 use App\Services\Central\Auth\RegistrationJourney;
 use App\Services\Central\Auth\RegistrationVerificationNotification;
+use App\Services\Central\Authorization\CentralUserAccess;
 use App\Services\Central\Countries\CountryCatalog;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -35,6 +36,8 @@ class FortifyServiceProvider extends ServiceProvider
 {
     /** Durée minimale (µs) de la vérification des identifiants : masque le temps de réponse. */
     private const int LOGIN_TIMEBOX = 200_000;
+
+    private const int STATUS_REFRESH_PER_MINUTE = 20;
 
     public function register(): void
     {
@@ -117,6 +120,15 @@ class FortifyServiceProvider extends ServiceProvider
 
     private function configureRateLimiting(): void
     {
+        RateLimiter::for('registration-status', function (Request $request): Limit {
+            $actor = $request->user('central');
+            abort_unless($actor instanceof User, 403);
+
+            return app(CentralUserAccess::class)->isStaff($actor)
+                ? Limit::none()
+                : Limit::perMinute(self::STATUS_REFRESH_PER_MINUTE)->by('central-user:'.$actor->getAuthIdentifier());
+        });
+
         RateLimiter::for('two-factor', fn (Request $request) => Limit::perMinute(5)
             ->by($request->session()->get('login.id') ?: $request->ip()));
 

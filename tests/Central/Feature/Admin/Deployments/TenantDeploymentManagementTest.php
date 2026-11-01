@@ -60,8 +60,10 @@ test('deployment readers see the paginated history and UUID pages without privat
     $this->actingAs($reader, 'central')->get(route('central.deployments.index'))
         ->assertOk()->assertSee($deployment->tenant->shop_name)->assertSee('Échec')
         ->assertDontSee('private-database-secret');
+    $deployment->forceFill(['started_at' => '2026-11-01 10:00:00', 'ended_at' => '2026-11-01 10:01:05'])->save();
     $this->get(route('central.deployments.show', $deployment))->assertOk()
         ->assertSee('Historique des tentatives')->assertDontSee('Diagnostic nettoyé')
+        ->assertSee('Durée d’exécution')->assertSee('1 min 5 s')
         ->assertDontSee('Relancer une tentative')->assertDontSee('private-database-secret');
     $this->get(route('central.deployments.show', $deployment->id))->assertNotFound();
 });
@@ -283,24 +285,21 @@ test('scheduled recovery selects only aged latest candidates and respects its fa
     }
 });
 
-test('deployment throttling has a separate counter from other six-per-minute admin actions', function (): void {
+test('authenticated administration remains unthrottled across domains and deployments', function (): void {
     $admin = deploymentAdmin();
     $deployment = deploymentRecord();
     $domain = $deployment->tenant->domains()->make(['domain' => 'throttle-test.example.com', 'type' => 2, 'is_primary' => true]);
     $domain->forceFill(['verification_status' => VerificationStatusEnum::PENDING])->save();
     Queue::fake();
     $this->actingAs($admin, 'central');
-    for ($i = 0; $i < 6; $i++) {
+    for ($i = 0; $i < 7; $i++) {
         $this->postJson(route('central.domains.verify', $domain), [])->assertUnprocessable();
     }
-    $this->postJson(route('central.domains.verify', $domain), [])->assertTooManyRequests();
-    for ($i = 0; $i < 6; $i++) {
+    for ($i = 0; $i < 7; $i++) {
         $this->post(route('central.deployments.provision', $deployment), ['expected_state' => $deployment->managementState()])
             ->assertSessionHasNoErrors()->assertRedirect();
     }
-    $this->post(route('central.deployments.provision', $deployment), ['expected_state' => $deployment->managementState()])
-        ->assertTooManyRequests();
-    Queue::assertPushed(ProvisionTenantDatabase::class, 6);
+    Queue::assertPushed(ProvisionTenantDatabase::class, 7);
 });
 
 test('error explanations preserve legacy codes and never expose an unknown stored error', function (?string $code, string $explanation): void {

@@ -13,7 +13,7 @@ require __DIR__.'/central/diagnostics.php';
 require __DIR__.'/central/geography.php';
 
 Route::get('inscription/statut', RegistrationStatusController::class)
-    ->middleware(['auth:central', EnsureActiveCentralAccount::class.':optional'])
+    ->middleware(['auth:central', EnsureActiveCentralAccount::class.':optional', 'throttle:registration-status'])
     ->name('registration.status');
 
 Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class])->group(function (): void {
