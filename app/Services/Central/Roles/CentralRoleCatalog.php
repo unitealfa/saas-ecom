@@ -17,6 +17,7 @@ class CentralRoleCatalog
         'saas.plans.features.update' => 'Définir les fonctionnalités et quotas d’un plan',
         'saas.plans.versions.create' => 'Créer une nouvelle version d’un plan',
         'saas.plans.activate' => 'Activer ou désactiver la commercialisation d’un plan',
+        'saas.plans.archive' => 'Archiver une offre autorisée',
     ];
 
     public const array CARRIER_PERMISSIONS = [
@@ -115,7 +116,7 @@ class CentralRoleCatalog
     ];
 
     public const array GROUPS = [
-        'Plans et offres' => ['saas.plans.view', 'saas.plans.create', 'saas.plans.features.update', 'saas.plans.versions.create', 'saas.plans.activate'],
+        'Plans et offres' => ['saas.plans.view', 'saas.plans.create', 'saas.plans.features.update', 'saas.plans.versions.create', 'saas.plans.activate', 'saas.plans.archive'],
         'Transporteurs' => ['saas.carriers.view', 'saas.carriers.create', 'saas.carriers.update', 'saas.carriers.activate', 'saas.carriers.archive'],
         'Wilayas et communes' => ['saas.geography.view', 'saas.geography.create', 'saas.geography.update', 'saas.geography.activate', 'saas.geography.archive'],
         'Fonctionnalités commerciales' => ['saas.features.view', 'saas.features.create', 'saas.features.update', 'saas.features.activate', 'saas.features.archive'],

@@ -42,4 +42,10 @@ class PlanPolicy
         return ! $plan->trashed() && strtolower($plan->code) !== 'free'
             && $this->access->allows($actor, 'saas.plans.activate');
     }
+
+    public function archive(User $actor, Plan $plan): bool
+    {
+        return ! $plan->trashed() && strtolower($plan->code) !== 'free'
+            && $this->access->allows($actor, 'saas.plans.archive');
+    }
 }

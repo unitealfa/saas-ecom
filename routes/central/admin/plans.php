@@ -10,4 +10,5 @@ Route::controller(PlanController::class)->prefix('plans')->name('plans.')->group
     Route::put('{plan}/features', 'updateFeatures')->name('features.update');
     Route::post('{plan}/versions', 'storeVersion')->name('versions.store');
     Route::patch('{plan}/activation', 'activate')->name('activate');
+    Route::delete('{plan}', 'archive')->name('archive');
 });

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Central\Admin\Plans;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Central\Plans\ArchivePlanRequest;
 use App\Http\Requests\Central\Plans\SearchPlansRequest;
 use App\Http\Requests\Central\Plans\StorePlanRequest;
 use App\Http\Requests\Central\Plans\StorePlanVersionRequest;
@@ -10,11 +11,12 @@ use App\Http\Requests\Central\Plans\UpdatePlanFeaturesRequest;
 use App\Http\Requests\Central\Plans\UpdatePlanActivationRequest;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Plans\PlanFeature;
-use App\Services\Central\Plans\PlanCatalogService;
-use App\Services\Central\Plans\PlanCreationService;
-use App\Services\Central\Plans\PlanCompositionService;
-use App\Services\Central\Plans\PlanVersionService;
 use App\Services\Central\Plans\PlanActivationService;
+use App\Services\Central\Plans\PlanArchiveService;
+use App\Services\Central\Plans\PlanCatalogService;
+use App\Services\Central\Plans\PlanCompositionService;
+use App\Services\Central\Plans\PlanCreationService;
+use App\Services\Central\Plans\PlanVersionService;
 use Illuminate\Http\JsonResponse;
 
 class PlanController extends Controller
@@ -25,6 +27,7 @@ class PlanController extends Controller
         private readonly PlanCompositionService $composition,
         private readonly PlanVersionService $versions,
         private readonly PlanActivationService $activation,
+        private readonly PlanArchiveService $archive,
     ) {}
 
     public function store(StorePlanRequest $request): JsonResponse
@@ -90,6 +93,13 @@ class PlanController extends Controller
     public function activate(UpdatePlanActivationRequest $request, Plan $plan): JsonResponse
     {
         $this->activation->setActive($this->centralActor(), $plan, $request->validated());
+
+        return response()->json(null, 204)->header('Cache-Control', 'private, no-store');
+    }
+
+    public function archive(ArchivePlanRequest $request, Plan $plan): JsonResponse
+    {
+        $this->archive->archive($this->centralActor(), $plan, $request->validated());
 
         return response()->json(null, 204)->header('Cache-Control', 'private, no-store');
     }

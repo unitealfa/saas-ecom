@@ -24,6 +24,10 @@ Ajout de POST admin/plans/{plan}/versions sous saas.plans.versions.create. Copie
 
 Décision utilisateur : activer une version désactive automatiquement les autres versions commercialisées du même plan. Ajout de PATCH admin/plans/{plan}/activation, permission saas.plans.activate, vérification d'état et Policies sous verrou, audit de chaque changement ; free et les versions archivées restent protégés. Les abonnements restent liés à leurs versions. PHP 8.5.12 : syntaxe des huit fichiers concernés valide, route chargée, quatre tests unitaires réussis (14 assertions) sans MySQL. Tests fonctionnels écrits mais non exécutés : ils nécessitent une autorisation explicite pour créer des bases MySQL isolées. Aucun seeder ni changement sur les données existantes n'a été exécuté.
 
+## 1er novembre 2026 — Module 09, archivage backend
+
+Ajout de DELETE admin/plans/{plan} et saas.plans.archive. La version inutilisée et non système est désactivée puis archivée logiquement avec état attendu, Policy sous verrou et audit atomique ; tout abonnement référencé bloque l'action, et les associations restent conservées. PHP 8.5.12 : syntaxe des huit fichiers concernés valide, route chargée, cinq tests unitaires réussis (18 assertions) sans MySQL. Les tests fonctionnels écrits ne sont pas exécutés : les bases temporaires MySQL nécessitent une autorisation explicite. Aucun seeder ni changement des données existantes n'a été exécuté.
+
 ## Références et priorité
 
 1. `Schema-BDD-SaaS-Ecommerce-UUID.md`, V4.9 : 28 tables centrales et 59 tables boutique, hors tables techniques Laravel.
