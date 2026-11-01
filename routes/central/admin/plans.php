@@ -8,4 +8,5 @@ Route::controller(PlanController::class)->prefix('plans')->name('plans.')->group
     Route::post('/', 'store')->name('store');
     Route::get('{plan}', 'show')->withTrashed()->name('show');
     Route::put('{plan}/features', 'updateFeatures')->name('features.update');
+    Route::post('{plan}/versions', 'storeVersion')->name('versions.store');
 });

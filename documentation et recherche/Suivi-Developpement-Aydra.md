@@ -16,6 +16,10 @@ PHP 8.5.12 : syntaxe des sept fichiers PHP concernés et chargement des routes v
 
 Ajout de PUT admin/plans/{plan}/features sous saas.plans.features.update. Remplacement complet protégé par état attendu, verrous, contrôles de fonctionnalités et d'abonnement, préservation des UUID conservés et audit atomique. Le plan gratuit et les versions utilisées restent protégés. PHP 8.5.12 : syntaxe des neuf fichiers concernés valide, routes chargées ; tests unitaires du jeton d'état et de la validation réussis (2 tests, 6 assertions), sans MySQL. Les tests fonctionnels nécessitent une autorisation explicite pour créer des bases MySQL isolées et ne sont pas exécutés. Aucun seeder ni changement sur les données existantes n'a été exécuté.
 
+## 1er novembre 2026 — Module 09, création backend d'une version
+
+Ajout de POST admin/plans/{plan}/versions sous saas.plans.versions.create. Copie inactive des informations et fonctionnalités, sans altérer la source ni les abonnements ; contrôle des états attendus et du plus grand numéro, y compris archivé ; Policy, verrous, audit et interdiction de versionner free. PHP 8.5.12 : syntaxe des neuf fichiers concernés valide, routes chargées et trois tests unitaires réussis (dix assertions), sans MySQL. Aucun seeder ni changement des données existantes n'a été exécuté. Tests fonctionnels écrits mais non exécutés : ils nécessitent une autorisation explicite pour créer des bases MySQL isolées.
+
 ## Références et priorité
 
 1. `Schema-BDD-SaaS-Ecommerce-UUID.md`, V4.9 : 28 tables centrales et 59 tables boutique, hors tables techniques Laravel.

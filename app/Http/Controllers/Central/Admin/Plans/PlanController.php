@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Central\Admin\Plans;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Plans\SearchPlansRequest;
 use App\Http\Requests\Central\Plans\StorePlanRequest;
+use App\Http\Requests\Central\Plans\StorePlanVersionRequest;
 use App\Http\Requests\Central\Plans\UpdatePlanFeaturesRequest;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Plans\PlanFeature;
 use App\Services\Central\Plans\PlanCatalogService;
 use App\Services\Central\Plans\PlanCreationService;
 use App\Services\Central\Plans\PlanCompositionService;
+use App\Services\Central\Plans\PlanVersionService;
 use Illuminate\Http\JsonResponse;
 
 class PlanController extends Controller
@@ -19,6 +21,7 @@ class PlanController extends Controller
         private readonly PlanCatalogService $plans,
         private readonly PlanCreationService $creation,
         private readonly PlanCompositionService $composition,
+        private readonly PlanVersionService $versions,
     ) {}
 
     public function store(StorePlanRequest $request): JsonResponse
@@ -46,8 +49,10 @@ class PlanController extends Controller
 
     public function show(Plan $plan): JsonResponse
     {
-        $plan = $this->plans->details($this->centralActor(), $plan);
+        $actor = $this->centralActor();
+        $plan = $this->plans->details($actor, $plan);
         $data = $this->planData($plan);
+        $data['latest_version'] = $this->plans->latestVersion($actor, $plan);
         $data['expected_state'] = $plan->compositionState($plan->features);
         $data['features'] = $plan->features->map(fn (PlanFeature $item): array => [
             'uuid' => $item->feature->uuid,
@@ -69,6 +74,14 @@ class PlanController extends Controller
         $this->composition->update($this->centralActor(), $plan, $request->validated());
 
         return response()->json(null, 204)->header('Cache-Control', 'private, no-store');
+    }
+
+    public function storeVersion(StorePlanVersionRequest $request, Plan $plan): JsonResponse
+    {
+        $version = $this->versions->create($this->centralActor(), $plan, $request->validated());
+
+        return response()->json(['data' => ['uuid' => $version->uuid]], 201)
+            ->header('Cache-Control', 'private, no-store');
     }
 
     /** @return array<string, mixed> */

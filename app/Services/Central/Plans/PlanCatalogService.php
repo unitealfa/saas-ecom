@@ -35,4 +35,11 @@ class PlanCatalogService
 
         return $plan->load(['features.feature' => fn (BelongsTo $relation) => $relation->withTrashed()]);
     }
+
+    public function latestVersion(User $actor, Plan $plan): int
+    {
+        Gate::forUser($actor)->authorize('view', $plan);
+
+        return (int) Plan::withTrashed()->where('code', $plan->code)->max('version');
+    }
 }
