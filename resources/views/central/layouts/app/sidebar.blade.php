@@ -45,6 +45,11 @@
                             {{ __('Pays') }}
                         </flux:sidebar.item>
                     @endcan
+                    @can('viewAny', \App\Models\Central\Shipping\ShippingCarrier::class)
+                        <flux:sidebar.item :href="route('central.carriers.index')" :current="request()->routeIs('central.carriers.*')" wire:navigate>
+                            {{ __('Transporteurs') }}
+                        </flux:sidebar.item>
+                    @endcan
                     @can('viewAny', \App\Models\Central\Geography\GeographicArea::class)
                         <flux:sidebar.item :href="route('central.geography.index')" :current="request()->routeIs('central.geography.*')" wire:navigate>
                             {{ __('Wilayas et communes') }}

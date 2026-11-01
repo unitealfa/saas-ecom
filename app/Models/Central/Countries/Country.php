@@ -6,6 +6,7 @@ use App\Concerns\HasPublicUuid;
 use App\Services\Central\Countries\CountryCatalog;
 use App\Services\Central\Geography\GeographyCatalog;
 use App\Services\Central\Users\PhoneNumberNormalizer;
+use Carbon\CarbonInterface;
 use Database\Factories\Central\CountryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -16,6 +17,19 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
+/**
+ * @property int $id
+ * @property string $uuid
+ * @property string $code
+ * @property string $name_fr
+ * @property string $name_en
+ * @property string|null $name_ar
+ * @property bool $is_active
+ * @property CarbonInterface|null $created_at
+ * @property CarbonInterface|null $updated_at
+ * @property CarbonInterface|null $deleted_at
+ * @property-read string|null $calling_code
+ */
 #[Fillable(['code', 'name_fr', 'name_en', 'name_ar', 'is_active'])]
 #[Hidden(['id'])]
 #[UseFactory(CountryFactory::class)]

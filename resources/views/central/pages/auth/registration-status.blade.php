@@ -3,20 +3,27 @@
     <div class="space-y-6"
         x-data="{
             version: @js($progress['version']),
+            state: @js($progress['state']),
             endpoint: @js(route('registration.status')),
             loginUrl: @js(route('login')),
             timer: null,
+            cooldownTimer: null,
             loading: false,
+            coolingDown: false,
+            refreshLimited: false,
             refreshFailed: false,
             init() {
                 this.timer = window.setInterval(() => this.refresh(), 15000);
             },
             destroy() {
                 window.clearInterval(this.timer);
+                window.clearTimeout(this.cooldownTimer);
             },
             async refresh() {
-                if (document.hidden || this.loading) return;
+                if (document.hidden || this.loading || this.coolingDown) return;
                 this.loading = true;
+                this.coolingDown = true;
+                let cooldown = 5000;
                 try {
                     const response = await fetch(this.endpoint, {
                         headers: { Accept: 'application/json' },
@@ -27,21 +34,30 @@
                         window.location.replace(this.loginUrl);
                         return;
                     }
+                    if (response.status === 429) {
+                        this.refreshLimited = true;
+                        cooldown = Math.max(cooldown, (Number(response.headers.get('Retry-After')) || 5) * 1000);
+                        return;
+                    }
                     if (!response.ok) throw new Error('Status refresh failed');
                     const progress = await response.json();
                     this.refreshFailed = false;
-                    if (progress.redirect !== this.endpoint || progress.version !== this.version) {
+                    this.refreshLimited = false;
+                    if (progress.state !== this.state || progress.version !== this.version) {
                         window.location.replace(progress.redirect);
                     }
                 } catch {
                     this.refreshFailed = true;
                 } finally {
                     this.loading = false;
+                    this.cooldownTimer = window.setTimeout(() => {
+                        this.coolingDown = false;
+                        this.refreshLimited = false;
+                    }, cooldown);
                 }
             },
         }">
         <flux:heading size="xl">Bonjour {{ $user->first_name ?: $user->last_name }}</flux:heading>
-        @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
         @if ($progress['state'] === 'rejected')
             <flux:heading>Inscription refusée</flux:heading>
             <flux:text>Votre demande d’inscription n’a pas été approuvée.</flux:text>
@@ -80,7 +96,8 @@
             <flux:text>Vous ne pouvez pas encore accéder à votre espace commerçant. Après approbation, vous pourrez créer votre première boutique.</flux:text>
         @endif
         <p x-cloak x-show="refreshFailed" role="status" class="text-sm text-zinc-600 dark:text-zinc-400">L’actualisation automatique est momentanément indisponible. Vous pouvez utiliser le bouton ci-dessous.</p>
-        <flux:button :href="route('registration.status')">Actualiser mon statut</flux:button>
+        <p x-cloak x-show="refreshLimited" role="status" class="text-sm text-zinc-600 dark:text-zinc-400">Veuillez patienter avant de réactualiser votre statut.</p>
+        <flux:button type="button" x-on:click="refresh()" x-bind:disabled="loading || coolingDown" x-bind:aria-busy="loading">Actualiser mon statut</flux:button>
         <form method="POST" action="{{ route('logout') }}">@csrf <flux:button type="submit" variant="ghost">Se déconnecter</flux:button></form>
     </div>
 </x-layouts::auth>

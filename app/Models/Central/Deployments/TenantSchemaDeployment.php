@@ -6,6 +6,7 @@ use App\Concerns\HasPublicUuid;
 use App\Enums\Central\Deployments\OperationEnum;
 use App\Enums\Central\Deployments\StatusEnum;
 use App\Models\Central\Tenants\Tenant;
+use Carbon\CarbonImmutable;
 use Database\Factories\Central\TenantSchemaDeploymentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
@@ -18,6 +19,8 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
 /**
  * @property OperationEnum $operation
  * @property StatusEnum $status
+ * @property CarbonImmutable|null $started_at
+ * @property CarbonImmutable|null $ended_at
  */
 #[Fillable([
     'tenant_id', 'source_version', 'target_version', 'operation', 'status', 'attempt_number',
@@ -33,6 +36,19 @@ class TenantSchemaDeployment extends Model
     public function getRouteKeyName(): string
     {
         return 'uuid';
+    }
+
+    public function durationLabel(): string
+    {
+        if ($this->started_at === null) {
+            return 'Pas encore démarré';
+        }
+        if ($this->ended_at === null) {
+            return 'En cours';
+        }
+
+        return $this->started_at->diffAsCarbonInterval($this->ended_at)->locale('fr')
+            ->forHumans(['short' => true, 'parts' => 3, 'options' => 0]);
     }
 
     public function managementState(): string

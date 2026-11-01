@@ -463,6 +463,7 @@ resources/views/central/pages/admin/geography/
 Module 14 — Gestion des transporteurs communs
 Table : shipping_carriers
 Interface : Administration → Transporteurs
+Périmètre validé : seul Yalidine est ajouté par le seeder initial, inactif ; le formulaire permet d'ajouter d'autres transporteurs avec leur propre code unique, modifiable uniquement avant création. Aucune connexion API ou information privée de boutique dans ce module. Les autres transporteurs déjà présents sont conservés. Création et activation restent distinctes, code permanent réservé même après archivage ; archivage refusé en présence de correspondances, bureaux ou comptes boutique. Voir architecture §47.
 Permission	Fonctionnalité
 saas.carriers.view	Consulter les transporteurs
 saas.carriers.create	Ajouter un transporteur
@@ -470,13 +471,20 @@ saas.carriers.update	Modifier les informations d'un transporteur
 saas.carriers.activate	Activer ou désactiver un transporteur
 saas.carriers.archive	Archiver un transporteur autorisé
 Fichiers :
-app/Models/Central/ShippingCarrier.php
+app/Models/Central/Shipping/ShippingCarrier.php
 
-app/Http/Controllers/Central/Admin/
+app/Http/Controllers/Central/Admin/Shipping/
     ShippingCarrierController.php
 
 app/Services/Central/Shipping/
     ShippingCarrierService.php
+    ShippingCarrierCatalog.php
+
+app/Policies/Central/ShippingCarrierPolicy.php
+app/Http/Requests/Central/Shipping/StoreShippingCarrierRequest.php
+app/Http/Requests/Central/Shipping/ShippingCarrierActionRequest.php
+database/seeders/Central/ShippingCarrierSeeder.php
+database/seeders/Central/CarrierPermissionSeeder.php
 
 resources/views/central/pages/admin/shipping/carriers/
     index.blade.php

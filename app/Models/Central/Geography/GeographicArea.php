@@ -6,6 +6,7 @@ use App\Concerns\HasPublicUuid;
 use App\Enums\Central\Geography\GeoZoneTypeEnum;
 use App\Models\Central\Countries\Country;
 use App\Services\Central\Geography\GeographyCatalog;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,16 +14,27 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Carbon;
 use LogicException;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
 /**
- * @property GeoZoneTypeEnum $type
- * @property Carbon|null $effective_at
+ * @property int $id
+ * @property string $uuid
  * @property int $country_id
  * @property int|null $parent_id
+ * @property GeoZoneTypeEnum $type
+ * @property int|null $parent_type
+ * @property int $parent_key
+ * @property string $code
+ * @property string $name_fr
+ * @property string|null $name_ar
  * @property bool $is_active
+ * @property string $reference_source
+ * @property string $reference_version
+ * @property CarbonInterface|null $effective_at
+ * @property CarbonInterface|null $created_at
+ * @property CarbonInterface|null $updated_at
+ * @property CarbonInterface|null $deleted_at
  * @property-read Country $country
  * @property-read GeographicArea|null $parent
  */
