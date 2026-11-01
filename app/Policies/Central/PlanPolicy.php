@@ -19,4 +19,15 @@ class PlanPolicy
     {
         return $this->viewAny($actor);
     }
+
+    public function create(User $actor): bool
+    {
+        return $this->access->allows($actor, 'saas.plans.create');
+    }
+
+    public function updateFeatures(User $actor, Plan $plan): bool
+    {
+        return ! $plan->trashed() && strtolower($plan->code) !== 'free'
+            && $this->access->allows($actor, 'saas.plans.features.update');
+    }
 }

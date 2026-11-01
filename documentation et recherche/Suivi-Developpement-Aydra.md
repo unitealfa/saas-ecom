@@ -6,6 +6,16 @@ Ouvert le 6 octobre 2026 pour exécuter `instruction.txt`. Ce fichier distingue 
 
 Ajout des seules lectures administratives JSON des plans et de leurs versions, y compris archivées, et de leur composition. Permission centrale explicite saas.plans.view, sans attribution automatique aux rôles. Pas d'interface ni de mutation des plans, abonnements ou boutiques. PHP 8.5.12, au chemin local explicitement fourni, valide la syntaxe des dix fichiers concernés ; route:list confirme les deux routes sur les trois domaines centraux. Les tests fonctionnels correspondants sont écrits mais n'ont pas été exécutés : ils créent des bases MySQL isolées et exigent une autorisation distincte. L'ajout de la permission à la base centrale existante reste à exécuter explicitement après autorisation ; aucun seeder réel n'a été lancé.
 
+## 1er novembre 2026 — Module 09, création backend
+
+Ajout de POST admin/plans et de la permission saas.plans.create dans le catalogue et le seeder dédié existants. La création choisit une version 1 inactive et vide, conserve free, refuse les codes existants même archivés et journalise l'opération dans la transaction. Validation partagée par la Form Request et le service ; réponse limitée à l'UUID, sans droit de consultation implicite. Aucune interface ni modification d'offre, d'abonnement ou de boutique existants.
+
+PHP 8.5.12 : syntaxe des sept fichiers PHP concernés et chargement des routes vérifiés. Les tests de comportement sont écrits mais pas exécutés : ils nécessitent des bases MySQL temporaires et leur autorisation explicite. Aucun seeder n'a été exécuté sur la base centrale existante ; saas.plans.create reste à y enregistrer après autorisation, sans enrichir les attributions existantes.
+
+## 1er novembre 2026 — Module 09, composition backend
+
+Ajout de PUT admin/plans/{plan}/features sous saas.plans.features.update. Remplacement complet protégé par état attendu, verrous, contrôles de fonctionnalités et d'abonnement, préservation des UUID conservés et audit atomique. Le plan gratuit et les versions utilisées restent protégés. PHP 8.5.12 : syntaxe des neuf fichiers concernés valide, routes chargées ; tests unitaires du jeton d'état et de la validation réussis (2 tests, 6 assertions), sans MySQL. Les tests fonctionnels nécessitent une autorisation explicite pour créer des bases MySQL isolées et ne sont pas exécutés. Aucun seeder ni changement sur les données existantes n'a été exécuté.
+
 ## Références et priorité
 
 1. `Schema-BDD-SaaS-Ecommerce-UUID.md`, V4.9 : 28 tables centrales et 59 tables boutique, hors tables techniques Laravel.

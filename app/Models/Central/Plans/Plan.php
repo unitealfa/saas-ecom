@@ -7,6 +7,7 @@ use Database\Factories\Central\PlanFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -46,5 +47,18 @@ class Plan extends Model
     public function features(): HasMany
     {
         return $this->hasMany(PlanFeature::class);
+    }
+
+    /** @param  Collection<int, PlanFeature>  $features */
+    public function compositionState(Collection $features): string
+    {
+        $composition = $features->sortBy('feature_id')->map(fn (PlanFeature $feature): array => [
+            $feature->uuid, $feature->feature_id, $feature->is_active, $feature->limit,
+        ])->values()->all();
+
+        return hash('sha256', json_encode([
+            $this->only(['uuid', 'code', 'version', 'name', 'description', 'monthly_price', 'annual_price', 'is_active', 'deleted_at']),
+            $composition,
+        ], JSON_THROW_ON_ERROR));
     }
 }

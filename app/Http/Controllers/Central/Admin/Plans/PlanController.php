@@ -4,14 +4,30 @@ namespace App\Http\Controllers\Central\Admin\Plans;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Plans\SearchPlansRequest;
+use App\Http\Requests\Central\Plans\StorePlanRequest;
+use App\Http\Requests\Central\Plans\UpdatePlanFeaturesRequest;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Plans\PlanFeature;
 use App\Services\Central\Plans\PlanCatalogService;
+use App\Services\Central\Plans\PlanCreationService;
+use App\Services\Central\Plans\PlanCompositionService;
 use Illuminate\Http\JsonResponse;
 
 class PlanController extends Controller
 {
-    public function __construct(private readonly PlanCatalogService $plans) {}
+    public function __construct(
+        private readonly PlanCatalogService $plans,
+        private readonly PlanCreationService $creation,
+        private readonly PlanCompositionService $composition,
+    ) {}
+
+    public function store(StorePlanRequest $request): JsonResponse
+    {
+        $plan = $this->creation->create($this->centralActor(), $request->validated());
+
+        return response()->json(['data' => ['uuid' => $plan->uuid]], 201)
+            ->header('Cache-Control', 'private, no-store');
+    }
 
     public function index(SearchPlansRequest $request): JsonResponse
     {
@@ -32,6 +48,7 @@ class PlanController extends Controller
     {
         $plan = $this->plans->details($this->centralActor(), $plan);
         $data = $this->planData($plan);
+        $data['expected_state'] = $plan->compositionState($plan->features);
         $data['features'] = $plan->features->map(fn (PlanFeature $item): array => [
             'uuid' => $item->feature->uuid,
             'code' => $item->feature->code,
@@ -45,6 +62,13 @@ class PlanController extends Controller
         ])->values();
 
         return response()->json(['data' => $data])->header('Cache-Control', 'private, no-store');
+    }
+
+    public function updateFeatures(UpdatePlanFeaturesRequest $request, Plan $plan): JsonResponse
+    {
+        $this->composition->update($this->centralActor(), $plan, $request->validated());
+
+        return response()->json(null, 204)->header('Cache-Control', 'private, no-store');
     }
 
     /** @return array<string, mixed> */

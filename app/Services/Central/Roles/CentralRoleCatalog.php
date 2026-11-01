@@ -13,6 +13,8 @@ class CentralRoleCatalog
 {
     public const array PLAN_PERMISSIONS = [
         'saas.plans.view' => 'Consulter les plans et leurs versions',
+        'saas.plans.create' => 'Créer un nouveau plan',
+        'saas.plans.features.update' => 'Définir les fonctionnalités et quotas d’un plan',
     ];
 
     public const array CARRIER_PERMISSIONS = [
@@ -111,7 +113,7 @@ class CentralRoleCatalog
     ];
 
     public const array GROUPS = [
-        'Plans et offres' => ['saas.plans.view'],
+        'Plans et offres' => ['saas.plans.view', 'saas.plans.create', 'saas.plans.features.update'],
         'Transporteurs' => ['saas.carriers.view', 'saas.carriers.create', 'saas.carriers.update', 'saas.carriers.activate', 'saas.carriers.archive'],
         'Wilayas et communes' => ['saas.geography.view', 'saas.geography.create', 'saas.geography.update', 'saas.geography.activate', 'saas.geography.archive'],
         'Fonctionnalités commerciales' => ['saas.features.view', 'saas.features.create', 'saas.features.update', 'saas.features.activate', 'saas.features.archive'],
