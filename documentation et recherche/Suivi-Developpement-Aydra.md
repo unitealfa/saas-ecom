@@ -20,6 +20,10 @@ Ajout de PUT admin/plans/{plan}/features sous saas.plans.features.update. Rempla
 
 Ajout de POST admin/plans/{plan}/versions sous saas.plans.versions.create. Copie inactive des informations et fonctionnalités, sans altérer la source ni les abonnements ; contrôle des états attendus et du plus grand numéro, y compris archivé ; Policy, verrous, audit et interdiction de versionner free. PHP 8.5.12 : syntaxe des neuf fichiers concernés valide, routes chargées et trois tests unitaires réussis (dix assertions), sans MySQL. Aucun seeder ni changement des données existantes n'a été exécuté. Tests fonctionnels écrits mais non exécutés : ils nécessitent une autorisation explicite pour créer des bases MySQL isolées.
 
+## 1er novembre 2026 — Module 09, commercialisation backend
+
+Décision utilisateur : activer une version désactive automatiquement les autres versions commercialisées du même plan. Ajout de PATCH admin/plans/{plan}/activation, permission saas.plans.activate, vérification d'état et Policies sous verrou, audit de chaque changement ; free et les versions archivées restent protégés. Les abonnements restent liés à leurs versions. PHP 8.5.12 : syntaxe des huit fichiers concernés valide, route chargée, quatre tests unitaires réussis (14 assertions) sans MySQL. Tests fonctionnels écrits mais non exécutés : ils nécessitent une autorisation explicite pour créer des bases MySQL isolées. Aucun seeder ni changement sur les données existantes n'a été exécuté.
+
 ## Références et priorité
 
 1. `Schema-BDD-SaaS-Ecommerce-UUID.md`, V4.9 : 28 tables centrales et 59 tables boutique, hors tables techniques Laravel.

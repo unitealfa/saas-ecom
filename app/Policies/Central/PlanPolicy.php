@@ -36,4 +36,10 @@ class PlanPolicy
         return ! $plan->trashed() && strtolower($plan->code) !== 'free'
             && $this->access->allows($actor, 'saas.plans.versions.create');
     }
+
+    public function activate(User $actor, Plan $plan): bool
+    {
+        return ! $plan->trashed() && strtolower($plan->code) !== 'free'
+            && $this->access->allows($actor, 'saas.plans.activate');
+    }
 }
