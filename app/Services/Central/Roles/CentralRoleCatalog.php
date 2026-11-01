@@ -11,6 +11,15 @@ use Spatie\Permission\Models\Permission as PackagePermission;
 
 class CentralRoleCatalog
 {
+    public const array PLAN_PERMISSIONS = [
+        'saas.plans.view' => 'Consulter les plans et leurs versions',
+        'saas.plans.create' => 'Créer un nouveau plan',
+        'saas.plans.features.update' => 'Définir les fonctionnalités et quotas d’un plan',
+        'saas.plans.versions.create' => 'Créer une nouvelle version d’un plan',
+        'saas.plans.activate' => 'Activer ou désactiver la commercialisation d’un plan',
+        'saas.plans.archive' => 'Archiver une offre autorisée',
+    ];
+
     public const array CARRIER_PERMISSIONS = [
         'saas.carriers.view' => 'Consulter les transporteurs',
         'saas.carriers.create' => 'Ajouter un transporteur',
@@ -53,6 +62,7 @@ class CentralRoleCatalog
     ];
 
     public const array PERMISSIONS = [
+        ...self::PLAN_PERMISSIONS,
         ...self::CARRIER_PERMISSIONS,
         ...self::GEOGRAPHY_PERMISSIONS,
         ...self::FEATURE_PERMISSIONS,
@@ -106,6 +116,7 @@ class CentralRoleCatalog
     ];
 
     public const array GROUPS = [
+        'Plans et offres' => ['saas.plans.view', 'saas.plans.create', 'saas.plans.features.update', 'saas.plans.versions.create', 'saas.plans.activate', 'saas.plans.archive'],
         'Transporteurs' => ['saas.carriers.view', 'saas.carriers.create', 'saas.carriers.update', 'saas.carriers.activate', 'saas.carriers.archive'],
         'Wilayas et communes' => ['saas.geography.view', 'saas.geography.create', 'saas.geography.update', 'saas.geography.activate', 'saas.geography.archive'],
         'Fonctionnalités commerciales' => ['saas.features.view', 'saas.features.create', 'saas.features.update', 'saas.features.activate', 'saas.features.archive'],

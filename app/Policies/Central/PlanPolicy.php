@@ -1,0 +1,51 @@
+<?php
+
+namespace App\Policies\Central;
+
+use App\Models\Central\Plans\Plan;
+use App\Models\Central\Users\User;
+use App\Services\Central\Authorization\CentralUserAccess;
+
+class PlanPolicy
+{
+    public function __construct(private readonly CentralUserAccess $access) {}
+
+    public function viewAny(User $actor): bool
+    {
+        return $this->access->allows($actor, 'saas.plans.view');
+    }
+
+    public function view(User $actor, Plan $plan): bool
+    {
+        return $this->viewAny($actor);
+    }
+
+    public function create(User $actor): bool
+    {
+        return $this->access->allows($actor, 'saas.plans.create');
+    }
+
+    public function updateFeatures(User $actor, Plan $plan): bool
+    {
+        return ! $plan->trashed() && strtolower($plan->code) !== 'free'
+            && $this->access->allows($actor, 'saas.plans.features.update');
+    }
+
+    public function createVersion(User $actor, Plan $plan): bool
+    {
+        return ! $plan->trashed() && strtolower($plan->code) !== 'free'
+            && $this->access->allows($actor, 'saas.plans.versions.create');
+    }
+
+    public function activate(User $actor, Plan $plan): bool
+    {
+        return ! $plan->trashed() && strtolower($plan->code) !== 'free'
+            && $this->access->allows($actor, 'saas.plans.activate');
+    }
+
+    public function archive(User $actor, Plan $plan): bool
+    {
+        return ! $plan->trashed() && strtolower($plan->code) !== 'free'
+            && $this->access->allows($actor, 'saas.plans.archive');
+    }
+}

@@ -2,6 +2,32 @@
 
 Ouvert le 6 octobre 2026 pour exécuter `instruction.txt`. Ce fichier distingue les spécifications, le code et les vérifications réelles. Une case non cochée signifie que le travail reste à faire ; une migration écrite ne prouve pas son exécution.
 
+## 1er novembre 2026 — Module 09, consultation backend
+
+Ajout des seules lectures administratives JSON des plans et de leurs versions, y compris archivées, et de leur composition. Permission centrale explicite saas.plans.view, sans attribution automatique aux rôles. Pas d'interface ni de mutation des plans, abonnements ou boutiques. PHP 8.5.12, au chemin local explicitement fourni, valide la syntaxe des dix fichiers concernés ; route:list confirme les deux routes sur les trois domaines centraux. Les tests fonctionnels correspondants sont écrits mais n'ont pas été exécutés : ils créent des bases MySQL isolées et exigent une autorisation distincte. L'ajout de la permission à la base centrale existante reste à exécuter explicitement après autorisation ; aucun seeder réel n'a été lancé.
+
+## 1er novembre 2026 — Module 09, création backend
+
+Ajout de POST admin/plans et de la permission saas.plans.create dans le catalogue et le seeder dédié existants. La création choisit une version 1 inactive et vide, conserve free, refuse les codes existants même archivés et journalise l'opération dans la transaction. Validation partagée par la Form Request et le service ; réponse limitée à l'UUID, sans droit de consultation implicite. Aucune interface ni modification d'offre, d'abonnement ou de boutique existants.
+
+PHP 8.5.12 : syntaxe des sept fichiers PHP concernés et chargement des routes vérifiés. Les tests de comportement sont écrits mais pas exécutés : ils nécessitent des bases MySQL temporaires et leur autorisation explicite. Aucun seeder n'a été exécuté sur la base centrale existante ; saas.plans.create reste à y enregistrer après autorisation, sans enrichir les attributions existantes.
+
+## 1er novembre 2026 — Module 09, composition backend
+
+Ajout de PUT admin/plans/{plan}/features sous saas.plans.features.update. Remplacement complet protégé par état attendu, verrous, contrôles de fonctionnalités et d'abonnement, préservation des UUID conservés et audit atomique. Le plan gratuit et les versions utilisées restent protégés. PHP 8.5.12 : syntaxe des neuf fichiers concernés valide, routes chargées ; tests unitaires du jeton d'état et de la validation réussis (2 tests, 6 assertions), sans MySQL. Les tests fonctionnels nécessitent une autorisation explicite pour créer des bases MySQL isolées et ne sont pas exécutés. Aucun seeder ni changement sur les données existantes n'a été exécuté.
+
+## 1er novembre 2026 — Module 09, création backend d'une version
+
+Ajout de POST admin/plans/{plan}/versions sous saas.plans.versions.create. Copie inactive des informations et fonctionnalités, sans altérer la source ni les abonnements ; contrôle des états attendus et du plus grand numéro, y compris archivé ; Policy, verrous, audit et interdiction de versionner free. PHP 8.5.12 : syntaxe des neuf fichiers concernés valide, routes chargées et trois tests unitaires réussis (dix assertions), sans MySQL. Aucun seeder ni changement des données existantes n'a été exécuté. Tests fonctionnels écrits mais non exécutés : ils nécessitent une autorisation explicite pour créer des bases MySQL isolées.
+
+## 1er novembre 2026 — Module 09, commercialisation backend
+
+Décision utilisateur : activer une version désactive automatiquement les autres versions commercialisées du même plan. Ajout de PATCH admin/plans/{plan}/activation, permission saas.plans.activate, vérification d'état et Policies sous verrou, audit de chaque changement ; free et les versions archivées restent protégés. Les abonnements restent liés à leurs versions. PHP 8.5.12 : syntaxe des huit fichiers concernés valide, route chargée, quatre tests unitaires réussis (14 assertions) sans MySQL. Tests fonctionnels écrits mais non exécutés : ils nécessitent une autorisation explicite pour créer des bases MySQL isolées. Aucun seeder ni changement sur les données existantes n'a été exécuté.
+
+## 1er novembre 2026 — Module 09, archivage backend
+
+Ajout de DELETE admin/plans/{plan} et saas.plans.archive. La version inutilisée et non système est désactivée puis archivée logiquement avec état attendu, Policy sous verrou et audit atomique ; tout abonnement référencé bloque l'action, et les associations restent conservées. PHP 8.5.12 : syntaxe des huit fichiers concernés valide, route chargée, cinq tests unitaires réussis (18 assertions) sans MySQL. Les tests fonctionnels écrits ne sont pas exécutés : les bases temporaires MySQL nécessitent une autorisation explicite. Aucun seeder ni changement des données existantes n'a été exécuté.
+
 ## Références et priorité
 
 1. `Schema-BDD-SaaS-Ecommerce-UUID.md`, V4.9 : 28 tables centrales et 59 tables boutique, hors tables techniques Laravel.
