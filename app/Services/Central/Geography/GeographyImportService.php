@@ -27,7 +27,7 @@ class GeographyImportService
     /** @return array<string, mixed> */
     public function loadLocal(): array
     {
-        $payload = ['metadata' => config('geography.reference')];
+        $payload = ['metadata' => config('central.geography.reference')];
         $hash = hash_init('sha256');
 
         foreach (self::LOCAL_FILES as $name => $file) {

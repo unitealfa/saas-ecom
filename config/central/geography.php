@@ -3,7 +3,7 @@
 return [
     /*
     |--------------------------------------------------------------------------
-    | Référentiel géographique local
+    | Référentiel géographique central
     |--------------------------------------------------------------------------
     |
     | Métadonnées utilisées par GeographyImportService::loadLocal().

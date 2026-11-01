@@ -1210,6 +1210,8 @@ La demande de refactorisation précise les §18–24 : responsabilité technique
 
 ## 25.1 Audit et décisions de classement
 
+Configuration, décision du 1er novembre 2026 : les fichiers propres à Aydra suivent le contexte lorsqu'il existe, par exemple config/central/geography.php, lu avec config('central.geography.reference'). Les fichiers standards Laravel et des packages restent à la racine de config pour conserver leurs clés publiques database.*, auth.*, tenancy.*, permission.*, etc. Ne pas déplacer ces fichiers uniquement pour créer des sous-dossiers, ni ajouter de copies ou de wrappers. Aucun dossier de contexte vide n'est nécessaire. Après déplacement, mettre à jour les consommateurs et vérifier le chargement réel ; renouveler un cache de configuration seulement s'il était déjà utilisé.
+
 Les DTOs, Requests et Services centraux plats mélangent identité, pays, rôles, abonnements et provisionnement. Les Controllers administratifs sont regroupés dans Central/Admin/{Users,Roles,Countries,Tenants}. Les Services Users déjà organisés ne bougent pas. Auth regroupe les Actions Fortify, invitations, réponse d’inscription, middleware et action Livewire de déconnexion. Authorization porte les contrôles communs aux modules ; Roles porte le catalogue et la gestion des rôles. Plans et Subscriptions restent séparés. Tenant conserve ses seuls modules réellement préparés : Shop, Dashboard, Users et Diagnostics. Les enums tenant d’utilisateur rejoignent Tenant/Users, sans changer leurs valeurs.
 
 Décision actualisée le 27 octobre 2026 : les modèles suivent désormais Central/Tenant puis module métier, selon la correspondance du §46. Les Policies et factories restent dans leurs dossiers de contexte. Préserver les contrats de morph map, d’authentification et de sérialisation lors des déplacements. Les seeders conservent leurs chemins et commandes ; les jeux d’essai orchestrent plusieurs modules. Les jobs sérialisables, Providers, bootstrappers Tenancy, traits partagés et SchemaBlueprint restent à leur emplacement documenté. PermissionAssignment rejoint Models/Shared/Authorization ; les alias vides User/Tenant restent à la racine. Les enums réellement partagés ne sont pas dupliqués. Le modèle Test reste un exemple technique, rangé dans Models/Examples, sans table métier.
@@ -1999,6 +2001,26 @@ Décision confirmée : conserver les améliorations correctes proposées par l'u
 
 Pour chaque application, examiner les appelants et types de retour avant de modifier, conserver les contrôles contre les formulaires obsolètes et les audits utiles, puis vérifier le comportement et ses échecs importants. Ajouter une régression pertinente pour un bug confirmé ; ne pas remplacer ces contrôles par le seul formatage ou l'analyse statique. Respecter les autorisations de tests et ne pas installer de dépendance ou modifier les données existantes sur la seule base de ces conventions.
 
+## Apprentissage des améliorations utilisateur — 1er novembre 2026
+
+Décision explicite : tirer les règles réutilisables des phases où l'utilisateur améliore le code, afin de les appliquer dès la première réalisation des prochaines tâches pertinentes. Comparer chaque changement au comportement, aux appelants et aux vérifications avant de le classer comme amélioration validée. Conserver ses bonnes modifications ; documenter aussi les pièges révélés par la revue. Une proposition non vérifiée ne devient pas une convention et une correction propre à un module ne justifie pas une réécriture globale.
+
+| Déclencheur | Pratique à appliquer directement | Limites et contrôle |
+|---|---|---|
+| Une classe reçoit une dépendance stable | Injection typée au constructeur, promotion et readonly si la référence n'est jamais réaffectée ; réutiliser $this. | Ne pas appliquer readonly aux attributs Eloquent ou à l'état mutable Livewire. Respecter les cycles des jobs et des Providers (§27). |
+| Des valeurs techniques expriment une règle ou sont répétées | Réutiliser les enums existants et nommer les constantes utiles, par exemple pagination, TTL et nombre de tentatives. | Pas d'enum ou de constante artificielle pour chaque texte ; ne pas transformer un statut métier en booléen. |
+| Une méthode mélange plusieurs étapes cohérentes | Extraire quelques méthodes privées au nom explicite, garder les retours anticipés et des paramètres/retours typés. | Une extraction doit clarifier une responsabilité ; ne pas multiplier les enveloppes, callbacks ou classes pour déplacer la complexité. Préserver validation, Policy, verrous et audit. |
+| Un helper reçoit une requête Eloquent ou l'éditeur confond Model et Builder | Construire explicitement Model::query()->where/whereKey et documenter Builder<Modele>. Pour un callback SQL, utiliser le vrai Query Builder, distinct du Builder Eloquent. | Vérifier le type dans le framework installé ; ne pas élargir une signature correcte à mixed pour faire disparaître le diagnostic. |
+| Une propriété Eloquent ou relation est signalée inconnue | Documenter @property/@property-read d'après les migrations, casts, accesseurs et relations réels, avec leur nullabilité et leurs génériques. | Ne créer aucune propriété PHP concrète ou colonne pour satisfaire l'éditeur ; elle pourrait masquer l'attribut Eloquent. Pour les dates, employer un contrat compatible avec les classes réellement retournées. |
+| Un curseur est mal interprété par l'éditeur | Conserver le parcours paresseux et préciser son type réel lorsque nécessaire. Une annotation locale est acceptable si elle correspond au modèle effectivement hydraté et au contrat générique du curseur. | Ni faux @var, ni conversion, ni requête supplémentaire par ID, ni chargement de toute la collection uniquement pour contourner une inférence. |
+| Des avertissements d'éditeur apparaissent | Lire leur message/code/source ; vérifier namespace, autoload réel, version PHP et types avant de corriger. Distinguer défaut de code, annotation manquante et index obsolète. | Ne pas désactiver globalement les diagnostics ni supprimer une protection. Les contrôles CLI ne prouvent pas à eux seuls la disparition visuelle du soulignement ; réglages locaux détaillés au §22. |
+| Un contrôleur prépare une vue ou un formulaire | Charger seulement les données et relations réellement utilisées dans cette branche ; réutiliser les résultats et la pagination existants. | La page Modifier n'a pas besoin des listes réservées à la création. Vérifier le rendu et les appelants ; ne pas annoncer un gain de temps sans mesure. |
+| Un cache reçoit des filtres équivalents | Normaliser l'ordre des clés d'un tableau associatif de filtres avant de calculer son empreinte, si l'ordre n'a aucun sens métier. | Ne pas trier une liste dont l'ordre compte. Garder portée, TTL, invalidation après commit et lecture directe en transaction (§36). |
+| Un référentiel central est lu depuis une boutique | Garder une connexion et un chemin de cache centraux stables, indépendants du storage_path suffixé par tenancy. | Les données propres aux boutiques conservent leur isolation. Aucun cache de décision de permission, statut, quota ou unicité. |
+| Un traitement central ouvre temporairement un contexte tenant | Garantir la fin/restauration du contexte dans finally, même si une requête ou l'initialisation échoue ; examiner les garanties de la version installée du package. | Ne pas présumer qu'un helper run restaure le contexte après exception. Conserver le refus métier, le rollback et l'audit appropriés ; ne pas masquer l'échec. |
+
+Avant de livrer du code concerné, relire ce tableau avec les sections applicables, vérifier le raccordement de la fonctionnalité et choisir les contrôles ciblés autorisés. Une correction de PHPDoc ou une reformulation équivalente de Builder n'impose pas de nouveaux tests SQL ; un changement de comportement exige une couverture pertinente. Aucun accord de tests ou d'écriture réelle n'est déduit de cette capitalisation. Le suivi conserve les exemples et résultats datés ; ce tableau conserve les règles à réutiliser. Ces instructions de dépôt facilitent les prochaines sessions, sans constituer un réentraînement ni une mémoire indépendante du dépôt.
+
 # 39. Gestion centrale des profils et décisions — 20 octobre 2026
 
 ## Décision métier et simplicité
@@ -2164,6 +2186,8 @@ Résultats réellement exécutés et limites dans le suivi du 21 octobre 2026. L
 
 # 42. Autorisations explicites et transactions Laravel — 21 octobre 2026
 
+Actualisation du parcours, 1er novembre 2026 : le bouton « Actualiser mon statut » et le polling de 15 secondes utilisent la même lecture JSON privée. Une seule requête simultanée, aucune lecture lorsque l'onglet est masqué, et un délai minimal de cinq secondes après chaque réponse. Le serveur limite cette lecture à vingt requêtes par minute et par commerçant ; le personnel SaaS est exempt, conformément à l'absence de limitation administrative. Une réponse 429 respecte Retry-After avec un message d'attente. Comparer les états et la version du parcours, jamais les URL, pour décider du changement de page. Cette lecture ne crée ni boutique ni job et ne modifie aucun statut métier.
+
 ## Décision et connexion par défaut
 
 Cette section applique modiff.txt et les précisions reçues pendant le refactoring. Elle remplace les anciens détails d'AuthorizationMutation des §39–41, sans changer les permissions métier ni le mode de profils centraux.
@@ -2274,6 +2298,8 @@ Domain applique désormais SoftDeletes, conformément à deleted_at déjà prés
 Revue des modifications du 26 octobre : le Form Request réutilise DomainService.normalize pour les hôtes réservés, afin de conserver la même règle que le service et de permettre les alias valides sous la base SaaS. Une règle bail précède les contrôles personnalisés : une valeur non textuelle doit produire une erreur de validation, sans conversion forcée. Le contrôle HTTPS essaie au maximum deux IP publiques et s'arrête au premier certificat valide ; les contrôles d'IP et de nom restent obligatoires. La redirection publique compare aussi le UUID du principal à celui du domaine courant, pour éviter une redirection vers soi-même avec un ancien indicateur is_primary.
 
 # 44. Module 07 — Administration des déploiements boutiques
+
+Durée d'exécution, ajout du 1er novembre 2026 : la fiche affiche TenantSchemaDeployment::durationLabel(), calculée depuis started_at et ended_at de la tentative consultée. L'attente dans la queue est exclue ; sans début, afficher « Pas encore démarré », sans fin « En cours », puis la durée réelle une fois terminée, y compris zéro seconde. Aucune nouvelle colonne ni estimation de fin.
 
 Emplacements retenus selon le §25 : Controller Central/Admin/Deployments/TenantDeploymentController, Request Central/Deployments/DeploymentActionRequest, Policy Central/TenantSchemaDeploymentPolicy, Services Central/Tenants/TenantDeploymentService et TenantSchemaVersions ; vues central/pages/admin/deployments/index et show ; routes central/admin/deployments.php ; seeder Central/DeploymentPermissionSeeder ; tests Central/Feature/Admin/Deployments et Central/Integration. Réutiliser TenantSchemaDeployment, TenantProvisioner, TenantProvisioningRetry et le job existant Jobs/Central/ProvisionTenantDatabase ; ajouter uniquement Jobs/Central/MigrateTenantJob pour les migrations. Les noms plats de la liste de modules sont des exemples, pas une seconde organisation à créer.
 
@@ -2410,7 +2436,7 @@ Inventaire des fichiers du Module 13 créés ou modifiés (les JSON et modificat
 - app/Services/Central/Geography/GeographyCatalog.php
 - app/Services/Central/Geography/GeographyImportService.php
 - app/Services/Central/Roles/CentralRoleCatalog.php
-- config/geography.php
+- config/central/geography.php
 - database/migrations/central/2026_10_31_101808_allow_unknown_geographic_effective_date.php
 - database/migrations/central/2026_10_31_174124_remove_obsolete_geography_import_permission.php
 - database/seeders/Central/GeographicAreaSeeder.php

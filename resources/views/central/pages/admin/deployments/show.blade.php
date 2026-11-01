@@ -11,6 +11,7 @@
             <div><dt>Tentative</dt><dd>{{ $deployment->attempt_number }}</dd></div>
             <div><dt>Début</dt><dd>{{ $deployment->started_at?->format('d/m/Y H:i:s') ?? 'Pas encore démarré' }}</dd></div>
             <div><dt>Fin</dt><dd>{{ $deployment->ended_at?->format('d/m/Y H:i:s') ?? 'Non terminé' }}</dd></div>
+            <div><dt>Durée d’exécution</dt><dd>{{ $deployment->durationLabel() }}</dd></div>
             <div><dt>Version actuelle de la boutique</dt><dd>{{ $deployment->tenant?->schema_version ?? 'Non préparée' }}</dd></div>
         </dl>
         @if ($error !== null)

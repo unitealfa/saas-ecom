@@ -25,6 +25,78 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Stancl\Tenancy\Events\TenantCreated;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\Process\Process;
+
+test('status refresh spam is limited per merchant without modifying the journey', function (): void {
+    $merchant = journeyMerchant(['status' => StatusEnum::PENDING]);
+    $this->actingAs($merchant, 'central');
+    for ($i = 0; $i < 20; $i++) {
+        $this->getJson(route('registration.status'))->assertOk()->assertJsonPath('state', 'pending');
+    }
+    $this->getJson(route('registration.status'))->assertStatus(429)->assertHeader('Retry-After');
+    expect($merchant->fresh()->status)->toBe(StatusEnum::PENDING)
+        ->and(Tenant::where('user_id', $merchant->id)->exists())->toBeFalse();
+
+    $other = journeyMerchant(['status' => StatusEnum::PENDING]);
+    $this->actingAs($other, 'central')->getJson(route('registration.status'))->assertOk();
+    $this->travel(61)->seconds();
+    $this->actingAs($merchant, 'central')->getJson(route('registration.status'))->assertOk();
+});
+
+test('SaaS staff is exempt from the merchant status refresh limit', function (): void {
+    $this->seed(AuthorizationSeeder::class);
+    $staff = User::factory()->create();
+    $staff->assignRole(Role::findByName('root', 'central'));
+    $this->actingAs($staff, 'central');
+    for ($i = 0; $i < 21; $i++) {
+        $this->getJson(route('registration.status'))->assertOk()->assertJsonPath('state', 'ready');
+    }
+});
+
+test('the real status page prevents parallel clicks and respects server backoff', function (): void {
+    $merchant = journeyMerchant(['status' => StatusEnum::PENDING]);
+    $response = $this->actingAs($merchant, 'central')->withSession(['status' => 'status-message-once'])
+        ->get(route('registration.status'))->assertOk();
+    expect(substr_count($response->getContent(), 'status-message-once'))->toBe(1);
+    $script = <<<'JS'
+    const fs = require('fs');
+    const vm = require('vm');
+    const assert = require('assert/strict');
+    const html = fs.readFileSync(0, 'utf8');
+    const expression = html.match(/x-data="(\{\s*version:[\s\S]*?\})"/)[1]
+      .replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+    let calls = 0, resolveFetch;
+    const timers = [];
+    const sandbox = {
+      document: {hidden: false},
+      window: {setTimeout: (callback, delay) => timers.push({callback, delay}), clearTimeout() {},
+        clearInterval() {}, setInterval() {}, location: {replace() { throw new Error('Unexpected redirect'); }}},
+      fetch: () => { calls++; return new Promise(resolve => { resolveFetch = resolve; }); }
+    };
+    (async () => {
+      const state = vm.runInNewContext('(' + expression + ')', sandbox);
+      const first = state.refresh();
+      await Promise.all(Array.from({length: 30}, () => state.refresh()));
+      assert.equal(calls, 1);
+      resolveFetch({status: 200, ok: true, json: async () => ({state: state.state, version: state.version})});
+      await first;
+      await state.refresh();
+      assert.equal(calls, 1);
+      assert.equal(timers.at(-1).delay, 5000);
+      timers.at(-1).callback();
+      sandbox.fetch = async () => { calls++; return {status: 429, headers: {get: () => '60'}}; };
+      await state.refresh();
+      assert.equal(state.refreshLimited, true);
+      assert.equal(timers.at(-1).delay, 60000);
+      await state.refresh();
+      assert.equal(calls, 2);
+      console.log('safe');
+    })().catch(error => { console.error(error); process.exitCode = 1; });
+    JS;
+    $process = new Process(['node', '-e', $script], base_path());
+    $process->setInput($response->getContent())->mustRun();
+    expect(trim($process->getOutput()))->toBe('safe');
+});
 
 function journeyMerchant(array $attributes = []): User
 {
