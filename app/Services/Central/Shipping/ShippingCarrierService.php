@@ -6,6 +6,7 @@ use App\Models\Central\Shipping\ShippingCarrier;
 use App\Models\Central\Tenants\Tenant;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -30,40 +31,51 @@ class ShippingCarrierService
 
     public function __construct(private readonly AuthorizationMutation $mutations) {}
 
-    /** @param array<string, mixed> $filters
+    /**
+     * @param  array<string, mixed>  $filters
      * @return LengthAwarePaginator<int, ShippingCarrier>
      */
     public function search(User $actor, array $filters): LengthAwarePaginator
     {
-        abort_if(tenancy()->initialized, 403);
+        $this->assertCentralContext();
         Gate::forUser($actor)->authorize('viewAny', ShippingCarrier::class);
-        $pattern = '%'.addcslashes(trim((string) ($filters['search'] ?? '')), '\\%_').'%';
+
+        $search = trim((string) ($filters['search'] ?? ''));
+        $pattern = '%'.addcslashes($search, '\\%_').'%';
 
         return ShippingCarrier::query()
             ->when($filters['archived'] ?? false, fn (Builder $query) => $query->onlyTrashed())
             ->when(isset($filters['is_active']), fn (Builder $query) => $query->where('is_active', (bool) $filters['is_active']))
-            ->where(fn (Builder $query) => $query->where('name', 'like', $pattern)->orWhere('code', 'like', $pattern))
-            ->orderBy('name')->orderBy('id')->paginate(self::PER_PAGE)->withQueryString();
+            ->when($search !== '', fn (Builder $query) => $query->where(
+                fn (Builder $query) => $query->where('name', 'like', $pattern)->orWhere('code', 'like', $pattern),
+            ))
+            ->orderBy('name')->orderBy('id')
+            ->paginate(self::PER_PAGE)
+            ->withQueryString();
     }
 
     public function create(User $actor, string $code, string $name): ShippingCarrier
     {
-        abort_if(tenancy()->initialized, 403);
+        $this->assertCentralContext();
 
         return $this->mutations->run($actor, 'create', fn () => ShippingCarrier::class,
             function () use ($actor, $code, $name): ShippingCarrier {
+                $isYalidine = $code === ShippingCarrier::YALIDINE;
+
                 $carrier = new ShippingCarrier(['name' => $name]);
                 $carrier->forceFill([
                     'code' => $code,
-                    'adapter' => $code === ShippingCarrier::YALIDINE ? ShippingCarrier::YALIDINE : ShippingCarrier::UNCONFIGURED_ADAPTER,
+                    'adapter' => $isYalidine ? ShippingCarrier::YALIDINE : ShippingCarrier::UNCONFIGURED_ADAPTER,
                     'default_api_url' => null,
-                    'reference_source' => $code === ShippingCarrier::YALIDINE ? ShippingCarrier::YALIDINE_SOURCE : ShippingCarrier::MANUAL_SOURCE,
+                    'reference_source' => $isYalidine ? ShippingCarrier::YALIDINE_SOURCE : ShippingCarrier::MANUAL_SOURCE,
                 ]);
+
                 try {
                     $carrier->save();
                 } catch (UniqueConstraintViolationException) {
                     $this->fail('code', 'Ce transporteur existe déjà, y compris dans les archives.');
                 }
+
                 $this->audit($actor, $carrier, self::EVENT_CREATED, null);
 
                 return $carrier;
@@ -72,56 +84,57 @@ class ShippingCarrierService
 
     public function update(User $actor, ShippingCarrier $carrier, string $name, string $expected): void
     {
-        abort_if(tenancy()->initialized, 403);
+        $this->mutate($actor, $carrier, 'update', $expected, function (ShippingCarrier $carrier) use ($actor, $name): void {
+            if ($carrier->name === $name) {
+                return;
+            }
 
-        $this->mutations->run($actor, 'update', fn () => $this->lock($carrier, $expected),
-            function (ShippingCarrier $carrier) use ($actor, $name): void {
-                if ($carrier->name === $name) {
-                    return;
-                }
-                $before = $carrier->only(self::AUDITED);
-                $carrier->name = $name;
-                $this->saveRevision($carrier);
-                $this->audit($actor, $carrier, self::EVENT_UPDATED, $before);
-            });
+            $before = $this->revise($carrier, ['name' => $name]);
+            $this->audit($actor, $carrier, self::EVENT_UPDATED, $before);
+        });
     }
 
     public function setActive(User $actor, ShippingCarrier $carrier, bool $active, string $expected): void
     {
-        abort_if(tenancy()->initialized, 403);
+        $this->mutate($actor, $carrier, 'activate', $expected, function (ShippingCarrier $carrier) use ($actor, $active): void {
+            if ($carrier->is_active === $active) {
+                return;
+            }
 
-        $this->mutations->run($actor, 'activate', fn () => $this->lock($carrier, $expected),
-            function (ShippingCarrier $carrier) use ($actor, $active): void {
-                if ($carrier->is_active === $active) {
-                    return;
-                }
-                $before = $carrier->only(self::AUDITED);
-                $carrier->forceFill(['is_active' => $active]);
-                $this->saveRevision($carrier);
-                $this->audit($actor, $carrier, self::EVENT_ACTIVATED, $before);
-            });
+            $before = $this->revise($carrier, ['is_active' => $active]);
+            $this->audit($actor, $carrier, self::EVENT_ACTIVATED, $before);
+        });
     }
 
     public function archive(User $actor, ShippingCarrier $carrier, string $expected): void
     {
-        abort_if(tenancy()->initialized, 403);
+        $this->mutate($actor, $carrier, 'archive', $expected, function (ShippingCarrier $carrier) use ($actor): void {
+            if ($this->isReferenced($carrier)) {
+                $this->fail('carrier', 'Ce transporteur est utilisé. Désactivez-le plutôt que de l’archiver.');
+            }
 
-        $this->mutations->run($actor, 'archive', fn () => $this->lock($carrier, $expected),
-            function (ShippingCarrier $carrier) use ($actor): void {
-                if ($this->isReferenced($carrier)) {
-                    $this->fail('carrier', 'Ce transporteur est utilisé. Désactivez-le plutôt que de l’archiver.');
-                }
-                $before = $carrier->only(self::AUDITED);
-                $carrier->forceFill(['is_active' => false]);
-                $this->saveRevision($carrier);
-                $carrier->delete();
-                $this->audit($actor, $carrier, self::EVENT_ARCHIVED, $before);
-            });
+            $before = $this->revise($carrier, ['is_active' => false]);
+            $carrier->delete();
+            $this->audit($actor, $carrier, self::EVENT_ARCHIVED, $before);
+        });
+    }
+
+    /**
+     * Exécute une modification sur le transporteur verrouillé, après contrôle de l'état attendu.
+     *
+     * @param  Closure(ShippingCarrier): void  $mutation
+     */
+    private function mutate(User $actor, ShippingCarrier $carrier, string $ability, string $expected, Closure $mutation): void
+    {
+        $this->assertCentralContext();
+
+        $this->mutations->run($actor, $ability, fn () => $this->lock($carrier, $expected), $mutation);
     }
 
     private function lock(ShippingCarrier $carrier, string $expected): ShippingCarrier
     {
         $current = ShippingCarrier::query()->whereKey($carrier->id)->lockForUpdate()->firstOrFail();
+
         if (! hash_equals($current->managementState(), $expected)) {
             $this->fail('conflict', 'Ce transporteur a changé. Rechargez la page avant de recommencer.');
         }
@@ -129,19 +142,39 @@ class ShippingCarrierService
         return $current;
     }
 
-    private function saveRevision(ShippingCarrier $carrier): void
+    /**
+     * Applique les changements, incrémente la version de référence et retourne l'état audité d'avant.
+     *
+     * @param  array<string, mixed>  $changes
+     * @return array<string, mixed>
+     */
+    private function revise(ShippingCarrier $carrier, array $changes): array
     {
+        $before = $carrier->only(self::AUDITED);
+
+        $carrier->forceFill($changes);
         $carrier->reference_version++;
         $carrier->save();
+
+        return $before;
     }
 
     private function isReferenced(ShippingCarrier $carrier): bool
     {
+        return $this->hasCentralReferences($carrier) || $this->hasTenantReferences($carrier);
+    }
+
+    private function hasCentralReferences(ShippingCarrier $carrier): bool
+    {
         $central = $carrier->getConnection();
-        if ($central->table('carrier_geo_mappings')->where('carrier_id', $carrier->id)->exists()
-            || $central->table('pickup_points')->where('carrier_id', $carrier->id)->exists()) {
-            return true;
-        }
+
+        return $central->table('carrier_geo_mappings')->where('carrier_id', $carrier->id)->exists()
+            || $central->table('pickup_points')->where('carrier_id', $carrier->id)->exists();
+    }
+
+    /** Parcourt toutes les boutiques préparées : si l'une est illisible, l'archivage est refusé par prudence. */
+    private function hasTenantReferences(ShippingCarrier $carrier): bool
+    {
         foreach (Tenant::query()->withTrashed()->whereNotNull('provisioned_at')->cursor() as $tenant) {
             /** @var Tenant $tenant */
             try {
@@ -150,16 +183,23 @@ class ShippingCarrierService
                     ->where('carrier_uuid', $carrier->uuid)->exists();
             } catch (Throwable $exception) {
                 report($exception);
+
                 $this->fail('carrier', 'Les références des boutiques sont indisponibles. Archivage refusé.');
             } finally {
                 tenancy()->end();
             }
+
             if ($referenced) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private function assertCentralContext(): void
+    {
+        abort_if(tenancy()->initialized, 403);
     }
 
     /** @param array<string, mixed>|null $before */

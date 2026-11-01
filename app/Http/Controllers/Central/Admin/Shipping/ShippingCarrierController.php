@@ -20,12 +20,16 @@ class ShippingCarrierController extends Controller
     {
         $actor = $this->centralActor();
         Gate::forUser($actor)->authorize('viewAny', ShippingCarrier::class);
+
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
-            'is_active' => ['nullable', 'boolean'], 'archived' => ['nullable', 'boolean'],
+            'is_active' => ['nullable', 'boolean'],
+            'archived' => ['nullable', 'boolean'],
         ]);
 
-        return view('central.pages.admin.shipping.carriers.index', ['carriers' => $this->carriers->search($actor, $filters)]);
+        return view('central.pages.admin.shipping.carriers.index', [
+            'carriers' => $this->carriers->search($actor, $filters),
+        ]);
     }
 
     public function create(): View
@@ -37,7 +41,11 @@ class ShippingCarrierController extends Controller
 
     public function store(StoreShippingCarrierRequest $request): RedirectResponse
     {
-        $carrier = $this->carriers->create($this->centralActor(), $request->validated('code'), $request->validated('name'));
+        $carrier = $this->carriers->create(
+            $this->centralActor(),
+            $request->validated('code'),
+            $request->validated('name'),
+        );
 
         return $this->redirectWithStatus($carrier, 'Transporteur ajouté inactif. Vous pouvez l’activer avec le droit dédié.');
     }
@@ -58,14 +66,24 @@ class ShippingCarrierController extends Controller
 
     public function update(StoreShippingCarrierRequest $request, ShippingCarrier $carrier): RedirectResponse
     {
-        $this->carriers->update($this->centralActor(), $carrier, $request->validated('name'), $request->validated('expected_state'));
+        $this->carriers->update(
+            $this->centralActor(),
+            $carrier,
+            $request->validated('name'),
+            $request->validated('expected_state'),
+        );
 
         return $this->redirectWithStatus($carrier, 'Transporteur enregistré.');
     }
 
     public function activate(ShippingCarrierActionRequest $request, ShippingCarrier $carrier): RedirectResponse
     {
-        $this->carriers->setActive($this->centralActor(), $carrier, $request->boolean('is_active'), $request->validated('expected_state'));
+        $this->carriers->setActive(
+            $this->centralActor(),
+            $carrier,
+            $request->boolean('is_active'),
+            $request->validated('expected_state'),
+        );
 
         return $this->redirectWithStatus($carrier, 'Disponibilité du transporteur enregistrée.');
     }
@@ -77,10 +95,13 @@ class ShippingCarrierController extends Controller
         return $this->redirectWithStatus($carrier, 'Transporteur archivé. Son code reste réservé.');
     }
 
+    /** Redirige vers la fiche si l'acteur peut la voir, sinon vers le tableau de bord. */
     private function redirectWithStatus(ShippingCarrier $carrier, string $message): RedirectResponse
     {
-        return (Gate::forUser($this->centralActor())->allows('view', $carrier)
+        $redirect = Gate::forUser($this->centralActor())->allows('view', $carrier)
             ? to_route('central.carriers.show', $carrier)
-            : to_route('dashboard'))->with('status', $message);
+            : to_route('dashboard');
+
+        return $redirect->with('status', $message);
     }
 }

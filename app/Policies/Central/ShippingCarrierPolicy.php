@@ -12,7 +12,7 @@ class ShippingCarrierPolicy
 
     public function viewAny(User $actor): bool
     {
-        return $this->access->allows($actor, 'saas.carriers.view');
+        return $this->has($actor, 'view');
     }
 
     public function view(User $actor, ShippingCarrier $carrier): bool
@@ -22,21 +22,32 @@ class ShippingCarrierPolicy
 
     public function create(User $actor): bool
     {
-        return $this->access->allows($actor, 'saas.carriers.create');
+        return $this->has($actor, 'create');
     }
 
     public function update(User $actor, ShippingCarrier $carrier): bool
     {
-        return ! $carrier->trashed() && $this->access->allows($actor, 'saas.carriers.update');
+        return $this->canManage($actor, $carrier, 'update');
     }
 
     public function activate(User $actor, ShippingCarrier $carrier): bool
     {
-        return ! $carrier->trashed() && $this->access->allows($actor, 'saas.carriers.activate');
+        return $this->canManage($actor, $carrier, 'activate');
     }
 
     public function archive(User $actor, ShippingCarrier $carrier): bool
     {
-        return ! $carrier->trashed() && $this->access->allows($actor, 'saas.carriers.archive');
+        return $this->canManage($actor, $carrier, 'archive');
+    }
+
+    /** Un transporteur archivé n'est plus modifiable. */
+    private function canManage(User $actor, ShippingCarrier $carrier, string $ability): bool
+    {
+        return ! $carrier->trashed() && $this->has($actor, $ability);
+    }
+
+    private function has(User $actor, string $ability): bool
+    {
+        return $this->access->allows($actor, "saas.carriers.$ability");
     }
 }

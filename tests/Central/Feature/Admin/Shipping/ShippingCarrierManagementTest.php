@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Central\Geography\GeoZoneTypeEnum;
 use App\Models\Central\Audit\Activity;
 use App\Models\Central\Countries\Country;
 use App\Models\Central\Geography\GeographicArea;
@@ -15,6 +16,8 @@ use Database\Seeders\Central\ShippingCarrierSeeder;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
+const SHIPPING_TEST_PERMISSION_DAYS = 7;
+
 function shippingAdmin(): User
 {
     test()->seed(AuthorizationSeeder::class);
@@ -27,7 +30,7 @@ function shippingAdmin(): User
 function shippingStaff(string $permission): User
 {
     $actor = User::factory()->create();
-    $actor->assignRole(Role::createWithPermissions('carrier-'.Str::random(10), [$permission => 7]));
+    $actor->assignRole(Role::createWithPermissions('carrier-'.Str::random(10), [$permission => SHIPPING_TEST_PERMISSION_DAYS]));
 
     return $actor;
 }
@@ -53,8 +56,13 @@ test('all carrier HTTP actions refuse staff without their permission', function 
     $carrier = ShippingCarrier::factory()->create();
     $actor = shippingStaff('saas.users.view');
     $this->actingAs($actor, 'central');
-    foreach (['index', 'create', 'show', 'edit'] as $action) {
-        $this->get(route('central.carriers.'.$action, in_array($action, ['show', 'edit'], true) ? $carrier : []))->assertForbidden();
+    foreach ([
+        route('central.carriers.index'),
+        route('central.carriers.create'),
+        route('central.carriers.show', $carrier),
+        route('central.carriers.edit', $carrier),
+    ] as $url) {
+        $this->get($url)->assertForbidden();
     }
     $this->post(route('central.carriers.store'), [])->assertForbidden();
     $this->put(route('central.carriers.update', $carrier), [])->assertForbidden();
@@ -66,10 +74,12 @@ test('carrier permissions remain independent at the policy level', function (str
     shippingAdmin();
     $carrier = ShippingCarrier::factory()->create();
     $actor = shippingStaff('saas.carriers.'.$permission);
-    foreach (['viewAny', 'create', 'update', 'activate', 'archive'] as $candidate) {
-        expect(Gate::forUser($actor)->allows($candidate,
-            in_array($candidate, ['viewAny', 'create'], true) ? ShippingCarrier::class : $carrier))
-            ->toBe($candidate === $ability);
+    $subjects = [
+        'viewAny' => ShippingCarrier::class, 'create' => ShippingCarrier::class,
+        'update' => $carrier, 'activate' => $carrier, 'archive' => $carrier,
+    ];
+    foreach ($subjects as $candidate => $subject) {
+        expect(Gate::forUser($actor)->allows($candidate, $subject))->toBe($candidate === $ability);
     }
 })->with(['view' => ['view', 'viewAny'], 'create' => ['create', 'create'],
     'update' => ['update', 'update'], 'activate' => ['activate', 'activate'], 'archive' => ['archive', 'archive']]);
@@ -118,7 +128,7 @@ test('a custom carrier code is editable on creation without inheriting Yalidine 
     $this->get(route('central.carriers.edit', $carrier))->assertOk()->assertSee('readonly', false);
     $this->put(route('central.carriers.update', $carrier), [
         'code' => 'changed-code', 'name' => 'Autre transporteur', 'expected_state' => $carrier->managementState(),
-    ])->assertSessionHasErrors('code');
+    ])->assertSessionHasErrors(['code' => 'Le code d’un transporteur ne peut pas être modifié.']);
     $this->post(route('central.carriers.store'), ['code' => 'FAST-DELIVERY', 'name' => 'Doublon'])
         ->assertSessionHasErrors('code');
     expect($carrier->refresh()->code)->toBe('fast-delivery')->and(ShippingCarrier::count())->toBe(1);
@@ -171,14 +181,10 @@ test('a failed carrier transaction preserves state and audit history', function 
     $admin = shippingAdmin();
     $carrier = ShippingCarrier::factory()->create();
     $before = Activity::count();
-    try {
-        $carrier->getConnection()->transaction(function () use ($admin, $carrier): void {
-            app(ShippingCarrierService::class)->setActive($admin, $carrier, true, $carrier->managementState());
-            throw new RuntimeException('Test rollback');
-        });
-    } catch (RuntimeException $exception) {
-        expect($exception->getMessage())->toBe('Test rollback');
-    }
+    expect(fn () => $carrier->getConnection()->transaction(function () use ($admin, $carrier): void {
+        app(ShippingCarrierService::class)->setActive($admin, $carrier, true, $carrier->managementState());
+        throw new RuntimeException('Test rollback');
+    }))->toThrow(RuntimeException::class, 'Test rollback');
     expect($carrier->refresh()->is_active)->toBeFalse()->and(Activity::count())->toBe($before);
 });
 
@@ -189,12 +195,12 @@ test('central geographic references prevent carrier archival', function (): void
     $area = new GeographicArea;
     $area->forceFill([
         'country_id' => Country::where('code', 'DZ')->sole()->id,
-        'type' => 1, 'code' => '16', 'name_fr' => 'Alger', 'is_active' => true,
+        'type' => GeoZoneTypeEnum::PROVINCE, 'code' => '16', 'name_fr' => 'Alger', 'is_active' => true,
         'reference_source' => 'test', 'reference_version' => 'test-1',
     ])->save();
     $carrier->getConnection()->table('carrier_geo_mappings')->insert([
         'uuid' => (string) Str::uuid(), 'carrier_id' => $carrier->id, 'geographic_area_id' => $area->id,
-        'zone_type' => 1, 'external_code' => '16', 'external_name' => 'Test',
+        'zone_type' => GeoZoneTypeEnum::PROVINCE->value, 'external_code' => '16', 'external_name' => 'Test',
         'external_province_code' => '16', 'verification_source' => 'test', 'mapping_version' => 1, 'is_active' => false,
     ]);
     $this->actingAs($admin, 'central')->delete(route('central.carriers.archive', $carrier), [

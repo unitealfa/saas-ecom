@@ -33,6 +33,15 @@ test('carrier cache avoids repeated queries and follows committed changes withou
     try {
         expect($catalog->active())->toBe($expected);
         expect($connection->getQueryLog())->toBe([]);
+
+        $originalStorage = app()->storagePath();
+        try {
+            app()->useStoragePath($originalStorage.'/tenant-cache-check');
+            expect($catalog->active())->toBe($expected);
+            expect($connection->getQueryLog())->toBe([]);
+        } finally {
+            app()->useStoragePath($originalStorage);
+        }
     } finally {
         $connection->disableQueryLog();
     }
