@@ -11,6 +11,10 @@ use Spatie\Permission\Models\Permission as PackagePermission;
 
 class CentralRoleCatalog
 {
+    public const array PLAN_PERMISSIONS = [
+        'saas.plans.view' => 'Consulter les plans et leurs versions',
+    ];
+
     public const array CARRIER_PERMISSIONS = [
         'saas.carriers.view' => 'Consulter les transporteurs',
         'saas.carriers.create' => 'Ajouter un transporteur',
@@ -53,6 +57,7 @@ class CentralRoleCatalog
     ];
 
     public const array PERMISSIONS = [
+        ...self::PLAN_PERMISSIONS,
         ...self::CARRIER_PERMISSIONS,
         ...self::GEOGRAPHY_PERMISSIONS,
         ...self::FEATURE_PERMISSIONS,
@@ -106,6 +111,7 @@ class CentralRoleCatalog
     ];
 
     public const array GROUPS = [
+        'Plans et offres' => ['saas.plans.view'],
         'Transporteurs' => ['saas.carriers.view', 'saas.carriers.create', 'saas.carriers.update', 'saas.carriers.activate', 'saas.carriers.archive'],
         'Wilayas et communes' => ['saas.geography.view', 'saas.geography.create', 'saas.geography.update', 'saas.geography.activate', 'saas.geography.archive'],
         'Fonctionnalités commerciales' => ['saas.features.view', 'saas.features.create', 'saas.features.update', 'saas.features.activate', 'saas.features.archive'],

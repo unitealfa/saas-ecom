@@ -347,6 +347,7 @@ resources/views/central/pages/admin/plans/
 
 
 Une ancienne version déjà utilisée doit rester conservée pour les abonnements historiques.
+Première étape : consultation backend seulement. La liste JSON paginée expose les versions, y compris archivées, avec recherche par code ou nom ; la fiche par UUID expose la composition et les quotas. Ces lectures administratives requièrent saas.plans.view et restent non mises en cache. Les six autres actions et l'interface restent à réaliser.
 Module 10 — Gestion des abonnements
 Table : subscriptions
 Interface : Administration → Abonnements

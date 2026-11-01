@@ -2,6 +2,10 @@
 
 Ouvert le 6 octobre 2026 pour exécuter `instruction.txt`. Ce fichier distingue les spécifications, le code et les vérifications réelles. Une case non cochée signifie que le travail reste à faire ; une migration écrite ne prouve pas son exécution.
 
+## 1er novembre 2026 — Module 09, consultation backend
+
+Ajout des seules lectures administratives JSON des plans et de leurs versions, y compris archivées, et de leur composition. Permission centrale explicite saas.plans.view, sans attribution automatique aux rôles. Pas d'interface ni de mutation des plans, abonnements ou boutiques. PHP 8.5.12, au chemin local explicitement fourni, valide la syntaxe des dix fichiers concernés ; route:list confirme les deux routes sur les trois domaines centraux. Les tests fonctionnels correspondants sont écrits mais n'ont pas été exécutés : ils créent des bases MySQL isolées et exigent une autorisation distincte. L'ajout de la permission à la base centrale existante reste à exécuter explicitement après autorisation ; aucun seeder réel n'a été lancé.
+
 ## Références et priorité
 
 1. `Schema-BDD-SaaS-Ecommerce-UUID.md`, V4.9 : 28 tables centrales et 59 tables boutique, hors tables techniques Laravel.
