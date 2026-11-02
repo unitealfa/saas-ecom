@@ -11,6 +11,13 @@ use Spatie\Permission\Models\Permission as PackagePermission;
 
 class CentralRoleCatalog
 {
+    public const array MEDIA_PERMISSIONS = [
+        'saas.media.view' => 'Consulter les fichiers centraux',
+        'saas.media.upload' => 'Importer un fichier autorisé',
+        'saas.media.download' => 'Télécharger un fichier privé autorisé',
+        'saas.media.archive' => 'Archiver un fichier dont le retrait est permis',
+    ];
+
     public const array PICKUP_POINT_PERMISSIONS = [
         'saas.pickup-points.view' => 'Consulter les bureaux de retrait',
         'saas.pickup-points.create' => 'Ajouter un bureau',
@@ -81,6 +88,7 @@ class CentralRoleCatalog
     public const array PERMISSIONS = [
         ...self::CARRIER_MAPPING_PERMISSIONS,
         ...self::PICKUP_POINT_PERMISSIONS,
+        ...self::MEDIA_PERMISSIONS,
         ...self::PLAN_PERMISSIONS,
         ...self::CARRIER_PERMISSIONS,
         ...self::GEOGRAPHY_PERMISSIONS,
@@ -135,6 +143,7 @@ class CentralRoleCatalog
     ];
 
     public const array GROUPS = [
+        'Fichiers centraux' => ['saas.media.view', 'saas.media.upload', 'saas.media.download', 'saas.media.archive'],
         'Bureaux de retrait' => ['saas.pickup-points.view', 'saas.pickup-points.create', 'saas.pickup-points.update', 'saas.pickup-points.import', 'saas.pickup-points.activate', 'saas.pickup-points.archive'],
         'Correspondances géographiques des transporteurs' => ['saas.carrier-mappings.view', 'saas.carrier-mappings.create', 'saas.carrier-mappings.update', 'saas.carrier-mappings.import', 'saas.carrier-mappings.archive'],
         'Transporteurs' => ['saas.carriers.view', 'saas.carriers.create', 'saas.carriers.update', 'saas.carriers.activate', 'saas.carriers.archive'],
