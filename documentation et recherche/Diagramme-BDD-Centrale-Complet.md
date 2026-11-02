@@ -1350,6 +1350,8 @@ Le catalogue commun des bureaux officiels des transporteurs, avec leur adresse, 
 
 ## 5. Décisions et contrôles de cette version
 
+Module 16 : pickup_points est administrée dans Central/Shipping, avec six permissions Spatie distinctes. Création/import inactifs, activation dédiée, édition de la présentation et archivage logique sans effacement des snapshots tenant. Identité transporteur/code/wilaya/commune stable et contraintes existantes conservées. Import CSV avec aperçu puis confirmation atomique, sans création de source officielle fictive. Voir architecture §49.
+
 | Données | Emplacement |
 |---|---|
 | Pays et zones | countries/geographic_areas centraux, conservés |

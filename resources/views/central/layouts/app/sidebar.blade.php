@@ -50,6 +50,9 @@
                             {{ __('Transporteurs') }}
                         </flux:sidebar.item>
                     @endcan
+                    @can('viewAny', \App\Models\Central\Shipping\PickupPoint::class)
+                        <flux:sidebar.item :href="route('central.pickup-points.index')" :current="request()->routeIs('central.pickup-points.*')" wire:navigate>Bureaux de retrait</flux:sidebar.item>
+                    @endcan
                     @can('viewAny', \App\Models\Central\Shipping\CarrierGeoMapping::class)
                         <flux:sidebar.item :href="route('central.carrier-mappings.index')" :current="request()->routeIs('central.carrier-mappings.*')" wire:navigate>
                             {{ __('Codes géographiques des transporteurs') }}
