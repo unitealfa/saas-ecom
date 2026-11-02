@@ -27,6 +27,15 @@ class CentralRoleCatalog
         'saas.carrier-mappings.import' => 'Importer les codes des transporteurs',
         'saas.carrier-mappings.archive' => 'Archiver une correspondance',
     ];
+  
+    public const array PLAN_PERMISSIONS = [
+        'saas.plans.view' => 'Consulter les plans et leurs versions',
+        'saas.plans.create' => 'Créer un nouveau plan',
+        'saas.plans.features.update' => 'Définir les fonctionnalités et quotas d’un plan',
+        'saas.plans.versions.create' => 'Créer une nouvelle version d’un plan',
+        'saas.plans.activate' => 'Activer ou désactiver la commercialisation d’un plan',
+        'saas.plans.archive' => 'Archiver une offre autorisée',
+    ];
 
     public const array CARRIER_PERMISSIONS = [
         'saas.carriers.view' => 'Consulter les transporteurs',
@@ -72,6 +81,7 @@ class CentralRoleCatalog
     public const array PERMISSIONS = [
         ...self::CARRIER_MAPPING_PERMISSIONS,
         ...self::PICKUP_POINT_PERMISSIONS,
+        ...self::PLAN_PERMISSIONS,
         ...self::CARRIER_PERMISSIONS,
         ...self::GEOGRAPHY_PERMISSIONS,
         ...self::FEATURE_PERMISSIONS,
