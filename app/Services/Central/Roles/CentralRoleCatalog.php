@@ -11,6 +11,15 @@ use Spatie\Permission\Models\Permission as PackagePermission;
 
 class CentralRoleCatalog
 {
+    public const array PICKUP_POINT_PERMISSIONS = [
+        'saas.pickup-points.view' => 'Consulter les bureaux de retrait',
+        'saas.pickup-points.create' => 'Ajouter un bureau',
+        'saas.pickup-points.update' => 'Modifier un bureau',
+        'saas.pickup-points.import' => 'Importer les bureaux officiels',
+        'saas.pickup-points.activate' => 'Activer ou désactiver un bureau',
+        'saas.pickup-points.archive' => 'Archiver un bureau',
+    ];
+
     public const array CARRIER_MAPPING_PERMISSIONS = [
         'saas.carrier-mappings.view' => 'Consulter les correspondances géographiques',
         'saas.carrier-mappings.create' => 'Créer une correspondance',
@@ -71,6 +80,7 @@ class CentralRoleCatalog
 
     public const array PERMISSIONS = [
         ...self::CARRIER_MAPPING_PERMISSIONS,
+        ...self::PICKUP_POINT_PERMISSIONS,
         ...self::PLAN_PERMISSIONS,
         ...self::CARRIER_PERMISSIONS,
         ...self::GEOGRAPHY_PERMISSIONS,
@@ -125,6 +135,7 @@ class CentralRoleCatalog
     ];
 
     public const array GROUPS = [
+        'Bureaux de retrait' => ['saas.pickup-points.view', 'saas.pickup-points.create', 'saas.pickup-points.update', 'saas.pickup-points.import', 'saas.pickup-points.activate', 'saas.pickup-points.archive'],
         'Correspondances géographiques des transporteurs' => ['saas.carrier-mappings.view', 'saas.carrier-mappings.create', 'saas.carrier-mappings.update', 'saas.carrier-mappings.import', 'saas.carrier-mappings.archive'],
         'Transporteurs' => ['saas.carriers.view', 'saas.carriers.create', 'saas.carriers.update', 'saas.carriers.activate', 'saas.carriers.archive'],
         'Wilayas et communes' => ['saas.geography.view', 'saas.geography.create', 'saas.geography.update', 'saas.geography.activate', 'saas.geography.archive'],
