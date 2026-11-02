@@ -1320,6 +1320,8 @@ Le dictionnaire commun qui traduit une wilaya ou une commune en code compris par
 | `created_at` | La date d’ajout de cette correspondance. |
 | `updated_at` | La date de dernière actualisation autorisée. |
 
+Module 15 : carrier_geo_mappings est administrée sous les cinq permissions saas.carrier-mappings.view/create/update/import/archive. L'archivage désactive is_active sans supprimer la ligne ; l'import CSV prévisualisé puis confirmé conserve les UUID, les FK centrales réelles, les versions et l'audit. Aucune colonne ajoutée par ce module. Le type vient de la zone ; les codes transporteur proviennent d'une source vérifiée, jamais d'une déduction du code postal ou de la PK.
+
 ### 27. `pickup_points` — 19 champs
 
 Le catalogue commun des bureaux officiels des transporteurs, avec leur adresse, leur code et leur emplacement. Chaque commerçant choisit séparément les bureaux qu’il autorise.

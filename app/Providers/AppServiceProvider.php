@@ -14,6 +14,7 @@ use App\Models\Central\Permissions\Permission;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Plans\PlanFeature;
 use App\Models\Central\Roles\Role;
+use App\Models\Central\Shipping\CarrierGeoMapping;
 use App\Models\Central\Shipping\ShippingCarrier;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Tenants\Tenant;
@@ -27,6 +28,7 @@ use App\Models\Tenant\Roles\Role as TenantRole;
 use App\Models\Tenant\Shop\Shop;
 use App\Models\Tenant\Users\User as ShopUser;
 use App\Models\User;
+use App\Policies\Central\CarrierGeoMappingPolicy;
 use App\Policies\Central\CountryPolicy;
 use App\Policies\Central\DomainPolicy;
 use App\Policies\Central\FeaturePolicy;
@@ -58,6 +60,7 @@ class AppServiceProvider extends ServiceProvider
         Permission::class => PermissionPolicy::class,
         Country::class => CountryPolicy::class,
         ShippingCarrier::class => ShippingCarrierPolicy::class,
+        CarrierGeoMapping::class => CarrierGeoMappingPolicy::class,
         GeographicArea::class => GeographicAreaPolicy::class,
         Domain::class => DomainPolicy::class,
         Feature::class => FeaturePolicy::class,
