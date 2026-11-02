@@ -34,6 +34,7 @@ use App\Policies\Central\CountryPolicy;
 use App\Policies\Central\DomainPolicy;
 use App\Policies\Central\FeaturePolicy;
 use App\Policies\Central\GeographicAreaPolicy;
+use App\Policies\Central\MediaPolicy;
 use App\Policies\Central\PermissionPolicy;
 use App\Policies\Central\PickupPointPolicy;
 use App\Policies\Central\RolePolicy;
@@ -64,6 +65,7 @@ class AppServiceProvider extends ServiceProvider
         ShippingCarrier::class => ShippingCarrierPolicy::class,
         CarrierGeoMapping::class => CarrierGeoMappingPolicy::class,
         PickupPoint::class => PickupPointPolicy::class,
+        Media::class => MediaPolicy::class,
         GeographicArea::class => GeographicAreaPolicy::class,
         Domain::class => DomainPolicy::class,
         Feature::class => FeaturePolicy::class,
