@@ -11,6 +11,14 @@ use Spatie\Permission\Models\Permission as PackagePermission;
 
 class CentralRoleCatalog
 {
+    public const array CARRIER_MAPPING_PERMISSIONS = [
+        'saas.carrier-mappings.view' => 'Consulter les correspondances géographiques',
+        'saas.carrier-mappings.create' => 'Créer une correspondance',
+        'saas.carrier-mappings.update' => 'Modifier une correspondance',
+        'saas.carrier-mappings.import' => 'Importer les codes des transporteurs',
+        'saas.carrier-mappings.archive' => 'Archiver une correspondance',
+    ];
+  
     public const array PLAN_PERMISSIONS = [
         'saas.plans.view' => 'Consulter les plans et leurs versions',
         'saas.plans.create' => 'Créer un nouveau plan',
@@ -62,6 +70,7 @@ class CentralRoleCatalog
     ];
 
     public const array PERMISSIONS = [
+        ...self::CARRIER_MAPPING_PERMISSIONS,
         ...self::PLAN_PERMISSIONS,
         ...self::CARRIER_PERMISSIONS,
         ...self::GEOGRAPHY_PERMISSIONS,
@@ -116,7 +125,7 @@ class CentralRoleCatalog
     ];
 
     public const array GROUPS = [
-        'Plans et offres' => ['saas.plans.view', 'saas.plans.create', 'saas.plans.features.update', 'saas.plans.versions.create', 'saas.plans.activate', 'saas.plans.archive'],
+        'Correspondances géographiques des transporteurs' => ['saas.carrier-mappings.view', 'saas.carrier-mappings.create', 'saas.carrier-mappings.update', 'saas.carrier-mappings.import', 'saas.carrier-mappings.archive'],
         'Transporteurs' => ['saas.carriers.view', 'saas.carriers.create', 'saas.carriers.update', 'saas.carriers.activate', 'saas.carriers.archive'],
         'Wilayas et communes' => ['saas.geography.view', 'saas.geography.create', 'saas.geography.update', 'saas.geography.activate', 'saas.geography.archive'],
         'Fonctionnalités commerciales' => ['saas.features.view', 'saas.features.create', 'saas.features.update', 'saas.features.activate', 'saas.features.archive'],
