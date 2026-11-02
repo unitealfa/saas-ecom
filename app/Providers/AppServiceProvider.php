@@ -15,6 +15,7 @@ use App\Models\Central\Plans\Plan;
 use App\Models\Central\Plans\PlanFeature;
 use App\Models\Central\Roles\Role;
 use App\Models\Central\Shipping\CarrierGeoMapping;
+use App\Models\Central\Shipping\PickupPoint;
 use App\Models\Central\Shipping\ShippingCarrier;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Tenants\Tenant;
@@ -34,6 +35,7 @@ use App\Policies\Central\DomainPolicy;
 use App\Policies\Central\FeaturePolicy;
 use App\Policies\Central\GeographicAreaPolicy;
 use App\Policies\Central\PermissionPolicy;
+use App\Policies\Central\PickupPointPolicy;
 use App\Policies\Central\PlanPolicy;
 use App\Policies\Central\RolePolicy;
 use App\Policies\Central\ShippingCarrierPolicy;
@@ -63,6 +65,7 @@ class AppServiceProvider extends ServiceProvider
         Country::class => CountryPolicy::class,
         ShippingCarrier::class => ShippingCarrierPolicy::class,
         CarrierGeoMapping::class => CarrierGeoMappingPolicy::class,
+        PickupPoint::class => PickupPointPolicy::class,
         GeographicArea::class => GeographicAreaPolicy::class,
         Domain::class => DomainPolicy::class,
         Feature::class => FeaturePolicy::class,

@@ -1,4 +1,7 @@
 <x-layouts::app :title="$carrier->name">
+    @can('viewAny', \App\Models\Central\Shipping\PickupPoint::class)
+        <flux:button :href="route('central.pickup-points.index', ['carrier_uuid' => $carrier->uuid])">Bureaux de retrait</flux:button>
+    @endcan
     <section class="flex flex-col gap-6">
         <flux:heading size="xl">{{ $carrier->name }}</flux:heading>
         @if (session('status'))<flux:text role="status">{{ session('status') }}</flux:text>@endif
