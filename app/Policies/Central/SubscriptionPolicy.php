@@ -19,4 +19,9 @@ class SubscriptionPolicy
     {
         return $this->viewAny($actor);
     }
+
+    public function assign(User $actor): bool
+    {
+        return $this->access->allows($actor, 'saas.subscriptions.assign');
+    }
 }

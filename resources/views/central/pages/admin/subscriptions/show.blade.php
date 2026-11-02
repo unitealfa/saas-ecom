@@ -1,6 +1,7 @@
 <x-layouts::app :title="__('Abonnement')">
     <section class="flex flex-col gap-6">
         <flux:heading size="xl" level="1">Détail de l’abonnement</flux:heading>
+        @if (session('status'))<flux:text role="status">{{ session('status') }}</flux:text>@endif
         <dl class="grid gap-4 sm:grid-cols-2">
             @foreach ([
                 'Identifiant' => $subscription->uuid,

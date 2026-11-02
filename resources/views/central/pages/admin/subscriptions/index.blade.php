@@ -2,6 +2,10 @@
     <section class="flex flex-col gap-6">
         <flux:heading size="xl" level="1">Abonnements</flux:heading>
         <flux:text>Recherchez les abonnements par propriétaire, offre ou identifiant.</flux:text>
+        @if (session('status'))<flux:text role="status">{{ session('status') }}</flux:text>@endif
+        @can('assign', \App\Models\Central\Subscriptions\Subscription::class)
+            <div><flux:button :href="route('central.subscriptions.create')" variant="primary">Attribuer un abonnement</flux:button></div>
+        @endcan
         @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
         <form method="GET" action="{{ route('central.subscriptions.index') }}" class="flex flex-wrap items-end gap-3">
             <flux:input name="search" label="Rechercher" :value="request('search')" placeholder="Nom, e-mail, offre ou UUID" />

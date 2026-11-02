@@ -2,6 +2,10 @@
 
 Ouvert le 6 octobre 2026 pour exécuter `instruction.txt`. Ce fichier distingue les spécifications, le code et les vérifications réelles. Une case non cochée signifie que le travail reste à faire ; une migration écrite ne prouve pas son exécution.
 
+## Module 10 — Attribution d'un abonnement
+
+Attribution immédiate préparée sous saas.subscriptions.assign, depuis le module ou une fiche utilisateur : commerçant actif non personnel, version commercialisée, prix confirmé mensuel ou annuel, idempotence, conservation de l'historique, refus d'un abonnement payant en cours et rééquilibrage des boutiques via le service existant. Décision utilisateur : le montant convenu est le tarif correspondant à la version choisie. PHP 8.5 : syntaxe valide, routes chargées et test unitaire réussi (1 test, 4 assertions). Tests fonctionnels ajoutés mais non exécutés : autorisation MySQL explicite nécessaire pour cette tâche. Aucun seeder ni changement réel exécuté ; le droit assign reste à enregistrer après autorisation, sans attribution automatique. Vérification navigateur non effectuée.
+
 ## Module 10 — Consultation des abonnements
 
 Liste et fiche administratives en lecture seule, recherche et filtre d'état, scope type 1 et références historiques, sous saas.subscriptions.view ; les vues utilisateur et boutique sont soumises au même droit. PHP 8.5 : syntaxe valide, six routes chargées sur les trois domaines et test unitaire réussi (1 test, 3 assertions). Tests fonctionnels écrits mais non exécutés : ils créent des bases MySQL isolées et exigent une autorisation explicite propre à cette tâche. Aucun seeder ni changement de données réelles exécuté. Le droit doit être enregistré par SubscriptionPermissionSeeder après autorisation, sans attribution automatique. L'ancien saas.subscriptions.manage est conservé dans LocalDevelopmentSeeder et n'est pas migré lors de cette étape.

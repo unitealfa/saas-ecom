@@ -105,6 +105,9 @@
         {{ $subscriptions->links() }}
         @endcan
         <div class="flex flex-wrap gap-3">
+            @can('assign', \App\Models\Central\Subscriptions\Subscription::class)
+                <flux:button :href="route('central.subscriptions.create', ['owner' => $user->uuid])">Attribuer un abonnement</flux:button>
+            @endcan
             @include('central.pages.admin.users.lifecycle-actions')
             @can('viewHistory', $user)
                 <flux:button :href="route('central.users.history', $user)">Historique administratif</flux:button>

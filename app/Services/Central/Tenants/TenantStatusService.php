@@ -17,6 +17,7 @@ use App\Services\Central\Authorization\AuthorizationMutation;
 use App\Services\Central\Authorization\CentralUserAccess;
 use App\Services\Central\Subscriptions\DefaultSubscription;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use LogicException;
@@ -90,6 +91,21 @@ class TenantStatusService
                 ],
                 'Opération technique terminée et état d’accès calculé automatiquement.');
         });
+    }
+
+    /** Appelé pendant la transaction d'attribution, après verrouillage du propriétaire. */
+    public function rebalanceForSubscription(User $actor, User $owner): void
+    {
+        if (DB::transactionLevel() === 0) {
+            throw new LogicException('Subscription quota reconciliation requires a transaction.');
+        }
+        Gate::forUser($actor)->authorize('assign', Subscription::class);
+        $owner = User::whereKey($owner->id)->lockForUpdate()->firstOrFail();
+        $shops = Tenant::where('user_id', $owner->id)->orderBy('id')->lockForUpdate()->get();
+        if ($shops->isNotEmpty()) {
+            $this->assertOwnerEligible($owner);
+            $this->rebalance($actor, $owner, $shops, null, 'Attribution d’un abonnement');
+        }
     }
 
     public function change(User $actor, Tenant $tenant, string $action, StatusEnum $expected, ?string $reason): void

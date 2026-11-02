@@ -365,6 +365,7 @@ Permission existante à conserver pendant la transition :
 saas.subscriptions.manage
 Cette permission doit être recensée dans Codex afin de retrouver tous ses usages actuels. Une fois les actions détaillées intégrées aux Policies et les rôles existants migrés correctement, elle pourra être retirée de l'utilisation active.
 Consultation : liste administrative paginée et fiche par UUID, recherche par propriétaire, e-mail, offre ou UUID et filtre d'état. La permission saas.subscriptions.view protège également les informations d'abonnement sur les fiches utilisateur et boutique. Seuls les abonnements de type 1 sont consultés ; les échéances restent réservées à leur permission propre. Les comptes et plans archivés restent lisibles comme références historiques. Aucun abonnement n'est modifié.
+Attribution immédiate : saas.subscriptions.assign, commerçant actif non personnel et offre non gratuite commercialisée. Le montant convenu est le tarif mensuel ou annuel de la version choisie ; un changement de tarif depuis l'affichage est refusé. Le renouvellement commence désactivé. L'offre gratuite existante est conservée dans l'historique ; une offre payante en cours ou une attribution prévue bloque cette action. La demande est idempotente, auditée et recalcule les états admissibles des boutiques selon le quota.
 Fichiers :
 app/Models/Central/
     Subscription.php
