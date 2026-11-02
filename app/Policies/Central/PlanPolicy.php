@@ -31,6 +31,12 @@ class PlanPolicy
             && $this->access->allows($actor, 'saas.plans.features.update');
     }
 
+    public function update(User $actor, Plan $plan): bool
+    {
+        return ! $plan->trashed() && strtolower($plan->code) !== 'free'
+            && $this->access->allows($actor, 'saas.plans.update');
+    }
+
     public function createVersion(User $actor, Plan $plan): bool
     {
         return ! $plan->trashed() && strtolower($plan->code) !== 'free'
