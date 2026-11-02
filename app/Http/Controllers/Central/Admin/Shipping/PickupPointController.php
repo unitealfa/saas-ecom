@@ -10,6 +10,7 @@ use App\Models\Central\Shipping\PickupPoint;
 use App\Models\Central\Shipping\ShippingCarrier;
 use App\Services\Central\Shipping\PickupPointImportService;
 use App\Services\Central\Shipping\PickupPointService;
+use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -20,6 +21,10 @@ use Illuminate\Validation\ValidationException;
 class PickupPointController extends Controller
 {
     private const string IMPORT_PREVIEW_SESSION = 'pickup_point_import_preview';
+
+    private const string IMPORT_ROUTE = 'central.pickup-points.import';
+
+    private const array RELATIONS = ['carrier', 'province', 'municipality'];
 
     public function __construct(
         private readonly PickupPointService $points,
@@ -66,7 +71,7 @@ class PickupPointController extends Controller
         Gate::forUser($this->centralActor())->authorize('update', $point);
 
         return view('central.pages.admin.shipping.pickup-points.edit', [
-            'point' => $point->load(['carrier', 'province', 'municipality']),
+            'point' => $point->load(self::RELATIONS),
         ]);
     }
 
@@ -86,7 +91,7 @@ class PickupPointController extends Controller
     {
         Gate::forUser($this->centralActor())->authorize('view', $point);
 
-        return view('central.pages.admin.shipping.pickup-points.show', ['point' => $point->load(['carrier', 'province', 'municipality'])]);
+        return view('central.pages.admin.shipping.pickup-points.show', ['point' => $point->load(self::RELATIONS)]);
     }
 
     public function activate(PickupPointActionRequest $request, PickupPoint $point): RedirectResponse
@@ -118,28 +123,24 @@ class PickupPointController extends Controller
 
     public function preview(ImportPickupPointRequest $request): RedirectResponse
     {
-        try {
-            $preview = $this->imports->preview(
+        $preview = $this->redirectOnImportError(
+            fn (): array => $this->imports->preview(
                 $this->centralActor(),
                 $request->validated('carrier_uuid'),
                 $request->file('file'),
-            );
-        } catch (ValidationException $exception) {
-            throw $exception->redirectTo(route('central.pickup-points.import'));
-        }
+            ),
+        );
 
         $request->session()->put(self::IMPORT_PREVIEW_SESSION, $preview['token']);
 
-        return to_route('central.pickup-points.import');
+        return to_route(self::IMPORT_ROUTE);
     }
 
     public function confirm(ImportPickupPointRequest $request): RedirectResponse
     {
-        try {
-            $result = $this->imports->confirm($this->centralActor(), $request->validated('token'));
-        } catch (ValidationException $exception) {
-            throw $exception->redirectTo(route('central.pickup-points.import'));
-        }
+        $result = $this->redirectOnImportError(
+            fn (): array => $this->imports->confirm($this->centralActor(), $request->validated('token')),
+        );
 
         $request->session()->forget(self::IMPORT_PREVIEW_SESSION);
 
@@ -155,6 +156,21 @@ class PickupPointController extends Controller
     private function carriers(): Collection
     {
         return ShippingCarrier::query()->orderBy('name')->get(['id', 'uuid', 'name']);
+    }
+
+    /**
+     * @template TResult
+     *
+     * @param  Closure(): TResult  $action
+     * @return TResult
+     */
+    private function redirectOnImportError(Closure $action): mixed
+    {
+        try {
+            return $action();
+        } catch (ValidationException $exception) {
+            throw $exception->redirectTo(route(self::IMPORT_ROUTE));
+        }
     }
 
     /** Redirige vers la liste si l'acteur peut la voir, sinon vers le tableau de bord. */

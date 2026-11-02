@@ -41,18 +41,22 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
 #[UseFactory(PickupPointFactory::class)]
 class PickupPoint extends Model
 {
-    use CentralConnection, HasPublicUuid, SoftDeletes;
-
     /** @use HasFactory<PickupPointFactory> */
-    use HasFactory;
+    use CentralConnection, HasFactory, HasPublicUuid, SoftDeletes;
 
+    /** Format du jeton `expected_state` (empreinte SHA-256 en hexadécimal). */
     public const string STATE_PATTERN = '/^[a-f0-9]{64}$/D';
 
+    /** Champs modifiables par l'administration (identiques à ceux du `#[Fillable]`). */
     public const array EDITABLE = ['name', 'address', 'phone', 'map_url', 'reference_source'];
 
+    /** Champs qui fixent l'identité du bureau : ils ne peuvent plus changer après la création. */
     private const array IDENTITY = ['carrier_id', 'external_code', 'province_id', 'municipality_id'];
 
-    public const array STATE_FIELDS = ['uuid', ...self::IDENTITY, ...self::EDITABLE, 'reference_version', 'is_carrier_active', 'synced_at', 'deleted_at'];
+    public const array STATE_FIELDS = [
+        'uuid', ...self::IDENTITY, ...self::EDITABLE,
+        'reference_version', 'is_carrier_active', 'synced_at', 'deleted_at',
+    ];
 
     protected static function booted(): void
     {
@@ -62,9 +66,11 @@ class PickupPoint extends Model
             }
         });
 
+        // Le catalogue en cache n'est invalidé qu'une fois la transaction validée.
         $invalidate = static function (self $point): void {
             $point->getConnection()->afterCommit(fn () => app(PickupPointCatalog::class)->invalidate());
         };
+
         static::saved($invalidate);
         static::deleted($invalidate);
         static::restored($invalidate);
@@ -72,7 +78,11 @@ class PickupPoint extends Model
 
     protected function casts(): array
     {
-        return ['is_carrier_active' => 'boolean', 'reference_version' => 'integer', 'synced_at' => 'immutable_datetime'];
+        return [
+            'is_carrier_active' => 'boolean',
+            'reference_version' => 'integer',
+            'synced_at' => 'immutable_datetime',
+        ];
     }
 
     /** @return BelongsTo<ShippingCarrier, $this> */
@@ -93,6 +103,7 @@ class PickupPoint extends Model
         return $this->belongsTo(GeographicArea::class, 'municipality_id')->withTrashed();
     }
 
+    /** Empreinte de l'état courant, utilisée pour détecter les modifications concurrentes. */
     public function managementState(): string
     {
         return hash('sha256', json_encode($this->only(self::STATE_FIELDS), JSON_THROW_ON_ERROR));
