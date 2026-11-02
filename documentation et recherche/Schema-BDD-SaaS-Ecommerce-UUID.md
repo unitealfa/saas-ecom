@@ -1396,6 +1396,8 @@ erDiagram
 
 Tous les champs ont le sens défini en T2 et au §7.6, avec chemins `central/public/...` ou `central/private/...`. Les champs proof_storage_key/immutable_document_key encore présents dans les tables de boutique conservent leur rôle local. Pour les cinq tables de facturation centrale, les métadonnées canoniques sont uniquement media.storage_key/file_hash via la FK de pièce, avec protection du média et des octets selon C8.4 ; aucune preuve historique n’est abandonnée. Un reçu ou document peut avoir un média rattaché par morph sans modifier son identité documentaire ou sa politique de conservation.
 
+Le Module 17 administre la table media centrale décrite ci-dessus : quatre droits saas.media.view/upload/download/archive, import de documents administratifs privés, téléchargement signé avec Policy et contrôle d'empreinte. Archivage logique réservé aux documents administratifs non référencés ; photos de profil et pièces métier conservent leurs propres règles. Aucun fichier tenant ni métadonnée privée mis en cache. Voir architecture §50.
+
 ### C10 — Référentiels de livraison communs
 
 **`shipping_carriers` — Le catalogue commun des sociétés et réseaux de livraison : leur nom, leur code et le connecteur serveur prévu. Il ne contient aucun compte privé de boutique.**

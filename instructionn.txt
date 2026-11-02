@@ -568,7 +568,7 @@ Fichiers :
 app/Models/Central/Media/Media.php
 
 app/Http/Controllers/Central/Admin/
-    CentralMediaController.php
+    Media/CentralMediaController.php
 
 app/Services/Central/Media/
     CentralMediaService.php
