@@ -10,6 +10,7 @@ use App\Http\Middleware\EnsureLocalDiagnostics;
 use App\Models\Central\Deployments\TenantSchemaDeployment;
 use App\Models\Central\Domains\Domain;
 use App\Models\Central\Tenants\Tenant;
+use App\Services\Central\Tenants\TenantStatusService;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -25,7 +26,7 @@ class EnsureTenantAvailable
     /** Un déploiement en attente ou en cours met la boutique en maintenance. */
     private const array DEPLOYMENT_OPEN = [DeploymentStatus::PENDING, DeploymentStatus::RUNNING];
 
-    public function __construct(private EnsureLocalDiagnostics $diagnostics) {}
+    public function __construct(private EnsureLocalDiagnostics $diagnostics, private TenantStatusService $statuses) {}
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -39,6 +40,10 @@ class EnsureTenantAvailable
         );
 
         $tenant = $domain->tenant;
+        if ($tenant->owner?->status === UserStatus::ACTIVE) {
+            $this->statuses->synchronizeSubscription($tenant->owner);
+            $tenant->refresh();
+        }
         $usable = $this->isUsable($tenant);
 
         abort_if(! $usable && ! $request->routeIs('tenant.home'), 403);

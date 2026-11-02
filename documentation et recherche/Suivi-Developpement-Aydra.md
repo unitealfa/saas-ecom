@@ -2,6 +2,10 @@
 
 Ouvert le 6 octobre 2026 pour exécuter `instruction.txt`. Ce fichier distingue les spécifications, le code et les vérifications réelles. Une case non cochée signifie que le travail reste à faire ; une migration écrite ne prouve pas son exécution.
 
+## Module 10 — Fin et changement programmés
+
+Décisions utilisateur du 2 novembre 2026 : fin et changement d'une offre payée à l'échéance, sans perte des droits de la période. Actions préparées sous saas.subscriptions.close et saas.subscriptions.change ; conservation de l'historique, état attendu, clé idempotente pour le changement, contrôle du tarif et audit. La transition arrivée à échéance est résolue à l'accès central propriétaire ou storefront et rééquilibre les boutiques selon le quota existant. PHP 8.5 : syntaxe valide, routes chargées et test unitaire réussi (1 test, 1 assertion). Tests fonctionnels et de quota ajoutés mais non exécutés : ils exigent une nouvelle autorisation explicite MySQL. Aucun seeder ni changement réel exécuté ; les deux permissions restent à enregistrer après autorisation, sans attribution automatique. Parcours navigateur non vérifié.
+
 ## Module 10 — Attribution d'un abonnement
 
 Attribution immédiate sous saas.subscriptions.assign, depuis le module ou une fiche utilisateur : commerçant actif non personnel, version commercialisée, prix confirmé mensuel ou annuel, idempotence, conservation de l'historique, refus d'un abonnement payant en cours et rééquilibrage des boutiques via le service existant. Décision utilisateur : le montant convenu est le tarif correspondant à la version choisie. PHP 8.5 : syntaxe valide, routes chargées et test unitaire réussi (1 test, 4 assertions). Après autorisation, tests fonctionnels du module sur MySQL isolé : 8 tests réussis, 24 assertions. SubscriptionPermissionSeeder exécuté sur aydra : deux permissions enregistrées, les 4 attributions de rôle et 4 attributions directes restent inchangées. Aucune attribution réelle ni vérification navigateur effectuée.

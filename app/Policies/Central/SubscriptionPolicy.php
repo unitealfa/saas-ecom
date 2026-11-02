@@ -24,4 +24,14 @@ class SubscriptionPolicy
     {
         return $this->access->allows($actor, 'saas.subscriptions.assign');
     }
+
+    public function change(User $actor, Subscription $subscription): bool
+    {
+        return $this->access->allows($actor, 'saas.subscriptions.change');
+    }
+
+    public function close(User $actor, Subscription $subscription): bool
+    {
+        return $this->access->allows($actor, 'saas.subscriptions.close');
+    }
 }

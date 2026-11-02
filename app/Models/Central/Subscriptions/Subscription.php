@@ -81,4 +81,12 @@ class Subscription extends Model
     {
         return $this->belongsTo(User::class, 'assigned_by_id')->withTrashed();
     }
+
+    public function transitionState(): string
+    {
+        return hash('sha256', json_encode($this->only([
+            'uuid', 'user_id', 'plan_id', 'status', 'period', 'agreed_amount', 'started_at',
+            'period_starts_at', 'period_ends_at', 'trial_ends_at', 'ended_at', 'auto_renew',
+        ]), JSON_THROW_ON_ERROR));
+    }
 }

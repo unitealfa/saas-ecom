@@ -42,7 +42,24 @@ class DefaultSubscription
                     return $current;
                 }
 
-                $current->update(['status' => StatusEnum::EXPIRED, 'ended_at' => now()]);
+                $current->update(['status' => StatusEnum::EXPIRED, 'ended_at' => $current->period_ends_at]);
+            }
+
+            $scheduled = Subscription::where('user_id', $owner->id)
+                ->where('status', StatusEnum::SCHEDULED)
+                ->where('period_starts_at', '<=', now())
+                ->orderBy('period_starts_at')->orderBy('id')->lockForUpdate()->get();
+            foreach ($scheduled as $next) {
+                if ($next->period_ends_at !== null && $next->period_ends_at->lessThanOrEqualTo(now())) {
+                    $next->update(['status' => StatusEnum::EXPIRED, 'ended_at' => $next->period_ends_at]);
+                    continue;
+                }
+                $next->update(['status' => StatusEnum::ACTIVE]);
+                activity()->performedOn($next)->event('subscription_scheduled_activated')
+                    ->withProperties(['owner_uuid' => $owner->uuid, 'effective_at' => $next->period_starts_at->toISOString()])
+                    ->log('Abonnement programmé activé.');
+
+                return $next;
             }
 
             $previous = $current ?? Subscription::where('user_id', $owner->id)

@@ -2,6 +2,7 @@
     <section class="flex flex-col gap-6">
         <flux:heading size="xl" level="1">Détail de l’abonnement</flux:heading>
         @if (session('status'))<flux:text role="status">{{ session('status') }}</flux:text>@endif
+        @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
         <dl class="grid gap-4 sm:grid-cols-2">
             @foreach ([
                 'Identifiant' => $subscription->uuid,
@@ -23,6 +24,20 @@
                 <div><dt class="font-medium">{{ $label }}</dt><dd><flux:text>{{ $value ?? 'Non renseigné' }}</flux:text></dd></div>
             @endforeach
         </dl>
-        <div><flux:button :href="route('central.subscriptions.index')">Retour aux abonnements</flux:button></div>
+        <div class="flex flex-wrap gap-3">
+            @if ($subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::ACTIVE && $subscription->period_ends_at?->isFuture() && $subscription->ended_at === null && $subscription->plan?->code !== 'free')
+                @can('change', $subscription)
+                    <flux:button :href="route('central.subscriptions.change.form', $subscription)">Changer l’offre</flux:button>
+                @endcan
+                @can('close', $subscription)
+                    <form method="POST" action="{{ route('central.subscriptions.close', $subscription) }}" x-data x-on:submit="if (! window.confirm('Mettre fin à cet abonnement à la fin de sa période ?')) $event.preventDefault()">
+                        @csrf
+                        <input type="hidden" name="expected_state" value="{{ $subscription->transitionState() }}">
+                        <flux:button type="submit">Programmer la fin</flux:button>
+                    </form>
+                @endcan
+            @endif
+            <flux:button :href="route('central.subscriptions.index')">Retour aux abonnements</flux:button>
+        </div>
     </section>
 </x-layouts::app>
