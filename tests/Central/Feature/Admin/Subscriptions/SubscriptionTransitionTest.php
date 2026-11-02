@@ -116,7 +116,8 @@ test('a permitted closure rejects obsolete form state and a different permission
 
 test('a due change applies the new quota while preserving suspended shops', function (): void {
     Event::fake([TenantCreated::class]);
-    $owner = User::factory()->create(['legal_profile_version' => 1, 'legal_verification_status' => VerificationStatusEnum::VERIFIED, 'legal_verified_at' => now()]);
+    $reviewer = User::factory()->create();
+    $owner = User::factory()->create(['legal_profile_version' => 1, 'legal_verification_status' => VerificationStatusEnum::VERIFIED, 'legal_verified_at' => now(), 'legal_verified_by_id' => $reviewer->id]);
     $current = Subscription::factory()->create(['user_id' => $owner->id, 'period_ends_at' => now()->addDay()]);
     $plan = Plan::factory()->create();
     $feature = Feature::factory()->create(['code' => 'shops', 'is_active' => true]);
