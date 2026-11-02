@@ -539,10 +539,10 @@ saas.pickup-points.import	Importer les bureaux officiels
 saas.pickup-points.activate	Activer ou désactiver un bureau
 saas.pickup-points.archive	Archiver un bureau
 Fichiers :
-app/Models/Central/PickupPoint.php
+app/Models/Central/Shipping/PickupPoint.php
 
 app/Http/Controllers/Central/Admin/
-    PickupPointController.php
+    Shipping/PickupPointController.php
 
 app/Services/Central/Shipping/
     PickupPointService.php

@@ -8,6 +8,7 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
     ->whereUuid(['user', 'role', 'country', 'tenant', 'domain', 'deployment', 'feature', 'carrier'])->group(function (): void {
         require __DIR__.'/admin/carriers.php';
         require __DIR__.'/admin/carrier-mappings.php';
+        require __DIR__.'/admin/pickup-points.php';
         require __DIR__.'/admin/users.php';
         require __DIR__.'/admin/staff.php';
         require __DIR__.'/admin/tenants.php';
