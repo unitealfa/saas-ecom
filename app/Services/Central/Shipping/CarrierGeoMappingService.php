@@ -31,31 +31,42 @@ class CarrierGeoMappingService
 
     private const string IMPORTED = 'carrier_mapping_imported';
 
-    private const array AUDITED = ['uuid', 'carrier_id', 'geographic_area_id', 'zone_type',
-        ...CarrierGeoMapping::EDITABLE, 'is_active', 'mapping_version', 'verified_at', 'synced_at'];
+    private const array AUDITED = [
+        'uuid', 'carrier_id', 'geographic_area_id', 'zone_type', ...CarrierGeoMapping::EDITABLE,
+        'is_active', 'mapping_version', 'verified_at', 'synced_at',
+    ];
 
     /** @return array<string, mixed> */
     public static function dataRules(): array
     {
-        return ['carrier_uuid' => ['required', 'uuid'], 'geographic_area_uuid' => ['required', 'uuid'],
-            ...array_fill_keys(CarrierGeoMapping::EDITABLE, ['required', 'string', 'max:255'])];
+        return [
+            'carrier_uuid' => ['required', 'uuid'],
+            'geographic_area_uuid' => ['required', 'uuid'],
+            ...array_fill_keys(CarrierGeoMapping::EDITABLE, ['required', 'string', 'max:255']),
+        ];
     }
 
-    /** @param array<string, mixed> $filters
+    /**
+     * @param  array<string, mixed>  $filters
      * @return LengthAwarePaginator<int, CarrierGeoMapping>
      */
     public function search(User $actor, array $filters): LengthAwarePaginator
     {
         $this->authorize($actor, 'viewAny');
-        $pattern = '%'.addcslashes(trim((string) ($filters['search'] ?? '')), '\\%_').'%';
+
+        $search = trim((string) ($filters['search'] ?? ''));
+        $pattern = '%'.addcslashes($search, '\\%_').'%';
 
         return CarrierGeoMapping::query()->with(['carrier', 'area'])
             ->when($filters['carrier_uuid'] ?? null, fn (Builder $query, string $uuid) => $query->whereRelation('carrier', 'uuid', $uuid))
             ->when(isset($filters['is_active']), fn (Builder $query) => $query->where('is_active', (bool) $filters['is_active']))
-            ->when($filters['search'] ?? null, fn (Builder $query) => $query->where(fn (Builder $query) => $query
-                ->where('external_code', 'like', $pattern)->orWhere('external_name', 'like', $pattern)
-                ->orWhereHas('area', fn (Builder $query) => $query->where('name_fr', 'like', $pattern))))
-            ->orderBy('carrier_id')->orderBy('geographic_area_id')->paginate(self::PER_PAGE)->withQueryString();
+            ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query
+                ->where('external_code', 'like', $pattern)
+                ->orWhere('external_name', 'like', $pattern)
+                ->orWhereHas('area', fn (Builder $area) => $area->where('name_fr', 'like', $pattern))))
+            ->orderBy('carrier_id')->orderBy('geographic_area_id')
+            ->paginate(self::PER_PAGE)
+            ->withQueryString();
     }
 
     /** @param array<string, mixed> $data */
@@ -63,15 +74,16 @@ class CarrierGeoMappingService
     {
         $ability = $mapping === null ? 'create' : 'update';
         $this->authorize($actor, $ability, $mapping);
-        $data = Validator::make($data, self::dataRules())->validate();
-        $data['geographic_area_uuid'] = strtolower($data['geographic_area_uuid']);
+        $data = $this->validated($data);
 
         return DB::transaction(function () use ($actor, $ability, $data, $mapping, $expected): CarrierGeoMapping {
             $carrier = $this->lockCarrier($data['carrier_uuid']);
-            $current = $mapping === null ? null : CarrierGeoMapping::query()->whereKey($mapping->id)->lockForUpdate()->firstOrFail();
+            $current = $mapping === null ? null : $this->lockMapping($mapping);
             $this->authorize($actor, $ability, $current);
+
             if ($current !== null) {
                 $this->assertCurrent($current, $expected);
+
                 if ($current->carrier_id !== $carrier->id || $current->area->uuid !== $data['geographic_area_uuid']) {
                     $this->fail('mapping', 'Le transporteur et la zone d’une correspondance sont permanents.');
                 }
@@ -84,18 +96,22 @@ class CarrierGeoMappingService
     public function archive(User $actor, CarrierGeoMapping $mapping, string $expected): void
     {
         $this->authorize($actor, 'archive', $mapping);
+
         DB::transaction(function () use ($actor, $mapping, $expected): void {
             $this->lockCarrier($mapping->carrier->uuid);
-            $current = CarrierGeoMapping::query()->whereKey($mapping->id)->lockForUpdate()->firstOrFail();
+            $current = $this->lockMapping($mapping);
+
             $this->authorize($actor, 'archive', $current);
             $this->assertCurrent($current, $expected);
+
             $before = $current->only(self::AUDITED);
             $current->forceFill(['is_active' => false, 'mapping_version' => $current->mapping_version + 1])->save();
             $this->audit($actor, $current, self::ARCHIVED, $before);
         }, self::ATTEMPTS);
     }
 
-    /** @param list<array<string, mixed>> $rows
+    /**
+     * @param  list<array<string, mixed>>  $rows
      * @return array{created: int, updated: int, unchanged: int}
      */
     public function import(User $actor, string $carrierUuid, array $rows): array
@@ -105,30 +121,35 @@ class CarrierGeoMappingService
         return DB::transaction(function () use ($actor, $carrierUuid, $rows): array {
             $carrier = $this->lockCarrier($carrierUuid);
             $this->authorize($actor, 'import');
+
             $areas = $this->lockAreas(array_column($rows, 'geographic_area_uuid'));
             $existing = CarrierGeoMapping::query()->where('carrier_id', $carrier->id)
                 ->whereIn('geographic_area_id', $areas->pluck('id'))
                 ->orderBy('geographic_area_id')->lockForUpdate()->get()->keyBy('geographic_area_id');
+
             $counts = ['created' => 0, 'updated' => 0, 'unchanged' => 0];
+
             foreach ($rows as $row) {
-                $data = Validator::make([...$row, 'carrier_uuid' => $carrierUuid], self::dataRules())->validate();
-                $data['geographic_area_uuid'] = strtolower($data['geographic_area_uuid']);
-                $area = $areas->get($data['geographic_area_uuid']);
-                if ($area === null) {
-                    $this->fail('geographic_area_uuid', 'La zone de l’aperçu n’existe plus. Recommencez l’import.');
-                }
+                $data = $this->validated([...$row, 'carrier_uuid' => $carrierUuid]);
+                $area = $areas->get($data['geographic_area_uuid'])
+                    ?? $this->fail('geographic_area_uuid', 'La zone de l’aperçu n’existe plus. Recommencez l’import.');
+
                 $current = $existing->get($area->id);
+                $expected = $row['expected_state'] ?? null;
+
                 if ($current !== null) {
-                    $this->assertCurrent($current, $row['expected_state'] ?? null);
+                    $this->assertCurrent($current, $expected);
+
                     if (! $current->is_active) {
                         $this->fail('file', 'Une correspondance archivée ne peut pas être remplacée par un import.');
                     }
-                } elseif (($row['expected_state'] ?? null) !== null) {
+                } elseif ($expected !== null) {
                     $this->fail('conflict', 'Une correspondance de l’aperçu a disparu. Recommencez l’import.');
                 }
+
                 $before = $current?->mapping_version;
                 $saved = $this->write($actor, $carrier, $data, $current, true, $area);
-                $counts[$before === null ? 'created' : ($saved->mapping_version === $before ? 'unchanged' : 'updated')]++;
+                $counts[$this->outcome($before, $saved->mapping_version)]++;
             }
 
             return $counts;
@@ -136,40 +157,87 @@ class CarrierGeoMappingService
     }
 
     /** @param array<string, mixed> $data */
-    private function write(User $actor, ShippingCarrier $carrier, array $data, ?CarrierGeoMapping $current, bool $import, ?GeographicArea $lockedArea = null): CarrierGeoMapping
-    {
-        $area = $lockedArea ?? $this->lockAreas([$data['geographic_area_uuid']])->get($data['geographic_area_uuid']);
-        if ($area === null) {
-            $this->fail('geographic_area_uuid', 'Sélectionnez une zone active dont le pays et la wilaya sont disponibles.');
-        }
+    private function write(
+        User $actor,
+        ShippingCarrier $carrier,
+        array $data,
+        ?CarrierGeoMapping $current,
+        bool $import,
+        ?GeographicArea $lockedArea = null,
+    ): CarrierGeoMapping {
+        $area = $lockedArea ?? $this->lockAreas([$data['geographic_area_uuid']])->get($data['geographic_area_uuid'])
+            ?? $this->fail('geographic_area_uuid', 'Sélectionnez une zone active dont le pays et la wilaya sont disponibles.');
+
         $mapping = $current ?? new CarrierGeoMapping;
         $before = $mapping->exists ? $mapping->only(self::AUDITED) : null;
+
         $mapping->fill(Arr::only($data, CarrierGeoMapping::EDITABLE));
+
         if ($mapping->exists && ! $mapping->isDirty()) {
             return $mapping;
         }
+
         $mapping->forceFill([
-            'carrier_id' => $carrier->id, 'geographic_area_id' => $area->id, 'zone_type' => $area->type,
-            'mapping_version' => ($current->mapping_version ?? 0) + 1,
-            'is_active' => true, 'verified_at' => now(),
+            'carrier_id' => $carrier->id,
+            'geographic_area_id' => $area->id,
+            'zone_type' => $area->type,
+            'mapping_version' => ($mapping->mapping_version ?? 0) + 1,
+            'is_active' => true,
+            'verified_at' => now(),
             'synced_at' => $import ? now() : $mapping->synced_at,
         ]);
+
         try {
             $mapping->save();
         } catch (UniqueConstraintViolationException) {
             $this->fail('geographic_area_uuid', 'Cette zone possède déjà une correspondance pour ce transporteur.');
         }
-        $this->audit($actor, $mapping, $import ? self::IMPORTED : ($before === null ? self::CREATED : self::UPDATED), $before);
+
+        $event = match (true) {
+            $import => self::IMPORTED,
+            $before === null => self::CREATED,
+            default => self::UPDATED,
+        };
+
+        $this->audit($actor, $mapping, $event, $before);
 
         return $mapping;
     }
 
-    /** @param list<string> $uuids
+    /**
+     * Valide les données et normalise l'uuid de la zone en minuscules.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function validated(array $data): array
+    {
+        $data = Validator::make($data, self::dataRules())->validate();
+        $data['geographic_area_uuid'] = strtolower($data['geographic_area_uuid']);
+
+        return $data;
+    }
+
+    /** @return 'created'|'updated'|'unchanged' */
+    private function outcome(?int $before, int $after): string
+    {
+        return match (true) {
+            $before === null => 'created',
+            $before === $after => 'unchanged',
+            default => 'updated',
+        };
+    }
+
+    /**
+     * Verrouille les pays puis les zones, toujours dans le même ordre, pour éviter les interblocages.
+     *
+     * @param  list<string>  $uuids
      * @return Collection<string, GeographicArea>
      */
     private function lockAreas(array $uuids): Collection
     {
         $areas = GeographicArea::withTrashed()->whereIn('uuid', $uuids)->get(['id', 'country_id']);
+
         Country::query()->whereIn('id', $areas->pluck('country_id'))->orderBy('id')->lockForUpdate()->get(['id']);
 
         return GeographicArea::selectable()->whereIn('id', $areas->pluck('id'))
@@ -178,12 +246,13 @@ class CarrierGeoMappingService
 
     private function lockCarrier(string $uuid): ShippingCarrier
     {
-        $carrier = ShippingCarrier::query()->where('uuid', $uuid)->lockForUpdate()->first();
-        if ($carrier === null) {
-            $this->fail('carrier_uuid', 'Ce transporteur est introuvable ou archivé.');
-        }
+        return ShippingCarrier::query()->where('uuid', $uuid)->lockForUpdate()->first()
+            ?? $this->fail('carrier_uuid', 'Ce transporteur est introuvable ou archivé.');
+    }
 
-        return $carrier;
+    private function lockMapping(CarrierGeoMapping $mapping): CarrierGeoMapping
+    {
+        return CarrierGeoMapping::query()->whereKey($mapping->id)->lockForUpdate()->firstOrFail();
     }
 
     private function assertCurrent(CarrierGeoMapping $mapping, ?string $expected): void

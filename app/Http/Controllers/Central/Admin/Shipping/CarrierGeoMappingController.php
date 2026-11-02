@@ -30,11 +30,16 @@ class CarrierGeoMappingController extends Controller
     {
         $actor = $this->centralActor();
         Gate::forUser($actor)->authorize('viewAny', CarrierGeoMapping::class);
-        $filters = $request->validate(['carrier_uuid' => ['nullable', 'uuid'],
-            'search' => ['nullable', 'string', 'max:255'], 'is_active' => ['nullable', 'boolean']]);
+
+        $filters = $request->validate([
+            'carrier_uuid' => ['nullable', 'uuid'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
 
         return view('central.pages.admin.shipping.geo-mappings.index', [
-            'mappings' => $this->mappings->search($actor, $filters), 'carriers' => $this->carriers(),
+            'mappings' => $this->mappings->search($actor, $filters),
+            'carriers' => $this->carriers(),
         ]);
     }
 
@@ -42,7 +47,10 @@ class CarrierGeoMappingController extends Controller
     {
         Gate::forUser($this->centralActor())->authorize('create', CarrierGeoMapping::class);
 
-        return view('central.pages.admin.shipping.geo-mappings.create', ['mapping' => null, 'carriers' => $this->carriers()]);
+        return view('central.pages.admin.shipping.geo-mappings.create', [
+            'mapping' => null,
+            'carriers' => $this->carriers(),
+        ]);
     }
 
     public function store(StoreCarrierGeoMappingRequest $request): RedirectResponse
@@ -55,14 +63,20 @@ class CarrierGeoMappingController extends Controller
     public function edit(CarrierGeoMapping $mapping): View
     {
         Gate::forUser($this->centralActor())->authorize('update', $mapping);
-        $mapping->load(['carrier', 'area']);
 
-        return view('central.pages.admin.shipping.geo-mappings.edit', compact('mapping'));
+        return view('central.pages.admin.shipping.geo-mappings.edit', [
+            'mapping' => $mapping->load(['carrier', 'area']),
+        ]);
     }
 
     public function update(StoreCarrierGeoMappingRequest $request, CarrierGeoMapping $mapping): RedirectResponse
     {
-        $this->mappings->save($this->centralActor(), $request->validated(), $mapping, $request->validated('expected_state'));
+        $this->mappings->save(
+            $this->centralActor(),
+            $request->validated(),
+            $mapping,
+            $request->validated('expected_state'),
+        );
 
         return $this->redirectWithStatus('Correspondance mise à jour.');
     }
@@ -76,20 +90,29 @@ class CarrierGeoMappingController extends Controller
 
     public function import(Request $request): View
     {
-        Gate::forUser($this->centralActor())->authorize('import', CarrierGeoMapping::class);
-        $token = $request->session()->get(self::IMPORT_PREVIEW_SESSION);
-        $preview = is_string($token) ? $this->imports->review($this->centralActor(), $token) : null;
+        $actor = $this->centralActor();
+        Gate::forUser($actor)->authorize('import', CarrierGeoMapping::class);
 
-        return view('central.pages.admin.shipping.geo-mappings.import', ['carriers' => $this->carriers(), 'preview' => $preview]);
+        $token = $request->session()->get(self::IMPORT_PREVIEW_SESSION);
+
+        return view('central.pages.admin.shipping.geo-mappings.import', [
+            'carriers' => $this->carriers(),
+            'preview' => is_string($token) ? $this->imports->review($actor, $token) : null,
+        ]);
     }
 
     public function preview(ImportCarrierGeoMappingRequest $request): RedirectResponse
     {
         try {
-            $preview = $this->imports->preview($this->centralActor(), $request->validated('carrier_uuid'), $request->file('file'));
+            $preview = $this->imports->preview(
+                $this->centralActor(),
+                $request->validated('carrier_uuid'),
+                $request->file('file'),
+            );
         } catch (ValidationException $exception) {
             throw $exception->redirectTo(route('central.carrier-mappings.import'));
         }
+
         $request->session()->put(self::IMPORT_PREVIEW_SESSION, $preview['token']);
 
         return to_route('central.carrier-mappings.import');
@@ -102,10 +125,15 @@ class CarrierGeoMappingController extends Controller
         } catch (ValidationException $exception) {
             throw $exception->redirectTo(route('central.carrier-mappings.import'));
         }
+
         $request->session()->forget(self::IMPORT_PREVIEW_SESSION);
 
-        return $this->redirectWithStatus('Import confirmé : '.$result['created'].' créée(s), '
-            .$result['updated'].' modifiée(s), '.$result['unchanged'].' inchangée(s).');
+        return $this->redirectWithStatus(sprintf(
+            'Import confirmé : %d créée(s), %d modifiée(s), %d inchangée(s).',
+            $result['created'],
+            $result['updated'],
+            $result['unchanged'],
+        ));
     }
 
     /** @return Collection<int, ShippingCarrier> */
@@ -114,11 +142,13 @@ class CarrierGeoMappingController extends Controller
         return ShippingCarrier::query()->orderBy('name')->get(['id', 'uuid', 'name']);
     }
 
+    /** Redirige vers la liste si l'acteur peut la voir, sinon vers le tableau de bord. */
     private function redirectWithStatus(string $message): RedirectResponse
     {
-        $response = Gate::forUser($this->centralActor())->allows('viewAny', CarrierGeoMapping::class)
-            ? to_route('central.carrier-mappings.index') : to_route('dashboard');
+        $redirect = Gate::forUser($this->centralActor())->allows('viewAny', CarrierGeoMapping::class)
+            ? to_route('central.carrier-mappings.index')
+            : to_route('dashboard');
 
-        return $response->with('status', $message);
+        return $redirect->with('status', $message);
     }
 }

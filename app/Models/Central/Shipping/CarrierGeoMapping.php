@@ -37,8 +37,10 @@ class CarrierGeoMapping extends Model
 {
     use CentralConnection, HasPublicUuid;
 
+    /** Format du jeton `expected_state` (empreinte SHA-256 en hexadécimal). */
     public const string STATE_PATTERN = '/^[a-f0-9]{64}$/D';
 
+    /** Champs modifiables par l'administration (identiques à ceux du `#[Fillable]`). */
     public const array EDITABLE = ['external_code', 'external_name', 'external_province_code', 'verification_source'];
 
     private const array STATE_FIELDS = [
@@ -53,17 +55,25 @@ class CarrierGeoMapping extends Model
                 throw new LogicException('A carrier mapping cannot change its carrier or geographic area.');
             }
         });
+
+        // Le catalogue en cache n'est invalidé qu'une fois la transaction validée.
         $invalidate = static function (self $mapping): void {
             $mapping->getConnection()->afterCommit(fn () => app(CarrierGeoMappingCatalog::class)->invalidate());
         };
+
         static::saved($invalidate);
         static::deleted($invalidate);
     }
 
     protected function casts(): array
     {
-        return ['zone_type' => GeoZoneTypeEnum::class, 'mapping_version' => 'integer',
-            'is_active' => 'boolean', 'verified_at' => 'immutable_datetime', 'synced_at' => 'immutable_datetime'];
+        return [
+            'zone_type' => GeoZoneTypeEnum::class,
+            'mapping_version' => 'integer',
+            'is_active' => 'boolean',
+            'verified_at' => 'immutable_datetime',
+            'synced_at' => 'immutable_datetime',
+        ];
     }
 
     /** @return BelongsTo<ShippingCarrier, $this> */
@@ -78,6 +88,7 @@ class CarrierGeoMapping extends Model
         return $this->belongsTo(GeographicArea::class, 'geographic_area_id')->withTrashed();
     }
 
+    /** Empreinte de l'état courant, utilisée pour détecter les modifications concurrentes. */
     public function managementState(): string
     {
         return hash('sha256', json_encode($this->only(self::STATE_FIELDS), JSON_THROW_ON_ERROR));

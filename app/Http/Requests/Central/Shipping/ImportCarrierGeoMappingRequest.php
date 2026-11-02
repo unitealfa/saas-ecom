@@ -19,9 +19,18 @@ class ImportCarrierGeoMappingRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return $this->route()?->getActionMethod() === 'confirm'
-            ? ['token' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/D'], 'file' => ['prohibited']]
-            : ['carrier_uuid' => ['required', 'uuid'], 'file' => ['required', 'file', 'extensions:csv', 'max:1024']];
+        // `confirm` valide le jeton de l'aperçu ; `preview` valide le fichier envoyé.
+        if ($this->route()?->getActionMethod() === 'confirm') {
+            return [
+                'token' => ['required', 'string', 'regex:'.CarrierGeoMapping::STATE_PATTERN],
+                'file' => ['prohibited'],
+            ];
+        }
+
+        return [
+            'carrier_uuid' => ['required', 'uuid'],
+            'file' => ['required', 'file', 'extensions:csv', 'max:1024'],
+        ];
     }
 
     protected function getRedirectUrl(): string

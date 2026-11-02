@@ -22,12 +22,12 @@ class CarrierGeoMappingPolicy
 
     public function update(User $actor, CarrierGeoMapping $mapping): bool
     {
-        return $mapping->is_active && $this->has($actor, 'update');
+        return $this->canManage($actor, $mapping, 'update');
     }
 
     public function archive(User $actor, CarrierGeoMapping $mapping): bool
     {
-        return $mapping->is_active && $this->has($actor, 'archive');
+        return $this->canManage($actor, $mapping, 'archive');
     }
 
     public function import(User $actor): bool
@@ -35,8 +35,14 @@ class CarrierGeoMappingPolicy
         return $this->has($actor, 'import');
     }
 
-    private function has(User $actor, string $action): bool
+    /** Une correspondance archivée (inactive) n'est plus modifiable. */
+    private function canManage(User $actor, CarrierGeoMapping $mapping, string $ability): bool
     {
-        return $this->access->allows($actor, 'saas.carrier-mappings.'.$action);
+        return $mapping->is_active && $this->has($actor, $ability);
+    }
+
+    private function has(User $actor, string $ability): bool
+    {
+        return $this->access->allows($actor, "saas.carrier-mappings.$ability");
     }
 }

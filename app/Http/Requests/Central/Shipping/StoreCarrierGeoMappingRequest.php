@@ -18,20 +18,28 @@ class StoreCarrierGeoMappingRequest extends FormRequest
     public function authorize(): bool
     {
         $actor = $this->user('central');
-        $mapping = $this->route('mapping');
+        $mapping = $this->mapping();
 
-        return $actor instanceof User && Gate::forUser($actor)->allows(
-            $mapping instanceof CarrierGeoMapping ? 'update' : 'create',
-            $mapping instanceof CarrierGeoMapping ? $mapping : CarrierGeoMapping::class,
-        );
+        return $actor instanceof User
+            && Gate::forUser($actor)->allows($mapping ? 'update' : 'create', $mapping ?? CarrierGeoMapping::class);
     }
 
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return [...CarrierGeoMappingService::dataRules(),
-            'expected_state' => $this->route('mapping') instanceof CarrierGeoMapping
-                ? ['required', 'string', 'regex:'.CarrierGeoMapping::STATE_PATTERN] : ['prohibited'],
-            ...array_fill_keys(self::FORBIDDEN, ['prohibited'])];
+        return [
+            ...CarrierGeoMappingService::dataRules(),
+            'expected_state' => $this->mapping()
+                ? ['required', 'string', 'regex:'.CarrierGeoMapping::STATE_PATTERN]
+                : ['prohibited'],
+            ...array_fill_keys(self::FORBIDDEN, ['prohibited']),
+        ];
+    }
+
+    private function mapping(): ?CarrierGeoMapping
+    {
+        $mapping = $this->route('mapping');
+
+        return $mapping instanceof CarrierGeoMapping ? $mapping : null;
     }
 }

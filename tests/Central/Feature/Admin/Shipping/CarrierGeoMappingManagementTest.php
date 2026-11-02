@@ -15,6 +15,7 @@ use Database\Seeders\Central\AuthorizationSeeder;
 use Database\Seeders\Central\CarrierMappingPermissionSeeder;
 use Database\Seeders\Central\CountrySeeder;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Js;
@@ -145,6 +146,16 @@ test('mapping uniqueness is per carrier and zone while external codes may repeat
     expect(CarrierGeoMapping::count())->toBe(3);
 });
 
+test('a zero search is treated as text rather than an empty mapping filter', function (): void {
+    $actor = mappingAdmin();
+    $carrier = ShippingCarrier::factory()->create();
+    $target = app(CarrierGeoMappingService::class)->save($actor, mappingData($carrier, mappingArea(), '016'));
+    app(CarrierGeoMappingService::class)->save($actor, mappingData($carrier, mappingArea('31'), 'ABC'));
+
+    $this->actingAs($actor, 'central')->get(route('central.carrier-mappings.index', ['search' => '0']))
+        ->assertOk()->assertViewHas('mappings', fn (LengthAwarePaginator $page): bool => $page->total() === 1 && $page->first()->uuid === $target->uuid);
+});
+
 test('mapping updates preserve identity and stale forms or moving relationships are refused', function (): void {
     $actor = mappingAdmin();
     $carrier = ShippingCarrier::factory()->create();
@@ -263,6 +274,16 @@ test('invalid CSV headers duplicate zones missing data and invalid UTF8 are reje
         $this->post(route('central.carrier-mappings.preview'), ['carrier_uuid' => $carrier->uuid, 'file' => $file])
             ->assertSessionHasErrors('file');
     }
+    expect(CarrierGeoMapping::count())->toBe(0);
+});
+
+test('CSV parsing stops at the declared row limit before confirming any mappings', function (): void {
+    $carrier = ShippingCarrier::factory()->create();
+    $data = mappingData($carrier, mappingArea());
+    $this->actingAs(mappingAdmin(), 'central')->post(route('central.carrier-mappings.preview'), [
+        'carrier_uuid' => $carrier->uuid,
+        'file' => mappingCsv(array_fill(0, 501, $data)),
+    ])->assertSessionHasErrors(['file' => 'Fichier limité à 500 lignes, avec exactement cinq colonnes par ligne.']);
     expect(CarrierGeoMapping::count())->toBe(0);
 });
 
