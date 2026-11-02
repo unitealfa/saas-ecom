@@ -8,6 +8,7 @@ use App\Http\Requests\Central\Users\ChangeUserStatusRequest;
 use App\Http\Requests\Central\Users\StoreUserRequest;
 use App\Http\Requests\Central\Users\UpdateUserRequest;
 use App\Models\Central\Users\User;
+use App\Models\Central\Subscriptions\Subscription;
 use App\Services\Central\Authorization\CentralUserAccess;
 use App\Services\Central\Countries\CountryCatalog;
 use App\Services\Central\Users\UserManagementService;
@@ -58,7 +59,9 @@ class UserController extends Controller
 
         return view('central.pages.admin.users.show', [
             'user' => $user->load(['country', 'phoneCountry', 'roles', 'legalVerifier']),
-            'subscriptions' => $user->subscriptions()->with('plan')->orderByDesc('id')->paginate(10),
+            'subscriptions' => Gate::allows('viewAny', Subscription::class)
+                ? $user->subscriptions()->with('plan')->orderByDesc('id')->paginate(10)
+                : null,
             'shops' => $user->tenants()->select(['uuid', 'shop_name', 'status'])->orderBy('id')->get(),
         ]);
     }

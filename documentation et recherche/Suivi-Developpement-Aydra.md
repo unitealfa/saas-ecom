@@ -2,9 +2,13 @@
 
 Ouvert le 6 octobre 2026 pour exécuter `instruction.txt`. Ce fichier distingue les spécifications, le code et les vérifications réelles. Une case non cochée signifie que le travail reste à faire ; une migration écrite ne prouve pas son exécution.
 
+## Module 10 — Consultation des abonnements
+
+Liste et fiche administratives en lecture seule, recherche et filtre d'état, scope type 1 et références historiques, sous saas.subscriptions.view ; les vues utilisateur et boutique sont soumises au même droit. PHP 8.5 : syntaxe valide, six routes chargées sur les trois domaines et test unitaire réussi (1 test, 3 assertions). Tests fonctionnels écrits mais non exécutés : ils créent des bases MySQL isolées et exigent une autorisation explicite propre à cette tâche. Aucun seeder ni changement de données réelles exécuté. Le droit doit être enregistré par SubscriptionPermissionSeeder après autorisation, sans attribution automatique. L'ancien saas.subscriptions.manage est conservé dans LocalDevelopmentSeeder et n'est pas migré lors de cette étape.
+
 ## 2 novembre 2026 — Module 09, interface administrative
 
-Menu et pages admin/offres raccordés aux services existants ; modification des informations ajoutée sous saas.plans.update, avec état attendu, protection des versions utilisées et audit. Les routes JSON restent disponibles. PHP 8.5 : syntaxe valide, 27 routes chargées sur les trois domaines et test unitaire réussi (1 test, 4 assertions). Tests fonctionnels MySQL ajoutés mais non exécutés : ils exigent une autorisation explicite. Aucun seeder ni changement de données exécuté. Reste à autoriser les tests MySQL isolés, vérifier le parcours navigateur et enregistrer les permissions par PlanPermissionSeeder après autorisation, sans attribution automatique.
+Menu et pages admin/offres raccordés aux services existants ; modification des informations ajoutée sous saas.plans.update, avec état attendu, protection des versions utilisées et audit. Les routes JSON restent disponibles. PHP 8.5 : syntaxe valide, 27 routes chargées sur les trois domaines et test unitaire réussi (1 test, 4 assertions). Après autorisation explicite, tests fonctionnels MySQL isolés réussis : 4 tests, 15 assertions. Puis PlanPermissionSeeder exécuté sur la base centrale aydra : les sept permissions sont présentes, contre zéro auparavant ; les 4 attributions de rôle et 4 attributions directes restent inchangées. Aucun parcours navigateur connecté vérifié ; aucune attribution automatique ajoutée.
 
 ## 1er novembre 2026 — Module 09, consultation backend
 

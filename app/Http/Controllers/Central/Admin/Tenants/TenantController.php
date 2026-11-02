@@ -11,6 +11,7 @@ use App\Http\Requests\Central\Tenants\StoreTenantRequest;
 use App\Http\Requests\Central\Tenants\UpdateTenantPrioritiesRequest;
 use App\Http\Requests\Central\Tenants\UpdateTenantRequest;
 use App\Models\Central\Tenants\Tenant;
+use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Users\User;
 use App\Services\Central\Tenants\TenantCreator;
 use App\Services\Central\Tenants\TenantManagementService;
@@ -39,7 +40,8 @@ class TenantController extends Controller
             'search' => $search,
             'status' => $status,
             'statuses' => StatusEnum::cases(),
-            'subscriptions' => $this->tenants->subscriptions(collect($shops->items())),
+            'subscriptions' => Gate::allows('viewAny', Subscription::class)
+                ? $this->tenants->subscriptions($this->centralActor(), collect($shops->items())) : collect(),
         ]);
     }
 
@@ -82,7 +84,8 @@ class TenantController extends Controller
 
         return view('central.pages.admin.tenants.show', [
             'tenant' => $tenant,
-            'subscription' => $this->tenants->subscriptions(collect([$tenant]))->get($tenant->user_id),
+            'subscription' => Gate::allows('viewAny', Subscription::class)
+                ? $this->tenants->subscriptions($this->centralActor(), collect([$tenant]))->get($tenant->user_id) : null,
         ]);
     }
 
