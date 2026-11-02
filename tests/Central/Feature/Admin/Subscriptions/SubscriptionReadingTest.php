@@ -20,8 +20,8 @@ test('authorized staff can search subscriptions and view archived plan details',
     $actor = subscriptionReader('saas.subscriptions.view');
     $owner = User::factory()->create(['name' => 'Marchand Exemple']);
     $plan = Plan::factory()->create(['name' => 'Offre Exemple']);
-    $subscription = Subscription::factory()->create(['user_id' => $owner->id, 'plan_id' => $plan->id]);
     $plan->delete();
+    $subscription = Subscription::factory()->create(['user_id' => $owner->id, 'plan_id' => $plan->id]);
     $this->actingAs($actor, 'central')->get(route('central.subscriptions.index', ['search' => 'Marchand Exemple']))
         ->assertOk()->assertSee('Offre Exemple');
     $this->get(route('central.subscriptions.show', $subscription))->assertOk()->assertSee('Offre Exemple');

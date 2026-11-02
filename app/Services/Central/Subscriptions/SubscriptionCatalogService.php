@@ -20,7 +20,10 @@ class SubscriptionCatalogService
             ->when($status !== null, fn (Builder $query) => $query->where('status', $status))
             ->when($search !== '', fn (Builder $query) => $query->where(function (Builder $query) use ($pattern): void {
                 $query->where('uuid', 'like', $pattern)
-                    ->orWhereHas('owner', fn (Builder $owner) => $owner->where('name', 'like', $pattern)->orWhere('email', 'like', $pattern))
+                    ->orWhereHas('owner', fn (Builder $owner) => $owner->where('first_name', 'like', $pattern)
+                        ->orWhere('last_name', 'like', $pattern)
+                        ->orWhereRaw("CONCAT_WS(' ', first_name, last_name) LIKE ?", [$pattern])
+                        ->orWhere('email', 'like', $pattern))
                     ->orWhereHas('plan', fn (Builder $plan) => $plan->where('name', 'like', $pattern)->orWhere('code', 'like', $pattern));
             }))
             ->orderByDesc('id')->paginate(20)->withQueryString();
