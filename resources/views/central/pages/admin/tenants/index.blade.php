@@ -14,7 +14,7 @@
         </form>
         <div class="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
             <table class="w-full text-left text-sm">
-                <thead><tr>@foreach (['Boutique', 'Propriétaire', 'Domaines', 'État', 'Abonnement', 'Base MySQL', 'Actions'] as $heading)<th class="p-4">{{ $heading }}</th>@endforeach</tr></thead>
+                <thead><tr>@foreach (['Boutique', 'Propriétaire', 'Domaines', 'État'] as $heading)<th class="p-4">{{ $heading }}</th>@endforeach @can('viewAny', \App\Models\Central\Subscriptions\Subscription::class)<th class="p-4">Abonnement</th>@endcan @foreach (['Base MySQL', 'Actions'] as $heading)<th class="p-4">{{ $heading }}</th>@endforeach</tr></thead>
                 <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
                     @forelse ($shops as $tenant)
                         <tr>
@@ -22,7 +22,7 @@
                             <td class="p-4">{{ $tenant->owner?->name ?? 'Compte archivé' }}<br>{{ $tenant->owner?->email }}</td>
                             <td class="p-4">{{ $tenant->domains->pluck('domain')->join(', ') ?: 'Aucun domaine' }}</td>
                             <td class="p-4">{{ $tenant->status->label() }}</td>
-                            <td class="p-4">{{ $subscriptions->get($tenant->user_id)?->plan?->name ?? 'Aucun abonnement actif enregistré' }}</td>
+                            @can('viewAny', \App\Models\Central\Subscriptions\Subscription::class)<td class="p-4">{{ $subscriptions->get($tenant->user_id)?->plan?->name ?? 'Aucun abonnement actif enregistré' }}</td>@endcan
                             <td class="p-4">{{ $tenant->getInternal('db_name') ?? 'Non réservée' }}</td>
                             <td class="p-4">@include('central.pages.admin.tenants.actions', ['detail' => false])</td>
                         </tr>

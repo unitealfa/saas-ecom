@@ -40,15 +40,19 @@ use App\Policies\Central\PickupPointPolicy;
 use App\Policies\Central\PlanPolicy;
 use App\Policies\Central\RolePolicy;
 use App\Policies\Central\ShippingCarrierPolicy;
+use App\Policies\Central\SubscriptionPolicy;
 use App\Policies\Central\TenantPolicy;
 use App\Policies\Central\TenantSchemaDeploymentPolicy;
 use App\Policies\Central\UserPolicy;
+use App\Services\Central\Subscriptions\DefaultSubscription;
+use App\Services\Central\Tenants\TenantStatusService;
 use App\Services\SchemaBlueprint;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -63,6 +67,7 @@ class AppServiceProvider extends ServiceProvider
         Role::class => RolePolicy::class,
         Permission::class => PermissionPolicy::class,
         Plan::class => PlanPolicy::class,
+        Subscription::class => SubscriptionPolicy::class,
         Country::class => CountryPolicy::class,
         ShippingCarrier::class => ShippingCarrierPolicy::class,
         CarrierGeoMapping::class => CarrierGeoMappingPolicy::class,
@@ -84,6 +89,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->registerMorphMap();
         $this->registerPolicies();
+        Event::listen(DefaultSubscription::EFFECTIVE_CHANGED, [TenantStatusService::class, 'applySubscriptionQuota']);
 
         $this->loadMigrationsFrom(database_path('migrations/central'));
         Livewire::addPersistentMiddleware([EnsureActiveCentralAccount::class]);
