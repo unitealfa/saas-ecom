@@ -56,3 +56,33 @@ test('the composition form submits selected features and quotas', function (): v
     ])->assertRedirect(route('central.plan-pages.show', $plan));
     expect($plan->features()->firstOrFail()->limit)->toBe(12);
 });
+
+test('the composition form preserves choices and a rejected quota after validation failure', function (): void {
+    $actor = planInterfaceActor(['saas.plans.view', 'saas.plans.features.update']);
+    $plan = Plan::factory()->create();
+    $feature = Feature::factory()->create(['is_active' => true]);
+    $url = route('central.plan-pages.show', $plan);
+
+    $this->actingAs($actor, 'central')->from($url)
+        ->put(route('central.plan-pages.features.update', $plan), [
+            '_composition' => '1', 'expected_state' => $plan->compositionState($plan->features),
+            'selected' => [$feature->uuid], 'enabled' => [$feature->uuid => '1'], 'limits' => [$feature->uuid => '-1'],
+        ])->assertRedirect($url)->assertSessionHasErrors('features.0.limit');
+
+    $response = $this->get($url)->assertOk();
+    $response->assertSee('name="selected[]" value="'.$feature->uuid.'" checked', false);
+    $response->assertSee('name="enabled['.$feature->uuid.']" value="1" checked', false);
+    $response->assertSee('name="limits['.$feature->uuid.']" value="-1"', false);
+    expect($plan->features()->count())->toBe(0);
+});
+
+test('malformed previous composition input still renders the form safely', function (): void {
+    $actor = planInterfaceActor(['saas.plans.view', 'saas.plans.features.update']);
+    $plan = Plan::factory()->create();
+    $feature = Feature::factory()->create(['is_active' => true]);
+
+    $this->actingAs($actor, 'central')->withSession(['_old_input' => [
+        '_composition' => '1', 'selected' => 'invalid', 'enabled' => 'invalid',
+        'limits' => [$feature->uuid => ['invalid']],
+    ]])->get(route('central.plan-pages.show', $plan))->assertOk();
+});

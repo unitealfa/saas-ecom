@@ -21,6 +21,7 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
  * @property StatusEnum $status
  * @property CarbonImmutable $period_starts_at
  * @property CarbonImmutable|null $period_ends_at
+ * @property CarbonImmutable|null $trial_ends_at
  */
 #[Fillable([
     'user_id', 'plan_id', 'assigned_by_id', 'operation_key', 'status', 'period', 'agreed_amount',
@@ -88,5 +89,31 @@ class Subscription extends Model
             'uuid', 'user_id', 'plan_id', 'status', 'period', 'agreed_amount', 'started_at',
             'period_starts_at', 'period_ends_at', 'trial_ends_at', 'ended_at', 'auto_renew',
         ]), JSON_THROW_ON_ERROR));
+    }
+
+    public function effectiveEndsAt(): ?CarbonImmutable
+    {
+        if ($this->status !== StatusEnum::TRIAL || $this->trial_ends_at === null) {
+            return $this->period_ends_at;
+        }
+
+        return $this->period_ends_at === null || $this->trial_ends_at->lessThan($this->period_ends_at)
+            ? $this->trial_ends_at
+            : $this->period_ends_at;
+    }
+
+    /** @param Builder<static> $query */
+    public function scopeDueForResolution(Builder $query): void
+    {
+        $query->where(function (Builder $query): void {
+            $query->where(function (Builder $query): void {
+                $query->whereIn('status', [StatusEnum::ACTIVE, StatusEnum::TRIAL])
+                    ->where('period_ends_at', '<=', now());
+            })->orWhere(function (Builder $query): void {
+                $query->where('status', StatusEnum::TRIAL)->where('trial_ends_at', '<=', now());
+            })->orWhere(function (Builder $query): void {
+                $query->where('status', StatusEnum::SCHEDULED)->where('period_starts_at', '<=', now());
+            });
+        });
     }
 }

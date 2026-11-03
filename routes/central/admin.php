@@ -1,4 +1,3 @@
-
 <?php
 
 use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
