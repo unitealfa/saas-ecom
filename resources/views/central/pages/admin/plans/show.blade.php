@@ -42,15 +42,20 @@
                 <flux:text>Sélectionnez les fonctionnalités à associer. Une limite vide signifie sans limite ; une version liée à un abonnement ne peut plus être modifiée.</flux:text>
                 <form method="POST" action="{{ route('central.plan-pages.features.update', $plan) }}" class="mt-4 flex flex-col gap-4">
                     @csrf @method('PUT')
+                    <input type="hidden" name="_composition" value="1">
                     <input type="hidden" name="expected_state" value="{{ $state }}">
                     @php($currentFeatures = $plan->features->keyBy('feature_id'))
+                    @php($submittedComposition = old('_composition') === '1')
+                    @php($selectedFeatures = is_array(old('selected')) ? old('selected') : [])
+                    @php($enabledFeatures = is_array(old('enabled')) ? old('enabled') : [])
                     @foreach ($availableFeatures->merge($plan->features->pluck('feature'))->unique('id')->sortBy('name') as $feature)
                         @php($current = $currentFeatures->get($feature->id))
                         <div class="flex flex-wrap items-center gap-4 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
-                            <label><input type="checkbox" name="selected[]" value="{{ $feature->uuid }}" @checked($current !== null)> {{ $feature->name }} ({{ $feature->code }})</label>
-                            <label><input type="checkbox" name="enabled[{{ $feature->uuid }}]" value="1" @checked($current?->is_active ?? true)> Activée dans ce plan</label>
+                            <label><input type="checkbox" name="selected[]" value="{{ $feature->uuid }}" @checked($submittedComposition ? in_array($feature->uuid, $selectedFeatures, true) : $current !== null)> {{ $feature->name }} ({{ $feature->code }})</label>
+                            <label><input type="checkbox" name="enabled[{{ $feature->uuid }}]" value="1" @checked($submittedComposition ? isset($enabledFeatures[$feature->uuid]) : ($current?->is_active ?? true))> Activée dans ce plan</label>
                             @if ($feature->value_type === \App\Enums\Central\Features\ValueTypeEnum::QUANTITY)
-                                <label>Limite <input class="rounded border border-zinc-300 bg-transparent p-1" type="number" min="0" name="limits[{{ $feature->uuid }}]" value="{{ $current?->limit }}"> {{ $feature->unit }}</label>
+                                @php($limit = old('limits.'.$feature->uuid, $current?->limit))
+                                <label>Limite <input class="rounded border border-zinc-300 bg-transparent p-1" type="number" min="0" name="limits[{{ $feature->uuid }}]" value="{{ is_scalar($limit) ? $limit : '' }}"> {{ $feature->unit }}</label>
                             @endif
                             @if ($feature->trashed() || ! $feature->is_active)<span>Indisponible : conserver sans changement ou retirer.</span>@endif
                         </div>

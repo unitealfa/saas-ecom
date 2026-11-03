@@ -4,6 +4,7 @@ namespace App\Http\Requests\Central\Subscriptions;
 
 use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Models\Central\Subscriptions\Subscription;
+use App\Models\Central\Users\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -12,7 +13,9 @@ class SearchSubscriptionsRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return Gate::forUser($this->user('central'))->allows('viewAny', Subscription::class);
+        $actor = $this->user('central');
+
+        return $actor instanceof User && Gate::forUser($actor)->allows('viewAny', Subscription::class);
     }
 
     protected function prepareForValidation(): void
@@ -22,6 +25,7 @@ class SearchSubscriptionsRequest extends FormRequest
         }
     }
 
+    /** @return array<string, list<mixed>> */
     public function rules(): array
     {
         return [
