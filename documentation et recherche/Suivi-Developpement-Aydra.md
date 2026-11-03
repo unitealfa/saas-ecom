@@ -2,6 +2,10 @@
 
 Ouvert le 6 octobre 2026 pour exécuter `instruction.txt`. Ce fichier distingue les spécifications, le code et les vérifications réelles. Une case non cochée signifie que le travail reste à faire ; une migration écrite ne prouve pas son exécution.
 
+## 2 novembre 2026 — Module 09, interface administrative
+
+Menu et pages admin/offres raccordés aux services existants ; modification des informations ajoutée sous saas.plans.update, avec état attendu, protection des versions utilisées et audit. Les routes JSON restent disponibles. PHP 8.5 : syntaxe valide, 27 routes chargées sur les trois domaines et test unitaire réussi (1 test, 4 assertions). Tests fonctionnels MySQL ajoutés mais non exécutés : ils exigent une autorisation explicite. Aucun seeder ni changement de données exécuté. Reste à autoriser les tests MySQL isolés, vérifier le parcours navigateur et enregistrer les permissions par PlanPermissionSeeder après autorisation, sans attribution automatique.
+
 ## 1er novembre 2026 — Module 09, consultation backend
 
 Ajout des seules lectures administratives JSON des plans et de leurs versions, y compris archivées, et de leur composition. Permission centrale explicite saas.plans.view, sans attribution automatique aux rôles. Pas d'interface ni de mutation des plans, abonnements ou boutiques. PHP 8.5.12, au chemin local explicitement fourni, valide la syntaxe des dix fichiers concernés ; route:list confirme les deux routes sur les trois domaines centraux. Les tests fonctionnels correspondants sont écrits mais n'ont pas été exécutés : ils créent des bases MySQL isolées et exigent une autorisation distincte. L'ajout de la permission à la base centrale existante reste à exécuter explicitement après autorisation ; aucun seeder réel n'a été lancé.

@@ -81,6 +81,9 @@
                             {{ __('Fonctionnalités') }}
                         </flux:sidebar.item>
                     @endcan
+                    @can('viewAny', \App\Models\Central\Plans\Plan::class)
+                        <flux:sidebar.item :href="route('central.plan-pages.index')" :current="request()->routeIs('central.plan-pages.*')" wire:navigate>Plans et offres</flux:sidebar.item>
+                    @endcan
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 
