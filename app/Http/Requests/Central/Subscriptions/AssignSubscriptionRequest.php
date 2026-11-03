@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Central\Subscriptions;
 
 use App\Models\Central\Subscriptions\Subscription;
+use App\Models\Central\Users\User;
 use App\Services\Central\Subscriptions\SubscriptionAssignmentService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
@@ -11,9 +12,12 @@ class AssignSubscriptionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return Gate::forUser($this->user('central'))->allows('assign', Subscription::class);
+        $actor = $this->user('central');
+
+        return $actor instanceof User && Gate::forUser($actor)->allows('assign', Subscription::class);
     }
 
+    /** @return array<string, list<mixed>> */
     public function rules(): array
     {
         return SubscriptionAssignmentService::rules();

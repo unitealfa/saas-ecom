@@ -101,6 +101,7 @@ class TenantStatusService
         }
         Gate::forUser($actor)->authorize('assign', Subscription::class);
         $owner = User::whereKey($owner->id)->lockForUpdate()->firstOrFail();
+        /** @var Collection<int, Tenant> $shops */
         $shops = Tenant::where('user_id', $owner->id)->orderBy('id')->lockForUpdate()->get();
         if ($shops->isNotEmpty()) {
             $this->assertOwnerEligible($owner);
@@ -111,39 +112,63 @@ class TenantStatusService
     /** Applique une transition arrivée à échéance avant d'autoriser l'accès à une boutique. */
     public function synchronizeSubscription(User $owner): void
     {
-        $due = Subscription::where('user_id', $owner->id)->where(function ($query): void {
-            $query->where(fn ($query) => $query->where('status', \App\Enums\Central\Subscriptions\StatusEnum::ACTIVE)
-                ->whereNotNull('period_ends_at')->where('period_ends_at', '<=', now()))
-                ->orWhere(fn ($query) => $query->where('status', \App\Enums\Central\Subscriptions\StatusEnum::SCHEDULED)
-                    ->where('period_starts_at', '<=', now()));
-        })->exists();
-        if (! $due) {
+        if (! Subscription::where('user_id', $owner->id)->dueForResolution()->exists()) {
             return;
         }
 
-        $this->mutations->transaction(function () use ($owner): void {
-            $owner = User::whereKey($owner->id)->lockForUpdate()->firstOrFail();
-            $shops = Tenant::where('user_id', $owner->id)->orderBy('id')->lockForUpdate()->get();
-            $current = $this->subscriptions->ensure($owner);
-            if ($shops->isNotEmpty() && $this->isOwnerEligible($owner)) {
-                $grant = $this->shopsGrant($current, required: false);
-                if ($grant !== null && $grant->is_active) {
-                    $this->rebalance(null, $owner, $shops, null, 'Échéance d’un abonnement');
-                } else {
-                    foreach ($shops as $shop) {
-                        if ($shop->status !== StatusEnum::ACTIVE) {
-                            continue;
-                        }
-                        $shop->forceFill(['status' => StatusEnum::OVER_QUOTA, 'over_quota_since_at' => now()])->save();
-                        $this->audit(null, $shop, 'tenant_quota_rebalanced', [
-                            'before' => ['status' => StatusEnum::ACTIVE->value],
-                            'after' => ['status' => StatusEnum::OVER_QUOTA->value],
-                            'reason' => 'Échéance d’un abonnement',
-                        ], 'Choix des boutiques actives sous quota mis à jour.');
-                    }
+        $this->subscriptions->ensure($owner);
+    }
+
+    /** Réconciliation synchrone appelée par DefaultSubscription avant le commit. */
+    public function applySubscriptionQuota(User $owner, Subscription $subscription, ?User $actor = null): void
+    {
+        if (DB::transactionLevel() === 0 || $subscription->user_id !== $owner->id) {
+            throw new LogicException('Subscription quota reconciliation requires its owner transaction.');
+        }
+
+        $owner = User::whereKey($owner->id)->lockForUpdate()->firstOrFail();
+        /** @var Collection<int, Tenant> $shops */
+        $shops = Tenant::where('user_id', $owner->id)->orderBy('id')->lockForUpdate()->get();
+        if ($shops->isEmpty() || ! $this->isOwnerEligible($owner)) {
+            return;
+        }
+
+        $eligible = $this->eligibleShops($shops);
+        $grant = $this->shopsGrant($subscription, required: false);
+        $selected = collect();
+
+        if ($grant !== null && $grant->is_active) {
+            foreach ($eligible as $shop) {
+                if ($grant->limit !== null && $selected->count() >= $grant->limit) {
+                    break;
+                }
+                if ($this->preparedForAutomaticQuota($actor, $owner, $shop)) {
+                    $selected->push($shop);
                 }
             }
-        });
+        }
+
+        $eligible = $eligible->filter(fn (Tenant $shop): bool => in_array($shop->status, self::QUOTA_STATUSES, true));
+        $this->saveQuotaSelection($actor, $eligible, $selected, null, 'Échéance d’un abonnement');
+    }
+
+    private function preparedForAutomaticQuota(?User $actor, User $owner, Tenant $shop): bool
+    {
+        try {
+            $this->profiles->assertPrepared($shop, $owner);
+
+            return true;
+        } catch (ValidationException) {
+            $before = $shop->status;
+            $shop->forceFill(['status' => StatusEnum::INACTIVE, 'over_quota_since_at' => null])->save();
+            $this->audit($actor, $shop, 'tenant_subscription_access_blocked', [
+                'before' => ['status' => $before->value],
+                'after' => ['status' => StatusEnum::INACTIVE->value],
+                'reason' => 'Préparation technique de la boutique à vérifier.',
+            ], 'Accès bloqué : la préparation technique doit être vérifiée.');
+
+            return false;
+        }
     }
 
     public function change(User $actor, Tenant $tenant, string $action, StatusEnum $expected, ?string $reason): void
@@ -335,20 +360,7 @@ class TenantStatusService
             $this->fail('tenant', 'L’offre applicable ne permet pas d’activer une boutique.');
         }
 
-        $busy = TenantSchemaDeployment::whereIn('tenant_id', $shops->pluck('id'))
-            ->whereIn('status', self::OPEN_DEPLOYMENT)->lockForUpdate()->pluck('tenant_id');
-
-        $eligible = $shops
-            ->filter(fn (Tenant $shop): bool => in_array($shop->status, self::QUOTA_STATUSES, true)
-                && $this->isProvisioned($shop)
-                && ! $busy->contains($shop->id))
-            ->sortBy(fn (Tenant $shop): array => [
-                $shop->activation_priority === null ? 1 : 0,
-                $shop->activation_priority ?? PHP_INT_MAX,
-                $shop->is_primary ? 0 : 1,
-                $shop->created_at->timestamp,
-                $shop->uuid,
-            ])->values();
+        $eligible = $this->eligibleShops($shops);
 
         if ($shops->contains(fn (Tenant $shop): bool => $shop->status === StatusEnum::ACTIVE && ! $eligible->contains('id', $shop->id))) {
             $this->fail('tenant', 'Une boutique active a une préparation technique incomplète.');
@@ -364,6 +376,33 @@ class TenantStatusService
             $this->profiles->assertPrepared($shop, $owner);
         }
 
+        $this->saveQuotaSelection($actor, $eligible, $selected, $requested, $reason);
+    }
+
+    /** @param Collection<int, Tenant> $shops
+     * @return Collection<int, Tenant>
+     */
+    private function eligibleShops(Collection $shops): Collection
+    {
+        $busy = TenantSchemaDeployment::whereIn('tenant_id', $shops->pluck('id'))
+            ->whereIn('status', self::OPEN_DEPLOYMENT)->lockForUpdate()->pluck('tenant_id');
+
+        return $shops->filter(fn (Tenant $shop): bool => in_array($shop->status, self::QUOTA_STATUSES, true)
+            && $this->isProvisioned($shop) && ! $busy->contains($shop->id))
+            ->sortBy(fn (Tenant $shop): array => [
+                $shop->activation_priority === null ? 1 : 0,
+                $shop->activation_priority ?? PHP_INT_MAX,
+                $shop->is_primary ? 0 : 1,
+                $shop->created_at->timestamp,
+                $shop->uuid,
+            ])->values();
+    }
+
+    /** @param Collection<int, Tenant> $eligible
+     * @param  Collection<int, Tenant>  $selected
+     */
+    private function saveQuotaSelection(?User $actor, Collection $eligible, Collection $selected, ?Tenant $requested, ?string $reason): void
+    {
         foreach ($eligible as $shop) {
             $before = $shop->status;
             $status = $selected->contains('id', $shop->id) ? StatusEnum::ACTIVE : StatusEnum::OVER_QUOTA;
