@@ -11,6 +11,13 @@ use Spatie\Permission\Models\Permission as PackagePermission;
 
 class CentralRoleCatalog
 {
+    public const array SUBSCRIPTION_PERMISSIONS = [
+        'saas.subscriptions.view' => 'Consulter et rechercher les abonnements',
+        'saas.subscriptions.assign' => 'Attribuer un abonnement à un utilisateur',
+        'saas.subscriptions.change' => 'Changer le plan d’un abonnement',
+        'saas.subscriptions.close' => 'Mettre fin à un abonnement',
+    ];
+
     public const array MEDIA_PERMISSIONS = [
         'saas.media.view' => 'Consulter les fichiers centraux',
         'saas.media.upload' => 'Importer un fichier autorisé',
@@ -87,6 +94,7 @@ class CentralRoleCatalog
     ];
 
     public const array PERMISSIONS = [
+        ...self::SUBSCRIPTION_PERMISSIONS,
         ...self::CARRIER_MAPPING_PERMISSIONS,
         ...self::PICKUP_POINT_PERMISSIONS,
         ...self::MEDIA_PERMISSIONS,
@@ -151,6 +159,7 @@ class CentralRoleCatalog
         'Wilayas et communes' => ['saas.geography.view', 'saas.geography.create', 'saas.geography.update', 'saas.geography.activate', 'saas.geography.archive'],
         'Fonctionnalités commerciales' => ['saas.features.view', 'saas.features.create', 'saas.features.update', 'saas.features.activate', 'saas.features.archive'],
         'Plans et offres' => ['saas.plans.view', 'saas.plans.create', 'saas.plans.update', 'saas.plans.features.update', 'saas.plans.versions.create', 'saas.plans.activate', 'saas.plans.archive'],
+        'Abonnements' => ['saas.subscriptions.view', 'saas.subscriptions.assign', 'saas.subscriptions.change', 'saas.subscriptions.close'],
         'Déploiements' => ['saas.deployments.view', 'saas.deployments.provision', 'saas.deployments.migrate', 'saas.deployments.retry', 'saas.deployments.errors.view'],
         'Domaines' => ['saas.domains.view', 'saas.domains.create', 'saas.domains.update', 'saas.domains.verify', 'saas.domains.primary.update', 'saas.domains.archive'],
         'Utilisateurs centraux' => ['saas.users.view', 'saas.users.create', 'saas.users.update', 'saas.users.approve', 'saas.users.reject', 'saas.users.suspend', 'saas.users.activate', 'saas.users.archive'],

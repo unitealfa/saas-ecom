@@ -80,8 +80,10 @@ class TenantManagementService
      * @param  Collection<int, Tenant>  $tenants
      * @return Collection<int, Subscription>
      */
-    public function subscriptions(Collection $tenants): Collection
+    public function subscriptions(User $actor, Collection $tenants): Collection
     {
+        Gate::forUser($actor)->authorize('viewAny', Subscription::class);
+
         return Subscription::whereIn('user_id', $tenants->pluck('user_id')->unique())
             ->whereIn('status', [SubscriptionStatus::ACTIVE, SubscriptionStatus::TRIAL])
             ->where('period_starts_at', '<=', now())

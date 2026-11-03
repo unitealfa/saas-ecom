@@ -1,4 +1,3 @@
-
 <?php
 
 use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
@@ -17,6 +16,7 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
         'feature',
         'carrier',
         'plan',
+        'subscription',
     ])
     ->group(function (): void {
         require __DIR__.'/admin/carriers.php';
@@ -30,6 +30,7 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
         require __DIR__.'/admin/deployments.php';
         require __DIR__.'/admin/features.php';
         require __DIR__.'/admin/plans.php';
+        require __DIR__.'/admin/subscriptions.php';
         require __DIR__.'/admin/roles.php';
         require __DIR__.'/admin/permissions.php';
         require __DIR__.'/admin/countries.php';

@@ -10,6 +10,7 @@ use App\Models\Central\Audit\Activity;
 use App\Models\Central\Tenants\Tenant;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
+use App\Services\Central\Tenants\TenantStatusService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Gate;
 
@@ -20,7 +21,7 @@ class RegistrationJourney
 
     private const string EVENT_REJECTED = 'central_account_rejected';
 
-    public function __construct(private CentralUserAccess $access) {}
+    public function __construct(private CentralUserAccess $access, private TenantStatusService $tenantStatuses) {}
 
     public function mayAuthenticate(User $user): bool
     {
@@ -92,6 +93,7 @@ class RegistrationJourney
     /** @return Collection<int, Tenant> */
     private function loadTenants(User $user): Collection
     {
+        $this->tenantStatuses->synchronizeSubscription($user);
         /** @var Collection<int, Tenant> $tenants */
         $tenants = $user->tenants()->orderBy('id')
             ->get(['id', 'uuid', 'user_id', 'shop_name', 'status', 'schema_version', 'provisioned_at']);

@@ -8,10 +8,13 @@ use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Users\User;
 use App\Services\Central\Plans\FreePlanCatalog;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use LogicException;
 
 class DefaultSubscription
 {
+    public const string EFFECTIVE_CHANGED = 'central.subscription.effective_changed';
+
     private const string KEY_PREFIX = 'default-free:';
 
     private const string INITIAL = 'initial';
@@ -38,18 +41,45 @@ class DefaultSubscription
                     throw new LogicException('An active subscription cannot start in the future.');
                 }
 
-                if ($current->period_ends_at === null || $current->period_ends_at->isFuture()) {
+                $end = $current->effectiveEndsAt();
+                if ($end === null || $end->isFuture()) {
                     return $current;
                 }
 
-                $current->update(['status' => StatusEnum::EXPIRED, 'ended_at' => now()]);
+                $current->update(['status' => StatusEnum::EXPIRED, 'ended_at' => $end]);
+            }
+
+            $scheduled = Subscription::where('user_id', $owner->id)
+                ->where('status', StatusEnum::SCHEDULED)
+                ->where('period_starts_at', '<=', now())
+                ->orderBy('period_starts_at')->orderBy('id')->lockForUpdate()->get();
+            foreach ($scheduled as $next) {
+                if ($next->period_ends_at !== null && $next->period_ends_at->lessThanOrEqualTo(now())) {
+                    $next->update(['status' => StatusEnum::EXPIRED, 'ended_at' => $next->period_ends_at]);
+
+                    continue;
+                }
+                $next->update(['status' => StatusEnum::ACTIVE]);
+                activity()->performedOn($next)->event('subscription_scheduled_activated')
+                    ->withProperties(['owner_uuid' => $owner->uuid, 'effective_at' => $next->period_starts_at->toISOString()])
+                    ->log('Abonnement programmé activé.');
+
+                return $this->resolved($owner, $next, $assignedBy);
             }
 
             $previous = $current ?? Subscription::where('user_id', $owner->id)
                 ->orderByDesc('id')->lockForUpdate()->first();
 
-            return $this->createFree($owner, $assignedBy, $previous);
+            return $this->resolved($owner, $this->createFree($owner, $assignedBy, $previous), $assignedBy);
         }, self::ATTEMPTS);
+    }
+
+    private function resolved(User $owner, Subscription $subscription, ?User $actor): Subscription
+    {
+        // Le quota doit être appliqué dans la même transaction, avant tout accès.
+        Event::dispatch(self::EFFECTIVE_CHANGED, [$owner, $subscription, $actor]);
+
+        return $subscription;
     }
 
     private function currentOf(User $owner): ?Subscription
