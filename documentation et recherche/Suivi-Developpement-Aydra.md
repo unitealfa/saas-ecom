@@ -2,9 +2,21 @@
 
 Ouvert le 6 octobre 2026 pour exécuter `instruction.txt`. Ce fichier distingue les spécifications, le code et les vérifications réelles. Une case non cochée signifie que le travail reste à faire ; une migration écrite ne prouve pas son exécution.
 
+## Module 10 — Fin et changement programmés
+
+Décisions utilisateur du 2 novembre 2026 : fin et changement d'une offre payée à l'échéance, sans perte des droits de la période. Actions sous saas.subscriptions.close et saas.subscriptions.change ; conservation de l'historique, état attendu, clé idempotente pour le changement, contrôle du tarif et audit. La transition arrivée à échéance est résolue à l'accès central propriétaire ou storefront et rééquilibre les boutiques selon le quota existant. PHP 8.5 : syntaxe valide, routes chargées et test unitaire réussi (1 test, 1 assertion). Après autorisation, tests MySQL isolés réussis : module abonnements 16 tests/54 assertions, accès boutiques 6 tests/18 assertions et parcours commerçant 12 tests/197 assertions. Le premier test de quota échouait car son dossier vérifié omettait le vérificateur ; ses données ont été corrigées et la série relancée avec succès. SubscriptionPermissionSeeder exécuté sur aydra : 4 permissions présentes contre 2 auparavant ; les 4 attributions de rôle et 4 attributions directes restent inchangées. Aucune transition réelle ni vérification navigateur effectuée.
+
+## Module 10 — Attribution d'un abonnement
+
+Attribution immédiate sous saas.subscriptions.assign, depuis le module ou une fiche utilisateur : commerçant actif non personnel, version commercialisée, prix confirmé mensuel ou annuel, idempotence, conservation de l'historique, refus d'un abonnement payant en cours et rééquilibrage des boutiques via le service existant. Décision utilisateur : le montant convenu est le tarif correspondant à la version choisie. PHP 8.5 : syntaxe valide, routes chargées et test unitaire réussi (1 test, 4 assertions). Après autorisation, tests fonctionnels du module sur MySQL isolé : 8 tests réussis, 24 assertions. SubscriptionPermissionSeeder exécuté sur aydra : deux permissions enregistrées, les 4 attributions de rôle et 4 attributions directes restent inchangées. Aucune attribution réelle ni vérification navigateur effectuée.
+
+## Module 10 — Consultation des abonnements
+
+Liste et fiche administratives en lecture seule, recherche et filtre d'état, scope type 1 et références historiques, sous saas.subscriptions.view ; les vues utilisateur et boutique sont soumises au même droit. PHP 8.5 : syntaxe valide et test unitaire réussi (1 test, 3 assertions). La recherche utilise les colonnes first_name et last_name ; le test de référence historique archive l'offre avant création de sa référence, conformément à la protection SQL. Tests et ajout des permissions décrits ci-dessus. L'ancien saas.subscriptions.manage est conservé dans LocalDevelopmentSeeder et n'est pas migré lors de cette étape.
+
 ## 2 novembre 2026 — Module 09, interface administrative
 
-Menu et pages admin/offres raccordés aux services existants ; modification des informations ajoutée sous saas.plans.update, avec état attendu, protection des versions utilisées et audit. Les routes JSON restent disponibles. PHP 8.5 : syntaxe valide, 27 routes chargées sur les trois domaines et test unitaire réussi (1 test, 4 assertions). Tests fonctionnels MySQL ajoutés mais non exécutés : ils exigent une autorisation explicite. Aucun seeder ni changement de données exécuté. Reste à autoriser les tests MySQL isolés, vérifier le parcours navigateur et enregistrer les permissions par PlanPermissionSeeder après autorisation, sans attribution automatique.
+Menu et pages admin/offres raccordés aux services existants ; modification des informations ajoutée sous saas.plans.update, avec état attendu, protection des versions utilisées et audit. Les routes JSON restent disponibles. PHP 8.5 : syntaxe valide, 27 routes chargées sur les trois domaines et test unitaire réussi (1 test, 4 assertions). Après autorisation explicite, tests fonctionnels MySQL isolés réussis : 4 tests, 15 assertions. Puis PlanPermissionSeeder exécuté sur la base centrale aydra : les sept permissions sont présentes, contre zéro auparavant ; les 4 attributions de rôle et 4 attributions directes restent inchangées. Aucun parcours navigateur connecté vérifié ; aucune attribution automatique ajoutée.
 
 ## 1er novembre 2026 — Module 09, consultation backend
 

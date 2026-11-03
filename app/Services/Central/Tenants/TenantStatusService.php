@@ -17,6 +17,7 @@ use App\Services\Central\Authorization\AuthorizationMutation;
 use App\Services\Central\Authorization\CentralUserAccess;
 use App\Services\Central\Subscriptions\DefaultSubscription;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use LogicException;
@@ -89,6 +90,59 @@ class TenantStatusService
                     'target_version' => $deployment->target_version,
                 ],
                 'Opération technique terminée et état d’accès calculé automatiquement.');
+        });
+    }
+
+    /** Appelé pendant la transaction d'attribution, après verrouillage du propriétaire. */
+    public function rebalanceForSubscription(User $actor, User $owner): void
+    {
+        if (DB::transactionLevel() === 0) {
+            throw new LogicException('Subscription quota reconciliation requires a transaction.');
+        }
+        Gate::forUser($actor)->authorize('assign', Subscription::class);
+        $owner = User::whereKey($owner->id)->lockForUpdate()->firstOrFail();
+        $shops = Tenant::where('user_id', $owner->id)->orderBy('id')->lockForUpdate()->get();
+        if ($shops->isNotEmpty()) {
+            $this->assertOwnerEligible($owner);
+            $this->rebalance($actor, $owner, $shops, null, 'Attribution d’un abonnement');
+        }
+    }
+
+    /** Applique une transition arrivée à échéance avant d'autoriser l'accès à une boutique. */
+    public function synchronizeSubscription(User $owner): void
+    {
+        $due = Subscription::where('user_id', $owner->id)->where(function ($query): void {
+            $query->where(fn ($query) => $query->where('status', \App\Enums\Central\Subscriptions\StatusEnum::ACTIVE)
+                ->whereNotNull('period_ends_at')->where('period_ends_at', '<=', now()))
+                ->orWhere(fn ($query) => $query->where('status', \App\Enums\Central\Subscriptions\StatusEnum::SCHEDULED)
+                    ->where('period_starts_at', '<=', now()));
+        })->exists();
+        if (! $due) {
+            return;
+        }
+
+        $this->mutations->transaction(function () use ($owner): void {
+            $owner = User::whereKey($owner->id)->lockForUpdate()->firstOrFail();
+            $shops = Tenant::where('user_id', $owner->id)->orderBy('id')->lockForUpdate()->get();
+            $current = $this->subscriptions->ensure($owner);
+            if ($shops->isNotEmpty() && $this->isOwnerEligible($owner)) {
+                $grant = $this->shopsGrant($current, required: false);
+                if ($grant !== null && $grant->is_active) {
+                    $this->rebalance(null, $owner, $shops, null, 'Échéance d’un abonnement');
+                } else {
+                    foreach ($shops as $shop) {
+                        if ($shop->status !== StatusEnum::ACTIVE) {
+                            continue;
+                        }
+                        $shop->forceFill(['status' => StatusEnum::OVER_QUOTA, 'over_quota_since_at' => now()])->save();
+                        $this->audit(null, $shop, 'tenant_quota_rebalanced', [
+                            'before' => ['status' => StatusEnum::ACTIVE->value],
+                            'after' => ['status' => StatusEnum::OVER_QUOTA->value],
+                            'reason' => 'Échéance d’un abonnement',
+                        ], 'Choix des boutiques actives sous quota mis à jour.');
+                    }
+                }
+            }
         });
     }
 
@@ -273,7 +327,7 @@ class TenantStatusService
     }
 
     /** @param Collection<int, Tenant> $shops */
-    private function rebalance(User $actor, User $owner, Collection $shops, ?Tenant $requested, ?string $reason): void
+    private function rebalance(?User $actor, User $owner, Collection $shops, ?Tenant $requested, ?string $reason): void
     {
         $grant = $this->shopsGrant($this->subscriptions->ensure($owner, $actor));
 

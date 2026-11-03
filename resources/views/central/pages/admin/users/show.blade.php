@@ -72,6 +72,7 @@
                 @endforeach
             </dl>
         @endcan
+        @can('viewAny', \App\Models\Central\Subscriptions\Subscription::class)
         <flux:heading level="2">Abonnements</flux:heading>
         @forelse ($subscriptions as $subscription)
             <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
@@ -102,7 +103,11 @@
             <flux:text>Aucun abonnement enregistré.</flux:text>
         @endforelse
         {{ $subscriptions->links() }}
+        @endcan
         <div class="flex flex-wrap gap-3">
+            @can('assign', \App\Models\Central\Subscriptions\Subscription::class)
+                <flux:button :href="route('central.subscriptions.create', ['owner' => $user->uuid])">Attribuer un abonnement</flux:button>
+            @endcan
             @include('central.pages.admin.users.lifecycle-actions')
             @can('viewHistory', $user)
                 <flux:button :href="route('central.users.history', $user)">Historique administratif</flux:button>

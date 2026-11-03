@@ -84,6 +84,9 @@
                     @can('viewAny', \App\Models\Central\Plans\Plan::class)
                         <flux:sidebar.item :href="route('central.plan-pages.index')" :current="request()->routeIs('central.plan-pages.*')" wire:navigate>Plans et offres</flux:sidebar.item>
                     @endcan
+                    @can('viewAny', \App\Models\Central\Subscriptions\Subscription::class)
+                        <flux:sidebar.item :href="route('central.subscriptions.index')" :current="request()->routeIs('central.subscriptions.*')" wire:navigate>Abonnements</flux:sidebar.item>
+                    @endcan
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 
