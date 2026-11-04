@@ -4,11 +4,16 @@ namespace Database\Seeders\Central;
 
 use App\Models\Central\Countries\Country;
 use Illuminate\Database\Seeder;
+use LogicException;
 
 class CountrySeeder extends Seeder
 {
     public function run(): void
     {
+        if (tenancy()->initialized) {
+            throw new LogicException('Countries must be seeded in the central context.');
+        }
+
         foreach ([
             ['DZ', 'Algérie', 'Algeria', 'الجزائر', true],
             ['FR', 'France', 'France', 'فرنسا', false],

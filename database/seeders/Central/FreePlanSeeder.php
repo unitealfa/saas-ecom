@@ -8,6 +8,7 @@ use App\Enums\Central\Features\ValueTypeEnum;
 use App\Models\Central\Features\Feature;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Plans\PlanFeature;
+use App\Services\Central\Plans\FreePlanCatalog;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -22,17 +23,19 @@ class FreePlanSeeder extends Seeder
 
         DB::transaction(function (): void {
             // Ne pas recréer ni modifier un plan déjà existant.
-            $existing = Plan::where('code', 'free')
+            $existing = Plan::withTrashed()->where('code', 'free')
                 ->orderByDesc('version')
                 ->lockForUpdate()
                 ->first();
 
             if ($existing !== null) {
+                app(FreePlanCatalog::class)->current();
+
                 return;
             }
 
             // Fonctionnalité : nombre de boutiques par propriétaire.
-            $feature = Feature::firstOrCreate(
+            $feature = Feature::withTrashed()->firstOrCreate(
                 ['code' => Feature::SHOPS_CODE],
                 [
                     'name' => 'Nombre de boutiques',
@@ -47,7 +50,8 @@ class FreePlanSeeder extends Seeder
             }
 
             if (
-                $feature->value_type !== ValueTypeEnum::QUANTITY
+                $feature->trashed()
+                || $feature->value_type !== ValueTypeEnum::QUANTITY
                 || $feature->quota_scope !== QuotaScopeEnum::OWNER
                 || $feature->period !== PeriodEnum::LIFETIME
                 || ! $feature->is_active

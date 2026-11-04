@@ -14,6 +14,6 @@ class LocalAuthenticationSeeder extends Seeder
             throw new LogicException('Central context required.');
         }
 
-        $this->command->info('Authentification : rôles et permissions initialisés.');
+        $this->command?->info('Authentification : les rôles et permissions sont gérés par AuthorizationSeeder.');
     }
 }

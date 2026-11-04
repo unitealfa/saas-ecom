@@ -6,7 +6,7 @@ return [
     | Référentiel géographique central
     |--------------------------------------------------------------------------
     |
-    | Métadonnées utilisées par GeographyImportService::loadLocal().
+    | Métadonnées utilisées par GeographicAreaSeeder::loadLocal().
     | La version n'est pas saisie ici : elle est calculée à partir de
     | l'empreinte SHA-256 des fichiers JSON.
     |

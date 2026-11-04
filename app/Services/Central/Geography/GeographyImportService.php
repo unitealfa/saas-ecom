@@ -12,7 +12,9 @@ use LogicException;
 class GeographyImportService
 {
     private const string EVENT_IMPORTED = 'geography_imported';
+
     private const string COUNTRY_CODE = 'DZ';
+
     private const int ATTEMPTS = 3;
 
     public function __construct(

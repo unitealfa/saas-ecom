@@ -13,12 +13,15 @@ class LocalDevelopmentSeeder extends Seeder
 {
     public function run(): void
     {
+        if (! app()->environment(['local', 'testing'])) {
+            $this->command?->warn('Compte de démonstration ignoré hors environnement local ou testing.');
+
+            return;
+        }
 
         if (tenancy()->initialized) {
             throw new LogicException('Central context required.');
         }
-
-        
 
         $admin = [
             'first_name' => 'Admin',

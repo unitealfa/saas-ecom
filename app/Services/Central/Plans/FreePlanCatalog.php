@@ -21,7 +21,7 @@ class FreePlanCatalog
         }
 
         // Lire la dernière version du plan gratuit.
-        $plan = Plan::where('code', 'free')
+        $plan = Plan::withTrashed()->where('code', 'free')
             ->orderByDesc('version')
             ->first();
 
@@ -31,9 +31,9 @@ class FreePlanCatalog
             );
         }
 
-        if (! $plan->is_active) {
+        if ($plan->trashed() || ! $plan->is_active || $plan->monthly_price !== '0.00' || $plan->annual_price !== '0.00') {
             throw new LogicException(
-                'The latest free plan version is inactive.'
+                'The latest free plan must be non-archived, active and free of charge.'
             );
         }
 
@@ -59,6 +59,7 @@ class FreePlanCatalog
         if (! PlanFeature::where('plan_id', $plan->id)
             ->where('feature_id', $feature->id)
             ->where('is_active', true)
+            ->where('limit', 2)
             ->exists()) {
             throw new LogicException(
                 'The latest free plan has no active shops quota.'
