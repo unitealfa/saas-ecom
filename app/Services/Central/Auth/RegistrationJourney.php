@@ -2,11 +2,13 @@
 
 namespace App\Services\Central\Auth;
 
+use App\Enums\Central\Deployments\StatusEnum as DeploymentStatus;
 use App\Enums\Central\Tenants\StatusEnum as TenantStatus;
 use App\Enums\Central\Users\JourneyState;
 use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Audit\Activity;
+use App\Models\Central\Deployments\TenantSchemaDeployment;
 use App\Models\Central\Tenants\Tenant;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
@@ -14,7 +16,7 @@ use App\Services\Central\Tenants\TenantStatusService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Gate;
 
-/** @phpstan-type ShopProgress array{name: string, status: string, prepared: bool, failed: bool, ready: bool, retry_url: string|null} */
+/** @phpstan-type ShopProgress array{name: string, status: string, preparation: string, in_progress: bool, prepared: bool, failed: bool, ready: bool, retry_url: string|null} */
 class RegistrationJourney
 {
     private const string EVENT_APPROVED = 'central_account_approved';
@@ -48,7 +50,10 @@ class RegistrationJourney
         if ($state === null) {
             $tenants = $this->loadTenants($user);
             $state = $this->stateFromTenants($tenants);
-            $shops = $tenants->map(fn (Tenant $tenant): array => $this->shopData($tenant, $user))->all();
+            $deployments = TenantSchemaDeployment::whereIn('id', TenantSchemaDeployment::selectRaw('MAX(id)')
+                ->whereIn('tenant_id', $tenants->modelKeys())->groupBy('tenant_id'))
+                ->get(['id', 'tenant_id', 'status'])->keyBy('tenant_id');
+            $shops = $tenants->map(fn (Tenant $tenant): array => $this->shopData($tenant, $user, $deployments->get($tenant->id)))->all();
         }
 
         $reason = $state === JourneyState::REJECTED ? $this->refusalReason($user) : null;
@@ -124,7 +129,7 @@ class RegistrationJourney
     }
 
     /** @return ShopProgress */
-    private function shopData(Tenant $tenant, User $user): array
+    private function shopData(Tenant $tenant, User $user, ?TenantSchemaDeployment $deployment = null): array
     {
         $tenant->setRelation('owner', $user);
         $failed = $tenant->status === TenantStatus::PROVISIONING_FAILED;
@@ -132,6 +137,9 @@ class RegistrationJourney
         return [
             'name' => $tenant->shop_name,
             'status' => $tenant->status->label(),
+            'preparation' => $this->preparationLabel($tenant, $deployment),
+            'in_progress' => $tenant->status === TenantStatus::PROVISIONING
+                && ! in_array($deployment?->status, [DeploymentStatus::FAILED, DeploymentStatus::CANCELLED, DeploymentStatus::SUCCEEDED], true),
             'prepared' => $this->isPrepared($tenant),
             'failed' => $failed,
             'ready' => $this->isReady($tenant),
@@ -139,6 +147,28 @@ class RegistrationJourney
                 ? route('owner.shops.retry', $tenant)
                 : null,
         ];
+    }
+
+    private function preparationLabel(Tenant $tenant, ?TenantSchemaDeployment $deployment): string
+    {
+        if ($this->isReady($tenant)) {
+            return 'Boutique prête';
+        }
+        if ($tenant->status === TenantStatus::PROVISIONING_FAILED) {
+            return 'Préparation interrompue : une reprise est nécessaire.';
+        }
+
+        return match ($deployment?->status) {
+            DeploymentStatus::FAILED => 'Préparation interrompue : une reprise est nécessaire.',
+            DeploymentStatus::CANCELLED => 'Préparation annulée.',
+            DeploymentStatus::PENDING => 'Demande enregistrée : en attente du traitement.',
+            DeploymentStatus::RUNNING => $this->isPrepared($tenant)
+                ? 'Base initialisée : finalisation de l’accès.'
+                : 'Création et initialisation de la base en cours.',
+            default => $this->isPrepared($tenant)
+                ? 'Préparation technique terminée : vérification des conditions d’accès.'
+                : 'Demande enregistrée : préparation à démarrer.',
+        };
     }
 
     private function refusalReason(User $user): ?string

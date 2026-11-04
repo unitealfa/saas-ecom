@@ -4,6 +4,7 @@
         x-data="{
             version: @js($progress['version']),
             state: @js($progress['state']),
+            shops: @js($progress['shops']),
             endpoint: @js(route('registration.status')),
             loginUrl: @js(route('login')),
             timer: null,
@@ -12,12 +13,17 @@
             coolingDown: false,
             refreshLimited: false,
             refreshFailed: false,
+            visibilityHandler: null,
             init() {
-                this.timer = window.setInterval(() => this.refresh(), 15000);
+                this.timer = window.setInterval(() => this.refresh(), this.state === 'preparing' ? 5000 : 15000);
+                this.visibilityHandler = () => { if (!document.hidden) this.refresh(); };
+                document.addEventListener('visibilitychange', this.visibilityHandler);
+                this.refresh();
             },
             destroy() {
                 window.clearInterval(this.timer);
                 window.clearTimeout(this.cooldownTimer);
+                document.removeEventListener('visibilitychange', this.visibilityHandler);
             },
             async refresh() {
                 if (document.hidden || this.loading || this.coolingDown) return;
@@ -29,6 +35,7 @@
                         headers: { Accept: 'application/json' },
                         credentials: 'same-origin',
                         cache: 'no-store',
+                        signal: AbortSignal.timeout(10000),
                     });
                     if (response.status === 401 || response.status === 403) {
                         window.location.replace(this.loginUrl);
@@ -43,9 +50,13 @@
                     const progress = await response.json();
                     this.refreshFailed = false;
                     this.refreshLimited = false;
-                    if (progress.state !== this.state || progress.version !== this.version) {
+                    if (progress.state !== this.state || progress.state === 'ready'
+                        || (this.state !== 'preparing' && progress.version !== this.version)) {
                         window.location.replace(progress.redirect);
+                        return;
                     }
+                    this.shops = progress.shops ?? this.shops;
+                    this.version = progress.version;
                 } catch {
                     this.refreshFailed = true;
                 } finally {
@@ -73,22 +84,21 @@
         @elseif ($progress['state'] === 'preparing')
             <flux:heading>Préparation de votre boutique</flux:heading>
             <flux:text>Votre boutique a été enregistrée. Vous accéderez automatiquement au tableau de bord lorsqu’une de vos boutiques sera prête et active.</flux:text>
-            @foreach ($progress['shops'] as $shop)
-                <flux:callout>
-                    <flux:callout.heading>{{ $shop['name'] }}</flux:callout.heading>
-                    <flux:text>État : {{ $shop['status'] }}</flux:text>
-                    @if ($shop['failed'])
-                        <flux:callout.text>La préparation a échoué. Vos informations sont conservées et vous n’avez pas besoin de créer une nouvelle boutique.</flux:callout.text>
-                        @if ($shop['retry_url'])
-                            <form method="POST" action="{{ $shop['retry_url'] }}">@csrf <flux:button type="submit">Relancer la préparation</flux:button></form>
-                        @endif
-                    @elseif (! $shop['prepared'])
-                        <flux:callout.text>La préparation technique est en cours. Votre boutique n’est pas encore accessible.</flux:callout.text>
-                    @else
-                        <flux:callout.text>La préparation est terminée. L’accès reste limité par l’état du compte, du quota ou de la boutique. Aucune seconde approbation de boutique n’est demandée.</flux:callout.text>
-                    @endif
-                </flux:callout>
-            @endforeach
+            <flux:text>Le suivi s’actualise automatiquement toutes les 5 secondes. Vous pouvez rester connecté sur cette page.</flux:text>
+            <template x-for="(shop, index) in shops" :key="index">
+                <div class="space-y-3 rounded-xl border border-zinc-200 p-4 dark:border-zinc-700" aria-live="polite">
+                    <p class="font-medium" x-text="shop.name"></p>
+                    <p class="text-sm" x-text="'État : ' + shop.status"></p>
+                    <p class="text-sm" x-text="shop.preparation"></p>
+                    <div x-show="shop.in_progress" role="status" aria-label="Préparation en cours">
+                        <flux:icon.loading class="size-5 animate-spin" />
+                    </div>
+                    <p x-show="shop.failed" class="text-sm">Vos informations sont conservées. Une reprise peut être demandée.</p>
+                    <template x-if="shop.retry_url">
+                        <form method="POST" :action="shop.retry_url">@csrf <flux:button type="submit">Relancer la préparation</flux:button></form>
+                    </template>
+                </div>
+            </template>
         @else
             <flux:heading>Bienvenue sur Aydra !</flux:heading>
             <flux:text>Votre compte a bien été créé.</flux:text>
