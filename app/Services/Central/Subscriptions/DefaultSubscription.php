@@ -17,7 +17,6 @@ class DefaultSubscription
 
     private const string KEY_PREFIX = 'default-free:';
 
-    private const string KEY_PREFIX = 'default-free:';
     private const string INITIAL = 'initial';
     private const int ATTEMPTS = 3;
 
@@ -95,7 +94,7 @@ class DefaultSubscription
             $previous = $current ?? Subscription::where('user_id', $owner->id)
                 ->orderByDesc('id')->lockForUpdate()->first();
 
-            return $this->resolved($owner, $this->createFree($owner, $assignedBy, $previous), $assignedBy);
+            return $this->resolved($owner, $this->createDefaultSubscription($owner, $assignedBy, $previous), $assignedBy);
         }, self::ATTEMPTS);
     }
 
