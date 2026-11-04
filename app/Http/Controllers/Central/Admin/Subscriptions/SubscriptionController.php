@@ -44,6 +44,16 @@ class SubscriptionController extends Controller
         ]);
     }
 
+    public function history(Subscription $subscription): View
+    {
+        $history = $this->subscriptions->history($this->centralActor(), $subscription);
+
+        return view('central.pages.admin.subscriptions.history', [
+            'subscription' => $subscription->load('owner'),
+            'history' => $history,
+        ]);
+    }
+
     public function create(): View
     {
         Gate::forUser($this->centralActor())->authorize('assign', Subscription::class);
