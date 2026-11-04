@@ -16,6 +16,8 @@ class DefaultSubscription
     public const string EFFECTIVE_CHANGED = 'central.subscription.effective_changed';
 
     private const string KEY_PREFIX = 'default-free:';
+
+    private const string KEY_PREFIX = 'default-free:';
     private const string INITIAL = 'initial';
     private const int ATTEMPTS = 3;
 
@@ -68,14 +70,8 @@ class DefaultSubscription
                 ->get();
 
             foreach ($scheduled as $next) {
-                if (
-                    $next->period_ends_at !== null
-                    && $next->period_ends_at->lessThanOrEqualTo(now())
-                ) {
-                    $next->update([
-                        'status' => StatusEnum::EXPIRED,
-                        'ended_at' => $next->period_ends_at,
-                    ]);
+                if ($next->period_ends_at !== null && $next->period_ends_at->lessThanOrEqualTo(now())) {
+                    $next->update(['status' => StatusEnum::EXPIRED, 'ended_at' => $next->period_ends_at]);
 
                     continue;
                 }
@@ -93,36 +89,20 @@ class DefaultSubscription
                     ])
                     ->log('Abonnement programmé activé.');
 
-                return $this->resolved(
-                    $owner,
-                    $next,
-                    $assignedBy
-                );
+                return $this->resolved($owner, $next, $assignedBy);
             }
 
-            $previous = $current
-                ?? Subscription::where('user_id', $owner->id)
-                    ->orderByDesc('id')
-                    ->lockForUpdate()
-                    ->first();
+            $previous = $current ?? Subscription::where('user_id', $owner->id)
+                ->orderByDesc('id')->lockForUpdate()->first();
 
-            return $this->resolved(
-                $owner,
-                $this->createDefaultSubscription($owner, $assignedBy, $previous),
-                $assignedBy
-            );
+            return $this->resolved($owner, $this->createFree($owner, $assignedBy, $previous), $assignedBy);
         }, self::ATTEMPTS);
     }
 
-    private function resolved(
-        User $owner,
-        Subscription $subscription,
-        ?User $actor
-    ): Subscription {
-        Event::dispatch(
-            self::EFFECTIVE_CHANGED,
-            [$owner, $subscription, $actor]
-        );
+    private function resolved(User $owner, Subscription $subscription, ?User $actor): Subscription
+    {
+        // Le quota doit être appliqué dans la même transaction, avant tout accès.
+        Event::dispatch(self::EFFECTIVE_CHANGED, [$owner, $subscription, $actor]);
 
         return $subscription;
     }

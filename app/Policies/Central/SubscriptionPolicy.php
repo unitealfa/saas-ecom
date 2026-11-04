@@ -34,4 +34,14 @@ class SubscriptionPolicy
     {
         return $this->access->allows($actor, 'saas.subscriptions.close');
     }
+
+    public function deactivate(User $actor, Subscription $subscription): bool
+    {
+        return $this->access->allows($actor, 'saas.subscriptions.deactivate');
+    }
+
+    public function history(User $actor, Subscription $subscription): bool
+    {
+        return $this->access->allows($actor, 'saas.subscriptions.history.view');
+    }
 }
