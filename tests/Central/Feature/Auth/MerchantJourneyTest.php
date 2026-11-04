@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Services\Central\Auth\RegistrationJourney;
 use App\Services\Central\Users\UserApprovalService;
 use Database\Seeders\Central\AuthorizationSeeder;
+use Database\Seeders\Central\FreePlanSeeder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
@@ -68,6 +69,7 @@ test('the real status page prevents parallel clicks and respects server backoff'
     let calls = 0, resolveFetch;
     const timers = [];
     const sandbox = {
+      AbortSignal,
       document: {hidden: false},
       window: {setTimeout: (callback, delay) => timers.push({callback, delay}), clearTimeout() {},
         clearInterval() {}, setInterval() {}, location: {replace() { throw new Error('Unexpected redirect'); }}},
@@ -258,11 +260,74 @@ test('progress retains the failed shop payload and only includes shops owned by 
         ->and($progress['shops'])->toBe([[
             'name' => $failed->shop_name,
             'status' => $failed->status->label(),
+            'preparation' => 'Préparation interrompue : une reprise est nécessaire.',
+            'in_progress' => false,
             'prepared' => false,
             'failed' => true,
             'ready' => false,
             'retry_url' => route('owner.shops.retry', $failed),
         ]]);
+});
+
+test('the connected merchant observes real deployment stages and then a ready shop without signing in again', function (): void {
+    $merchant = journeyMerchant();
+    Event::fake([TenantCreated::class]);
+    $shop = Tenant::factory()->create(['user_id' => $merchant->id, 'status' => TenantStatus::PROVISIONING]);
+    $deployment = TenantSchemaDeployment::factory()->create(['tenant_id' => $shop->id, 'status' => DeploymentStatus::PENDING]);
+    $this->actingAs($merchant, 'central');
+
+    $initial = $this->getJson(route('registration.status'))->assertOk()
+        ->assertJsonPath('state', 'preparing')
+        ->assertJsonPath('shops.0.preparation', 'Demande enregistrée : en attente du traitement.')
+        ->assertHeader('Cache-Control', 'no-store, private');
+    $deployment->update(['status' => DeploymentStatus::RUNNING, 'started_at' => now()]);
+    $running = $this->getJson(route('registration.status'))->assertOk()
+        ->assertJsonPath('shops.0.preparation', 'Création et initialisation de la base en cours.');
+    expect($running->json('version'))->not->toBe($initial->json('version'));
+
+    $deployment->update(['status' => DeploymentStatus::SUCCEEDED, 'ended_at' => now()]);
+    $shop->forceFill(['status' => TenantStatus::ACTIVE, 'schema_version' => 'ready', 'provisioned_at' => now()])->save();
+    $this->getJson(route('registration.status'))->assertOk()->assertJsonPath('state', 'ready')
+        ->assertJsonPath('redirect', route('dashboard'))->assertJsonPath('shops.0.preparation', 'Boutique prête');
+    $this->assertAuthenticatedAs($merchant, 'central');
+    Event::assertDispatchedTimes(TenantCreated::class, 1);
+});
+
+test('the preparation page updates stages in place and redirects as soon as the shop is ready', function (): void {
+    $merchant = journeyMerchant();
+    Event::fake([TenantCreated::class]);
+    Tenant::factory()->create(['user_id' => $merchant->id, 'status' => TenantStatus::PROVISIONING]);
+    $response = $this->actingAs($merchant, 'central')->get(route('registration.status'))->assertOk();
+    $script = <<<'JS'
+    const fs = require('fs'), vm = require('vm'), assert = require('assert/strict');
+    const expression = fs.readFileSync(0, 'utf8').match(/x-data="(\{\s*version:[\s\S]*?\})"/)[1]
+      .replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+    let redirected = null, interval = null, pending = true;
+    const sandbox = {AbortSignal, document: {hidden: false, addEventListener() {}, removeEventListener() {}},
+      window: {setInterval: (callback, delay) => {interval = delay;}, clearInterval() {},
+        setTimeout: callback => {callback();}, clearTimeout() {}, location: {replace: url => {redirected = url;}}},
+      fetch: async () => ({status: 200, ok: true, json: async () => pending
+        ? {state: 'preparing', version: 'running', shops: [{preparation: 'Création en cours'}]}
+        : {state: 'ready', version: 'ready', redirect: '/dashboard'}})};
+    (async () => {
+      const state = vm.runInNewContext('(' + expression + ')', sandbox);
+      await state.refresh();
+      assert.equal(state.shops[0].preparation, 'Création en cours');
+      assert.equal(redirected, null);
+      state.init();
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(interval, 5000);
+      pending = false;
+      await state.refresh();
+      assert.equal(redirected, '/dashboard');
+      state.destroy();
+      console.log('live');
+    })().catch(error => {console.error(error); process.exitCode = 1;});
+    JS;
+    $process = new Process(['node', '-e', $script], base_path());
+    $process->setInput($response->getContent())->mustRun();
+    expect(trim($process->getOutput()))->toBe('live');
+    Event::assertDispatchedTimes(TenantCreated::class, 1);
 });
 
 test('pending credentials errors remain generic when the password is wrong', function (): void {
@@ -311,6 +376,7 @@ test('a limited session observes rejection and subsequent approval without creat
 
 test('first shop creation requires its name and remains explicit owned and idempotent', function (): void {
     $this->seed(AuthorizationSeeder::class);
+    $this->seed(FreePlanSeeder::class);
     Queue::fake([ProvisionTenantDatabase::class]);
     $merchant = journeyMerchant();
     $other = User::factory()->create();

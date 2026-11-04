@@ -16,10 +16,15 @@ class DeploymentPermissionSeeder extends Seeder
         if (tenancy()->initialized) {
             throw new LogicException('Deployment permissions require the central context.');
         }
+
         DB::transaction(function (): void {
             foreach (CentralRoleCatalog::DEPLOYMENT_PERMISSIONS as $name => $label) {
-                Permission::firstOrCreate(['name' => $name, 'guard_name' => Permission::GUARD], ['label' => $label]);
+                Permission::firstOrCreate(
+                    ['name' => $name, 'guard_name' => Permission::GUARD],
+                    ['label' => $label]
+                );
             }
+
             DB::afterCommit(fn () => app(PermissionRegistrar::class)->forgetCachedPermissions());
         });
     }

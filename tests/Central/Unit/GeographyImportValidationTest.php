@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\Central\Geography\GeographyImportService;
+use Database\Seeders\Central\GeographicAreaSeeder;
 use Illuminate\Foundation\Testing\TestCase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -23,7 +24,7 @@ function geographyImportPayload(): array
 
 test('local geography has consistent source identifiers and factual metadata', function (): void {
     $service = app(GeographyImportService::class);
-    $bundle = $service->loadLocal();
+    $bundle = (new GeographicAreaSeeder)->loadLocal();
     $data = $service->validatePayload($bundle);
 
     expect($data['wilayas'])->toHaveCount(69)
