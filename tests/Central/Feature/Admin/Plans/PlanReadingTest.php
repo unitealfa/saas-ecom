@@ -1,13 +1,34 @@
 <?php
 
+test('the free plan seed is repeatable and remains a free two shop offer', function (): void {
+    $this->seed(FreePlanSeeder::class);
+    $plan = app(FreePlanCatalog::class)->current();
+    $this->seed(FreePlanSeeder::class);
+
+    expect(app(FreePlanCatalog::class)->current()->uuid)->toBe($plan->uuid);
+    expect($plan->monthly_price)->toBe('0.00');
+    expect($plan->features()->sole()->limit)->toBe(2);
+});
+
+test('the free plan seed refuses to recreate an archived system identity', function (): void {
+    $this->seed(FreePlanSeeder::class);
+    $plan = app(FreePlanCatalog::class)->current();
+    $plan->delete();
+
+    expect(fn () => $this->seed(FreePlanSeeder::class))->toThrow(LogicException::class);
+    expect(Plan::withTrashed()->where('code', 'free')->count())->toBe(1);
+});
+
 use App\Models\Central\Features\Feature;
 use App\Models\Central\Permissions\Permission;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Plans\PlanFeature;
 use App\Models\Central\Roles\Role;
 use App\Models\User;
+use App\Services\Central\Plans\FreePlanCatalog;
 use App\Services\Central\Plans\PlanCatalogService;
 use Database\Seeders\Central\AuthorizationSeeder;
+use Database\Seeders\Central\FreePlanSeeder;
 use Database\Seeders\Central\PlanPermissionSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Str;

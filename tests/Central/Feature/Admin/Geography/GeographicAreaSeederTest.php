@@ -11,7 +11,7 @@ use Illuminate\Validation\ValidationException;
 test('the complete local geography seed preserves identities states and manual corrections', function (): void {
     $this->seed([CountrySeeder::class, GeographicAreaSeeder::class]);
     $service = app(GeographyImportService::class);
-    $payload = $service->loadLocal();
+    $payload = (new GeographicAreaSeeder)->loadLocal();
     $areas = GeographicArea::orderBy('id')->get();
     $country = Country::where('code', 'DZ')->firstOrFail();
     $provinces = $areas->where('type', GeoZoneTypeEnum::PROVINCE)->keyBy('code');

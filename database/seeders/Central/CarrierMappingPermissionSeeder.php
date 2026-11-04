@@ -16,10 +16,15 @@ class CarrierMappingPermissionSeeder extends Seeder
         if (tenancy()->initialized) {
             throw new LogicException('Carrier mapping permissions require the central context.');
         }
+
         DB::transaction(function (): void {
             foreach (CentralRoleCatalog::CARRIER_MAPPING_PERMISSIONS as $name => $label) {
-                Permission::firstOrCreate(['name' => $name, 'guard_name' => Permission::GUARD], ['label' => $label]);
+                Permission::firstOrCreate(
+                    ['name' => $name, 'guard_name' => Permission::GUARD],
+                    ['label' => $label]
+                );
             }
+
             DB::afterCommit(fn () => app(PermissionRegistrar::class)->forgetCachedPermissions());
         });
     }
