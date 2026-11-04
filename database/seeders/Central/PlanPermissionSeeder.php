@@ -19,8 +19,12 @@ class PlanPermissionSeeder extends Seeder
 
         DB::transaction(function (): void {
             foreach (CentralRoleCatalog::PLAN_PERMISSIONS as $name => $label) {
-                Permission::firstOrCreate(['name' => $name, 'guard_name' => Permission::GUARD], ['label' => $label]);
+                Permission::firstOrCreate(
+                    ['name' => $name, 'guard_name' => Permission::GUARD],
+                    ['label' => $label]
+                );
             }
+
             DB::afterCommit(fn () => app(PermissionRegistrar::class)->forgetCachedPermissions());
         });
     }

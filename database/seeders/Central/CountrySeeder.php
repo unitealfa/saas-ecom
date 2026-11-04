@@ -7,9 +7,6 @@ use Illuminate\Database\Seeder;
 
 class CountrySeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         foreach ([
@@ -19,12 +16,15 @@ class CountrySeeder extends Seeder
             ['SD', 'Soudan', 'Sudan', 'السودان', false],
             ['EG', 'Égypte', 'Egypt', 'مصر', false],
         ] as [$code, $french, $english, $arabic, $active]) {
-            Country::withTrashed()->firstOrCreate(['code' => $code], [
-                'name_fr' => $french,
-                'name_en' => $english,
-                'name_ar' => $arabic,
-                'is_active' => $active,
-            ]);
+            Country::withTrashed()->firstOrCreate(
+                ['code' => $code],
+                [
+                    'name_fr' => $french,
+                    'name_en' => $english,
+                    'name_ar' => $arabic,
+                    'is_active' => $active,
+                ]
+            );
         }
     }
 }

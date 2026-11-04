@@ -19,10 +19,13 @@ class ShippingCarrierSeeder extends Seeder
             ShippingCarrier::unguarded(fn () => ShippingCarrier::withTrashed()->firstOrCreate(
                 ['code' => ShippingCarrier::YALIDINE],
                 [
-                    'name' => 'Yalidine', 'adapter' => ShippingCarrier::YALIDINE,
-                    'default_api_url' => null, 'is_active' => false,
-                    'reference_source' => ShippingCarrier::YALIDINE_SOURCE, 'reference_version' => 1,
-                ],
+                    'name' => 'Yalidine',
+                    'adapter' => ShippingCarrier::YALIDINE,
+                    'default_api_url' => null,
+                    'is_active' => false,
+                    'reference_source' => ShippingCarrier::YALIDINE_SOURCE,
+                    'reference_version' => 1,
+                ]
             ));
         });
     }
