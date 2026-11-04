@@ -25,6 +25,15 @@
             @endforeach
         </dl>
         <div class="flex flex-wrap gap-3">
+            @if (in_array($subscription->status, [\App\Enums\Central\Subscriptions\StatusEnum::ACTIVE, \App\Enums\Central\Subscriptions\StatusEnum::TRIAL], true) && ! $subscription->period_starts_at->isFuture() && $subscription->plan?->code !== 'free' && ($subscription->effectiveEndsAt() === null || $subscription->effectiveEndsAt()->isFuture()))
+                @can('deactivate', $subscription)
+                    <form method="POST" action="{{ route('central.subscriptions.deactivate', $subscription) }}" x-data x-on:submit="if (! window.confirm('Désactiver immédiatement cet abonnement et appliquer l’offre gratuite ? Le quota des boutiques sera recalculé.')) $event.preventDefault()">
+                        @csrf
+                        <input type="hidden" name="expected_state" value="{{ $subscription->transitionState() }}">
+                        <flux:button type="submit">Désactiver immédiatement</flux:button>
+                    </form>
+                @endcan
+            @endif
             @if ($subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::ACTIVE && $subscription->period_ends_at?->isFuture() && $subscription->ended_at === null && $subscription->plan?->code !== 'free')
                 @can('change', $subscription)
                     <flux:button :href="route('central.subscriptions.change.form', $subscription)">Changer l’offre</flux:button>

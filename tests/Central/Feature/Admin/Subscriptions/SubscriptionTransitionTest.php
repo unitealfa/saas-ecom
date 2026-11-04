@@ -31,6 +31,57 @@ function subscriptionTransitionActor(string $permission): User
     return $actor;
 }
 
+test('an authorized administrator can immediately cancel a paid subscription and restore the free plan', function (): void {
+    $actor = subscriptionTransitionActor('saas.subscriptions.deactivate');
+    $subscription = Subscription::factory()->create(['period_ends_at' => now()->addMonth(), 'auto_renew' => true]);
+    $this->actingAs($actor, 'central')->post(route('central.subscriptions.deactivate', $subscription), [
+        'expected_state' => $subscription->transitionState(),
+    ])->assertSessionHasNoErrors();
+
+    expect($subscription->fresh()->status)->toBe(StatusEnum::CANCELLED)
+        ->and($subscription->fresh()->auto_renew)->toBeFalse()
+        ->and($subscription->fresh()->ended_at)->not->toBeNull();
+    $current = Subscription::where('user_id', $subscription->user_id)->where('status', StatusEnum::ACTIVE)->firstOrFail();
+    expect($current->plan->code)->toBe('free');
+});
+
+test('immediate cancellation rejects stale forms, unauthorized users and scheduled changes', function (): void {
+    $actor = subscriptionTransitionActor('saas.subscriptions.deactivate');
+    $subscription = Subscription::factory()->create(['period_ends_at' => now()->addMonth()]);
+    $state = $subscription->transitionState();
+    $subscription->update(['auto_renew' => true]);
+    $this->actingAs($actor, 'central')->post(route('central.subscriptions.deactivate', $subscription), ['expected_state' => $state])
+        ->assertSessionHasErrors('expected_state');
+    $reader = subscriptionTransitionActor('saas.subscriptions.view');
+    $this->actingAs($reader, 'central')->post(route('central.subscriptions.deactivate', $subscription), ['expected_state' => $subscription->fresh()->transitionState()])
+        ->assertForbidden();
+    Subscription::factory()->create(['user_id' => $subscription->user_id, 'status' => StatusEnum::SCHEDULED, 'period_starts_at' => now()->addMonth()]);
+    $this->actingAs($actor, 'central')->post(route('central.subscriptions.deactivate', $subscription), ['expected_state' => $subscription->fresh()->transitionState()])
+        ->assertSessionHasErrors('subscription');
+    expect($subscription->fresh()->status)->toBe(StatusEnum::ACTIVE);
+});
+
+test('immediate cancellation applies the free quota and preserves suspended shops', function (): void {
+    Event::fake([TenantCreated::class]);
+    $actor = subscriptionTransitionActor('saas.subscriptions.deactivate');
+    $reviewer = User::factory()->create();
+    $owner = User::factory()->create(['legal_profile_version' => 1, 'legal_verification_status' => VerificationStatusEnum::VERIFIED, 'legal_verified_at' => now(), 'legal_verified_by_id' => $reviewer->id]);
+    $subscription = Subscription::factory()->create(['user_id' => $owner->id, 'period_ends_at' => now()->addMonth()]);
+    $shops = collect([1, 2, 3])->map(fn (int $priority) => Tenant::factory()->create([
+        'user_id' => $subscription->user_id, 'status' => TenantStatus::ACTIVE,
+        'schema_version' => 'ready', 'provisioned_at' => now(), 'activation_priority' => $priority,
+    ]));
+    $suspended = Tenant::factory()->create(['user_id' => $subscription->user_id, 'status' => TenantStatus::SUSPENDED, 'schema_version' => 'ready', 'provisioned_at' => now()]);
+    $this->mock(TenantProfileProjection::class)->shouldReceive('assertPrepared')->twice();
+    $this->actingAs($actor, 'central')->post(route('central.subscriptions.deactivate', $subscription), [
+        'expected_state' => $subscription->transitionState(),
+    ])->assertSessionHasNoErrors();
+    expect($shops[0]->fresh()->status)->toBe(TenantStatus::ACTIVE)
+        ->and($shops[1]->fresh()->status)->toBe(TenantStatus::ACTIVE)
+        ->and($shops[2]->fresh()->status)->toBe(TenantStatus::OVER_QUOTA)
+        ->and($suspended->fresh()->status)->toBe(TenantStatus::SUSPENDED);
+});
+
 test('a paid subscription is closed only at the end of its current period', function (): void {
     $actor = subscriptionTransitionActor('saas.subscriptions.close');
     $subscription = Subscription::factory()->create(['period_ends_at' => now()->addMonth(), 'auto_renew' => true]);

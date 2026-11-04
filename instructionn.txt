@@ -358,6 +358,7 @@ saas.subscriptions.change	Changer le plan d'un abonnement
 saas.subscriptions.period.update	Modifier les dates de période selon les transitions autorisées
 saas.subscriptions.renewal.update	Modifier le renouvellement futur
 saas.subscriptions.close	Mettre fin à un abonnement selon sa date d'effet
+saas.subscriptions.deactivate	Désactiver immédiatement un abonnement
 saas.subscriptions.installments.view	Consulter les échéances de paiement
 saas.subscriptions.installments.create	Créer une échéance autorisée
 saas.subscriptions.history.view	Consulter l'historique des abonnements
@@ -367,6 +368,7 @@ Cette permission doit être recensée dans Codex afin de retrouver tous ses usag
 Consultation : liste administrative paginée et fiche par UUID, recherche par propriétaire, e-mail, offre ou UUID et filtre d'état. La permission saas.subscriptions.view protège également les informations d'abonnement sur les fiches utilisateur et boutique. Seuls les abonnements de type 1 sont consultés ; les échéances restent réservées à leur permission propre. Les comptes et plans archivés restent lisibles comme références historiques. Aucun abonnement n'est modifié.
 Attribution immédiate : saas.subscriptions.assign, commerçant actif non personnel et offre non gratuite commercialisée. Le montant convenu est le tarif mensuel ou annuel de la version choisie ; un changement de tarif depuis l'affichage est refusé. Le renouvellement commence désactivé. L'offre gratuite existante est conservée dans l'historique ; une offre payante en cours ou une attribution prévue bloque cette action. La demande est idempotente, auditée et recalcule les états admissibles des boutiques selon le quota.
 Fin et changement : décision utilisateur du 2 novembre 2026, une période payée en cours est respectée jusqu'à son échéance. saas.subscriptions.close programme la fin à cette échéance ; saas.subscriptions.change programme la nouvelle version à cette même échéance. Le montant de la nouvelle période est celui de la version choisie, contrôlé contre le prix affiché. Les anciennes attributions et droits de la période en cours sont conservés ; aucun remboursement automatique n'est créé.
+Désactivation immédiate : saas.subscriptions.deactivate permet d'annuler un abonnement payant actif ou en essai et d'appliquer immédiatement l'offre gratuite et son quota. L'historique est conservé ; une offre future programmée bloque l'action et aucun remboursement automatique n'est créé.
 Fichiers :
 app/Models/Central/
     Subscription.php

@@ -16,6 +16,7 @@ class CentralRoleCatalog
         'saas.subscriptions.assign' => 'Attribuer un abonnement à un utilisateur',
         'saas.subscriptions.change' => 'Changer le plan d’un abonnement',
         'saas.subscriptions.close' => 'Mettre fin à un abonnement',
+        'saas.subscriptions.deactivate' => 'Désactiver immédiatement un abonnement',
     ];
 
     public const array MEDIA_PERMISSIONS = [
@@ -41,7 +42,7 @@ class CentralRoleCatalog
         'saas.carrier-mappings.import' => 'Importer les codes des transporteurs',
         'saas.carrier-mappings.archive' => 'Archiver une correspondance',
     ];
-  
+
     public const array PLAN_PERMISSIONS = [
         'saas.plans.view' => 'Consulter les plans et leurs versions',
         'saas.plans.create' => 'Créer un nouveau plan',
@@ -159,7 +160,7 @@ class CentralRoleCatalog
         'Wilayas et communes' => ['saas.geography.view', 'saas.geography.create', 'saas.geography.update', 'saas.geography.activate', 'saas.geography.archive'],
         'Fonctionnalités commerciales' => ['saas.features.view', 'saas.features.create', 'saas.features.update', 'saas.features.activate', 'saas.features.archive'],
         'Plans et offres' => ['saas.plans.view', 'saas.plans.create', 'saas.plans.update', 'saas.plans.features.update', 'saas.plans.versions.create', 'saas.plans.activate', 'saas.plans.archive'],
-        'Abonnements' => ['saas.subscriptions.view', 'saas.subscriptions.assign', 'saas.subscriptions.change', 'saas.subscriptions.close'],
+        'Abonnements' => ['saas.subscriptions.view', 'saas.subscriptions.assign', 'saas.subscriptions.change', 'saas.subscriptions.close', 'saas.subscriptions.deactivate'],
         'Déploiements' => ['saas.deployments.view', 'saas.deployments.provision', 'saas.deployments.migrate', 'saas.deployments.retry', 'saas.deployments.errors.view'],
         'Domaines' => ['saas.domains.view', 'saas.domains.create', 'saas.domains.update', 'saas.domains.verify', 'saas.domains.primary.update', 'saas.domains.archive'],
         'Utilisateurs centraux' => ['saas.users.view', 'saas.users.create', 'saas.users.update', 'saas.users.approve', 'saas.users.reject', 'saas.users.suspend', 'saas.users.activate', 'saas.users.archive'],
