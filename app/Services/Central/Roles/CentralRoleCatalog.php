@@ -11,6 +11,23 @@ use Spatie\Permission\Models\Permission as PackagePermission;
 
 class CentralRoleCatalog
 {
+    public const array INVOICE_PREPARATION_PERMISSIONS = [
+        'saas.subscriptions.installments.view' => 'Consulter les échéances de paiement',
+        'saas.subscriptions.installments.create' => 'Créer une échéance autorisée',
+        'saas.invoices.view' => 'Consulter et rechercher les factures',
+        'saas.invoices.create' => 'Préparer une facture',
+        'saas.invoices.issue' => 'Émettre définitivement une facture',
+    ];
+
+    public const array BILLING_PERMISSIONS = [
+        'saas.billing-rules.view' => 'Consulter les règles de facturation',
+        'saas.billing-rules.create' => 'Créer une règle de facturation',
+        'saas.billing-rules.update' => 'Modifier une règle encore modifiable',
+        'saas.billing-rules.activate' => 'Activer ou désactiver une règle',
+        'saas.billing-rules.versions.create' => 'Créer une nouvelle version de règle',
+        'saas.billing-sequences.view' => 'Consulter les compteurs et numérotations',
+    ];
+
     public const array SUBSCRIPTION_PERMISSIONS = [
         'saas.subscriptions.view' => 'Consulter et rechercher les abonnements',
         'saas.subscriptions.assign' => 'Attribuer un abonnement à un utilisateur',
@@ -41,7 +58,7 @@ class CentralRoleCatalog
         'saas.carrier-mappings.import' => 'Importer les codes des transporteurs',
         'saas.carrier-mappings.archive' => 'Archiver une correspondance',
     ];
-  
+
     public const array PLAN_PERMISSIONS = [
         'saas.plans.view' => 'Consulter les plans et leurs versions',
         'saas.plans.create' => 'Créer un nouveau plan',
@@ -98,6 +115,8 @@ class CentralRoleCatalog
         ...self::CARRIER_MAPPING_PERMISSIONS,
         ...self::PICKUP_POINT_PERMISSIONS,
         ...self::MEDIA_PERMISSIONS,
+        ...self::BILLING_PERMISSIONS,
+        ...self::INVOICE_PREPARATION_PERMISSIONS,
         ...self::PLAN_PERMISSIONS,
         ...self::CARRIER_PERMISSIONS,
         ...self::GEOGRAPHY_PERMISSIONS,
@@ -152,6 +171,10 @@ class CentralRoleCatalog
     ];
 
     public const array GROUPS = [
+        'Échéances de paiement' => ['saas.subscriptions.installments.view', 'saas.subscriptions.installments.create'],
+        'Factures SaaS' => ['saas.invoices.view', 'saas.invoices.create', 'saas.invoices.issue'],
+        'Règles de facturation' => ['saas.billing-rules.view', 'saas.billing-rules.create', 'saas.billing-rules.update', 'saas.billing-rules.activate', 'saas.billing-rules.versions.create'],
+        'Compteurs de facturation' => ['saas.billing-sequences.view'],
         'Fichiers centraux' => ['saas.media.view', 'saas.media.upload', 'saas.media.download', 'saas.media.archive'],
         'Bureaux de retrait' => ['saas.pickup-points.view', 'saas.pickup-points.create', 'saas.pickup-points.update', 'saas.pickup-points.import', 'saas.pickup-points.activate', 'saas.pickup-points.archive'],
         'Correspondances géographiques des transporteurs' => ['saas.carrier-mappings.view', 'saas.carrier-mappings.create', 'saas.carrier-mappings.update', 'saas.carrier-mappings.import', 'saas.carrier-mappings.archive'],

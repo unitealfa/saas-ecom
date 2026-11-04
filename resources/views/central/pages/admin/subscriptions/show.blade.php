@@ -25,6 +25,14 @@
             @endforeach
         </dl>
         <div class="flex flex-wrap gap-3">
+            @can('viewAny', \App\Models\Central\Subscriptions\SubscriptionInstallment::class)
+                <flux:button :href="route('central.subscriptions.installments.index', $subscription)">Échéances</flux:button>
+            @endcan
+            @can('createInstallment', $subscription)
+                @can('create', \App\Models\Central\Billing\SaasInvoice::class)
+                    <flux:button :href="route('central.invoices.create', $subscription)">Préparer l’échéance et la facture</flux:button>
+                @endcan
+            @endcan
             @if ($subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::ACTIVE && $subscription->period_ends_at?->isFuture() && $subscription->ended_at === null && $subscription->plan?->code !== 'free')
                 @can('change', $subscription)
                     <flux:button :href="route('central.subscriptions.change.form', $subscription)">Changer l’offre</flux:button>

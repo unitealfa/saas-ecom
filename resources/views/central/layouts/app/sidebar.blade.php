@@ -93,6 +93,24 @@
                         </flux:sidebar.item>
                     @endcan
 
+                    @can('viewAny', \App\Models\Central\Billing\BillingRule::class)
+                        <flux:sidebar.item :href="route('central.billing-rules.index')"
+                            :current="request()->routeIs('central.billing-rules.*')" wire:navigate>
+                            Facturation — Configuration
+                        </flux:sidebar.item>
+                    @endcan
+                    @can('viewAny', \App\Models\Central\Billing\BillingSequence::class)
+                        <flux:sidebar.item :href="route('central.billing-sequences.index')"
+                            :current="request()->routeIs('central.billing-sequences.*')" wire:navigate>
+                            Compteurs de facturation
+                        </flux:sidebar.item>
+                    @endcan
+                    @can('viewAny', \App\Models\Central\Billing\SaasInvoice::class)
+                        <flux:sidebar.item :href="route('central.invoices.index')" :current="request()->routeIs('central.invoices.*')" wire:navigate>
+                            Factures SaaS
+                        </flux:sidebar.item>
+                    @endcan
+
                     @can('viewAny', \App\Models\Central\Shipping\PickupPoint::class)
                         <flux:sidebar.item
                             :href="route('central.pickup-points.index')"
