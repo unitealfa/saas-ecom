@@ -1074,6 +1074,8 @@ L’historique de création et de mise à jour technique des bases des boutiques
 
 ### 19. `saas_invoices` — 38 champs
 
+**Périmètre MVP actuel (modiffmodule18afaire) :** une échéance couvre le montant intégral d'une période. Aucun échéancier, paiement partiel, remboursement commercial ou avoir automatique n'est proposé. Les types et états historiques restent lisibles ; les paiements partiels et remboursements décrits structurellement dans ce document ne sont pas activés dans le MVP. Une facture ou une preuve de versement n'active pas les droits ; le Module 21 doit confirmer administrativement le paiement intégral, en espèces ou hors plateforme. Le Module 18 ne réalise aucun encaissement.
+
 Les factures et les avoirs du SaaS. Chaque fiche indique qui doit payer, pour quel abonnement, la période, les montants et le PDF. Un avoir réduit une facture déjà émise.
 
 | Champ | Explication très simple |
@@ -1207,6 +1209,8 @@ Les envois des factures et des avoirs : à qui, par quel moyen, quand, combien d
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 
 ### 23. `saas_transfers` — 35 champs
+
+Décision MVP actuelle (`module19v2.txt`) : un paiement doit couvrir seul le total de la période. Ne pas additionner des règlements partiels pour confirmer ce total ; les structures historiques restent conservées. L'état de paiement est lu séparément de la facture fiscale immuable. La vérification réelle des fonds et le futur reçu relèvent de l'intégration du Module 21, pas de l'émission de facture. Voir [Module-19-Paiement-Integral.md](Module-19-Paiement-Integral.md).
 
 Les paiements reçus et remboursements effectués à distance par banque, CCP ou BaridiMob : montant, preuve PDF, référence, auteur et vérification.
 

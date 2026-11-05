@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Central\Auth\RegistrationStatusController;
 use App\Http\Controllers\Central\Dashboard\DashboardController;
+use App\Http\Controllers\Central\Owner\Billing\InvoiceController;
 use App\Http\Controllers\Central\Owner\Tenants\FirstTenantController;
 use App\Http\Controllers\Central\Owner\Tenants\TenantController as OwnerTenantController;
 use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
@@ -20,6 +21,11 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     Route::name('owner.')->group(function (): void {
+        Route::controller(InvoiceController::class)->prefix('factures')->name('invoices.')->whereUuid('invoice')->group(function (): void {
+            Route::get('/', 'index')->name('index');
+            Route::get('{invoice}', 'show')->name('show');
+            Route::get('{invoice}/pdf', 'download')->middleware('signed')->name('download');
+        });
         Route::controller(FirstTenantController::class)->prefix('premiere-boutique')->group(function (): void {
             Route::get('/', 'create')->name('first-shop');
             Route::post('/', 'store')->middleware('throttle:6,1')->name('first-shop.store');
