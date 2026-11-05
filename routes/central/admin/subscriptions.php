@@ -8,7 +8,9 @@ Route::controller(SubscriptionController::class)->prefix('subscriptions')->name(
     Route::get('create', 'create')->name('create');
     Route::post('/', 'store')->name('store');
     Route::get('{subscription}', 'show')->name('show');
+    Route::get('{subscription}/history', 'history')->name('history');
     Route::post('{subscription}/close', 'close')->name('close');
+    Route::post('{subscription}/deactivate', 'deactivate')->name('deactivate');
     Route::get('{subscription}/change', 'changeForm')->name('change.form');
     Route::post('{subscription}/change', 'change')->name('change');
 });

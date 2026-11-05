@@ -38,5 +38,13 @@ class SubscriptionPolicy
     public function createInstallment(User $actor, Subscription $subscription): bool
     {
         return ! tenancy()->initialized && $this->access->allows($actor, 'saas.subscriptions.installments.create');
+    public function deactivate(User $actor, Subscription $subscription): bool
+    {
+        return $this->access->allows($actor, 'saas.subscriptions.deactivate');
+    }
+
+    public function history(User $actor, Subscription $subscription): bool
+    {
+        return $this->access->allows($actor, 'saas.subscriptions.history.view');
     }
 }
