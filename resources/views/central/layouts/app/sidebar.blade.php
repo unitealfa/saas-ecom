@@ -57,6 +57,10 @@
                         </flux:sidebar.item>
                     @endcan
 
+                    @can('viewAny', \App\Models\Central\Audit\Activity::class)
+                        <flux:sidebar.item :href="route('central.activity.index')" :current="request()->routeIs('central.activity.*')" wire:navigate>Journal d’activité</flux:sidebar.item>
+                    @endcan
+
                     @can('viewAny', \App\Models\Central\Tenants\Tenant::class)
                         <flux:sidebar.item
                             :href="route('central.tenants.index')"

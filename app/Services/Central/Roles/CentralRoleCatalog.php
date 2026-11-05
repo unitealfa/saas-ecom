@@ -11,10 +11,17 @@ use Spatie\Permission\Models\Permission as PackagePermission;
 
 class CentralRoleCatalog
 {
+    public const array ACTIVITY_PERMISSIONS = [
+        'saas.activity.view' => 'Consulter et rechercher les activités centrales',
+        'saas.activity.export' => 'Exporter les activités centrales autorisées',
+    ];
+
     public const array QUOTA_PERMISSIONS = [
         'saas.quotas.view' => 'Consulter les quotas et leur consommation',
         'saas.quotas.reconcile' => 'Recalculer les quotas et états des boutiques',
         'saas.quotas.history.view' => 'Consulter les décisions et changements de quotas',
+    ];
+
     public const array INVOICE_PREPARATION_PERMISSIONS = [
         'saas.subscriptions.installments.view' => 'Consulter les échéances de paiement',
         'saas.subscriptions.installments.create' => 'Créer une échéance autorisée',
@@ -118,6 +125,7 @@ class CentralRoleCatalog
     ];
 
     public const array PERMISSIONS = [
+        ...self::ACTIVITY_PERMISSIONS,
         ...self::QUOTA_PERMISSIONS,
         ...self::SUBSCRIPTION_PERMISSIONS,
         ...self::CARRIER_MAPPING_PERMISSIONS,
@@ -179,6 +187,7 @@ class CentralRoleCatalog
     ];
 
     public const array GROUPS = [
+        'Journal d’activité' => ['saas.activity.view', 'saas.activity.export'],
         'Échéances de paiement' => ['saas.subscriptions.installments.view', 'saas.subscriptions.installments.create'],
         'Factures SaaS' => ['saas.invoices.view', 'saas.invoices.create', 'saas.invoices.issue'],
         'Règles de facturation' => ['saas.billing-rules.view', 'saas.billing-rules.create', 'saas.billing-rules.update', 'saas.billing-rules.activate', 'saas.billing-rules.versions.create'],
