@@ -2259,6 +2259,14 @@ Contrôles : 68 tests ciblés abonnements/parcours commerçant/frontière tenant
 
 Publication : la PR 26 a été fusionnée extérieurement dans dev pendant l'intervention (commit 197d4f089d291de862a3b54328b3f72585af97f1). Aucune fusion effectuée par cette intervention. Les corrections sont préparées localement ; une nouvelle PR vers dev a été proposée et nécessite la réponse de l'utilisateur avant publication.
 
+## 5 novembre 2026 — Module 18 : paiement intégral et préparation de la PR vers Module 19
+
+Décision actuelle : adaptation sur module-18 uniquement, pour une future PR utilisateur vers module-19. Aucun checkout, commit, push ou merge effectué. Les adaptations propres au Module 19 sont reportées ; ses méthodes d’émission, protections fiscales et PDF devront être conservées lors de la fusion. Rapport détaillé : [Module-18-Paiement-Integral.md](Module-18-Paiement-Integral.md).
+
+La préparation exige une obligation unique correspondant au montant et à la période complète de l’abonnement, sans paiement partiel. Une règle retirée reste historique mais ne permet plus une nouvelle facturation. Le rejeu d’un numéro déjà réservé conserve son identité et son snapshot. Aucune confirmation de paiement, activation de droits ou écriture réelle ajoutée.
+
+Contrôles sur MySQL local temporaire uniquement : série de régression de 68 tests / 2710 assertions ; fichier de scénario final de 19 tests / 117 assertions ; puis contrôles ciblés du sélecteur historique, de l’isolation tenant et de la concurrence multiprocessus réussis. Les séries se recouvrent et ne sont pas additionnées. PHPStan ciblé sans erreur, Pint et route:cache isolé conformes. Aucun test navigateur nouveau, suite globale ou exécution de la branche Module 19 revendiqué. Aucune migration, permission, attribution ou donnée réelle modifiée.
+
 ## 5 novembre 2026 — Revue complète du Module 18 demandée par module18.txt
 
 Rapport courant : [Module-18-Verification.md](Module-18-Verification.md), avec matrice T18-01 à T18-17, fichiers, changements de comportement et limites. Les entrées du 4 novembre ci-dessous décrivent l'implémentation historique ; la validation est désormais distincte de l'activation selon la nouvelle mission. Aucun document ni donnée du scénario Pro réel n'est modifié pendant cette revue.

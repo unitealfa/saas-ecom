@@ -10,6 +10,7 @@
     <section class="mx-auto flex w-full max-w-2xl flex-col gap-6">
         <flux:heading size="xl" level="1">{{ $title }}</flux:heading>
         <flux:text>Le contenu est modifiable en brouillon. Après validation, tout changement exige une nouvelle version.</flux:text>
+        <flux:text>Chaque période correspond à un paiement intégral. Le délai indique une date limite unique, sans échéancier. Une facture ne confirme aucun encaissement ni activation de droits.</flux:text>
         @if ($newVersion)<flux:text>La nouvelle version conserve le code {{ $rule->code }}. Son numéro est attribué automatiquement.</flux:text>@endif
         @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
         <form method="POST" action="{{ $action }}" class="flex flex-col gap-5" x-data="{ submitting: false }" x-on:submit="submitting = true">

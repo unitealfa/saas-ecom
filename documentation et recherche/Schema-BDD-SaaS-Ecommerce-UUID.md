@@ -1004,6 +1004,8 @@ erDiagram
 
 ### C8 — Facturation SaaS optimisée : cinq tables complémentaires
 
+**Décision MVP actuelle — modiffmodule18afaire :** chaque période d'abonnement est réglée intégralement, en espèces auprès de l'administration ou par versement hors Aydra avec justificatif. Pas de carte, passerelle, encaissement automatique, échéancier, paiement partiel, remboursement commercial ni avoir commercial automatique dans le MVP. L'échéance de type 2 représente la totalité de la période, jamais une fraction. Facture et justificatif ne confirment aucun paiement ni activation de droits : la confirmation administrative du paiement intégral appartient au Module 21. Les structures et états historiques décrits ci-dessous sont conservés pour leurs données et contraintes ; leurs possibilités de paiements partiels/remboursements ne sont pas des obligations fonctionnelles actuelles du MVP. Nouvelle facturation sous règle ACTIVE et applicable, sans réécriture des snapshots ou numéros anciens.
+
 **La table `saas_invoices` passe de 97 à 38 champs et ne contient plus que les en-têtes de factures et d’avoirs.** La demande actuelle autorise plusieurs tables en gardant leur nombre limité : les neuf objets de V4.4 sont répartis dans cinq tables, sans retirer les fonctionnalités. Les factures et avoirs partagent leur structure ; leurs lignes aussi ; paiements et remboursements partagent un journal de virements. Compteurs et règles sont réunis dans une petite table de réglages, avec deux rôles contrôlés. Les envois ont leur propre table, car leur état et leurs tentatives ne sont ni un document fiscal ni de l’argent.
 
 | Table | Champs | Explication très simple |

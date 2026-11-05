@@ -78,4 +78,14 @@ class SubscriptionInstallment extends Model
     {
         return 'subscription_installment';
     }
+
+    public function matchesFullPeriod(Subscription $subscription): bool
+    {
+        return $subscription->period_ends_at !== null
+            && $this->parent_subscription_id === $subscription->id
+            && $this->user_id === $subscription->user_id
+            && $this->installment_amount === $subscription->agreed_amount
+            && $this->period_starts_at->equalTo($subscription->period_starts_at)
+            && $this->period_ends_at->equalTo($subscription->period_ends_at);
+    }
 }

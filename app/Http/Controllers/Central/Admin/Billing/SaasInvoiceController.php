@@ -10,6 +10,7 @@ use App\Models\Central\Billing\BillingRule;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Subscriptions\SubscriptionInstallment;
+use App\Services\Central\Billing\BillingRuleService;
 use App\Services\Central\Billing\SaasInvoiceService;
 use App\Services\Central\Billing\SaasNumberingService;
 use Illuminate\Contracts\View\View;
@@ -17,6 +18,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Validator;
 
 class SaasInvoiceController extends Controller
 {
@@ -44,8 +46,9 @@ class SaasInvoiceController extends Controller
 
         return view('central.pages.admin.billing.invoices.create', [
             'subscription' => $subscription->load(['owner', 'plan']),
-            'rules' => BillingRule::whereIn('policy_status', [PolicyStatusEnum::ACTIVE, PolicyStatusEnum::RETIRED])
-                ->orderBy('code')->orderByDesc('version')->get()->filter(fn (BillingRule $rule) => $rule->isApplicableAt(now())),
+            'rules' => BillingRule::where('policy_status', PolicyStatusEnum::ACTIVE)
+                ->orderBy('code')->orderByDesc('version')->get()->filter(fn (BillingRule $rule): bool => $rule->isActiveAt(now())
+                    && Validator::make($rule->only(['code', 'trigger_event', 'parameters']), BillingRuleService::contentRules())->passes()),
         ]);
     }
 

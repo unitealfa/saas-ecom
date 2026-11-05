@@ -1,5 +1,7 @@
 # Module 18 — Vérification du 5 novembre 2026
 
+Rapport historique de la mission module18.txt. Le périmètre MVP et la validation courante sont maintenant décrits dans [Module-18-Paiement-Integral.md](Module-18-Paiement-Integral.md). L'absence du droit des avoirs ci-dessous ne bloque pas le nouveau MVP, qui n'autorise aucun avoir commercial automatique ; aucun ancien résultat de test n'est modifié.
+
 État : **MODULE PARTIEL / NON VALIDÉ intégralement**. Le parcours des règles et des compteurs de factures est implémenté et testé. La série des avoirs exige encore l'enregistrement autorisé du droit `saas.credit-notes.issue`, absent du catalogue actuel. Aucun droit supplémentaire ni aucune attribution réelle n'a été créé pendant cette revue.
 
 ## 1. Références et analyse

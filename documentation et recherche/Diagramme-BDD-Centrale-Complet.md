@@ -1074,6 +1074,8 @@ L’historique de création et de mise à jour technique des bases des boutiques
 
 ### 19. `saas_invoices` — 38 champs
 
+**Périmètre MVP actuel (modiffmodule18afaire) :** une échéance couvre le montant intégral d'une période. Aucun échéancier, paiement partiel, remboursement commercial ou avoir automatique n'est proposé. Les types et états historiques restent lisibles ; les paiements partiels et remboursements décrits structurellement dans ce document ne sont pas activés dans le MVP. Une facture ou une preuve de versement n'active pas les droits ; le Module 21 doit confirmer administrativement le paiement intégral, en espèces ou hors plateforme. Le Module 18 ne réalise aucun encaissement.
+
 Les factures et les avoirs du SaaS. Chaque fiche indique qui doit payer, pour quel abonnement, la période, les montants et le PDF. Un avoir réduit une facture déjà émise.
 
 | Champ | Explication très simple |

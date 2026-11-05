@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Stancl\Tenancy\Events\TenantCreated;
 use Stancl\Tenancy\Jobs\CreateDatabase;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
@@ -223,6 +224,7 @@ test('a reserved counter cannot move backwards or change its document type year 
 
 test('T18-17 central settings and audits stay central and tenant context cannot initialize a counter', function (): void {
     $actor = sequenceAdmin();
+    $subscription = Subscription::factory()->create(['user_id' => $actor->id]);
     Event::fake([TenantCreated::class]);
     $tenant = Tenant::factory()->create(['slug' => 'billing-'.Str::lower(Str::random(8))]);
     $database = $tenant->database()->getName();
@@ -235,9 +237,11 @@ test('T18-17 central settings and audits stay central and tenant context cannot 
             DB::table('billing_canary')->insert(['id' => 1, 'value' => 42]);
         });
         $sequence = app(SaasNumberingService::class)->initialize($actor, DocumentTypeEnum::INVOICE, 2034);
-        $tenant->run(function () use ($actor, $sequence): void {
+        $tenant->run(function () use ($actor, $sequence, $subscription): void {
             expect(fn () => app(SaasNumberingService::class)->initialize($actor, DocumentTypeEnum::INVOICE, 2035))
                 ->toThrow(AuthorizationException::class);
+            expect(fn () => app(SaasInvoiceService::class)->prepareCurrentPeriodWithoutTax($actor, $subscription, []))
+                ->toThrow(HttpException::class);
             expect(DB::table('billing_canary')->sole()->value)->toBe(42);
             expect(Activity::forSubject($sequence)->where('event', 'saas_sequence_initialized')->count())->toBe(1);
             expect(BillingSequence::count())->toBe(1);
