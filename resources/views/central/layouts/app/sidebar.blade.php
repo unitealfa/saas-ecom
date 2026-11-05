@@ -66,6 +66,10 @@
                         </flux:sidebar.item>
                     @endcan
 
+                    @can('viewAnyQuota', \App\Models\Central\Users\User::class)
+                        <flux:sidebar.item :href="route('central.quotas.index')" :current="request()->routeIs('central.quotas.*')" wire:navigate>Quotas</flux:sidebar.item>
+                    @endcan
+
                     @can('viewAny', \App\Models\Central\Countries\Country::class)
                         <flux:sidebar.item
                             :href="route('central.countries.index')"
