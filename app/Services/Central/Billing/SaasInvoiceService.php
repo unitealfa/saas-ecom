@@ -6,6 +6,7 @@ use App\Enums\Central\Billing\DocumentStatusEnum;
 use App\Enums\Central\Billing\DocumentTypeEnum;
 use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Enums\Central\Subscriptions\StatusEnum;
+use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Billing\BillingRule;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Billing\SaasInvoiceLine;
@@ -13,6 +14,9 @@ use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Subscriptions\SubscriptionInstallment;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -20,6 +24,8 @@ use Illuminate\Validation\ValidationException;
 
 class SaasInvoiceService
 {
+    private const int PER_PAGE = 20;
+
     private const string EVENT_CREATED = 'saas_invoice_prepared';
 
     private const string EVENT_INSTALLMENT = 'subscription_installment_created';
@@ -29,7 +35,106 @@ class SaasInvoiceService
     private const array CUSTOMER_FIELDS = ['uuid', 'first_name', 'last_name', 'email', 'legal_form',
         'activity_nature', 'nif', 'nis', 'registration_number', 'artisan_card_number', 'legal_address'];
 
-    public function __construct(private readonly AuthorizationMutation $mutations) {}
+    public function __construct(private readonly AuthorizationMutation $mutations, private readonly InvoiceCalculator $calculator) {}
+
+    /** @param array<string, mixed> $filters
+     * @return LengthAwarePaginator<int, SaasInvoice>
+     */
+    public function search(User $actor, array $filters, bool $own = false): LengthAwarePaginator
+    {
+        abort_if(tenancy()->initialized, 403);
+        Gate::forUser($actor)->authorize($own ? 'viewOwn' : 'viewAny', SaasInvoice::class);
+        $search = trim($filters['search'] ?? '');
+
+        return SaasInvoice::with('owner')
+            ->when($own, fn (Builder $query) => $query->where('user_id', $actor->id))
+            ->when(! $own && isset($filters['owner']), fn (Builder $query) => $query->whereRelation('owner', 'uuid', $filters['owner']))
+            ->when($search !== '', fn (Builder $query) => $query->where('number', 'like', '%'.addcslashes($search, '\\%_').'%'))
+            ->when(isset($filters['status']), fn (Builder $query) => $query->where('status', $filters['status']))
+            ->when(isset($filters['period_start']), fn (Builder $query) => $query->where('period_ends_at', '>', CarbonImmutable::parse($filters['period_start'])))
+            ->when(isset($filters['period_end']), fn (Builder $query) => $query->where('period_starts_at', '<', CarbonImmutable::parse($filters['period_end'])))
+            ->orderByDesc('id')->paginate(self::PER_PAGE)->withQueryString();
+    }
+
+    public function prepareInstallment(User $actor, Subscription $subscription, SubscriptionInstallment $installment, string $ruleUuid, string $expected): SaasInvoice
+    {
+        abort_if(tenancy()->initialized, 403);
+
+        return $this->mutations->run($actor, 'create', fn () => SaasInvoice::class,
+            function () use ($actor, $subscription, $installment, $ruleUuid, $expected): SaasInvoice {
+                $owner = User::withTrashed()->whereKey($subscription->user_id)->lockForUpdate()->firstOrFail();
+                $parent = Subscription::whereKey($subscription->id)->lockForUpdate()->firstOrFail();
+                $due = SubscriptionInstallment::whereKey($installment->id)->lockForUpdate()->firstOrFail();
+                if ($due->parent_subscription_id !== $parent->id || $due->user_id !== $owner->id
+                    || $due->period_ends_at->lessThanOrEqualTo($due->period_starts_at)
+                    || ! in_array($due->installment_status, [InstallmentStatusEnum::PENDING, InstallmentStatusEnum::PARTIALLY_PAID], true)) {
+                    $this->fail('installment', 'Cette échéance ne peut pas être facturée pour cet abonnement.');
+                }
+                $existing = SaasInvoice::where('installment_id', $due->id)->lockForUpdate()->first();
+                if ($existing !== null) {
+                    if ($existing->billingRule->uuid !== strtolower($ruleUuid)) {
+                        $this->fail('conflict', 'Cette échéance possède déjà une facture utilisant une autre règle.');
+                    }
+
+                    return $existing;
+                }
+                $rule = $this->lockRule($ruleUuid);
+                if (! hash_equals($due->managementState(), $expected)) {
+                    $this->fail('conflict', 'L’échéance a changé. Rechargez avant de préparer sa facture.');
+                }
+                [$issuer, $customer, $policy] = $this->fiscalData($owner);
+                $amounts = $this->calculator->fromTotal($due->installment_amount, 'Abonnement '.$parent->plan->name, $policy['rates']);
+                $invoice = new SaasInvoice;
+                $invoice->forceFill([
+                    'user_id' => $owner->id, 'subscription_id' => $parent->id, 'installment_id' => $due->id,
+                    'billing_rule_id' => $rule->id, 'document_type' => DocumentTypeEnum::INVOICE,
+                    'operation_key' => 'saas:invoice:installment:'.$due->uuid, 'status' => DocumentStatusEnum::DRAFT,
+                    'billing_rule_snapshot' => [...$rule->only(['uuid', 'code', 'version', 'parameters', 'validation_reference', 'validated_at', 'effective_at', 'ends_at']), 'fiscal_policy' => $policy],
+                    'net_amount' => $amounts['net_amount'], 'taxes' => $amounts['taxes'],
+                    'tax_amount' => $amounts['tax_amount'], 'total_amount' => $amounts['total_amount'], 'currency' => SaasInvoice::CURRENCY,
+                    'period_starts_at' => $due->period_starts_at, 'period_ends_at' => $due->period_ends_at, 'due_at' => $due->due_at,
+                    'saas_identity_snapshot' => $issuer, 'customer_identity_snapshot' => $customer, 'correlation_id' => (string) Str::uuid(),
+                ])->save();
+                foreach ($amounts['lines'] as $index => $line) {
+                    (new SaasInvoiceLine)->forceFill([...$line, 'document_id' => $invoice->id, 'user_id' => $owner->id,
+                        'document_type' => DocumentTypeEnum::INVOICE, 'line_number' => $index + 1,
+                        'operation_key' => 'saas:line:'.$invoice->uuid.':'.($index + 1), 'correlation_id' => $invoice->getAttribute('correlation_id')])->save();
+                }
+                activity('central')->causedBy($actor)->performedOn($invoice)->event(self::EVENT_CREATED)
+                    ->tap(fn ($activity) => $activity->forceFill(['correlation_id' => $invoice->getAttribute('correlation_id')]))
+                    ->withProperties(['invoice_uuid' => $invoice->uuid, 'installment_uuid' => $due->uuid, 'amount' => $invoice->total_amount])
+                    ->log('Facture préparée depuis une échéance, sans émission.');
+
+                return $invoice->refresh();
+            });
+    }
+
+    /** @return array{0: array<string, mixed>, 1: array<string, mixed>, 2: array<string, mixed>} */
+    private function fiscalData(User $owner): array
+    {
+        $issuer = config('central.billing.issuer', []);
+        $policy = config('central.billing.tax_policy', []);
+        $customer = config('central.billing.customers', [])[$owner->uuid] ?? [];
+        $customer['email'] = $owner->email;
+        $proof = ['name' => ['required', 'string', 'max:255'], 'address' => ['required', 'string', 'max:2000'],
+            'nif' => ['required', 'string', 'max:255'], 'validation_reference' => ['required', 'string', 'max:255'],
+            'validated_at' => ['required', 'date', 'before_or_equal:now']];
+        Validator::make($issuer, $proof, ['required' => 'Le champ :attribute de l’émetteur fiscal est obligatoire.'])->validate();
+        Validator::make($customer, [...$proof, 'email' => ['required', 'email']], ['required' => 'Le champ :attribute du client doit être renseigné et validé.'])->validate();
+        if ($customer['name'] !== trim($owner->first_name.' '.$owner->last_name)
+            || $customer['address'] !== $owner->legal_address || $customer['nif'] !== $owner->getAttribute('nif')) {
+            $this->fail('customer', 'Les informations fiscales du client ont changé depuis leur validation. Faites valider leur nouvelle version pour la facturation, sans nouvelle approbation du compte.');
+        }
+        if ($owner->legal_verification_status !== VerificationStatusEnum::VERIFIED || ! $owner->hasVerifiedEmail()) {
+            $this->fail('customer', 'L’identité et l’adresse e-mail du client doivent être vérifiées avant facturation.');
+        }
+        Validator::make($policy, ['validation_reference' => ['required', 'string', 'max:255'],
+            'validated_at' => ['required', 'date', 'before_or_equal:now'], 'rates' => ['present', 'array'],
+            'no_tax_reason' => empty($policy['rates']) ? ['required', 'string', 'max:2000'] : ['nullable', 'string', 'max:2000']],
+            ['required' => 'La politique fiscale doit renseigner :attribute avec une validation réelle.'])->validate();
+
+        return [$issuer, $customer, $policy];
+    }
 
     /** @return array<string, mixed> */
     public static function rules(): array

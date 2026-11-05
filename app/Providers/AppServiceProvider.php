@@ -7,6 +7,7 @@ use App\Models\Central\Audit\Activity;
 use App\Models\Central\Billing\BillingRule;
 use App\Models\Central\Billing\BillingSequence;
 use App\Models\Central\Billing\SaasCreditNote;
+use App\Models\Central\Billing\SaasDocumentDelivery;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Countries\Country;
 use App\Models\Central\Deployments\TenantSchemaDeployment;
@@ -115,6 +116,7 @@ class AppServiceProvider extends ServiceProvider
     private function registerMorphMap(): void
     {
         Relation::morphMap([
+            'saas_document_delivery' => SaasDocumentDelivery::class,
             'saas_credit_note' => SaasCreditNote::class,
             'saas_invoice' => SaasInvoice::class,
             'subscription_installment' => SubscriptionInstallment::class,

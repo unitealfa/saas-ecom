@@ -17,6 +17,7 @@ class CentralRoleCatalog
         'saas.invoices.view' => 'Consulter et rechercher les factures',
         'saas.invoices.create' => 'Préparer une facture',
         'saas.invoices.issue' => 'Émettre définitivement une facture',
+        'saas.invoices.download' => 'Télécharger le PDF d’une facture',
     ];
 
     public const array BILLING_PERMISSIONS = [

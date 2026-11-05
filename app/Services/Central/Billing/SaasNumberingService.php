@@ -8,6 +8,8 @@ use App\Models\Central\Audit\Activity;
 use App\Models\Central\Billing\BillingRule;
 use App\Models\Central\Billing\BillingSequence;
 use App\Models\Central\Billing\SaasInvoice;
+use App\Models\Central\Subscriptions\Subscription;
+use App\Models\Central\Subscriptions\SubscriptionInstallment;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use Closure;
@@ -45,6 +47,8 @@ class SaasNumberingService
 
         return $this->mutations->run($actor, 'reserveNumber', function () use ($document): SaasInvoice {
             User::withTrashed()->whereKey($document->user_id)->lockForUpdate()->firstOrFail();
+            Subscription::whereKey($document->subscription_id)->lockForUpdate()->firstOrFail();
+            SubscriptionInstallment::whereKey($document->installment_id)->lockForUpdate()->firstOrFail();
 
             return $document->newQuery()->whereKey($document->id)->lockForUpdate()->firstOrFail();
         }, function (SaasInvoice $invoice) use ($actor, $expected, $validateDocument): SaasInvoice {

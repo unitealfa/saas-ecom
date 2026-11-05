@@ -13,6 +13,7 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
  * @property string $description
  * @property string $quantity
  * @property string $net_unit_price
+ * @property string $net_discount
  * @property string $net_amount
  * @property string $tax_amount
  * @property string $total_amount

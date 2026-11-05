@@ -110,6 +110,9 @@
                             Factures SaaS
                         </flux:sidebar.item>
                     @endcan
+                      @can('viewOwn', \App\Models\Central\Billing\SaasInvoice::class)
+                          <flux:sidebar.item :href="route('owner.invoices.index')" :current="request()->routeIs('owner.invoices.*')" wire:navigate>Mes factures</flux:sidebar.item>
+                      @endcan
 
                     @can('viewAny', \App\Models\Central\Shipping\PickupPoint::class)
                         <flux:sidebar.item
