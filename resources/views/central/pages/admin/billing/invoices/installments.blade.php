@@ -10,6 +10,19 @@
                             <td class="p-3">{{ $installment->installment_number }}</td><td class="p-3">{{ $installment->installment_amount }} DZD</td>
                             <td class="p-3">{{ $installment->due_at->format('d/m/Y') }}</td><td class="p-3">{{ $installment->installment_status->label() }}</td>
                             <td class="p-3">
+                                @if ($installment->invoices->isEmpty() && $installment->matchesFullPeriod($subscription)
+                                    && $installment->installment_status === \App\Enums\Central\Subscriptions\InstallmentStatusEnum::PENDING)
+                                    @can('create', \App\Models\Central\Billing\SaasInvoice::class)
+                                        <form method="POST" action="{{ route('central.invoices.installment.store', ['subscription' => $subscription, 'installment' => $installment]) }}">
+                                            @csrf
+                                            <input type="hidden" name="expected_state" value="{{ $installment->managementState() }}">
+                                            <flux:select name="billing_rule_uuid" label="Règle applicable" required>
+                                                @foreach ($rules as $rule)<option value="{{ $rule->uuid }}">{{ $rule->code }} — V{{ $rule->version }}</option>@endforeach
+                                            </flux:select>
+                                            <flux:button type="submit" size="sm">Préparer la facture de cette échéance</flux:button>
+                                        </form>
+                                    @endcan
+                                @endif
                                 @foreach ($installment->invoices as $invoice)
                                     @can('view', $invoice)<flux:button size="sm" :href="route('central.invoices.show', $invoice)">{{ $invoice->number ?? 'Brouillon' }}</flux:button>@endcan
                                 @endforeach

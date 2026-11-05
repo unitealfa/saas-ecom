@@ -128,7 +128,7 @@ class BillingRuleController extends Controller
             $request->validated('reason'), $request->validated('ends_at'),
         );
 
-        return $this->redirectWithStatus($billingRule, 'Retrait enregistré. Les documents existants sont conservés ; cette version ne peut plus servir à une nouvelle facturation.');
+        return $this->redirectWithStatus($billingRule, 'Retrait enregistré. L’historique est conservé ; cette règle ne permet plus de nouvelle facturation.');
     }
 
     private function form(?BillingRule $rule = null, bool $newVersion = false): View

@@ -79,6 +79,11 @@ class SubscriptionInstallment extends Model
         return 'subscription_installment';
     }
 
+    public function managementState(): string
+    {
+        return hash('sha256', json_encode($this->getAttributes(), JSON_THROW_ON_ERROR));
+    }
+
     public function matchesFullPeriod(Subscription $subscription): bool
     {
         return $subscription->period_ends_at !== null

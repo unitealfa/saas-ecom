@@ -8,12 +8,15 @@ Route::controller(SaasInvoiceController::class)->prefix('billing/invoices')->nam
     Route::get('/', 'index')->name('index');
     Route::get('{invoice}', 'show')->name('show');
     Route::post('{invoice}/number', 'reserve')->name('reserve');
+    Route::post('{invoice}/issue', 'issue')->name('issue');
+    Route::get('{invoice}/pdf', 'download')->middleware('signed')->name('download');
 });
 
 Route::controller(SaasInvoiceController::class)->prefix('subscriptions/{subscription}')->group(function (): void {
     Route::get('installments', 'installments')->name('subscriptions.installments.index');
     Route::get('invoice/create', 'create')->name('invoices.create');
     Route::post('invoice', 'store')->name('invoices.store');
+    Route::post('installments/{installment}/invoice', 'prepareInstallment')->whereUuid(['subscription', 'installment'])->name('invoices.installment.store');
 });
 
 Route::controller(BillingRuleController::class)->prefix('billing')->group(function (): void {

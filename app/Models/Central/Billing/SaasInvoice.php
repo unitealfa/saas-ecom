@@ -5,6 +5,7 @@ namespace App\Models\Central\Billing;
 use App\Concerns\HasPublicUuid;
 use App\Enums\Central\Billing\DocumentStatusEnum;
 use App\Enums\Central\Billing\DocumentTypeEnum;
+use App\Models\Central\Media\Media;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Subscriptions\SubscriptionInstallment;
 use App\Models\Central\Users\User;
@@ -103,7 +104,19 @@ class SaasInvoice extends Model
     /** @return HasMany<SaasInvoiceLine, $this> */
     public function lines(): HasMany
     {
-        return $this->hasMany(SaasInvoiceLine::class, 'document_id');
+        return $this->hasMany(SaasInvoiceLine::class, 'document_id')->orderBy('line_number');
+    }
+
+    /** @return BelongsTo<Media, $this> */
+    public function media(): BelongsTo
+    {
+        return $this->belongsTo(Media::class, 'document_media_id');
+    }
+
+    /** @return HasMany<SaasDocumentDelivery, $this> */
+    public function deliveries(): HasMany
+    {
+        return $this->hasMany(SaasDocumentDelivery::class, 'document_id');
     }
 
     public function managementState(): string

@@ -139,18 +139,18 @@ class SaasNumberingService
         $rule = BillingRule::whereKey($rule->id)->lockForUpdate()->firstOrFail();
         Validator::make($rule->only(['code', 'trigger_event', 'parameters']), BillingRuleService::contentRules())->validate();
         if (! $rule->isActiveAt(now())) {
-            $this->fail('rule', 'La règle n’est plus active et applicable. Aucune réservation effectuée.');
+            $this->fail('rule', 'La règle n’est plus applicable. Aucune réservation effectuée.');
         }
         $installment = $invoice->installment;
-        $periodObligations = SubscriptionInstallment::where('parent_subscription_id', $invoice->subscription_id)
+        $obligations = SubscriptionInstallment::where('parent_subscription_id', $invoice->subscription_id)
             ->where('period_starts_at', $installment->period_starts_at)->where('period_ends_at', $installment->period_ends_at)
             ->orderBy('id')->lockForUpdate()->get(['id']);
-        if ($periodObligations->count() !== 1 || ! $installment->matchesFullPeriod($invoice->subscription)
+        if ($obligations->count() !== 1 || ! $installment->matchesFullPeriod($invoice->subscription)
             || $installment->installment_status !== InstallmentStatusEnum::PENDING
             || $invoice->total_amount !== $installment->installment_amount
             || ! $invoice->period_starts_at->equalTo($installment->period_starts_at)
             || ! $invoice->period_ends_at->equalTo($installment->period_ends_at)) {
-            $this->fail('installment', 'Le montant intégral et la période de la facture doivent correspondre à son unique échéance non réglée.');
+            $this->fail('installment', 'La facture doit correspondre à l’unique échéance intégrale non réglée de cette période.');
         }
     }
 

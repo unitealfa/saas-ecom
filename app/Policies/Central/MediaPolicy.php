@@ -3,9 +3,11 @@
 namespace App\Policies\Central;
 
 use App\Enums\MediaVisibilityEnum;
+use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Media\Media;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
+use App\Services\Central\Billing\SaasInvoicePdfService;
 use Illuminate\Support\Facades\Gate;
 
 class MediaPolicy
@@ -29,6 +31,13 @@ class MediaPolicy
 
     public function download(User $actor, Media $media): bool
     {
+        if ($media->collection_name === SaasInvoicePdfService::COLLECTION) {
+            $invoice = $media->model_type === 'saas_invoice' ? SaasInvoice::find($media->model_id) : null;
+
+            return ! tenancy()->initialized && ! $media->trashed() && $media->visibility === MediaVisibilityEnum::PRIVATE
+                && $invoice !== null && $invoice->getAttribute('document_media_id') === $media->id
+                && Gate::forUser($actor)->allows('download', $invoice);
+        }
         if ($media->trashed() || $media->visibility !== MediaVisibilityEnum::PRIVATE || ! $this->has($actor, 'download')) {
             return false;
         }
