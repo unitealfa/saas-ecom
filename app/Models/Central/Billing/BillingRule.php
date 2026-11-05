@@ -130,8 +130,4 @@ class BillingRule extends Model
             && ($this->ends_at === null || $this->ends_at->greaterThan($date));
     }
 
-    public function isActiveAt(CarbonInterface $date): bool
-    {
-        return $this->policy_status === PolicyStatusEnum::ACTIVE && $this->isApplicableAt($date);
-    }
 }

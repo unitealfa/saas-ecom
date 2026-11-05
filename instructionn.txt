@@ -760,7 +760,7 @@ Fichiers :
 app/Models/Central/Audit/Activity.php
 
 app/Http/Controllers/Central/Admin/
-    ActivityLogController.php
+    Audit/ActivityLogController.php
 
 app/Services/Central/Audit/
     CentralActivityService.php
@@ -773,6 +773,7 @@ config/activitylog.php
 
 
 Cette interface utilise Spatie Activity Log. Elle ne doit pas donner une permission de modifier ou supprimer librement des événements d'audit.
+La liste, la fiche et l'export exposent les seules métadonnées centrales : UUID, date UTC, journal, événement, origine, UUID d'acteur et de sujet central connus et corrélation. Les propriétés, changements bruts et identifiants numériques ne sont pas exposés. Les filtres journal, événement, dates UTC, UUID d'acteur/sujet et corrélation sont partagés avec l'export CSV. La consultation et la demande d'export sont tracées dans activity_log ; l'export est borné par l'identifiant maximal observé au début de la demande, sans garantir un instantané transactionnel, et neutralise les formules de tableur. Les deux droits restent distincts.
 Module 25 — Tableau de bord administrateur
 Tables : agrégats provenant des tables centrales.
 Interface : Administration → Dashboard
