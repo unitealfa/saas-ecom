@@ -4,8 +4,8 @@ namespace App\Services\Central\Subscriptions;
 
 use App\Enums\Central\Subscriptions\PeriodEnum;
 use App\Enums\Central\Subscriptions\StatusEnum;
-use App\Models\Central\Plans\Plan;
 use App\Models\Central\Features\Feature;
+use App\Models\Central\Plans\Plan;
 use App\Models\Central\Plans\PlanFeature;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Tenants\Tenant;
@@ -17,7 +17,7 @@ use Illuminate\Validation\ValidationException;
 
 class SubscriptionTransitionService
 {
-    public function __construct(private readonly AuthorizationMutation $mutations) {}
+    public function __construct(private readonly AuthorizationMutation $mutations, private readonly DefaultSubscription $defaults) {}
 
     public static function closeRules(): array
     {
@@ -47,6 +47,32 @@ class SubscriptionTransitionService
                 activity()->causedBy($actor)->performedOn($current)->event('subscription_closure_scheduled')
                     ->withProperties(['before' => $before, 'effective_at' => $current->period_ends_at->toISOString()])
                     ->log('Fin de l’abonnement programmée.');
+            });
+    }
+
+    /** @param array<string, mixed> $data */
+    public function deactivate(User $actor, Subscription $subscription, array $data): void
+    {
+        $this->mutations->run($actor, 'deactivate', fn () => $this->lock($subscription),
+            function (Subscription $current) use ($actor, $data): void {
+                $values = Validator::make($data, self::closeRules())->validate();
+                if (! hash_equals($current->transitionState(), $values['expected_state'])) {
+                    throw ValidationException::withMessages(['expected_state' => 'L’abonnement a changé. Rechargez la page.']);
+                }
+                $current->load('plan');
+                $end = $current->effectiveEndsAt();
+                if (! in_array($current->status, [StatusEnum::ACTIVE, StatusEnum::TRIAL], true)
+                    || $current->period_starts_at->isFuture() || $current->plan?->code === 'free'
+                    || ($end !== null && ! $end->isFuture())) {
+                    throw ValidationException::withMessages(['subscription' => 'Cet abonnement ne peut pas être désactivé.']);
+                }
+                $this->assertNoScheduled($current);
+                $endedAt = now();
+                $current->forceFill(['status' => StatusEnum::CANCELLED, 'ended_at' => $endedAt, 'auto_renew' => false])->save();
+                $this->defaults->ensure($current->owner, $actor);
+                activity()->causedBy($actor)->performedOn($current)->event('subscription_deactivated')
+                    ->withProperties(['owner_uuid' => $current->owner->uuid, 'effective_at' => $endedAt->toISOString()])
+                    ->log('Abonnement désactivé immédiatement.');
             });
     }
 

@@ -4,10 +4,11 @@ namespace App\Http\Controllers\Central\Admin\Subscriptions;
 
 use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Central\Subscriptions\SearchSubscriptionsRequest;
 use App\Http\Requests\Central\Subscriptions\AssignSubscriptionRequest;
 use App\Http\Requests\Central\Subscriptions\ChangeSubscriptionRequest;
 use App\Http\Requests\Central\Subscriptions\CloseSubscriptionRequest;
+use App\Http\Requests\Central\Subscriptions\DeactivateSubscriptionRequest;
+use App\Http\Requests\Central\Subscriptions\SearchSubscriptionsRequest;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Services\Central\Subscriptions\SubscriptionAssignmentService;
@@ -43,6 +44,16 @@ class SubscriptionController extends Controller
         ]);
     }
 
+    public function history(Subscription $subscription): View
+    {
+        $history = $this->subscriptions->history($this->centralActor(), $subscription);
+
+        return view('central.pages.admin.subscriptions.history', [
+            'subscription' => $subscription->load('owner'),
+            'history' => $history,
+        ]);
+    }
+
     public function create(): View
     {
         Gate::forUser($this->centralActor())->authorize('assign', Subscription::class);
@@ -68,6 +79,13 @@ class SubscriptionController extends Controller
         $this->transitions->close($this->centralActor(), $subscription, $request->validated());
 
         return $this->redirectAfterTransition($subscription, 'Fin de l’abonnement programmée.');
+    }
+
+    public function deactivate(DeactivateSubscriptionRequest $request, Subscription $subscription): RedirectResponse
+    {
+        $this->transitions->deactivate($this->centralActor(), $subscription, $request->validated());
+
+        return $this->redirectAfterTransition($subscription, 'Abonnement désactivé immédiatement ; offre gratuite appliquée.');
     }
 
     public function changeForm(Subscription $subscription): View

@@ -16,6 +16,41 @@ function subscriptionReader(string $permission): User
     return $actor;
 }
 
+test('subscription history shows only the selected merchant subscriptions to an authorized reader', function (): void {
+    $actor = subscriptionReader('saas.subscriptions.history.view');
+    $owner = User::factory()->create();
+    $old = Plan::factory()->create(['name' => 'Ancienne Offre']);
+    $old->delete();
+    $current = Plan::factory()->create(['name' => 'Offre Actuelle']);
+    $other = Plan::factory()->create(['name' => 'Offre Autre Marchand']);
+    $anchor = Subscription::factory()->create(['user_id' => $owner->id, 'plan_id' => $current->id]);
+    Subscription::factory()->create(['user_id' => $owner->id, 'plan_id' => $old->id, 'status' => 4]);
+    Subscription::factory()->create(['plan_id' => $other->id]);
+
+    $this->actingAs($actor, 'central')->get(route('central.subscriptions.history', $anchor))
+        ->assertOk()->assertSee('Ancienne Offre')->assertSee('Offre Actuelle')->assertDontSee('Offre Autre Marchand');
+});
+
+test('subscription history requires its own permission', function (): void {
+    $actor = subscriptionReader('saas.subscriptions.view');
+    $subscription = Subscription::factory()->create();
+    $this->actingAs($actor, 'central')->get(route('central.subscriptions.history', $subscription))->assertForbidden();
+});
+
+test('subscription history is paginated and linked from the subscription pages for authorized staff', function (): void {
+    test()->seed(AuthorizationSeeder::class);
+    $actor = User::factory()->create();
+    $actor->assignRole(Role::createWithPermissions('subscription-history-'.Str::random(10), [
+        'saas.subscriptions.view' => 7, 'saas.subscriptions.history.view' => 7,
+    ]));
+    $anchor = Subscription::factory()->create();
+    Subscription::factory()->count(21)->create(['user_id' => $anchor->user_id, 'status' => 4]);
+    $this->actingAs($actor, 'central')->get(route('central.subscriptions.show', $anchor))
+        ->assertOk()->assertSee(route('central.subscriptions.history', $anchor));
+    $this->get(route('central.subscriptions.history', $anchor))->assertOk()
+        ->assertViewHas('history', fn ($history) => $history->total() === 22 && $history->perPage() === 20);
+});
+
 test('authorized staff can search subscriptions and view archived plan details', function (): void {
     $actor = subscriptionReader('saas.subscriptions.view');
     $owner = User::factory()->create(['name' => 'Marchand Exemple']);

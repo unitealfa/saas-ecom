@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Gate;
 
 class SubscriptionCatalogService
 {
+    /** @return LengthAwarePaginator<int, Subscription> */
     public function paginate(User $actor, ?string $search, ?int $status): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize('viewAny', Subscription::class);
@@ -34,5 +35,14 @@ class SubscriptionCatalogService
         Gate::forUser($actor)->authorize('view', $subscription);
 
         return $subscription->load(['owner', 'plan', 'assignedBy']);
+    }
+
+    /** @return LengthAwarePaginator<int, Subscription> */
+    public function history(User $actor, Subscription $subscription): LengthAwarePaginator
+    {
+        Gate::forUser($actor)->authorize('history', $subscription);
+
+        return Subscription::query()->where('user_id', $subscription->user_id)
+            ->with('plan')->orderByDesc('period_starts_at')->orderByDesc('id')->paginate(20);
     }
 }
