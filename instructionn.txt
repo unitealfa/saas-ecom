@@ -399,6 +399,7 @@ saas.quotas.view	Consulter les quotas et leur consommation
 saas.quotas.reconcile	Lancer un recalcul contrôlé des quotas et états des boutiques
 saas.quotas.history.view	Consulter les décisions et changements de quotas
 Ces permissions ne permettent pas de modifier arbitrairement les plafonds d'un utilisateur. Pour changer son quota commercial, il faut modifier/versionner un plan puis lui attribuer l'offre correspondante.
+La fiche affiche les boutiques non archivées qui occupent une place, les boutiques archivées qui n'en occupent plus, la composition de l'offre enregistrée et les compteurs feature_usage existants. Un abonnement échu est signalé comme à résoudre au lieu de présenter son ancien plafond comme courant. Le recalcul agit sous verrou du propriétaire, contrôle l'état attendu et conserve les suspensions ; il ne libère aucune place par simple désactivation. L'historique regroupe les événements disponibles de réconciliation, boutiques et abonnements, sans inventer d'événements anciens.
 Fichiers :
 app/Models/Central/FeatureUsage.php
 

@@ -6,6 +6,7 @@ use App\Models\Central\Tenants\Tenant;
 use App\Models\Central\Users\User;
 use App\Models\Tenant\Shop\Shop;
 use App\Models\Tenant\Users\User as ShopUser;
+use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use LogicException;
@@ -22,7 +23,7 @@ class TenantProfileProjection
             throw ValidationException::withMessages(['tenant' => 'La base de cette boutique doit être préparée avant son activation.']);
         }
 
-        $tenant->run(function () use ($tenant, $owner): void {
+        $this->runInTenant($tenant, function () use ($tenant, $owner): void {
             $shop = Shop::where('singleton', self::SINGLETON)->first();
 
             if ($shop === null || $shop->tenant_uuid !== $tenant->uuid
@@ -44,7 +45,7 @@ class TenantProfileProjection
             throw new LogicException('The tenant database is not ready for profile projection.');
         }
 
-        $tenant->run(function () use ($tenant): void {
+        $this->runInTenant($tenant, function () use ($tenant): void {
             DB::transaction(function () use ($tenant): void {
                 $shop = Shop::where('singleton', self::SINGLETON)->lockForUpdate()->firstOrFail();
 
@@ -62,6 +63,22 @@ class TenantProfileProjection
                 ])->save();
             }, self::ATTEMPTS);
         });
+    }
+
+    /** @param Closure(): void $callback */
+    private function runInTenant(Tenant $tenant, Closure $callback): void
+    {
+        $previous = tenant();
+
+        try {
+            $tenant->run($callback);
+        } finally {
+            if ($previous !== null) {
+                tenancy()->initialize($previous);
+            } elseif (tenancy()->initialized) {
+                tenancy()->end();
+            }
+        }
     }
 
     private function databaseExists(Tenant $tenant): bool
