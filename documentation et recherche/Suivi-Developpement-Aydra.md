@@ -1,5 +1,17 @@
 # Suivi de développement et audit Aydra
 
+## 5 novembre 2026 — Module 19 : adaptation au paiement intégral
+
+Demande : module19v2.txt ; branche module-19 à partir de 1574903. Tests MySQL locaux temporaires et navigateur isolé autorisés pour cette mission. Aucun merge, push, migration, seeder ni changement de donnée réelle. Le remplacement utilisateur du fichier module19.txt est préservé. Rapport courant : [Module-19-Paiement-Integral.md](Module-19-Paiement-Integral.md).
+
+Corrections : nouvelle facture seulement pour une obligation PENDING unique couvrant intégralement montant et période ; règle ACTIVE avec paramètres autorisés ; maintien des reprises, snapshots, numéros et PDF. Les deux interfaces affichent le paiement séparément. InvoicePaymentService lit les transferts, sans cumuler des versements partiels, confirmer des fonds, émettre un reçu ou activer des droits. SaasPayment utilise le journal central existant. confirmedPayment est le point de lecture autorisé du futur reçu ; Module 21 et génération de reçu non implémentés, intégration réelle non exécutée.
+
+Vérifications intermédiaires : tests initiaux de Module 19, 24 réussis et un interactif ignoré ; deux nouveaux cas rouges confirmant l'acceptation indue de fractions, puis réussis après correction. Série commune initiale : 90 réussis, un interactif ignoré et une erreur de fixture copiant une colonne générée ; contrainte conservée et fixture corrigée. Fichier final Module 19 : 32 réussis / 173 assertions, un interactif ignoré. Régression ciblée Module 18/retrait : 11 réussis / 58 assertions. Ces séries se recouvrent et ne sont pas additionnées.
+
+Navigateur réel sur base/serveur/fichiers temporaires : un test réussi / six assertions. Émission administrative puis PDF privé HTTP 200 de 23 396 octets ; propriétaire connecté, liste/détail avec À payer malgré ISSUED, téléchargement 200, route administrative 403 et aucune action d'émission ni historique administratif. Nettoyage effectué par le test. Aucun paiement réel simulé hors des fixtures isolées.
+
+Série finale commune réussie : 120 tests / 3062 assertions, 275728 ms ; un interactif ignoré dans cette commande, exécuté séparément comme indiqué ci-dessus. Elle couvre Module 19, scénarios Module 18, règles, compteurs, schéma central et fichiers privés. Aucun échec restant dans ces contrôles ; les séries intermédiaires ne sont pas additionnées au total final. Pint conforme, PHPStan ciblé sans erreur, route:cache isolé conforme et fichier temporaire supprimé ; build frontend réussi avec avertissement sur l'optimisation optionnelle fontaine, sans ajout de dépendance. Graphe AST actualisé. Suite globale et parcours réel d'encaissement/reçu non exécutés.
+
 Ouvert le 6 octobre 2026 pour exécuter `instruction.txt`. Ce fichier distingue les spécifications, le code et les vérifications réelles. Une case non cochée signifie que le travail reste à faire ; une migration écrite ne prouve pas son exécution.
 
 ## Module 10 — Fin et changement programmés

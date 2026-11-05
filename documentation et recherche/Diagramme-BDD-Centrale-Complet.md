@@ -1208,6 +1208,8 @@ Les envois des factures et des avoirs : à qui, par quel moyen, quand, combien d
 
 ### 23. `saas_transfers` — 35 champs
 
+Décision MVP actuelle (`module19v2.txt`) : un paiement doit couvrir seul le total de la période. Ne pas additionner des règlements partiels pour confirmer ce total ; les structures historiques restent conservées. L'état de paiement est lu séparément de la facture fiscale immuable. La vérification réelle des fonds et le futur reçu relèvent de l'intégration du Module 21, pas de l'émission de facture. Voir [Module-19-Paiement-Integral.md](Module-19-Paiement-Integral.md).
+
 Les paiements reçus et remboursements effectués à distance par banque, CCP ou BaridiMob : montant, preuve PDF, référence, auteur et vérification.
 
 | Champ | Explication très simple |

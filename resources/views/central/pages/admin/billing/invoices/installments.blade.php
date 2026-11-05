@@ -10,7 +10,8 @@
                             <td class="p-3">{{ $installment->installment_number }}</td><td class="p-3">{{ $installment->installment_amount }} DZD</td>
                             <td class="p-3">{{ $installment->due_at->format('d/m/Y') }}</td><td class="p-3">{{ $installment->installment_status->label() }}</td>
                             <td class="p-3">
-                                @if ($installment->invoices->isEmpty())
+                                @if ($installment->invoices->isEmpty() && $installment->matchesFullPeriod($subscription)
+                                    && $installment->installment_status === \App\Enums\Central\Subscriptions\InstallmentStatusEnum::PENDING)
                                     @can('create', \App\Models\Central\Billing\SaasInvoice::class)
                                         <form method="POST" action="{{ route('central.invoices.installment.store', ['subscription' => $subscription, 'installment' => $installment]) }}">
                                             @csrf

@@ -2,6 +2,8 @@
 
 use App\Enums\Central\Billing\DeliveryStatusEnum;
 use App\Enums\Central\Billing\DocumentStatusEnum;
+use App\Enums\Central\Billing\PaymentStateEnum;
+use App\Enums\Central\Billing\TransferStatusEnum;
 use App\Enums\Central\Billing\TriggerEventEnum;
 use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Enums\VerificationStatusEnum;
@@ -9,6 +11,7 @@ use App\Models\Central\Audit\Activity;
 use App\Models\Central\Billing\BillingSequence;
 use App\Models\Central\Billing\SaasDocumentDelivery;
 use App\Models\Central\Billing\SaasInvoice;
+use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Media\Media;
 use App\Models\Central\Roles\Role;
 use App\Models\Central\Subscriptions\Subscription;
@@ -17,10 +20,13 @@ use App\Models\Central\Tenants\Tenant;
 use App\Models\User;
 use App\Services\Central\Billing\BillingRuleService;
 use App\Services\Central\Billing\InvoiceCalculator;
+use App\Services\Central\Billing\InvoicePaymentService;
 use App\Services\Central\Billing\SaasInvoiceIssuanceService;
 use App\Services\Central\Billing\SaasInvoicePdfService;
 use App\Services\Central\Billing\SaasInvoiceService;
+use Database\Factories\Central\MediaFactory;
 use Database\Seeders\Central\AuthorizationSeeder;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
@@ -80,6 +86,29 @@ function issuanceDraft(array $fixture): SaasInvoice
     return app(SaasInvoiceService::class)->prepareInstallment($fixture['actor'], $fixture['subscription'], $fixture['installment'], $fixture['rule']->uuid, $fixture['installment']->managementState());
 }
 
+test('full period invoicing refuses fractional or partially paid obligations', function (string $amount, InstallmentStatusEnum $status): void {
+    $f = issuanceFixture();
+    $f['installment']->forceFill(['installment_amount' => $amount, 'installment_status' => $status])->save();
+    $f['installment']->refresh();
+
+    expect(fn () => issuanceDraft($f))->toThrow(ValidationException::class);
+
+    expect(SaasInvoice::count())->toBe(0)->and(BillingSequence::count())->toBe(0);
+})->with([
+    'fractional' => ['1000.00', InstallmentStatusEnum::PENDING],
+    'partially paid' => ['3000.00', InstallmentStatusEnum::PARTIALLY_PAID],
+]);
+
+test('another obligation for the same period prevents a second invoice', function (): void {
+    $f = issuanceFixture();
+    $duplicate = $f['installment']->replicate(['uuid', 'operation_key', 'installment_number', 'parent_record_type', 'active_owner_slot']);
+    $duplicate->forceFill(['operation_key' => 'installment:test:'.Str::uuid(), 'installment_number' => 'TEST-'.Str::uuid()])->save();
+
+    expect(fn () => issuanceDraft($f))->toThrow(ValidationException::class);
+
+    expect(SubscriptionInstallment::count())->toBe(2)->and(SaasInvoice::count())->toBe(0);
+});
+
 test('invoice calculations use exact decimals across multiple lines', function (): void {
     $result = app(InvoiceCalculator::class)->calculate([
         ['description' => 'A', 'quantity' => '3.00', 'net_unit_price' => '0.10', 'net_discount' => '0.00'],
@@ -90,6 +119,54 @@ test('invoice calculations use exact decimals across multiple lines', function (
         ->and($result['total_amount'])->toBe('209.33');
 });
 
+test('payment state is derived without changing the issued invoice or PDF', function (TransferStatusEnum $status, string $amount, PaymentStateEnum $state, ?string $secondAmount = null): void {
+    $f = issuanceFixture();
+    $draft = issuanceDraft($f);
+    $invoice = app(SaasInvoiceIssuanceService::class)->issue($f['actor'], $draft, $draft->managementState());
+    $before = $invoice->getAttributes();
+    $hash = $invoice->media->file_hash;
+    $subscriptionState = $f['subscription']->refresh()->transitionState();
+    $payment = new SaasPayment;
+    $payment->forceFill(['user_id' => $invoice->user_id, 'document_id' => $invoice->id,
+        'record_type' => SaasPayment::RECORD_TYPE, 'transfer_method' => 4,
+        'transfer_status' => TransferStatusEnum::DECLARED, 'amount' => $amount, 'currency' => $invoice->currency,
+        'created_by_id' => $f['actor']->id, 'operation_key' => 'saas:payment:test:'.Str::uuid(), 'correlation_id' => Str::uuid()])->save();
+    $proof = Media::factory()->create(['model_type' => 'saas_payment', 'model_id' => $payment->getKey(),
+        'created_by_id' => $f['actor']->id, 'collection_name' => 'payment_proof']);
+    Storage::disk('local')->put($proof->storage_key, MediaFactory::PDF_CONTENT);
+    $payment->forceFill(['transfer_status' => $status, 'proof_media_id' => $proof->id,
+        'transfer_reference' => 'FIXTURE-'.Str::uuid(), 'financial_account_key' => 'fixture-account',
+        'transaction_fingerprint' => hash('sha256', $payment->getAttribute('uuid')),
+        'occurred_at' => now(), 'validated_by_id' => $status === TransferStatusEnum::VERIFIED ? $f['actor']->id : null,
+        'validated_at' => $status === TransferStatusEnum::VERIFIED ? now() : null])->save();
+    if ($secondAmount !== null) {
+        $second = $payment->replicate(['uuid', 'operation_key', 'proof_media_id', 'transaction_fingerprint']);
+        $second->forceFill(['transfer_status' => TransferStatusEnum::DECLARED, 'amount' => $secondAmount,
+            'operation_key' => 'saas:payment:test:'.Str::uuid()])->save();
+        $secondProof = Media::factory()->create(['model_type' => 'saas_payment', 'model_id' => $second->getKey(),
+            'created_by_id' => $f['actor']->id, 'collection_name' => 'payment_proof']);
+        Storage::disk('local')->put($secondProof->storage_key, MediaFactory::PDF_CONTENT);
+        $second->forceFill(['transfer_status' => TransferStatusEnum::VERIFIED, 'proof_media_id' => $secondProof->id,
+            'transaction_fingerprint' => hash('sha256', $second->getAttribute('uuid'))])->save();
+    }
+
+    $payments = app(InvoicePaymentService::class);
+    expect($payments->states($f['owner'], collect([$invoice]))[$invoice->id])->toBe($state)
+        ->and($payments->confirmedPayment($f['owner'], $invoice)?->getKey())->toBe($state === PaymentStateEnum::PAID ? $payment->getKey() : null);
+    $this->actingAs($f['owner'], 'central')->get(route('owner.invoices.show', $invoice))->assertOk()->assertSee($state->label());
+
+    expect($invoice->refresh()->getAttributes())->toBe($before)
+        ->and($invoice->media->file_hash)->toBe($hash)
+        ->and(hash('sha256', Storage::disk('local')->get($invoice->media->storage_key)))->toBe($hash)
+        ->and($f['subscription']->refresh()->transitionState())->toBe($subscriptionState);
+})->with([
+    'declared' => [TransferStatusEnum::DECLARED, '3000.00', PaymentStateEnum::REVIEW],
+    'verified full' => [TransferStatusEnum::VERIFIED, '3000.00', PaymentStateEnum::PAID],
+    'verified insufficient' => [TransferStatusEnum::VERIFIED, '1000.00', PaymentStateEnum::ANOMALY],
+    'rejected' => [TransferStatusEnum::REJECTED, '3000.00', PaymentStateEnum::ANOMALY],
+    'two partial transfers are not combined' => [TransferStatusEnum::VERIFIED, '1000.00', PaymentStateEnum::ANOMALY, '2000.00'],
+]);
+
 test('T19-01 invoice emission creates a real private PDF and atomic pending delivery', function (): void {
     $f = issuanceFixture();
     $invoice = issuanceDraft($f);
@@ -97,6 +174,9 @@ test('T19-01 invoice emission creates a real private PDF and atomic pending deli
         ->assertSessionHasNoErrors()->assertRedirect();
     $invoice->refresh();
     expect($invoice->status)->toBe(DocumentStatusEnum::ISSUED)->and($invoice->total_amount)->toBe('3000.00');
+    expect(app(InvoicePaymentService::class)->states($f['owner'], collect([$invoice]))[$invoice->id])->toBe(PaymentStateEnum::DUE)
+        ->and(app(InvoicePaymentService::class)->confirmedPayment($f['owner'], $invoice))->toBeNull()
+        ->and(SaasPayment::count())->toBe(0);
     $media = $invoice->media;
     expect(Storage::disk('local')->get($media->storage_key))->toStartWith('%PDF-');
     expect(hash('sha256', Storage::disk('local')->get($media->storage_key)))->toBe($media->file_hash);
@@ -312,6 +392,8 @@ test('invoice forms enforce server values while owner views and filters remain c
     $this->get(route('owner.invoices.show', $invoice))->assertOk()->assertDontSee('Émettre la facture');
     $this->get(route('central.invoices.show', $invoice))->assertForbidden();
     $this->actingAs(User::factory()->create(), 'central')->get(route('owner.invoices.show', $invoice))->assertForbidden();
+    expect(fn () => app(InvoicePaymentService::class)->confirmedPayment(User::factory()->create(), $invoice))
+        ->toThrow(AuthorizationException::class);
 });
 
 test('invalid line data or stale forms cannot reserve a number', function (string $invalid): void {
@@ -348,6 +430,7 @@ test('invoice services refuse an initialized shop context without touching its d
             expect(fn () => app(SaasInvoiceIssuanceService::class)->issue($f['actor'], $invoice, $invoice->managementState()))
                 ->toThrow(HttpException::class);
             expect(fn () => issuanceDraft($f))->toThrow(HttpException::class);
+            expect(fn () => app(InvoicePaymentService::class)->confirmedPayment($f['owner'], $invoice))->toThrow(HttpException::class);
             expect(DB::table('invoice_canary')->sole()->value)->toBe(42);
         });
         expect(BillingSequence::count())->toBe(0);

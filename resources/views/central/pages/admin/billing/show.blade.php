@@ -20,7 +20,7 @@
             <div><dt>Référence de validation</dt><dd class="whitespace-pre-wrap">{{ $rule->validation_reference ?? 'Non renseignée' }}</dd></div>
         </dl>
         @if ($rule->policy_status === \App\Enums\Central\Billing\PolicyStatusEnum::RETIRED && $rule->ends_at?->isFuture())
-            <flux:callout>Retrait programmé : cette version reste applicable jusqu’au {{ $rule->ends_at->format('d/m/Y H:i') }}.</flux:callout>
+            <flux:callout>Retrait programmé : fin historique au {{ $rule->ends_at->format('d/m/Y H:i') }}. Cette règle ne permet plus de nouvelle facturation ; les documents existants sont conservés.</flux:callout>
         @endif
         <div class="flex flex-wrap gap-3">
             @can('update', $rule)<flux:button :href="route('central.billing-rules.edit', $rule)">Modifier le brouillon</flux:button>@endcan

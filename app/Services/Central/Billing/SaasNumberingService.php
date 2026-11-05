@@ -4,6 +4,7 @@ namespace App\Services\Central\Billing;
 
 use App\Enums\Central\Billing\DocumentStatusEnum;
 use App\Enums\Central\Billing\DocumentTypeEnum;
+use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Models\Central\Audit\Activity;
 use App\Models\Central\Billing\BillingRule;
 use App\Models\Central\Billing\BillingSequence;
@@ -57,6 +58,9 @@ class SaasNumberingService
             }
             if (! hash_equals($invoice->managementState(), $expected)) {
                 $this->fail('conflict', 'La facture a changé. Rechargez avant de réserver son numéro.');
+            }
+            if ($invoice->document_type === DocumentTypeEnum::INVOICE) {
+                $this->assertInvoiceBilling($invoice);
             }
             $validateDocument($invoice);
             $year = (int) now()->format('Y');
@@ -128,14 +132,30 @@ class SaasNumberingService
         return $sequence;
     }
 
-    private function assertPrepared(SaasInvoice $invoice): void
+    private function assertInvoiceBilling(SaasInvoice $invoice): void
     {
         $rule = $invoice->billingRule;
         BillingRule::where('code', $rule->code)->orderBy('version')->lockForUpdate()->firstOrFail();
         $rule = BillingRule::whereKey($rule->id)->lockForUpdate()->firstOrFail();
-        if (! $rule->isApplicableAt(now())) {
+        Validator::make($rule->only(['code', 'trigger_event', 'parameters']), BillingRuleService::contentRules())->validate();
+        if (! $rule->isActiveAt(now())) {
             $this->fail('rule', 'La règle n’est plus applicable. Aucune réservation effectuée.');
         }
+        $installment = $invoice->installment;
+        $obligations = SubscriptionInstallment::where('parent_subscription_id', $invoice->subscription_id)
+            ->where('period_starts_at', $installment->period_starts_at)->where('period_ends_at', $installment->period_ends_at)
+            ->orderBy('id')->lockForUpdate()->get(['id']);
+        if ($obligations->count() !== 1 || ! $installment->matchesFullPeriod($invoice->subscription)
+            || $installment->installment_status !== InstallmentStatusEnum::PENDING
+            || $invoice->total_amount !== $installment->installment_amount
+            || ! $invoice->period_starts_at->equalTo($installment->period_starts_at)
+            || ! $invoice->period_ends_at->equalTo($installment->period_ends_at)) {
+            $this->fail('installment', 'La facture doit correspondre à l’unique échéance intégrale non réglée de cette période.');
+        }
+    }
+
+    private function assertPrepared(SaasInvoice $invoice): void
+    {
         if (trim((string) ($invoice->saas_identity_snapshot['name'] ?? '')) === ''
             || trim((string) ($invoice->customer_identity_snapshot['first_name'] ?? '')) === ''
             || trim((string) ($invoice->billing_rule_snapshot['no_tax_reason'] ?? '')) === '') {

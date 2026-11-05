@@ -15,7 +15,7 @@
             <div><dt>État</dt><dd>{{ $invoice->status->label() }}</dd></div>
             <div><dt>Commerçant au moment de la préparation</dt><dd>{{ $invoice->customer_identity_snapshot['name'] ?? trim(($invoice->customer_identity_snapshot['first_name'] ?? '').' '.($invoice->customer_identity_snapshot['last_name'] ?? '')) }}</dd></div>
             <div><dt>Échéance</dt><dd>{{ $invoice->installment->installment_number }}</dd></div>
-            <div><dt>État du règlement de l’échéance</dt><dd>{{ $invoice->installment->installment_status->label() }}</dd></div>
+            <div><dt>État du paiement</dt><dd>{{ $paymentState->label() }}</dd></div>
             <div><dt>Règle appliquée</dt><dd>{{ $invoice->billing_rule_snapshot['code'] }} — version {{ $invoice->billing_rule_snapshot['version'] }}</dd></div>
             <div><dt>Émetteur déclaré</dt><dd>{{ $invoice->saas_identity_snapshot['name'] }}</dd></div>
             <div><dt>Période</dt><dd>{{ $invoice->period_starts_at->format('d/m/Y') }} — {{ $invoice->period_ends_at->format('d/m/Y') }}</dd></div>
@@ -34,6 +34,8 @@
             </table>
         </div>
         <flux:heading>Total : {{ $invoice->total_amount }} {{ $invoice->currency }}</flux:heading>
+        <flux:text>La facture indique le montant intégral dû pour cette période. Son émission n’active pas les droits payants.</flux:text>
+        <flux:text>Le reçu sera disponible après l’intégration de la confirmation d’encaissement. Aucun reçu n’est généré par cette page.</flux:text>
         @foreach ($invoice->getAttribute('taxes') as $tax)<flux:text>{{ $tax['code'] }} : {{ $tax['rate'] }} % — {{ $tax['amount'] }} {{ $invoice->currency }}</flux:text>@endforeach
         @can('download', $invoice)
             <flux:button :href="\Illuminate\Support\Facades\URL::temporarySignedRoute($ownerMode ? 'owner.invoices.download' : 'central.invoices.download', now()->addMinutes(10), ['invoice' => $invoice])">Télécharger le PDF privé</flux:button>

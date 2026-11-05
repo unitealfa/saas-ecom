@@ -9,6 +9,7 @@ use App\Models\Central\Billing\BillingSequence;
 use App\Models\Central\Billing\SaasCreditNote;
 use App\Models\Central\Billing\SaasDocumentDelivery;
 use App\Models\Central\Billing\SaasInvoice;
+use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Countries\Country;
 use App\Models\Central\Deployments\TenantSchemaDeployment;
 use App\Models\Central\Domains\Domain;
@@ -119,6 +120,7 @@ class AppServiceProvider extends ServiceProvider
             'saas_document_delivery' => SaasDocumentDelivery::class,
             'saas_credit_note' => SaasCreditNote::class,
             'saas_invoice' => SaasInvoice::class,
+            'saas_payment' => SaasPayment::class,
             'subscription_installment' => SubscriptionInstallment::class,
             'saas_billing_rule' => BillingRule::class,
             'saas_sequence' => BillingSequence::class,

@@ -172,7 +172,7 @@ class SaasInvoiceIssuanceService
             $rule = $invoice->billingRule;
             BillingRule::where('code', $rule->code)->orderBy('version')->lockForUpdate()->firstOrFail();
             $rule = BillingRule::whereKey($rule->id)->lockForUpdate()->firstOrFail();
-            if (! $rule->isApplicableAt(now())) {
+            if (! $rule->isActiveAt(now())) {
                 $this->fail('La règle de facturation n’est plus applicable.');
             }
         }

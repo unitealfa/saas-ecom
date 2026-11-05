@@ -14,26 +14,31 @@ use App\Models\Central\Billing\BillingRule;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Subscriptions\SubscriptionInstallment;
+use App\Services\Central\Billing\BillingRuleService;
+use App\Services\Central\Billing\InvoicePaymentService;
 use App\Services\Central\Billing\SaasInvoiceIssuanceService;
 use App\Services\Central\Billing\SaasInvoiceService;
 use App\Services\Central\Billing\SaasNumberingService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SaasInvoiceController extends Controller
 {
     private const int PER_PAGE = 20;
 
-    public function __construct(private readonly SaasInvoiceService $invoices, private readonly SaasNumberingService $numbering) {}
+    public function __construct(private readonly SaasInvoiceService $invoices, private readonly SaasNumberingService $numbering, private readonly InvoicePaymentService $payments) {}
 
     public function index(SearchSaasInvoicesRequest $request): View
     {
         Gate::forUser($this->centralActor())->authorize('viewAny', SaasInvoice::class);
+        $invoices = $this->invoices->search($this->centralActor(), $request->validated());
 
         return view('central.pages.admin.billing.invoices.index', [
-            'invoices' => $this->invoices->search($this->centralActor(), $request->validated()), 'ownerMode' => false,
+            'invoices' => $invoices, 'ownerMode' => false,
+            'paymentStates' => $this->payments->states($this->centralActor(), $invoices->getCollection()),
         ]);
     }
 
@@ -45,8 +50,9 @@ class SaasInvoiceController extends Controller
 
         return view('central.pages.admin.billing.invoices.create', [
             'subscription' => $subscription->load(['owner', 'plan']),
-            'rules' => BillingRule::whereIn('policy_status', [PolicyStatusEnum::ACTIVE, PolicyStatusEnum::RETIRED])
-                ->orderBy('code')->orderByDesc('version')->get()->filter(fn (BillingRule $rule) => $rule->isApplicableAt(now())),
+            'rules' => BillingRule::where('policy_status', PolicyStatusEnum::ACTIVE)
+                ->orderBy('code')->orderByDesc('version')->get()->filter(fn (BillingRule $rule): bool => $rule->isActiveAt(now())
+                    && Validator::make($rule->only(['code', 'trigger_event', 'parameters']), BillingRuleService::contentRules())->passes()),
         ]);
     }
 
@@ -64,6 +70,7 @@ class SaasInvoiceController extends Controller
         return view('central.pages.admin.billing.invoices.show', [
             'invoice' => $invoice->load(['owner', 'installment', 'billingRule', 'sequence', 'lines', 'media', 'deliveries']),
             'ownerMode' => false, 'history' => Activity::forSubject($invoice)->orderByDesc('id')->paginate(20),
+            'paymentState' => $this->payments->states($this->centralActor(), collect([$invoice]))[$invoice->id],
         ]);
     }
 
@@ -101,8 +108,9 @@ class SaasInvoiceController extends Controller
 
         return view('central.pages.admin.billing.invoices.installments', [
             'subscription' => $subscription,
-            'rules' => BillingRule::whereIn('policy_status', [PolicyStatusEnum::ACTIVE, PolicyStatusEnum::RETIRED])->orderBy('code')->get()
-                ->filter(fn (BillingRule $rule) => $rule->isApplicableAt(now())),
+            'rules' => BillingRule::where('policy_status', PolicyStatusEnum::ACTIVE)->orderBy('code')->get()
+                ->filter(fn (BillingRule $rule): bool => $rule->isActiveAt(now())
+                    && Validator::make($rule->only(['code', 'trigger_event', 'parameters']), BillingRuleService::contentRules())->passes()),
             'installments' => SubscriptionInstallment::where('parent_subscription_id', $subscription->id)->with('invoices')
                 ->orderByDesc('id')->paginate(self::PER_PAGE),
         ]);

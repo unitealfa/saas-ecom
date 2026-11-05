@@ -116,6 +116,11 @@ class BillingRule extends Model
             ? (bool) $this->getAttribute('documents_exists') : $this->documents()->exists();
     }
 
+    public function isActiveAt(CarbonInterface $date): bool
+    {
+        return $this->policy_status === PolicyStatusEnum::ACTIVE && $this->isApplicableAt($date);
+    }
+
     public function isApplicableAt(CarbonInterface $date): bool
     {
         return in_array($this->policy_status, [PolicyStatusEnum::ACTIVE, PolicyStatusEnum::RETIRED], true)

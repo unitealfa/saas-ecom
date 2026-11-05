@@ -19,16 +19,19 @@
         </form>
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm">
-                <thead><tr><th class="p-3">Numéro</th><th class="p-3">Commerçant</th><th class="p-3">Montant</th><th class="p-3">État</th><th class="p-3">Actions</th></tr></thead>
+                <thead><tr><th class="p-3">Numéro</th><th class="p-3">Commerçant</th><th class="p-3">Montant</th><th class="p-3">Période</th><th class="p-3">État du document</th><th class="p-3">Paiement</th><th class="p-3">Actions</th></tr></thead>
                 <tbody>
                     @forelse ($invoices as $invoice)
                         <tr class="border-t border-zinc-200 dark:border-zinc-700">
                             <td class="p-3">{{ $invoice->number ?? 'Non réservé' }}</td><td class="p-3">{{ $invoice->owner?->name }}</td>
-                            <td class="p-3">{{ $invoice->total_amount }} {{ $invoice->currency }}</td><td class="p-3">{{ $invoice->status->label() }}</td>
+                            <td class="p-3">{{ $invoice->total_amount }} {{ $invoice->currency }}</td>
+                            <td class="p-3">{{ $invoice->period_starts_at->format('d/m/Y') }} — {{ $invoice->period_ends_at->format('d/m/Y') }}</td>
+                            <td class="p-3">{{ $invoice->status->label() }}</td>
+                            <td class="p-3">{{ $paymentStates[$invoice->id]->label() }}</td>
                             <td class="p-3"><flux:button size="sm" :href="route($ownerMode ? 'owner.invoices.show' : 'central.invoices.show', $invoice)">Informations</flux:button></td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="p-3">Aucune facture préparée.</td></tr>
+                        <tr><td colspan="7" class="p-3">Aucune facture préparée.</td></tr>
                     @endforelse
                 </tbody>
             </table>

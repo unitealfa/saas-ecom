@@ -66,8 +66,7 @@ class SaasInvoiceService
                 $parent = Subscription::whereKey($subscription->id)->lockForUpdate()->firstOrFail();
                 $due = SubscriptionInstallment::whereKey($installment->id)->lockForUpdate()->firstOrFail();
                 if ($due->parent_subscription_id !== $parent->id || $due->user_id !== $owner->id
-                    || $due->period_ends_at->lessThanOrEqualTo($due->period_starts_at)
-                    || ! in_array($due->installment_status, [InstallmentStatusEnum::PENDING, InstallmentStatusEnum::PARTIALLY_PAID], true)) {
+                    || $due->period_ends_at->lessThanOrEqualTo($due->period_starts_at)) {
                     $this->fail('installment', 'Cette échéance ne peut pas être facturée pour cet abonnement.');
                 }
                 $existing = SaasInvoice::where('installment_id', $due->id)->lockForUpdate()->first();
@@ -78,6 +77,7 @@ class SaasInvoiceService
 
                     return $existing;
                 }
+                $this->assertFullPeriod($parent, $due);
                 $rule = $this->lockRule($ruleUuid);
                 if (! hash_equals($due->managementState(), $expected)) {
                     $this->fail('conflict', 'L’échéance a changé. Rechargez avant de préparer sa facture.');
@@ -154,6 +154,8 @@ class SaasInvoiceService
      */
     public function prepareCurrentPeriodWithoutTax(User $actor, Subscription $subscription, array $data): SaasInvoice
     {
+        abort_if(tenancy()->initialized, 403);
+
         return $this->mutations->run($actor, 'createInstallment', function () use ($subscription): Subscription {
             User::withTrashed()->whereKey($subscription->user_id)->lockForUpdate()->firstOrFail();
 
@@ -176,7 +178,7 @@ class SaasInvoiceService
                 $this->fail('conflict', 'L’abonnement a changé. Rechargez avant de préparer son échéance.');
             }
             if ($subscription->status !== StatusEnum::ACTIVE || $subscription->period_ends_at === null
-                || $subscription->period_starts_at->isFuture() || $subscription->period_ends_at->isPast()
+                || $subscription->period_starts_at->isFuture() || $subscription->period_ends_at->lessThanOrEqualTo(now())
                 || $subscription->agreed_amount === '0.00') {
                 $this->fail('subscription', 'Choisissez la période en cours d’un abonnement payant actif.');
             }
@@ -185,7 +187,20 @@ class SaasInvoiceService
             $owner = $subscription->owner;
             abort_unless($owner instanceof User, 404);
             $due = now()->startOfSecond()->addDays($rule->parameters['payment_due_days']);
-            $installment = SubscriptionInstallment::where('operation_key', 'installment:'.$key)->lockForUpdate()->first();
+            $obligations = SubscriptionInstallment::where('parent_subscription_id', $subscription->id)
+                ->where('period_starts_at', $subscription->period_starts_at)->where('period_ends_at', $subscription->period_ends_at)
+                ->orderBy('id')->lockForUpdate()->get();
+            if ($obligations->count() > 1) {
+                $this->fail('installment', 'Cette période comporte plusieurs échéances historiques. Aucune nouvelle facture ne peut être préparée.');
+            }
+            $installment = $obligations->first();
+            if ($installment !== null) {
+                $this->assertFullPeriod($subscription, $installment);
+                $existing = $installment->invoices()->lockForUpdate()->first();
+                if ($existing !== null) {
+                    $this->fail('conflict', 'Cette échéance possède déjà une facture. Consultez le document existant.');
+                }
+            }
             if ($installment === null) {
                 $installment = new SubscriptionInstallment;
                 $installment->forceFill([
@@ -245,12 +260,24 @@ class SaasInvoiceService
         $candidate = BillingRule::where('uuid', strtolower($uuid))->firstOrFail();
         BillingRule::where('code', $candidate->code)->orderBy('version')->lockForUpdate()->firstOrFail();
         $rule = BillingRule::whereKey($candidate->id)->lockForUpdate()->firstOrFail();
-        if (! $rule->isApplicableAt(now())
+        Validator::make($rule->only(['code', 'trigger_event', 'parameters']), BillingRuleService::contentRules())->validate();
+        if (! $rule->isActiveAt(now())
             || $rule->parameters['document_type'] !== DocumentTypeEnum::INVOICE->value) {
             $this->fail('billing_rule_uuid', 'Choisissez une règle validée actuellement applicable aux factures d’abonnement.');
         }
 
         return $rule;
+    }
+
+    private function assertFullPeriod(Subscription $subscription, SubscriptionInstallment $installment): void
+    {
+        $obligations = SubscriptionInstallment::where('parent_subscription_id', $subscription->id)
+            ->where('period_starts_at', $installment->period_starts_at)->where('period_ends_at', $installment->period_ends_at)
+            ->orderBy('id')->lockForUpdate()->get(['id']);
+        if ($obligations->count() !== 1 || ! $installment->matchesFullPeriod($subscription)
+            || $installment->installment_status !== InstallmentStatusEnum::PENDING) {
+            $this->fail('installment', 'La facture exige une échéance unique non réglée couvrant le montant intégral et la période de l’abonnement.');
+        }
     }
 
     private function fail(string $field, string $message): never

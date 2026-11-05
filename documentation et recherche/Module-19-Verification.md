@@ -1,5 +1,7 @@
 # Module 19 — Factures SaaS : livraison et vérification
 
+Ce rapport décrit la livraison initiale. L'adaptation actuelle au paiement intégral, la lecture des états de paiement et les limites du futur reçu sont documentées dans [Module-19-Paiement-Integral.md](Module-19-Paiement-Integral.md). Les résultats historiques ci-dessous ne remplacent pas les contrôles de cette adaptation.
+
 Date : 5 novembre 2026.
 
 **Code implémenté et vérifié sur données isolées.** L'émission réelle reste volontairement bloquée tant que les identités et la politique fiscales privées ne sont pas renseignées et validées. Aucune facture réelle n'a été émise par cette intervention. Le scénario Pro historique est conservé en préparation limitée.
