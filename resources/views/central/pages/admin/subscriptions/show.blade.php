@@ -25,6 +25,14 @@
             @endforeach
         </dl>
         <div class="flex flex-wrap gap-3">
+            @can('viewAny', \App\Models\Central\Subscriptions\SubscriptionInstallment::class)
+                <flux:button :href="route('central.subscriptions.installments.index', $subscription)">Échéances</flux:button>
+            @endcan
+            @can('createInstallment', $subscription)
+                @can('create', \App\Models\Central\Billing\SaasInvoice::class)
+                    <flux:button :href="route('central.invoices.create', $subscription)">Préparer l’échéance et la facture</flux:button>
+                @endcan
+            @endcan
             @can('history', $subscription)
                 <flux:button :href="route('central.subscriptions.history', $subscription)">Historique des abonnements</flux:button>
             @endcan

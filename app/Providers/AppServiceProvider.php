@@ -4,6 +4,10 @@ namespace App\Providers;
 
 use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
 use App\Models\Central\Audit\Activity;
+use App\Models\Central\Billing\BillingRule;
+use App\Models\Central\Billing\BillingSequence;
+use App\Models\Central\Billing\SaasCreditNote;
+use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Countries\Country;
 use App\Models\Central\Deployments\TenantSchemaDeployment;
 use App\Models\Central\Domains\Domain;
@@ -18,6 +22,7 @@ use App\Models\Central\Shipping\CarrierGeoMapping;
 use App\Models\Central\Shipping\PickupPoint;
 use App\Models\Central\Shipping\ShippingCarrier;
 use App\Models\Central\Subscriptions\Subscription;
+use App\Models\Central\Subscriptions\SubscriptionInstallment;
 use App\Models\Central\Tenants\Tenant;
 use App\Models\Central\Users\User as CentralUser;
 use App\Models\Examples\Test;
@@ -29,6 +34,8 @@ use App\Models\Tenant\Roles\Role as TenantRole;
 use App\Models\Tenant\Shop\Shop;
 use App\Models\Tenant\Users\User as ShopUser;
 use App\Models\User;
+use App\Policies\Central\BillingRulePolicy;
+use App\Policies\Central\BillingSequencePolicy;
 use App\Policies\Central\CarrierGeoMappingPolicy;
 use App\Policies\Central\CountryPolicy;
 use App\Policies\Central\DomainPolicy;
@@ -39,7 +46,10 @@ use App\Policies\Central\PermissionPolicy;
 use App\Policies\Central\PickupPointPolicy;
 use App\Policies\Central\PlanPolicy;
 use App\Policies\Central\RolePolicy;
+use App\Policies\Central\SaasCreditNotePolicy;
+use App\Policies\Central\SaasInvoicePolicy;
 use App\Policies\Central\ShippingCarrierPolicy;
+use App\Policies\Central\SubscriptionInstallmentPolicy;
 use App\Policies\Central\SubscriptionPolicy;
 use App\Policies\Central\TenantPolicy;
 use App\Policies\Central\TenantSchemaDeploymentPolicy;
@@ -62,6 +72,11 @@ class AppServiceProvider extends ServiceProvider
 {
     /** @var array<class-string, class-string> Modèle => policy. */
     private const array POLICIES = [
+        SaasCreditNote::class => SaasCreditNotePolicy::class,
+        SaasInvoice::class => SaasInvoicePolicy::class,
+        SubscriptionInstallment::class => SubscriptionInstallmentPolicy::class,
+        BillingRule::class => BillingRulePolicy::class,
+        BillingSequence::class => BillingSequencePolicy::class,
         User::class => UserPolicy::class,
         CentralUser::class => UserPolicy::class,
         Role::class => RolePolicy::class,
@@ -100,6 +115,11 @@ class AppServiceProvider extends ServiceProvider
     private function registerMorphMap(): void
     {
         Relation::morphMap([
+            'saas_credit_note' => SaasCreditNote::class,
+            'saas_invoice' => SaasInvoice::class,
+            'subscription_installment' => SubscriptionInstallment::class,
+            'saas_billing_rule' => BillingRule::class,
+            'saas_sequence' => BillingSequence::class,
             'central_user' => User::class,
             'shop_user' => ShopUser::class,
 
