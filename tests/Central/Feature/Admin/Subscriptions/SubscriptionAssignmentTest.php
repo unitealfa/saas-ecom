@@ -4,6 +4,7 @@ use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Roles\Role;
 use App\Models\Central\Subscriptions\Subscription;
+use App\Models\Central\Subscriptions\SubscriptionInstallment;
 use App\Models\User;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Illuminate\Support\Str;
@@ -36,9 +37,10 @@ test('assignment preserves the free subscription and is idempotent', function ()
     $input = ['owner_uuid' => $owner->uuid, 'plan_uuid' => $plan->uuid, 'period' => 1, 'operation_key' => (string) Str::uuid(), 'expected_amount' => '500.00'];
     $this->actingAs($actor, 'central')->post(route('central.subscriptions.store'), $input)->assertRedirect();
     $this->post(route('central.subscriptions.store'), $input)->assertRedirect();
-    expect($previous->fresh()->status)->not->toBe(StatusEnum::ACTIVE)
+    expect($previous->fresh()->status)->toBe(StatusEnum::ACTIVE)
         ->and(Subscription::where('user_id', $owner->id)->where('status', StatusEnum::ACTIVE)->count())->toBe(1)
-        ->and(Subscription::where('user_id', $owner->id)->where('plan_id', $plan->id)->count())->toBe(1);
+        ->and(Subscription::where('user_id', $owner->id)->where('plan_id', $plan->id)->sole()->status)->toBe(StatusEnum::SCHEDULED)
+        ->and(SubscriptionInstallment::where('parent_subscription_id', Subscription::where('plan_id', $plan->id)->sole()->id)->count())->toBe(1);
 });
 
 test('assignment does not replace a paid subscription in progress', function (): void {

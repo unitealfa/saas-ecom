@@ -1,5 +1,7 @@
 # Diagramme complet de la BDD centrale
 
+**Décision courante Module 21, 6 novembre 2026 :** `saas_transfers` conserve les paiements manuels, sans table supplémentaire. Méthode 5 = espèces réellement reçues sur place ; montant intégral seulement. Nouvelle attribution payante, administrative comprise, en attente de confirmation. Un dépôt de preuve n'accorde aucun droit ; paiement, échéance et activation sont atomiques. Le reçu privé ne modifie pas la facture. Les mécanismes historiques restent lisibles sans activer de remboursement commercial. Voir [l'implémentation et ses contrôles](Module-21-Paiements-Manuels.md) ; migration réelle non exécutée pour cette mission.
+
 **Coordonnées centrales — décision du 19 octobre 2026 :** un e-mail et au maximum un téléphone par compte, directement dans users, avec unicité centrale et normalisation E.164. user_contacts et ses deux triggers sont retirés par migration corrective. Fortify utilise uniquement l’e-mail actuel ; changement soumis à vérification. Le téléphone reste obligatoire à l’inscription publique ; comptes historiques sans numéro conservés. Voir architecture §32–34.
 
 **Photos de profil, 13 octobre 2026 :** chaque compte possède une photo facultative et affiche public/default-avatar.svg en son absence. La photo personnelle est liée à users par media.model_type=central_user, media.model_id=users.id et collection_name=profile_photo ; au maximum un principal actif grâce à l’index existant. Ajout/remplacement/retrait dans le profil central, fichiers privés, URL signée et Policy Laravel, audit Activitylog. Aucun champ ajouté à users ni nouvelle table ; le fichier est séparé de la BDD.
@@ -1232,7 +1234,7 @@ Les paiements reçus et remboursements effectués à distance par banque, CCP ou
 | `document_type` | Vaut automatiquement 1, pour garantir que le virement est relié à une facture. |
 | `original_payment_record_type` | Vaut automatiquement 1 quand original_payment_id est rempli, pour imposer un vrai paiement source ; reste vide sans paiement d'origine. |
 | `credit_note_document_type` | Vaut automatiquement 2 quand credit_note_id est rempli, pour imposer un vrai avoir ; reste vide sans avoir lié. |
-| `transfer_method` | Le moyen utilisé pour effectuer le paiement ou le remboursement à distance. Choix : 1 = virement bancaire ; 2 = virement CCP ; 3 = BaridiMob ; 4 = autre transfert manuel. |
+| `transfer_method` | Moyen enregistré : 1 = virement bancaire ; 2 = virement CCP ; 3 = BaridiMob ; 4 = autre transfert manuel historique ; 5 = espèces sur place, avec constat et référence internes, sans preuve bancaire inventée. |
 | `transfer_status` | L’état du virement. Une correction par écriture inverse conserve l’original et son historique. Choix : 1 = déclaré ; 2 = approuvé ; 3 = vérifié ; 4 = refusé ; 5 = annulé ; 6 = résultat incertain ; 7 = corrigé par une écriture inverse. |
 | `refund_reason` | Le genre de raison qui justifie le remboursement. Choix : 1 = avoir ; 2 = trop-payé ; 3 = transfert reçu en double ; 4 = exception approuvée. |
 | `amount` | Le montant du paiement ou du remboursement. Il est positif pour un virement ordinaire ; un montant négatif sert uniquement à corriger une écriture. |

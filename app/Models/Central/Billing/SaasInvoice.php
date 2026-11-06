@@ -119,6 +119,12 @@ class SaasInvoice extends Model
         return $this->hasMany(SaasDocumentDelivery::class, 'document_id');
     }
 
+    /** @return HasMany<SaasPayment, $this> */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(SaasPayment::class, 'document_id');
+    }
+
     public function managementState(): string
     {
         return hash('sha256', json_encode($this->getAttributes(), JSON_THROW_ON_ERROR));

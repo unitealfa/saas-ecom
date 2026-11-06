@@ -2,16 +2,20 @@
 
 namespace App\Services\Central\Subscriptions;
 
+use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Enums\Central\Subscriptions\PeriodEnum;
 use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Models\Central\Features\Feature;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Plans\PlanFeature;
 use App\Models\Central\Subscriptions\Subscription;
+use App\Models\Central\Subscriptions\SubscriptionInstallment;
 use App\Models\Central\Tenants\Tenant;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
+use Brick\Math\BigDecimal;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -19,11 +23,13 @@ class SubscriptionTransitionService
 {
     public function __construct(private readonly AuthorizationMutation $mutations, private readonly DefaultSubscription $defaults) {}
 
+    /** @return array<string, mixed> */
     public static function closeRules(): array
     {
         return ['expected_state' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/D']];
     }
 
+    /** @return array<string, mixed> */
     public static function changeRules(): array
     {
         return [
@@ -35,6 +41,7 @@ class SubscriptionTransitionService
         ];
     }
 
+    /** @param array<string, mixed> $data */
     public function close(User $actor, Subscription $subscription, array $data): void
     {
         $this->mutations->run($actor, 'close', fn () => $this->lock($subscription),
@@ -76,6 +83,7 @@ class SubscriptionTransitionService
             });
     }
 
+    /** @param array<string, mixed> $data */
     public function change(User $actor, Subscription $subscription, array $data): Subscription
     {
         return $this->mutations->run($actor, 'change', fn () => $this->lock($subscription),
@@ -87,7 +95,7 @@ class SubscriptionTransitionService
                     $replay->load('plan');
                     if ($replay->user_id !== $current->user_id || $replay->plan?->uuid !== strtolower($values['plan_uuid'])
                         || $replay->period->value !== (int) $values['period']
-                        || $replay->agreed_amount !== number_format((float) $values['expected_amount'], 2, '.', '')) {
+                        || $replay->agreed_amount !== (string) BigDecimal::of((string) $values['expected_amount'])->toScale(2)) {
                         throw ValidationException::withMessages(['operation_key' => 'Cette demande a déjà été utilisée avec d’autres données.']);
                     }
 
@@ -108,7 +116,8 @@ class SubscriptionTransitionService
                 }
                 $period = PeriodEnum::from((int) $values['period']);
                 $amount = $period === PeriodEnum::MONTHLY ? $plan->monthly_price : $plan->annual_price;
-                if ((float) $amount > 999999.99 || number_format((float) $values['expected_amount'], 2, '.', '') !== $amount) {
+                if (BigDecimal::of($amount)->isGreaterThan('999999.99')
+                    || (string) BigDecimal::of((string) $values['expected_amount'])->toScale(2) !== $amount) {
                     throw ValidationException::withMessages(['plan_uuid' => 'Le tarif a changé ou dépasse la capacité des abonnements. Rechargez le formulaire.']);
                 }
                 $start = $current->period_ends_at;
@@ -119,6 +128,12 @@ class SubscriptionTransitionService
                     'period_ends_at' => $period === PeriodEnum::MONTHLY ? $start->addMonthNoOverflow() : $start->addYearNoOverflow(),
                     'auto_renew' => false,
                 ]);
+                (new SubscriptionInstallment)->forceFill([
+                    'user_id' => $current->user_id, 'parent_subscription_id' => $next->id,
+                    'operation_key' => 'installment:'.$next->uuid.':full-period', 'installment_number' => 'ECH-'.Str::uuid(),
+                    'installment_amount' => $amount, 'installment_status' => InstallmentStatusEnum::PENDING,
+                    'period_starts_at' => $next->period_starts_at, 'period_ends_at' => $next->period_ends_at, 'due_at' => $next->period_starts_at,
+                ])->save();
                 $current->forceFill(['auto_renew' => false, 'ended_at' => $start])->save();
                 activity()->causedBy($actor)->performedOn($current)->event('subscription_change_scheduled')
                     ->withProperties(['next_uuid' => $next->uuid, 'plan_uuid' => $plan->uuid, 'effective_at' => $start->toISOString(), 'agreed_amount' => $amount])

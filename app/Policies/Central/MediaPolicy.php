@@ -4,9 +4,11 @@ namespace App\Policies\Central;
 
 use App\Enums\MediaVisibilityEnum;
 use App\Models\Central\Billing\SaasInvoice;
+use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Media\Media;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
+use App\Services\Central\Billing\PaymentDocumentService;
 use App\Services\Central\Billing\SaasInvoicePdfService;
 use Illuminate\Support\Facades\Gate;
 
@@ -31,6 +33,15 @@ class MediaPolicy
 
     public function download(User $actor, Media $media): bool
     {
+        if (in_array($media->collection_name, [PaymentDocumentService::PROOF,
+            PaymentDocumentService::SOURCE, PaymentDocumentService::RECEIPT], true)) {
+            $payment = $media->model_type === 'saas_payment' ? SaasPayment::find($media->model_id) : null;
+
+            return ! tenancy()->initialized && ! $media->trashed() && $media->visibility === MediaVisibilityEnum::PRIVATE
+                && $payment !== null && Gate::forUser($actor)->allows($media->collection_name === PaymentDocumentService::RECEIPT ? 'receipt' : 'view', $payment)
+                && ($media->collection_name === PaymentDocumentService::RECEIPT
+                    || in_array($media->id, [$payment->getAttribute('proof_media_id'), $payment->getAttribute('source_proof_media_id')], true));
+        }
         if ($media->collection_name === SaasInvoicePdfService::COLLECTION) {
             $invoice = $media->model_type === 'saas_invoice' ? SaasInvoice::find($media->model_id) : null;
 

@@ -110,6 +110,15 @@
                             Factures SaaS
                         </flux:sidebar.item>
                     @endcan
+                    @can('viewAny', \App\Models\Central\Billing\SaasPayment::class)
+                        <flux:sidebar.item :href="route('central.payments.index')" :current="request()->routeIs('central.payments.*')" wire:navigate>Paiements SaaS</flux:sidebar.item>
+                    @endcan
+                    @can('viewOwn', \App\Models\Central\Billing\SaasPayment::class)
+                        <flux:sidebar.item :href="route('owner.payments.index')" :current="request()->routeIs('owner.payments.*')" wire:navigate>Mes paiements</flux:sidebar.item>
+                    @endcan
+                    @can('purchase', \App\Models\Central\Subscriptions\Subscription::class)
+                        <flux:sidebar.item :href="route('owner.subscriptions.index')" :current="request()->routeIs('owner.subscriptions.*')" wire:navigate>Mon abonnement et les offres</flux:sidebar.item>
+                    @endcan
                       @can('viewOwn', \App\Models\Central\Billing\SaasInvoice::class)
                           <flux:sidebar.item :href="route('owner.invoices.index')" :current="request()->routeIs('owner.invoices.*')" wire:navigate>Mes factures</flux:sidebar.item>
                       @endcan

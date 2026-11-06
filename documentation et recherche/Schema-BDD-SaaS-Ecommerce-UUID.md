@@ -1,5 +1,7 @@
 # Schéma BDD — SaaS e-commerce algérien
 
+**Décision courante Module 21, 6 novembre 2026 :** nouvelle attribution payante administrative ou propriétaire = période prévue, échéance intégrale, droits après confirmation des fonds seulement. Le journal central existant accepte aussi la méthode 5 espèces sur place ; preuve externe et paiement vérifié restent distincts. Les exemples historiques de fractionnement/remboursement ne décrivent pas le parcours courant. Reçu privé distinct de la facture, anomalies conservées, abonnements historiques préservés. Implémentation et limites : [Module-21-Paiements-Manuels.md](Module-21-Paiements-Manuels.md). Migration réelle non exécutée pour cette mission.
+
 Version V4.10 — 6 octobre 2026. ID numériques auto-incrémentés, UUID publics/inter-BDD et nommage stable des bases boutiques synchronisés avec le code ; fonctionnalités et tables de V4.9 conservées.
 
 Ce document contient **27 tables centrales cibles et 59 tables par boutique**. Les tables techniques Laravel et les passkeys facultatives restent hors décompte. Les cinq tables Spatie Permission et activity_log sont incluses ; les trois pivots gardent leurs clés composites. V4.9 retire feature_overrides au central et permission_overrides dans les deux contextes, puis porte les durées dans leurs attributions existantes. Les règles de rôles sont communes, mais les comptes, rôles, permissions, dates et activités restent indépendants dans chaque BDD.
@@ -182,7 +184,7 @@ Le même principe s'applique aux autres champs : `products.status => Publication
 | `SubscriptionRecordTypeEnum` | 1 SUBSCRIPTION ; 2 INSTALLMENT |
 | `SaasBillingSettingRecordTypeEnum` | 1 SEQUENCE ; 2 RULE |
 | `SaasTransferRecordTypeEnum` | 1 PAYMENT ; 2 REFUND |
-| `SaasTransferMethodEnum` | 1 BANK_TRANSFER ; 2 CCP_TRANSFER ; 3 BARIDIMOB ; 4 OTHER_MANUAL |
+| `SaasTransferMethodEnum` | 1 BANK_TRANSFER ; 2 CCP_TRANSFER ; 3 BARIDIMOB ; 4 OTHER_MANUAL ; 5 CASH_IN_PERSON — implémenté par TransferMethodEnum |
 | `SaasTransferStatusEnum` | 1 DECLARED ; 2 APPROVED ; 3 VERIFIED ; 4 REJECTED ; 5 CANCELLED ; 6 UNCERTAIN ; 7 REVERSED |
 | `SaasRefundReasonEnum` | 1 CREDIT_NOTE ; 2 OVERPAYMENT ; 3 DUPLICATE_TRANSFER ; 4 APPROVED_EXCEPTION |
 | `RemittanceBatchStatusEnum` | 1 DECLARED ; 2 VERIFIED ; 3 REVERSED |

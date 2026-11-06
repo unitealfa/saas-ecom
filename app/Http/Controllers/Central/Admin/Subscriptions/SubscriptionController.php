@@ -71,7 +71,7 @@ class SubscriptionController extends Controller
             ? to_route('central.subscriptions.show', $subscription)
             : to_route('dashboard');
 
-        return $redirect->with('status', 'Abonnement attribué.');
+        return $redirect->with('status', 'Abonnement réservé en attente du paiement intégral. Les droits actuels sont conservés.');
     }
 
     public function close(CloseSubscriptionRequest $request, Subscription $subscription): RedirectResponse
@@ -103,7 +103,7 @@ class SubscriptionController extends Controller
     {
         $this->transitions->change($this->centralActor(), $subscription, $request->validated());
 
-        return $this->redirectAfterTransition($subscription, 'Changement d’offre programmé.');
+        return $this->redirectAfterTransition($subscription, 'Changement d’offre réservé à échéance, sous réserve du paiement intégral de la nouvelle période.');
     }
 
     private function redirectAfterTransition(Subscription $subscription, string $message): RedirectResponse

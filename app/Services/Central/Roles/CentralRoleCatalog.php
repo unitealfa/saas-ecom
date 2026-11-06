@@ -11,6 +11,13 @@ use Spatie\Permission\Models\Permission as PackagePermission;
 
 class CentralRoleCatalog
 {
+    public const array PAYMENT_PERMISSIONS = [
+        'saas.payments.view' => 'Consulter les paiements déclarés',
+        'saas.payments.validate' => 'Valider un paiement après vérification',
+        'saas.payments.reject' => 'Rejeter une déclaration de paiement',
+        'saas.payments.reconcile' => 'Rapprocher un paiement avec les fonds et documents correspondants',
+    ];
+
     public const array INVOICE_PREPARATION_PERMISSIONS = [
         'saas.subscriptions.installments.view' => 'Consulter les échéances de paiement',
         'saas.subscriptions.installments.create' => 'Créer une échéance autorisée',
@@ -114,6 +121,7 @@ class CentralRoleCatalog
     ];
 
     public const array PERMISSIONS = [
+        ...self::PAYMENT_PERMISSIONS,
         ...self::SUBSCRIPTION_PERMISSIONS,
         ...self::CARRIER_MAPPING_PERMISSIONS,
         ...self::PICKUP_POINT_PERMISSIONS,

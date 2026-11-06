@@ -19,6 +19,8 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
 /**
  * @property StatusEnum $status
+ * @property PeriodEnum $period
+ * @property string $agreed_amount
  * @property string $agreed_amount
  * @property CarbonImmutable $period_starts_at
  * @property CarbonImmutable|null $period_ends_at

@@ -17,6 +17,7 @@ use App\Services\Central\Subscriptions\DefaultSubscription;
 use App\Services\Central\Tenants\TenantProfileProjection;
 use App\Services\Central\Tenants\TenantStatusService;
 use Database\Seeders\Central\AuthorizationSeeder;
+use Database\Seeders\Central\FreePlanSeeder;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -32,6 +33,7 @@ function subscriptionTransitionActor(string $permission): User
 }
 
 test('an authorized administrator can immediately cancel a paid subscription and restore the free plan', function (): void {
+    $this->seed(FreePlanSeeder::class);
     $actor = subscriptionTransitionActor('saas.subscriptions.deactivate');
     $subscription = Subscription::factory()->create(['period_ends_at' => now()->addMonth(), 'auto_renew' => true]);
     $this->actingAs($actor, 'central')->post(route('central.subscriptions.deactivate', $subscription), [
@@ -62,6 +64,7 @@ test('immediate cancellation rejects stale forms, unauthorized users and schedul
 });
 
 test('immediate cancellation applies the free quota and preserves suspended shops', function (): void {
+    $this->seed(FreePlanSeeder::class);
     Event::fake([TenantCreated::class]);
     $actor = subscriptionTransitionActor('saas.subscriptions.deactivate');
     $reviewer = User::factory()->create();
@@ -148,6 +151,7 @@ test('the scheduled offer becomes current when the previous period ends', functi
 });
 
 test('the free offer is restored when a closed paid period ends', function (): void {
+    $this->seed(FreePlanSeeder::class);
     $owner = User::factory()->create();
     $ending = Subscription::factory()->create(['user_id' => $owner->id, 'period_ends_at' => now()->addDay(), 'ended_at' => now()->addDay(), 'auto_renew' => false]);
     $this->travel(2)->days();
@@ -222,6 +226,7 @@ test('resolving an effective subscription directly also reconciles its shop quot
 });
 
 test('a trial expires at the first applicable deadline', function (?int $periodDays, int $trialDays): void {
+    $this->seed(FreePlanSeeder::class);
     $this->freezeTime();
     $owner = User::factory()->create();
     $trialEnd = now()->addDays($trialDays)->startOfSecond();
@@ -244,6 +249,7 @@ test('a trial expires at the first applicable deadline', function (?int $periodD
 ]);
 
 test('an unavailable shop does not break the merchant journey when a subscription expires', function (): void {
+    $this->seed(FreePlanSeeder::class);
     Event::fake([TenantCreated::class]);
     $owner = User::factory()->create([
         'legal_profile_version' => 1, 'legal_verification_status' => VerificationStatusEnum::VERIFIED,
@@ -261,6 +267,7 @@ test('an unavailable shop does not break the merchant journey when a subscriptio
 });
 
 test('a quota reconciliation failure rolls back the subscription transition and its audit', function (): void {
+    $this->seed(FreePlanSeeder::class);
     $owner = User::factory()->create();
     $subscription = Subscription::factory()->create(['user_id' => $owner->id, 'period_ends_at' => now()->addDay()]);
     $before = Activity::count();

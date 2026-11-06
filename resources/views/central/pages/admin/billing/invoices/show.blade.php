@@ -35,7 +35,17 @@
         </div>
         <flux:heading>Total : {{ $invoice->total_amount }} {{ $invoice->currency }}</flux:heading>
         <flux:text>La facture indique le montant intégral dû pour cette période. Son émission n’active pas les droits payants.</flux:text>
-        <flux:text>Le reçu sera disponible après l’intégration de la confirmation d’encaissement. Aucun reçu n’est généré par cette page.</flux:text>
+        <flux:text>Le reçu est disponible dans le paiement après confirmation intégrale des fonds. Le PDF de cette facture reste inchangé.</flux:text>
+        @if ($paymentState !== \App\Enums\Central\Billing\PaymentStateEnum::PAID)
+            @can('declarePayment', $invoice)<flux:button :href="route('owner.payments.create', $invoice)">Déposer un justificatif de versement</flux:button>@endcan
+            @unless ($ownerMode)
+                @can('recordCashPayment', $invoice)<flux:button :href="route('central.payments.cash.create', $invoice)">Enregistrer des espèces reçues</flux:button>@endcan
+            @endunless
+        @endif
+        @can('viewOwn', \App\Models\Central\Billing\SaasPayment::class)<flux:button :href="route('owner.payments.index')">Mes paiements et reçus</flux:button>@endcan
+        @unless ($ownerMode)
+            @can('viewAny', \App\Models\Central\Billing\SaasPayment::class)<flux:button :href="route('central.payments.index')">Paiements et reçus</flux:button>@endcan
+        @endunless
         @foreach ($invoice->getAttribute('taxes') as $tax)<flux:text>{{ $tax['code'] }} : {{ $tax['rate'] }} % — {{ $tax['amount'] }} {{ $invoice->currency }}</flux:text>@endforeach
         @can('download', $invoice)
             <flux:button :href="\Illuminate\Support\Facades\URL::temporarySignedRoute($ownerMode ? 'owner.invoices.download' : 'central.invoices.download', now()->addMinutes(10), ['invoice' => $invoice])">Télécharger le PDF privé</flux:button>
