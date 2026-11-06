@@ -3,6 +3,7 @@
 namespace App\Models\Central\Plans;
 
 use App\Concerns\HasPublicUuid;
+use App\Services\Central\Plans\PublicPlanCatalog;
 use Database\Factories\Central\PlanFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
@@ -24,6 +25,16 @@ class Plan extends Model
 {
     /** @use HasFactory<PlanFactory> */
     use CentralConnection, HasFactory, HasPublicUuid, SoftDeletes;
+
+    protected static function booted(): void
+    {
+        $invalidate = static function (self $plan): void {
+            $plan->getConnection()->afterCommit(fn () => app(PublicPlanCatalog::class)->invalidate());
+        };
+        static::saved($invalidate);
+        static::deleted($invalidate);
+        static::restored($invalidate);
+    }
 
     protected function casts(): array
     {

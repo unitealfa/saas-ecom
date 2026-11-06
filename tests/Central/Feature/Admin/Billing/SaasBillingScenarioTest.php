@@ -5,6 +5,7 @@ use App\Enums\Central\Billing\PolicyStatusEnum;
 use App\Enums\Central\Billing\TriggerEventEnum;
 use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Enums\Central\Subscriptions\PeriodEnum;
+use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Models\Central\Audit\Activity;
 use App\Models\Central\Billing\BillingRule;
 use App\Models\Central\Billing\BillingSequence;
@@ -12,6 +13,7 @@ use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Billing\SaasInvoiceLine;
 use App\Models\Central\Features\Feature;
 use App\Models\Central\Roles\Role;
+use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Subscriptions\SubscriptionInstallment;
 use App\Models\User;
 use App\Services\Central\Billing\BillingRuleService;
@@ -20,7 +22,6 @@ use App\Services\Central\Billing\SaasNumberingService;
 use App\Services\Central\Plans\PlanActivationService;
 use App\Services\Central\Plans\PlanCompositionService;
 use App\Services\Central\Plans\PlanCreationService;
-use App\Services\Central\Subscriptions\SubscriptionAssignmentService;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Database\Seeders\Central\FreePlanSeeder;
 use Illuminate\Support\Facades\DB;
@@ -145,9 +146,11 @@ function invoiceScenario(): array
     ]);
     $plan->refresh();
     app(PlanActivationService::class)->setActive($actor, $plan, ['is_active' => true, 'expected_state' => $plan->compositionState($plan->features()->get())]);
-    $subscription = app(SubscriptionAssignmentService::class)->assign($actor, [
-        'owner_uuid' => $owner->uuid, 'plan_uuid' => $plan->uuid, 'period' => PeriodEnum::MONTHLY->value,
-        'operation_key' => (string) Str::uuid(), 'expected_amount' => '3000.00',
+    // Abonnement historique déjà actif : les nouvelles attributions attendent désormais leur paiement.
+    $subscription = Subscription::factory()->create([
+        'user_id' => $owner->id, 'plan_id' => $plan->id, 'assigned_by_id' => $actor->id,
+        'period' => PeriodEnum::MONTHLY, 'status' => StatusEnum::ACTIVE, 'agreed_amount' => '3000.00',
+        'period_starts_at' => now()->startOfSecond(), 'period_ends_at' => now()->startOfSecond()->addMonthNoOverflow(),
     ]);
     $rule = app(BillingRuleService::class)->create($actor, [
         'code' => 'pro.monthly', 'trigger_event' => TriggerEventEnum::INSTALLMENT_DUE->value,

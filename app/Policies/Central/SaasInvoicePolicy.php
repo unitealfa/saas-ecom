@@ -16,6 +16,17 @@ class SaasInvoicePolicy
         return $this->has($actor, 'view');
     }
 
+    public function declarePayment(User $actor, SaasInvoice $invoice): bool
+    {
+        return $this->owns($actor, $invoice) && $actor->hasVerifiedEmail() && $invoice->status === DocumentStatusEnum::ISSUED;
+    }
+
+    public function recordCashPayment(User $actor, SaasInvoice $invoice): bool
+    {
+        return ! tenancy()->initialized && $actor->id !== $invoice->user_id && $invoice->status === DocumentStatusEnum::ISSUED
+            && $this->access->allows($actor, 'saas.payments.validate');
+    }
+
     public function view(User $actor, SaasInvoice $invoice): bool
     {
         return $this->viewAny($actor);

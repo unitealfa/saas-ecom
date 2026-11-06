@@ -2,6 +2,8 @@
 
 namespace App\Policies\Central;
 
+use App\Enums\Central\Users\StatusEnum;
+use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
@@ -9,6 +11,23 @@ use App\Services\Central\Authorization\CentralUserAccess;
 class SubscriptionPolicy
 {
     public function __construct(private readonly CentralUserAccess $access) {}
+
+    public function purchase(User $actor): bool
+    {
+        return ! tenancy()->initialized && ! $this->access->isStaff($actor)
+            && $actor->status === StatusEnum::ACTIVE && $actor->hasVerifiedEmail()
+            && $actor->legal_verification_status === VerificationStatusEnum::VERIFIED
+            && $actor->legal_verified_at !== null;
+    }
+
+    public function purchaseFor(User $actor, User $owner): bool
+    {
+        if ($owner->status !== StatusEnum::ACTIVE || $this->access->isStaff($owner) || tenancy()->initialized) {
+            return false;
+        }
+
+        return $actor->id === $owner->id ? $this->purchase($actor) : $this->assign($actor);
+    }
 
     public function viewAny(User $actor): bool
     {

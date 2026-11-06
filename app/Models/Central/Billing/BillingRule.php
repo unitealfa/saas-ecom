@@ -129,5 +129,4 @@ class BillingRule extends Model
             && $this->effective_at->lessThanOrEqualTo($date)
             && ($this->ends_at === null || $this->ends_at->greaterThan($date));
     }
-
 }

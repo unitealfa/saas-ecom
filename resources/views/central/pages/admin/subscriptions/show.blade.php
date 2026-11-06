@@ -24,15 +24,20 @@
                 <div><dt class="font-medium">{{ $label }}</dt><dd><flux:text>{{ $value ?? 'Non renseigné' }}</flux:text></dd></div>
             @endforeach
         </dl>
+        @if ($subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::SCHEDULED)
+            <flux:callout>Cette période est réservée. Préparez puis émettez sa facture depuis Échéances ; ses droits attendent la confirmation du paiement intégral et sa date de début.</flux:callout>
+        @endif
         <div class="flex flex-wrap gap-3">
             @can('viewAny', \App\Models\Central\Subscriptions\SubscriptionInstallment::class)
                 <flux:button :href="route('central.subscriptions.installments.index', $subscription)">Échéances</flux:button>
             @endcan
+            @if ($subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::ACTIVE)
             @can('createInstallment', $subscription)
                 @can('create', \App\Models\Central\Billing\SaasInvoice::class)
                     <flux:button :href="route('central.invoices.create', $subscription)">Préparer l’échéance et la facture</flux:button>
                 @endcan
             @endcan
+            @endif
             @can('history', $subscription)
                 <flux:button :href="route('central.subscriptions.history', $subscription)">Historique des abonnements</flux:button>
             @endcan

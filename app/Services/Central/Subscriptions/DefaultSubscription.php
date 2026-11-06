@@ -2,11 +2,17 @@
 
 namespace App\Services\Central\Subscriptions;
 
+use App\Enums\Central\Billing\DocumentStatusEnum;
+use App\Enums\Central\Billing\TransferStatusEnum;
+use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Enums\Central\Subscriptions\PeriodEnum;
 use App\Enums\Central\Subscriptions\StatusEnum;
+use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Subscriptions\Subscription;
+use App\Models\Central\Subscriptions\SubscriptionInstallment;
 use App\Models\Central\Users\User;
 use App\Services\Central\Plans\FreePlanCatalog;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use LogicException;
@@ -18,6 +24,7 @@ class DefaultSubscription
     private const string KEY_PREFIX = 'default-free:';
 
     private const string INITIAL = 'initial';
+
     private const int ATTEMPTS = 3;
 
     public function __construct(
@@ -51,13 +58,19 @@ class DefaultSubscription
                 $end = $current->effectiveEndsAt();
 
                 if ($end === null || $end->isFuture()) {
-                    return $current;
+                    $paidNext = $current->plan->code === 'free' && $this->paidDocuments()->where('user_id', $owner->id)
+                        ->whereHas('subscription', fn (Builder $query) => $query->where('status', StatusEnum::SCHEDULED)
+                            ->where('period_starts_at', '<=', now())->where('period_ends_at', '>', now()))->exists();
+                    if (! $paidNext) {
+                        return $current;
+                    }
+                    $current->forceFill(['status' => StatusEnum::CANCELLED, 'ended_at' => now()])->save();
+                } else {
+                    $current->update([
+                        'status' => StatusEnum::EXPIRED,
+                        'ended_at' => $end,
+                    ]);
                 }
-
-                $current->update([
-                    'status' => StatusEnum::EXPIRED,
-                    'ended_at' => $end,
-                ]);
             }
 
             $scheduled = Subscription::where('user_id', $owner->id)
@@ -72,6 +85,12 @@ class DefaultSubscription
                 if ($next->period_ends_at !== null && $next->period_ends_at->lessThanOrEqualTo(now())) {
                     $next->update(['status' => StatusEnum::EXPIRED, 'ended_at' => $next->period_ends_at]);
 
+                    continue;
+                }
+                $obligation = SubscriptionInstallment::where('parent_subscription_id', $next->id)
+                    ->where('period_starts_at', $next->period_starts_at)->where('period_ends_at', $next->period_ends_at)->exists();
+                if ($obligation && ! $this->paidDocuments()->where('subscription_id', $next->id)
+                    ->where('period_starts_at', $next->period_starts_at)->where('period_ends_at', $next->period_ends_at)->exists()) {
                     continue;
                 }
 
@@ -104,6 +123,17 @@ class DefaultSubscription
         Event::dispatch(self::EFFECTIVE_CHANGED, [$owner, $subscription, $actor]);
 
         return $subscription;
+    }
+
+    /** @return Builder<SaasInvoice> */
+    private function paidDocuments(): Builder
+    {
+        return SaasInvoice::where('status', DocumentStatusEnum::ISSUED)
+            ->whereHas('payments', fn (Builder $query) => $query->where('transfer_status', TransferStatusEnum::VERIFIED), '=', 1)
+            ->whereHas('installment', fn (Builder $query) => $query->where('installment_status', InstallmentStatusEnum::PAID))
+            ->whereHas('payments', fn (Builder $query) => $query->where('transfer_status', TransferStatusEnum::VERIFIED)
+                ->whereNull('reversal_of_id')->whereColumn('saas_transfers.amount', 'saas_invoices.total_amount')
+                ->whereColumn('saas_transfers.currency', 'saas_invoices.currency'));
     }
 
     private function currentOf(User $owner): ?Subscription

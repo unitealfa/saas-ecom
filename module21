@@ -1,0 +1,781 @@
+# AYDRA — MODULE 21 — DÉVELOPPEMENT COMPLET DU SYSTÈME DE PAIEMENT MANUEL INTÉGRAL
+
+## 0. MISSION PRINCIPALE
+
+Le Module 21 — Vérification des paiements SaaS — N'EST PAS ENCORE DÉVELOPPÉ.
+
+Tu dois le concevoir, développer, intégrer, tester et valider entièrement dans le projet Aydra.
+
+Je veux un système simple :
+
+Un commerçant choisit un abonnement payant.
+
+Il reçoit sa facture.
+
+Il paie le montant intégral :
+
+- Soit en espèces directement auprès de l'administration.
+- Soit par versement effectué hors Aydra, avec dépôt d'une photo ou d'un PDF du justificatif.
+
+Un administrateur confirme réellement l'encaissement complet.
+
+Le système marque la période comme payée.
+
+Les droits de l'abonnement sont activés selon les règles existantes.
+
+Le commerçant retrouve sa facture et une confirmation ou un reçu de paiement.
+
+C'est tout le parcours commercial normal.
+
+AUCUN paiement par carte intégré à Aydra.
+
+AUCUNE passerelle bancaire.
+
+AUCUNE API de paiement.
+
+AUCUN paiement fractionné.
+
+AUCUN échéancier pour régler une même période.
+
+AUCUN remboursement commercial.
+
+AUCUNE activation sur la seule base d'un justificatif téléchargé.
+
+Je veux une réalisation réellement fonctionnelle, avec backend, frontend, permissions, sécurité, tests complets et correction des erreurs.
+
+Le code doit être extrêmement simple à comprendre dès la première lecture.
+
+## 1. ANALYSE OBLIGATOIRE
+
+Avant de coder :
+
+1. Lis `AGENTS.md` et les instructions applicables.
+2. Lis `Schema-BDD-SaaS-Ecommerce-UUID(10).md`.
+3. Lis `Diagramme-BDD-Centrale-Complet(3).md`.
+4. Examine les nouvelles décisions métier de cette mission, qui remplacent les anciennes règles de paiements partiels et remboursements commerciaux.
+5. Analyse les Modules 18 et 19 déjà développés.
+6. Analyse le fonctionnement réel des offres.
+7. Analyse les abonnements et échéances.
+8. Analyse les droits et quotas d'abonnement.
+9. Examine `saas_transfers`.
+10. Examine `saas_invoices`.
+11. Examine `subscriptions`.
+12. Examine `media`.
+13. Examine les enums existants.
+14. Examine les Services et Policies.
+15. Examine les permissions exactes du Module 21.
+16. Examine les routes et Controllers.
+17. Examine les FormRequests.
+18. Examine les composants frontend.
+19. Examine les tests.
+20. Vérifie l'état Git.
+
+Le schéma historique prévoyait des paiements partiels, des remboursements et des méthodes bancaires.
+
+La nouvelle politique de cette mission est prioritaire pour le nouveau parcours commercial.
+
+Identifie précisément les incompatibilités de schéma, enums et validations.
+
+Ne conserve pas une ancienne règle contraire au métier simplement pour éviter une modification.
+
+Ne supprime aucune donnée ni migration historique.
+
+Utilise des migrations correctives non destructives si elles sont réellement nécessaires.
+
+## 2. ARCHITECTURE SIMPLE
+
+Respecte l'architecture existante d'Aydra :
+
+Route → Middleware → FormRequest → Controller → Service → Model → BDD.
+
+Utilise :
+
+- Laravel et PHP selon le dépôt.
+- MySQL central.
+- Fortify.
+- Spatie Permission.
+- Spatie Activity Log.
+- UUID publics.
+- ID internes numériques.
+- Services métier.
+- Policies.
+- DTOs utiles.
+- Frontend existant.
+
+Ne crée pas un moteur de paiement générique.
+
+Ne crée pas des couches inutiles.
+
+Ne mets pas les calculs d'abonnement dans les Controllers.
+
+Ne mets pas les validations financières dans React.
+
+Utilise des noms de méthodes explicites.
+
+Exemples :
+
+- `declareExternalPayment()`
+- `recordCashPayment()`
+- `verifyPayment()`
+- `rejectPayment()`
+- `activatePaidSubscription()`
+- `generatePaymentReceipt()`
+
+Adapte ces noms aux conventions existantes.
+
+Le code doit être facile à suivre.
+
+Conserve les transactions, verrous et contrôles de sécurité indispensables.
+
+## 3. TABLE PRINCIPALE
+
+Utilise `saas_transfers`.
+
+Dans la structure historique :
+
+- `record_type=1` : PAYMENT.
+- `record_type=2` : REFUND.
+
+Ce module implémente PAYMENT.
+
+Ne crée pas une nouvelle table `saas_payments`.
+
+Ne développe pas les remboursements.
+
+Le modèle logique SaasPayment doit filtrer strictement les enregistrements PAYMENT.
+
+Respecte les liens avec :
+
+- Propriétaire.
+- Facture.
+- Abonnement et échéance via la facture.
+- Média du justificatif.
+- Administrateur validateur.
+- Audit.
+
+Les champs réservés au serveur ne doivent jamais être contrôlés librement par le navigateur.
+
+## 4. MÉTHODES AUTORISÉES
+
+Deux parcours métier seulement.
+
+### A. CASH_IN_PERSON
+
+Paiement en espèces sur place.
+
+L'administrateur reçoit physiquement le montant intégral.
+
+Il enregistre :
+
+- Le commerçant.
+- La facture.
+- Le montant.
+- La devise.
+- La date et l'heure réelle.
+- Son identité d'administrateur.
+- Une référence interne d'encaissement unique.
+- La confirmation de la réception des espèces.
+
+Le système crée une preuve interne appropriée.
+
+Aucun justificatif fourni par le commerçant n'est obligatoire dans ce parcours.
+
+L'administrateur peut enregistrer et confirmer l'encaissement dans une opération contrôlée si l'argent est effectivement reçu, tout en respectant les transitions d'état et l'audit du dépôt.
+
+Aucune référence bancaire fictive.
+
+### B. EXTERNAL_DEPOSIT_PROOF
+
+Le commerçant effectue un versement hors du SaaS.
+
+Il transmet :
+
+- Une photo ou un PDF du justificatif.
+- Le montant déclaré.
+- La date déclarée.
+- La référence du document lorsqu'elle est disponible.
+
+Le système crée une déclaration en attente.
+
+Un administrateur :
+
+1. Consulte la déclaration.
+2. Consulte la facture.
+3. Vérifie la pièce.
+4. Vérifie le montant.
+5. Contrôle la réception réelle des fonds.
+6. Confirme ou refuse le paiement.
+7. Motive un refus.
+8. Enregistre son identité et sa décision.
+
+Le fichier transmis ne confirme jamais automatiquement le paiement.
+
+Les noms CASH_IN_PERSON et EXTERNAL_DEPOSIT_PROOF sont des noms métier proposés.
+
+Analyse les enums et migrations existants pour déterminer leur représentation technique correcte.
+
+Ne remplace pas une méthode en espèces par une méthode bancaire incorrecte.
+
+Ne casse pas les anciennes données.
+
+## 5. RÈGLE D'INTÉGRALITÉ DU PAIEMENT
+
+Pour une échéance payante de montant X :
+
+Le paiement normal doit correspondre exactement à X, dans la bonne devise.
+
+Exemple :
+
+- Montant dû : 3 000 DA.
+- 3 000 DA confirmés : paiement intégral.
+- 1 000 DA : insuffisant.
+- 2 500 DA : insuffisant.
+- 3 500 DA : incohérence à examiner, aucun crédit ou remboursement automatique.
+- Justificatif non vérifié : aucun droit.
+- Deux déclarations identiques : aucune double activation.
+
+Ne crée pas de possibilité de payer 1 000 DA aujourd'hui, puis 2 000 DA demain pour solder la même période.
+
+Ne développe pas de système de solde partiel à compléter.
+
+ATTENTION :
+
+Si un commerçant a réellement remis une somme insuffisante en espèces, ne supprime pas la réalité de l'encaissement.
+
+Prévois un traitement d'anomalie administratif traçable, sans activer l'abonnement et sans transformer cette anomalie en fonctionnalité de paiement fractionné.
+
+Si une situation exige un traitement comptable ou légal particulier, signale-la explicitement.
+
+## 6. PARCOURS COMMERÇANT
+
+Implémente :
+
+1. Consulter les abonnements disponibles.
+2. Consulter l'abonnement choisi.
+3. Consulter la facture de la période.
+4. Voir le montant intégral à régler.
+5. Voir les informations de paiement manuel prévues.
+6. Choisir le parcours de justificatif externe lorsqu'il est disponible.
+7. Téléverser la photo ou le PDF.
+8. Déclarer le montant et la date.
+9. Consulter l'état de la déclaration.
+10. Recevoir un message de confirmation de dépôt.
+11. Consulter le refus éventuel et son motif autorisé.
+12. Voir le paiement confirmé après validation.
+13. Consulter la période payée.
+14. Télécharger la facture.
+15. Télécharger le reçu après confirmation.
+
+Le commerçant ne doit jamais pouvoir :
+
+- Confirmer son propre paiement.
+- Choisir son vérificateur.
+- Modifier `transfer_status`.
+- Envoyer un `user_id` arbitraire.
+- Activer directement son abonnement.
+- Changer la période facturée.
+- Modifier le prix.
+- Télécharger les preuves d'autrui.
+- Remplacer une preuve probante figée.
+
+## 7. PARCOURS ADMINISTRATEUR
+
+Implémente :
+
+**Administration → Facturation → Paiements SaaS**
+
+Fonctionnalités :
+
+1. Tableau des paiements.
+2. Recherche et filtres.
+3. Consultation d'une déclaration.
+4. Consultation de la facture.
+5. Consultation du commerçant.
+6. Consultation sécurisée de la preuve.
+7. Vérification du montant.
+8. Vérification du moyen utilisé.
+9. Confirmation du versement réel.
+10. Refus motivé.
+11. Enregistrement d'un encaissement en espèces.
+12. Génération de la référence interne.
+13. Détection des doublons.
+14. Confirmation du montant intégral.
+15. Activation cohérente de la période payée.
+16. Génération du reçu.
+17. Historique.
+18. Audit.
+
+Les permissions doivent provenir du catalogue existant.
+
+Si une permission opérationnelle requise manque réellement, documente le besoin et ajoute-la selon les conventions validées, sans ouvrir l'action à tous.
+
+Un administrateur ne doit accéder qu'aux opérations et propriétaires qu'il est autorisé à gérer.
+
+## 8. STATUTS SIMPLES
+
+L'interface peut présenter :
+
+- EN ATTENTE.
+- À VÉRIFIER.
+- PAYÉ.
+- REFUSÉ ou ANOMALIE lorsque nécessaire.
+
+N'invente pas des valeurs numériques d'enum sans consulter le dépôt.
+
+Respecte les états réels de `SaasTransferStatusEnum` et leurs contraintes SQL.
+
+Une déclaration externe commence dans un état non vérifié.
+
+Un paiement confirmé est VERIFIED uniquement après confirmation des fonds réellement reçus.
+
+Un paiement vérifié ne doit pas être modifié silencieusement.
+
+Préserve les mécanismes de correction comptable nécessaires en cas d'erreur administrative, sans créer une fonctionnalité de remboursement commercial.
+
+## 9. ACTIVATION ET RENOUVELLEMENT
+
+C'est une partie essentielle du module.
+
+Lorsqu'un paiement intégral est réellement vérifié :
+
+1. Charger le propriétaire.
+2. Charger l'abonnement.
+3. Charger l'échéance.
+4. Charger la facture ISSUED.
+5. Vérifier que les références sont cohérentes.
+6. Vérifier que le montant est intégralement reçu.
+7. Vérifier la devise.
+8. Vérifier qu'aucune confirmation de cette obligation n'existe déjà.
+9. Valider le paiement.
+10. Mettre à jour l'échéance selon les états existants.
+11. Activer ou renouveler l'abonnement selon les règles du module Abonnements.
+12. Mettre à jour les droits et quotas selon les mécanismes existants.
+13. Enregistrer l'audit.
+
+Utilise un ordre de verrouillage cohérent.
+
+L'opération doit être atomique pour les données SQL liées.
+
+Un double clic ou deux administrateurs ne doivent jamais activer deux fois la même période.
+
+Un paiement vérifié pour une période future ne doit pas prolonger ou activer les droits à une mauvaise date.
+
+Respecte les règles de début, fin, renouvellement, plan gratuit, changement d'offre et droits déjà acquis existantes.
+
+Ne recode pas un deuxième système d'abonnements.
+
+Ne crée pas un nouveau plan.
+
+## 10. DÉTECTION DES DOUBLONS
+
+Implémente :
+
+- `operation_key` serveur stable.
+- Unicité des opérations.
+- Référence interne unique pour les espèces.
+- Normalisation des références externes lorsqu'elles existent.
+- Empreinte financière cohérente avec la méthode utilisée.
+- Protection contre deux déclarations du même versement.
+- Protection contre deux validations de la même facture/période.
+- Concurrence MySQL.
+- Idempotence.
+
+Les règles de duplication doivent respecter les différences entre espèces et justificatifs externes.
+
+Pour les espèces, n'invente pas de référence bancaire.
+
+Pour les versements externes, ne considère pas uniquement le montant ou le nom du fichier comme identifiant d'un transfert.
+
+Ne valide pas deux fois un même encaissement.
+
+Si une demande déjà traitée est rejouée, retrouve l'opération existante de façon autorisée.
+
+## 11. STOCKAGE DES PREUVES
+
+Réutilise `media`.
+
+### Justificatif externe
+
+- Photo ou PDF.
+- Taille limitée.
+- MIME réel contrôlé.
+- Stockage privé.
+- Propriétaire correct.
+- Conversion canonique si le schéma l'exige.
+- Original conservé si conversion.
+- Empreinte calculée sur les véritables octets.
+- Immutabilité après rattachement probant.
+- Accès autorisé seulement.
+
+### Espèces
+
+- Aucune pièce externe obligatoire.
+- Enregistrement interne de l'encaissement.
+- Référence interne.
+- Acteur réel.
+- Date réelle.
+- Preuve interne et reçu appropriés.
+- Journal d'audit.
+
+Ne fabrique pas un faux justificatif bancaire.
+
+Si les contraintes SQL exigent une preuve ou une référence bancaire universelle, adapte proprement les validations et le schéma avec une migration corrective compatible, plutôt que de remplir les champs avec des valeurs mensongères.
+
+Aucune preuve ou coordonnée sensible ne doit être enregistrée en clair dans Activity Log.
+
+## 12. FACTURE ET REÇU
+
+La facture vient du Module 19.
+
+Le paiement vient du Module 21.
+
+Après vérification intégrale :
+
+- Le commerçant voit « Payé ».
+- L'abonnement obtient les droits prévus.
+- Un reçu ou une confirmation de paiement est disponible.
+- Le reçu référence la facture.
+- Le reçu indique le montant réellement reçu.
+- Le reçu indique la date.
+- Le reçu indique la méthode.
+- Le reçu indique une référence interne traçable.
+
+Réutilise `media` pour le document privé.
+
+Respecte les exigences documentaires validées.
+
+Le reçu ne doit pas modifier le PDF de la facture.
+
+N'invente pas `document_type=3` pour `saas_invoices`.
+
+Ne crée pas une nouvelle table uniquement pour le reçu si le modèle de média existant permet un rattachement propre.
+
+Si le reçu nécessite une numérotation interne, elle doit être cohérente et distincte de la numérotation fiscale des factures.
+
+## 13. FRONTEND
+
+Réutilise le design et les composants existants.
+
+### Commerçant
+
+- Mes factures.
+- Montant à payer.
+- Instructions pour payer sur place.
+- Formulaire de justificatif externe.
+- Statut de vérification.
+- Messages.
+- Facture PDF.
+- Reçu après paiement confirmé.
+- Période d'abonnement active.
+
+### Administration
+
+- Liste des paiements.
+- Recherche.
+- Filtres.
+- Détail.
+- Encaissement en espèces.
+- Déclarations externes.
+- Justificatifs privés.
+- Validation.
+- Refus.
+- Motifs.
+- Reçu.
+- Historique.
+
+L'interface doit être simple, compréhensible et accessible.
+
+Les boutons ne remplacent jamais les autorisations serveur.
+
+## 14. TESTS AUTOMATISÉS DÉTAILLÉS
+
+Pour chaque scénario, écris réellement un test.
+
+Utilise ARRANGE / ACT / ASSERT et vérifie les lignes SQL, états, permissions, fichiers et audits.
+
+### T21-01 — Paiement espèces complet
+
+Arrange : facture ISSUED de 3 000 DA, commerçant A et administrateur autorisé.
+
+Act : enregistrer la remise réelle simulée en test de 3 000 DA.
+
+Assert : un paiement confirmé, référence interne unique, montant exact, période payée, droits activés, reçu disponible.
+
+### T21-02 — Espèces insuffisantes
+
+Arrange : facture de 3 000 DA.
+
+Act : tenter de confirmer 1 000 DA comme règlement complet.
+
+Assert : refus de validation intégrale, aucun droit payant accordé, incident réel traçable si des espèces ont effectivement été reçues.
+
+### T21-03 — Justificatif externe
+
+Arrange : facture de 3 000 DA.
+
+Act : téléverser une preuve de test valide et déclarer 3 000 DA.
+
+Assert : déclaration enregistrée, statut non vérifié, aucun droit payant accordé.
+
+### T21-04 — Vérification externe
+
+Arrange : déclaration fictive de 3 000 DA, preuve intègre et réception réelle simulée uniquement dans la fixture de test.
+
+Act : administrateur autorisé confirme.
+
+Assert : VERIFIED, montant intégral, acteur, dates, période activée et reçu.
+
+### T21-05 — Refus de preuve seule
+
+Arrange : justificatif téléversé.
+
+Act : tenter d'activer les droits sans vérification administrative.
+
+Assert : refus et aucun changement des droits.
+
+### T21-06 — Paiement insuffisant externe
+
+Arrange : facture de 3 000 DA.
+
+Act : déclarer 2 500 DA.
+
+Assert : aucun paiement intégral validé, aucune activation.
+
+### T21-07 — Montant supérieur
+
+Arrange : facture de 3 000 DA.
+
+Act : tenter de confirmer 3 500 DA comme paiement exact.
+
+Assert : anomalie ou refus contrôlé, aucun crédit automatique et aucune activation incohérente.
+
+### T21-08 — Montant nul ou négatif
+
+Act : soumettre un montant invalide.
+
+Assert : validation refusée, aucune opération financière.
+
+### T21-09 — Propriétaire étranger
+
+Arrange : facture de B.
+
+Act : utilisateur A soumet la facture de B.
+
+Assert : accès refusé, aucune mutation.
+
+### T21-10 — Permission absente
+
+Act : utilisateur non autorisé tente la validation.
+
+Assert : refus serveur et aucun droit accordé.
+
+### T21-11 — Double clic
+
+Act : soumettre deux fois la même déclaration.
+
+Assert : une opération logique, aucun doublon.
+
+### T21-12 — Double validation
+
+Act : deux administrateurs valident simultanément la même déclaration.
+
+Assert : au maximum une validation financière effective et une seule activation de la période.
+
+### T21-13 — Deux déclarations pour la même période
+
+Act : tenter deux paiements intégraux sur la même obligation déjà payée.
+
+Assert : aucune double activation ni double comptabilisation comme règlement de la même échéance ; anomalie financière conservée si des fonds supplémentaires ont réellement été reçus.
+
+### T21-14 — Justificatif altéré
+
+Arrange : preuve avec empreinte valide.
+
+Act : altérer les octets avant confirmation.
+
+Assert : vérification refusée.
+
+### T21-15 — Espèces sans preuve bancaire
+
+Act : enregistrer un encaissement espèces complet autorisé.
+
+Assert : fonctionnement correct sans fabriquer de référence bancaire.
+
+### T21-16 — Reçu
+
+Act : confirmer un paiement complet fictif.
+
+Assert : reçu privé lié au bon paiement et à la bonne facture, montant exact et accès contrôlé.
+
+### T21-17 — Reçu interdit
+
+Act : demander le reçu d'un autre commerçant.
+
+Assert : refus et aucune fuite de fichier.
+
+### T21-18 — Renouvellement
+
+Arrange : abonnement existant, nouvelle période mensuelle.
+
+Act : confirmer intégralement la nouvelle échéance.
+
+Assert : renouvellement une seule fois, dates et droits cohérents.
+
+### T21-19 — Paiement non confirmé
+
+Act : laisser une déclaration en attente.
+
+Assert : aucun accès payant accordé pour cette période.
+
+### T21-20 — Plan gratuit
+
+Act : consulter ou utiliser l'offre gratuite.
+
+Assert : aucune obligation de paiement payant créée artificiellement.
+
+### T21-21 — Rollback
+
+Arrange : échec SQL contrôlé lors de la validation.
+
+Act : effectuer la confirmation.
+
+Assert : pas d'état payé sans droits cohérents ni d'activation sans paiement confirmé ; reprise sûre.
+
+### T21-22 — Concurrence MySQL
+
+Act : exécuter les validations simultanées dans deux processus utilisant MySQL isolé.
+
+Assert : montants, états, contraintes et activations cohérents.
+
+### T21-23 — Isolation
+
+Assert : aucune donnée financière n'est enregistrée dans une BDD boutique.
+
+### T21-24 — Absence de banque
+
+Assert : aucun appel bancaire réel, aucune API de carte et aucun transfert automatique pendant les tests.
+
+Ajoute les tests complémentaires nécessaires :
+
+- Enums et migrations.
+- Fichiers non PDF.
+- Images malformées.
+- Taille de fichier.
+- Référence dupliquée.
+- Statuts interdits.
+- Rejet motivé.
+- Stockage indisponible.
+- Reprise après crash.
+- Journal d'audit.
+- Reçus privés.
+- Taxes et montant dû.
+- Changement d'abonnement.
+- Expiration de la période.
+- Régressions des Modules 18 et 19.
+- Tests frontend et navigateur.
+
+Utilise une vraie BDD MySQL de test isolée pour les verrous et contraintes.
+
+## 15. TEST D'INTÉGRATION COMPLET
+
+Scénario de bout en bout :
+
+1. Créer une offre Pro fictive à 3 000 DA.
+2. Créer un commerçant.
+3. Créer un abonnement.
+4. Créer une échéance.
+5. Émettre la facture.
+6. Vérifier le PDF.
+7. Déposer un justificatif externe fictif.
+8. Vérifier que l'abonnement n'est pas activé.
+9. Simuler en test la confirmation administrative d'un paiement intégral.
+10. Vérifier le paiement VERIFIED.
+11. Vérifier l'activation des droits.
+12. Vérifier la bonne période.
+13. Vérifier le reçu.
+14. Vérifier l'audit.
+15. Rejouer la validation.
+16. Vérifier l'absence de double activation.
+17. Refaire le parcours avec un paiement en espèces.
+18. Vérifier que les deux moyens fonctionnent.
+19. Vérifier qu'un paiement incomplet n'accorde aucun droit.
+20. Vérifier la non-régression des Modules 18 et 19.
+
+Ne réalise aucun véritable transfert financier.
+
+## 16. CONTRÔLE QUALITÉ
+
+Exécute :
+
+- Tests Unit.
+- Tests Feature.
+- Tests d'intégration.
+- Tests de concurrence.
+- Tests de permissions.
+- Tests de sécurité.
+- Tests de fichiers.
+- Tests d'abonnement.
+- Laravel Pint.
+- Analyse statique disponible.
+- Vérification des routes.
+- Vérification des migrations.
+- Build et tests frontend.
+- Tests navigateur si disponibles.
+- Tests de régression.
+
+Corrige les erreurs détectées.
+
+Après chaque correction, relance les tests concernés.
+
+Ne supprime jamais une vérification pour faire passer un test.
+
+Ne modifie jamais une fixture afin de cacher un bug réel.
+
+## 17. AUDIT FINAL DE SIMPLICITÉ
+
+Relis les fichiers.
+
+Vérifie :
+
+- Controllers faciles à comprendre.
+- Services avec méthodes explicites.
+- Aucune classe inutile.
+- Aucune duplication du calcul des droits.
+- Aucune logique financière dans React.
+- Transactions courtes.
+- Verrous cohérents.
+- Erreurs compréhensibles.
+- Code maintenable.
+
+Simplifie ce qui peut l'être sans changer les garanties métier.
+
+## 18. RAPPORT FINAL
+
+Fournis :
+
+1. Analyse initiale.
+2. Fonctionnalités développées.
+3. Architecture réellement utilisée.
+4. Fichiers créés.
+5. Fichiers modifiés.
+6. Migrations et compatibilité.
+7. Routes.
+8. Permissions.
+9. Tests exécutés et résultats.
+10. Tests non exécutés.
+11. Erreurs détectées.
+12. Corrections réalisées.
+13. Dépendances ou blocages.
+14. Parcours manuel espèces.
+15. Parcours manuel justificatif externe.
+16. Vérification du reçu.
+17. Vérification de l'activation.
+18. Explication très simple du code.
+
+Ne dis jamais que le module est terminé si les paiements espèces, la vérification externe, les droits, les reçus ou les tests de sécurité indispensables ne fonctionnent pas.
+
+Distingue IMPLÉMENTÉ, TESTÉ, VALIDÉ, PARTIEL, BLOQUÉ et NON TESTÉ.
+
+Commence par analyser le dépôt, puis développe et teste réellement le module.
+
+Avant de déclarer le module terminé, vérifie que **100 % des fonctionnalités demandées et de leurs détails sont réellement implémentés**, sans rien oublier ; teste chaque fonctionnalité en profondeur (backend, frontend, permissions, sécurité, base de données MySQL, calculs, fichiers, erreurs, cas limites, concurrence, idempotence et intégration avec les autres modules), corrige tous les problèmes détectés puis relance les tests et vérifie les régressions. Simplifie le code au maximum sans sacrifier sa sécurité ni son fonctionnement, et fournis des preuves précises des tests réellement exécutés. **N'annonce jamais que tout est terminé si une fonctionnalité manque, qu'un test critique échoue ou qu'une vérification indispensable n'a pas été effectuée ; indique clairement ce qui reste incomplet ou bloqué.**

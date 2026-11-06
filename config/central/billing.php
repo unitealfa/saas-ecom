@@ -10,6 +10,8 @@ if (! is_array($validatedCustomers)) {
 }
 
 return [
+    'cash_instructions' => env('BILLING_CASH_INSTRUCTIONS'),
+    'payment_instructions' => env('BILLING_PAYMENT_INSTRUCTIONS'),
     'issuer' => [
         'name' => env('BILLING_ISSUER_NAME'),
         'address' => env('BILLING_ISSUER_ADDRESS'),

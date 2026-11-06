@@ -2,7 +2,23 @@
 
 use App\Http\Controllers\Central\Admin\Billing\BillingRuleController;
 use App\Http\Controllers\Central\Admin\Billing\SaasInvoiceController;
+use App\Http\Controllers\Central\Admin\Billing\SaasPaymentController;
 use Illuminate\Support\Facades\Route;
+
+Route::controller(SaasPaymentController::class)->prefix('billing/payments')->name('payments.')->whereUuid('payment')->group(function (): void {
+    Route::get('/', 'index')->name('index');
+    Route::get('{payment}', 'show')->name('show');
+    Route::post('{payment}/verify', 'verify')->name('verify');
+    Route::post('{payment}/reject', 'reject')->name('reject');
+    Route::post('{payment}/reconcile', 'reconcile')->name('reconcile');
+    Route::post('{payment}/resume-cash', 'resumeCash')->name('resume-cash');
+    Route::get('{payment}/proof', 'proof')->middleware('signed')->name('proof');
+    Route::get('{payment}/receipt', 'receipt')->middleware('signed')->name('receipt');
+});
+Route::controller(SaasPaymentController::class)->prefix('billing/invoices/{invoice}/cash')->name('payments.cash.')->whereUuid('invoice')->group(function (): void {
+    Route::get('/', 'createCash')->name('create');
+    Route::post('/', 'cash')->name('store');
+});
 
 Route::controller(SaasInvoiceController::class)->prefix('billing/invoices')->name('invoices.')->whereUuid('invoice')->group(function (): void {
     Route::get('/', 'index')->name('index');
