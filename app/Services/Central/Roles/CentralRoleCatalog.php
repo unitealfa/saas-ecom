@@ -16,6 +16,15 @@ class CentralRoleCatalog
         'saas.payments.validate' => 'Valider un paiement après vérification',
         'saas.payments.reject' => 'Rejeter une déclaration de paiement',
         'saas.payments.reconcile' => 'Rapprocher un paiement avec les fonds et documents correspondants',
+    public const array ACTIVITY_PERMISSIONS = [
+        'saas.activity.view' => 'Consulter et rechercher les activités centrales',
+        'saas.activity.export' => 'Exporter les activités centrales autorisées',
+    ];
+
+    public const array QUOTA_PERMISSIONS = [
+        'saas.quotas.view' => 'Consulter les quotas et leur consommation',
+        'saas.quotas.reconcile' => 'Recalculer les quotas et états des boutiques',
+        'saas.quotas.history.view' => 'Consulter les décisions et changements de quotas',
     ];
 
     public const array INVOICE_PREPARATION_PERMISSIONS = [
@@ -122,6 +131,8 @@ class CentralRoleCatalog
 
     public const array PERMISSIONS = [
         ...self::PAYMENT_PERMISSIONS,
+        ...self::ACTIVITY_PERMISSIONS,
+        ...self::QUOTA_PERMISSIONS,
         ...self::SUBSCRIPTION_PERMISSIONS,
         ...self::CARRIER_MAPPING_PERMISSIONS,
         ...self::PICKUP_POINT_PERMISSIONS,
@@ -182,6 +193,7 @@ class CentralRoleCatalog
     ];
 
     public const array GROUPS = [
+        'Journal d’activité' => ['saas.activity.view', 'saas.activity.export'],
         'Échéances de paiement' => ['saas.subscriptions.installments.view', 'saas.subscriptions.installments.create'],
         'Factures SaaS' => ['saas.invoices.view', 'saas.invoices.create', 'saas.invoices.issue'],
         'Règles de facturation' => ['saas.billing-rules.view', 'saas.billing-rules.create', 'saas.billing-rules.update', 'saas.billing-rules.activate', 'saas.billing-rules.versions.create'],
@@ -194,6 +206,7 @@ class CentralRoleCatalog
         'Fonctionnalités commerciales' => ['saas.features.view', 'saas.features.create', 'saas.features.update', 'saas.features.activate', 'saas.features.archive'],
         'Plans et offres' => ['saas.plans.view', 'saas.plans.create', 'saas.plans.update', 'saas.plans.features.update', 'saas.plans.versions.create', 'saas.plans.activate', 'saas.plans.archive'],
         'Abonnements' => ['saas.subscriptions.view', 'saas.subscriptions.assign', 'saas.subscriptions.change', 'saas.subscriptions.close', 'saas.subscriptions.deactivate', 'saas.subscriptions.history.view'],
+        'Quotas' => ['saas.quotas.view', 'saas.quotas.reconcile', 'saas.quotas.history.view'],
         'Déploiements' => ['saas.deployments.view', 'saas.deployments.provision', 'saas.deployments.migrate', 'saas.deployments.retry', 'saas.deployments.errors.view'],
         'Domaines' => ['saas.domains.view', 'saas.domains.create', 'saas.domains.update', 'saas.domains.verify', 'saas.domains.primary.update', 'saas.domains.archive'],
         'Utilisateurs centraux' => ['saas.users.view', 'saas.users.create', 'saas.users.update', 'saas.users.approve', 'saas.users.reject', 'saas.users.suspend', 'saas.users.activate', 'saas.users.archive'],

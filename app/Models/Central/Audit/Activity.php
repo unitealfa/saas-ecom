@@ -8,6 +8,7 @@ use App\Enums\ActivityOriginEnum;
 use Spatie\Activitylog\Models\Activity as PackageActivity;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
+/** @property ActivityOriginEnum $origin */
 class Activity extends PackageActivity
 {
     use CentralConnection, HasActivityMetadata, HasPublicUuid;
