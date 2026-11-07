@@ -8,6 +8,7 @@ use App\Enums\Central\Billing\DocumentStatusEnum;
 use App\Enums\MediaVisibilityEnum;
 use App\Models\Central\Audit\Activity;
 use App\Models\Central\Billing\BillingRule;
+use App\Models\Central\Billing\SaasCreditNote;
 use App\Models\Central\Billing\SaasDocumentDelivery;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Media\Media;
@@ -34,6 +35,10 @@ class SaasInvoiceIssuanceService
 
     public const string EVENT_FAILED = 'saas_invoice_issuance_failed';
 
+    public const string CREDIT_ISSUED = 'saas_credit_note_issued';
+
+    public const string CREDIT_FAILED = 'saas_credit_note_issuance_failed';
+
     private const int LOCK_WAIT_SECONDS = 10;
 
     public function __construct(
@@ -42,6 +47,8 @@ class SaasInvoiceIssuanceService
         private readonly SaasInvoicePdfService $pdf,
         private readonly PrivateMediaAccessService $files,
         private readonly InvoiceCalculator $calculator,
+        private readonly SaasCreditNoteService $credits,
+        private readonly InvoicePaymentService $payments,
     ) {}
 
     public function issue(User $actor, SaasInvoice $invoice, string $expected): SaasInvoice
@@ -54,7 +61,7 @@ class SaasInvoiceIssuanceService
             $this->fail('Une émission est déjà en cours. Attendez puis rechargez cette facture.');
         }
         try {
-            $current = SaasInvoice::whereKey($invoice->id)->firstOrFail();
+            $current = $invoice->newQuery()->whereKey($invoice->id)->firstOrFail();
             Gate::forUser($actor)->authorize('issue', $current);
             if ($current->status === DocumentStatusEnum::ISSUED) {
                 $this->assertMedia($current);
@@ -70,9 +77,10 @@ class SaasInvoiceIssuanceService
 
             return $this->finalize($actor, $current, $file);
         } catch (Throwable $exception) {
-            activity('central')->causedBy($actor)->performedOn($invoice)->event(self::EVENT_FAILED)
+            activity('central')->causedBy($actor)->performedOn($invoice)->event($invoice instanceof SaasCreditNote ? self::CREDIT_FAILED : self::EVENT_FAILED)
                 ->tap(fn (Activity $activity) => $activity->forceFill(['correlation_id' => $invoice->getAttribute('correlation_id')]))
-                ->withProperties(['invoice_uuid' => $invoice->uuid, 'error_code' => 'INVOICE_ISSUANCE_FAILED'])
+                ->withProperties([$invoice instanceof SaasCreditNote ? 'credit_uuid' : 'invoice_uuid' => $invoice->uuid,
+                    'error_code' => $invoice instanceof SaasCreditNote ? 'CREDIT_NOTE_ISSUANCE_FAILED' : 'INVOICE_ISSUANCE_FAILED'])
                 ->log('Émission non finalisée. Une reprise conserve le document et son numéro.');
             if ($exception instanceof ValidationException || $exception instanceof AuthorizationException) {
                 throw $exception;
@@ -92,7 +100,7 @@ class SaasInvoiceIssuanceService
             Subscription::whereKey($invoice->subscription_id)->lockForUpdate()->firstOrFail();
             SubscriptionInstallment::whereKey($invoice->installment_id)->lockForUpdate()->firstOrFail();
 
-            return SaasInvoice::whereKey($invoice->id)->lockForUpdate()->firstOrFail();
+            return $invoice->newQuery()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
         }, function (SaasInvoice $current) use ($actor, $file): SaasInvoice {
             if ($current->status === DocumentStatusEnum::ISSUED) {
                 $this->assertMedia($current);
@@ -113,7 +121,13 @@ class SaasInvoiceIssuanceService
                 'disk' => CentralMediaService::DISK, 'original_name' => $current->number.'.pdf',
                 'mime_type' => 'application/pdf', 'visibility' => MediaVisibilityEnum::PRIVATE, 'is_primary' => true, 'position' => 1])->save();
             $current->forceFill(['document_media_id' => $media->id, 'status' => DocumentStatusEnum::ISSUED, 'issued_at' => now()])->save();
-            $recipient = $current->customer_identity_snapshot['email'];
+            if ($current instanceof SaasCreditNote) {
+                $this->payments->synchronizeInstallment($actor, $current->originalInvoice);
+            }
+            $recipient = $current instanceof SaasCreditNote ? $current->owner->email : $current->customer_identity_snapshot['email'];
+            if ($current instanceof SaasCreditNote && ! $current->owner->hasVerifiedEmail()) {
+                $this->fail('L’adresse actuelle du destinataire doit être vérifiée avant l’émission de l’avoir.');
+            }
             (new SaasDocumentDelivery)->forceFill([
                 'user_id' => $current->user_id, 'document_id' => $current->id, 'created_by_id' => $actor->id,
                 'document_type' => $current->document_type, 'channel' => DeliveryChannelEnum::EMAIL,
@@ -121,11 +135,11 @@ class SaasInvoiceIssuanceService
                 'attempts_count' => 0, 'operation_key' => 'saas:delivery:'.$current->uuid.':email:'.hash('sha256', $recipient).':initial',
                 'correlation_id' => $current->getAttribute('correlation_id'),
             ])->save();
-            activity('central')->causedBy($actor)->performedOn($current)->event(self::EVENT_ISSUED)
+            activity('central')->causedBy($actor)->performedOn($current)->event($current instanceof SaasCreditNote ? self::CREDIT_ISSUED : self::EVENT_ISSUED)
                 ->tap(fn (Activity $activity) => $activity->forceFill(['correlation_id' => $current->getAttribute('correlation_id')]))
                 ->withProperties(['invoice_uuid' => $current->uuid, 'number' => $current->number,
                     'amount' => $current->total_amount, 'currency' => $current->currency, 'media_uuid' => $media->uuid])
-                ->log('Facture émise et intention de transmission enregistrée, sans preuve d’envoi.');
+                ->log('Document émis et intention de transmission enregistrée, sans preuve d’envoi.');
 
             return $current->refresh();
         });
@@ -134,7 +148,7 @@ class SaasInvoiceIssuanceService
     public function download(User $actor, SaasInvoice $invoice): StreamedResponse
     {
         abort_if(tenancy()->initialized, 403);
-        $current = SaasInvoice::whereKey($invoice->id)->firstOrFail();
+        $current = $invoice->newQuery()->whereKey($invoice->id)->firstOrFail();
         Gate::forUser($actor)->authorize('download', $current);
         $media = $this->assertMedia($current);
 
@@ -167,6 +181,11 @@ class SaasInvoiceIssuanceService
             'rates' => ['present', 'array'], 'no_tax_reason' => empty($policy['rates']) ? ['required', 'string'] : ['nullable', 'string']])->validate();
         if ($invoice->currency !== SaasInvoice::CURRENCY || $invoice->period_ends_at->lessThanOrEqualTo($invoice->period_starts_at)) {
             $this->fail('La devise ou la période de la facture est invalide.');
+        }
+        if ($invoice instanceof SaasCreditNote) {
+            $this->credits->assertIssuable($invoice);
+
+            return;
         }
         if ($invoice->status === DocumentStatusEnum::DRAFT) {
             $rule = $invoice->billingRule;

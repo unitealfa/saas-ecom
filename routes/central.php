@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Central\Auth\RegistrationStatusController;
 use App\Http\Controllers\Central\Dashboard\DashboardController;
+use App\Http\Controllers\Central\Owner\Billing\CreditNoteController;
 use App\Http\Controllers\Central\Owner\Billing\InvoiceController;
 use App\Http\Controllers\Central\Owner\Billing\PaymentController;
 use App\Http\Controllers\Central\Owner\Billing\SubscriptionPurchaseController;
@@ -23,6 +24,11 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     Route::name('owner.')->group(function (): void {
+        Route::controller(CreditNoteController::class)->prefix('avoirs')->name('credit-notes.')->whereUuid('credit')->group(function (): void {
+            Route::get('/', 'index')->name('index');
+            Route::get('{credit}', 'show')->name('show');
+            Route::get('{credit}/pdf', 'download')->middleware('signed')->name('download');
+        });
         Route::controller(SubscriptionPurchaseController::class)->prefix('abonnements')->name('subscriptions.')->whereUuid('subscription')->group(function (): void {
             Route::get('/', 'index')->name('index');
             Route::post('/', 'store')->middleware('throttle:6,1')->name('store');

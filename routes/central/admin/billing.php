@@ -1,9 +1,23 @@
 <?php
 
 use App\Http\Controllers\Central\Admin\Billing\BillingRuleController;
+use App\Http\Controllers\Central\Admin\Billing\SaasCreditNoteController;
 use App\Http\Controllers\Central\Admin\Billing\SaasInvoiceController;
 use App\Http\Controllers\Central\Admin\Billing\SaasPaymentController;
 use Illuminate\Support\Facades\Route;
+
+Route::controller(SaasCreditNoteController::class)->prefix('billing/credit-notes')->name('credit-notes.')->whereUuid(['credit', 'invoice'])->group(function (): void {
+    Route::get('/', 'index')->name('index');
+    Route::get('create/{invoice}', 'create')->name('create');
+    Route::post('invoice/{invoice}', 'store')->name('store');
+    Route::get('{credit}', 'show')->name('show');
+    Route::get('{credit}/edit', 'edit')->name('edit');
+    Route::put('{credit}', 'update')->name('update');
+    Route::post('{credit}/prepare', 'prepare')->name('prepare');
+    Route::post('{credit}/issue', 'issue')->name('issue');
+    Route::post('{credit}/cancel', 'cancel')->name('cancel');
+    Route::get('{credit}/pdf', 'download')->middleware('signed')->name('download');
+});
 
 Route::controller(SaasPaymentController::class)->prefix('billing/payments')->name('payments.')->whereUuid('payment')->group(function (): void {
     Route::get('/', 'index')->name('index');

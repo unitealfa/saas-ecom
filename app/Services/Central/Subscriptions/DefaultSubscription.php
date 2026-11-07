@@ -3,6 +3,7 @@
 namespace App\Services\Central\Subscriptions;
 
 use App\Enums\Central\Billing\DocumentStatusEnum;
+use App\Enums\Central\Billing\DocumentTypeEnum;
 use App\Enums\Central\Billing\TransferStatusEnum;
 use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Enums\Central\Subscriptions\PeriodEnum;
@@ -132,7 +133,7 @@ class DefaultSubscription
             ->whereHas('payments', fn (Builder $query) => $query->where('transfer_status', TransferStatusEnum::VERIFIED), '=', 1)
             ->whereHas('installment', fn (Builder $query) => $query->where('installment_status', InstallmentStatusEnum::PAID))
             ->whereHas('payments', fn (Builder $query) => $query->where('transfer_status', TransferStatusEnum::VERIFIED)
-                ->whereNull('reversal_of_id')->whereColumn('saas_transfers.amount', 'saas_invoices.total_amount')
+                ->whereNull('reversal_of_id')->whereRaw('saas_transfers.amount >= saas_invoices.total_amount - (SELECT COALESCE(SUM(c.total_amount),0) FROM saas_invoices c WHERE c.original_invoice_id=saas_invoices.id AND c.document_type=? AND c.status=?)', [DocumentTypeEnum::CREDIT_NOTE->value, DocumentStatusEnum::ISSUED->value])
                 ->whereColumn('saas_transfers.currency', 'saas_invoices.currency'));
     }
 

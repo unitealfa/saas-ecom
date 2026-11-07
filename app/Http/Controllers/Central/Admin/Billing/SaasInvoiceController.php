@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Central\Admin\Billing;
 
+use App\Enums\Central\Billing\DocumentStatusEnum;
+use App\Enums\Central\Billing\DocumentTypeEnum;
 use App\Enums\Central\Billing\PolicyStatusEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Billing\CreateInstallmentInvoiceRequest;
@@ -11,6 +13,7 @@ use App\Http\Requests\Central\Billing\ReserveSaasInvoiceNumberRequest;
 use App\Http\Requests\Central\Billing\SearchSaasInvoicesRequest;
 use App\Models\Central\Audit\Activity;
 use App\Models\Central\Billing\BillingRule;
+use App\Models\Central\Billing\SaasCreditNote;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Subscriptions\SubscriptionInstallment;
@@ -50,7 +53,7 @@ class SaasInvoiceController extends Controller
 
         return view('central.pages.admin.billing.invoices.create', [
             'subscription' => $subscription->load(['owner', 'plan']),
-            'rules' => BillingRule::where('policy_status', PolicyStatusEnum::ACTIVE)
+            'rules' => BillingRule::where('policy_status', PolicyStatusEnum::ACTIVE)->where('parameters->document_type', DocumentTypeEnum::INVOICE->value)
                 ->orderBy('code')->orderByDesc('version')->get()->filter(fn (BillingRule $rule): bool => $rule->isActiveAt(now())
                     && Validator::make($rule->only(['code', 'trigger_event', 'parameters']), BillingRuleService::contentRules())->passes()),
         ]);
@@ -71,6 +74,8 @@ class SaasInvoiceController extends Controller
             'invoice' => $invoice->load(['owner', 'installment', 'billingRule', 'sequence', 'lines', 'media', 'deliveries']),
             'ownerMode' => false, 'history' => Activity::forSubject($invoice)->orderByDesc('id')->paginate(20),
             'paymentState' => $this->payments->states($this->centralActor(), collect([$invoice]))[$invoice->id],
+            'balance' => $this->payments->balance($this->centralActor(), $invoice),
+            'credits' => SaasCreditNote::where('original_invoice_id', $invoice->id)->where('status', DocumentStatusEnum::ISSUED)->get(),
         ]);
     }
 
@@ -108,7 +113,7 @@ class SaasInvoiceController extends Controller
 
         return view('central.pages.admin.billing.invoices.installments', [
             'subscription' => $subscription,
-            'rules' => BillingRule::where('policy_status', PolicyStatusEnum::ACTIVE)->orderBy('code')->get()
+            'rules' => BillingRule::where('policy_status', PolicyStatusEnum::ACTIVE)->where('parameters->document_type', DocumentTypeEnum::INVOICE->value)->orderBy('code')->get()
                 ->filter(fn (BillingRule $rule): bool => $rule->isActiveAt(now())
                     && Validator::make($rule->only(['code', 'trigger_event', 'parameters']), BillingRuleService::contentRules())->passes()),
             'installments' => SubscriptionInstallment::where('parent_subscription_id', $subscription->id)->with('invoices')

@@ -9,6 +9,7 @@ use App\Http\Requests\Central\Billing\SearchSaasPaymentsRequest;
 use App\Http\Requests\Central\Billing\StoreSaasPaymentRequest;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Billing\SaasPayment;
+use App\Services\Central\Billing\InvoicePaymentService;
 use App\Services\Central\Billing\PaymentDocumentService;
 use App\Services\Central\Billing\SaasPaymentService;
 use Illuminate\Contracts\View\View;
@@ -18,7 +19,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PaymentController extends Controller
 {
-    public function __construct(private readonly SaasPaymentService $payments, private readonly PaymentDocumentService $documents) {}
+    public function __construct(private readonly SaasPaymentService $payments, private readonly PaymentDocumentService $documents, private readonly InvoicePaymentService $balances) {}
 
     public function index(SearchSaasPaymentsRequest $request): View
     {
@@ -37,7 +38,7 @@ class PaymentController extends Controller
     {
         Gate::forUser($this->centralActor())->authorize('declarePayment', $invoice);
 
-        return view('central.pages.admin.billing.payments.create', ['invoice' => $invoice, 'cash' => false]);
+        return view('central.pages.admin.billing.payments.create', ['invoice' => $invoice, 'cash' => false, 'balance' => $this->balances->balance($this->centralActor(), $invoice)]);
     }
 
     public function store(StoreSaasPaymentRequest $request, SaasInvoice $invoice): RedirectResponse
