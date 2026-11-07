@@ -3,6 +3,7 @@
 namespace App\Policies\Central;
 
 use App\Enums\MediaVisibilityEnum;
+use App\Models\Central\Billing\SaasCreditNote;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Media\Media;
@@ -43,7 +44,11 @@ class MediaPolicy
                     || in_array($media->id, [$payment->getAttribute('proof_media_id'), $payment->getAttribute('source_proof_media_id')], true));
         }
         if ($media->collection_name === SaasInvoicePdfService::COLLECTION) {
-            $invoice = $media->model_type === 'saas_invoice' ? SaasInvoice::find($media->model_id) : null;
+            $invoice = match ($media->model_type) {
+                'saas_invoice' => SaasInvoice::find($media->model_id),
+                'saas_credit_note' => SaasCreditNote::find($media->model_id),
+                default => null,
+            };
 
             return ! tenancy()->initialized && ! $media->trashed() && $media->visibility === MediaVisibilityEnum::PRIVATE
                 && $invoice !== null && $invoice->getAttribute('document_media_id') === $media->id

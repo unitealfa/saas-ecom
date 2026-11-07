@@ -4,7 +4,7 @@
 <x-layouts::app :title="$cash ? 'Enregistrer des espèces reçues' : 'Déposer un justificatif'">
     <section class="mx-auto flex w-full max-w-3xl flex-col gap-6">
         <flux:heading size="xl" level="1">{{ $cash ? 'Enregistrer des espèces reçues' : 'Déposer un justificatif externe' }}</flux:heading>
-        <flux:text>Facture {{ $invoice->number }} — montant intégral : {{ $invoice->total_amount }} {{ $invoice->currency }}.</flux:text>
+        <flux:text>Facture {{ $invoice->number }} — montant initial : {{ $invoice->total_amount }} {{ $invoice->currency }}. Avoirs émis : {{ $balance['credits_total'] }}. Montant net intégral : {{ $balance['net_due'] }}.</flux:text>
         <flux:text>Période : {{ $invoice->period_starts_at->format('d/m/Y') }} — {{ $invoice->period_ends_at->format('d/m/Y') }}.</flux:text>
         <flux:callout>{{ config($cash ? 'central.billing.cash_instructions' : 'central.billing.payment_instructions') ?: 'Demandez à l’administration le lieu de remise des espèces ou les coordonnées de versement officielles avant tout paiement. Aucune coordonnée bancaire n’est inventée par Aydra.' }}</flux:callout>
         @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
@@ -12,7 +12,7 @@
             @csrf
             <input type="hidden" name="operation_id" value="{{ $oldText('operation_id', (string) \Illuminate\Support\Str::uuid()) }}">
             <input type="hidden" name="currency" value="{{ $invoice->currency }}">
-            <flux:input name="amount" label="Montant réellement reçu ou déclaré" inputmode="decimal" :value="$oldText('amount', $invoice->total_amount)" required />
+            <flux:input name="amount" label="Montant réellement reçu ou déclaré" inputmode="decimal" :value="$oldText('amount', $balance['net_due'])" required />
             <flux:input name="occurred_at" type="datetime-local" label="Date et heure réelles du paiement" :value="$oldText('occurred_at')" required />
             @if ($cash)
                 <flux:checkbox name="received" value="1" label="Je confirme avoir physiquement reçu ces espèces." required />

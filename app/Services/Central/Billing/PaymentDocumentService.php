@@ -157,7 +157,8 @@ class PaymentDocumentService
         $this->authorizeWriter($actor, $payment);
         $invoice = $payment->invoice;
         if ($payment->getAttribute('transfer_status') !== TransferStatusEnum::VERIFIED
-            || $payment->getAttribute('amount') !== $invoice->total_amount || $payment->getAttribute('currency') !== $invoice->currency
+            || $payment->getAttribute('amount') !== ($payment->getAttribute('encrypted_transfer_details')['settlement_total'] ?? $invoice->total_amount)
+            || $payment->getAttribute('currency') !== $invoice->currency
             || $payment->getAttribute('user_id') !== $invoice->user_id || $payment->getAttribute('reversal_of_id') !== null
             || $invoice->status !== DocumentStatusEnum::ISSUED
             || $invoice->installment->installment_status !== InstallmentStatusEnum::PAID

@@ -25,9 +25,12 @@
                 @endforeach
             </flux:select>
             <flux:select name="parameters[document_type]" label="Document à produire" required>
-                <option value="{{ \App\Enums\Central\Billing\DocumentTypeEnum::INVOICE->value }}">Facture</option>
+                @foreach (\App\Enums\Central\Billing\DocumentTypeEnum::cases() as $type)
+                    <option value="{{ $type->value }}" @selected($oldText('parameters.document_type', $rule?->parameters['document_type']) === (string) $type->value)>{{ $type->label() }}</option>
+                @endforeach
             </flux:select>
             <flux:input type="number" name="parameters[payment_due_days]" label="Délai de paiement en jours" min="0" step="1" :value="$oldText('parameters.payment_due_days', $rule?->parameters['payment_due_days'])" required description="Nombre de jours après l’émission. Saisissez 0 pour un paiement exigible le jour même." />
+            <flux:text>Pour une correction, choisissez l’événement « Correction d’une facture émise », le document « Avoir » et le délai 0. Un avoir n’a pas de date limite de paiement.</flux:text>
             <div class="flex flex-wrap gap-3">
                 <flux:button type="submit" variant="primary" x-bind:disabled="submitting" x-bind:aria-busy="submitting">Enregistrer le brouillon</flux:button>
                 @can('viewAny', \App\Models\Central\Billing\BillingRule::class)

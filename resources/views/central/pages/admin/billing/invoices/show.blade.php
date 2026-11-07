@@ -34,9 +34,22 @@
             </table>
         </div>
         <flux:heading>Total : {{ $invoice->total_amount }} {{ $invoice->currency }}</flux:heading>
+        <flux:text>Avoirs émis : {{ $balance['credits_total'] }} — dû net : {{ $balance['net_due'] }} — reste à payer : {{ $balance['remaining'] }} — surplus : {{ $balance['surplus'] }} {{ $invoice->currency }}.</flux:text>
+        @foreach ($credits as $credit)
+            @if ($ownerMode)
+                <flux:button :href="route('owner.credit-notes.show', $credit)">{{ $credit->number }} — {{ $credit->total_amount }} {{ $credit->currency }}</flux:button>
+            @else
+                @can('view', $credit)<flux:button :href="route('central.credit-notes.show', $credit)">{{ $credit->number }} — {{ $credit->total_amount }} {{ $credit->currency }}</flux:button>@endcan
+            @endif
+        @endforeach
+        @if ($invoice->status === \App\Enums\Central\Billing\DocumentStatusEnum::ISSUED)
+            @unless ($ownerMode)
+                @can('create', \App\Models\Central\Billing\SaasCreditNote::class)<flux:button :href="route('central.credit-notes.create', $invoice)">Préparer un avoir</flux:button>@endcan
+            @endunless
+        @endif
         <flux:text>La facture indique le montant intégral dû pour cette période. Son émission n’active pas les droits payants.</flux:text>
         <flux:text>Le reçu est disponible dans le paiement après confirmation intégrale des fonds. Le PDF de cette facture reste inchangé.</flux:text>
-        @if ($paymentState !== \App\Enums\Central\Billing\PaymentStateEnum::PAID)
+        @if (! in_array($paymentState, [\App\Enums\Central\Billing\PaymentStateEnum::PAID, \App\Enums\Central\Billing\PaymentStateEnum::CREDITED], true))
             @can('declarePayment', $invoice)<flux:button :href="route('owner.payments.create', $invoice)">Déposer un justificatif de versement</flux:button>@endcan
             @unless ($ownerMode)
                 @can('recordCashPayment', $invoice)<flux:button :href="route('central.payments.cash.create', $invoice)">Enregistrer des espèces reçues</flux:button>@endcan

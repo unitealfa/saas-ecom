@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Central\Owner\Billing;
 
+use App\Enums\Central\Billing\DocumentStatusEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Billing\SearchSaasInvoicesRequest;
+use App\Models\Central\Billing\SaasCreditNote;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Services\Central\Billing\InvoicePaymentService;
 use App\Services\Central\Billing\SaasInvoiceIssuanceService;
@@ -35,6 +37,8 @@ class InvoiceController extends Controller
         return view('central.pages.admin.billing.invoices.show', [
             'invoice' => $invoice->load(['installment', 'sequence', 'lines', 'media']), 'ownerMode' => true, 'history' => null,
             'paymentState' => $this->payments->states($actor, collect([$invoice]))[$invoice->id],
+            'balance' => $this->payments->balance($actor, $invoice),
+            'credits' => SaasCreditNote::where('original_invoice_id', $invoice->id)->where('status', DocumentStatusEnum::ISSUED)->get(),
         ]);
     }
 

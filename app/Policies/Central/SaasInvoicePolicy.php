@@ -9,6 +9,21 @@ use App\Services\Central\Authorization\CentralUserAccess;
 
 class SaasInvoicePolicy
 {
+    public function synchronizeBalance(User $actor, SaasInvoice $invoice): bool
+    {
+        return ! tenancy()->initialized && ($this->access->allows($actor, 'saas.credit-notes.issue')
+            || $this->access->allows($actor, 'saas.payments.validate'));
+    }
+
+    public function viewFinancialBalance(User $actor, SaasInvoice $invoice): bool
+    {
+        return ! tenancy()->initialized && ($this->owns($actor, $invoice) || $this->viewAny($actor)
+            || $this->access->allows($actor, 'saas.payments.validate')
+            || $this->access->allows($actor, 'saas.credit-notes.view')
+            || $this->access->allows($actor, 'saas.credit-notes.create')
+            || $this->access->allows($actor, 'saas.credit-notes.issue'));
+    }
+
     public function __construct(private readonly CentralUserAccess $access) {}
 
     public function viewAny(User $actor): bool

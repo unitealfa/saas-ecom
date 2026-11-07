@@ -2,6 +2,7 @@
 
 namespace App\Services\Central\Billing;
 
+use App\Enums\Central\Billing\DocumentTypeEnum;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Services\Central\Media\CentralMediaService;
 use Dompdf\Dompdf;
@@ -31,7 +32,7 @@ class SaasInvoicePdfService
             $options = new Options(['isRemoteEnabled' => false, 'isPhpEnabled' => false,
                 'isJavascriptEnabled' => false, 'defaultFont' => 'DejaVu Sans', 'chroot' => base_path('vendor/dompdf')]);
             $pdf = new Dompdf($options);
-            $pdf->loadHtml(view('central.documents.saas-invoice', ['invoice' => $invoice])->render(), 'UTF-8');
+            $pdf->loadHtml(view($invoice->document_type === DocumentTypeEnum::CREDIT_NOTE ? 'central.documents.saas-credit-note' : 'central.documents.saas-invoice', ['invoice' => $invoice])->render(), 'UTF-8');
             $pdf->setPaper('A4');
             $pdf->render();
             $bytes = $pdf->output();
@@ -70,6 +71,11 @@ class SaasInvoicePdfService
             'currency', 'period_starts_at', 'period_ends_at', 'due_at', 'net_amount', 'tax_amount', 'taxes', 'total_amount']);
         $content['lines'] = $invoice->lines
             ->map(fn ($line): array => $line->only(['description', 'quantity', 'net_unit_price', 'net_discount', 'net_amount', 'taxes', 'tax_amount', 'total_amount']))->all();
+
+        if ($invoice->document_type === DocumentTypeEnum::CREDIT_NOTE) {
+            $content['correction'] = $invoice->only(['document_type', 'original_invoice_id', 'reason']);
+            $content['origins'] = $invoice->lines->map(fn ($line): array => $line->only(['original_invoice_id', 'original_invoice_line_id', 'reason']))->all();
+        }
 
         return hash_hmac('sha256', json_encode($content, JSON_THROW_ON_ERROR).$bytes, config('app.key'));
     }

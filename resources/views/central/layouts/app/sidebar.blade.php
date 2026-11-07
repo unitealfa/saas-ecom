@@ -105,7 +105,10 @@
                             Compteurs de facturation
                         </flux:sidebar.item>
                     @endcan
-                    @can('viewAny', \App\Models\Central\Billing\SaasInvoice::class)
+                      @can('viewAny', \App\Models\Central\Billing\SaasCreditNote::class)
+                              <flux:sidebar.item :href="route('central.credit-notes.index')" :current="request()->routeIs('central.credit-notes.*')" wire:navigate>Avoirs SaaS</flux:sidebar.item>
+                          @endcan
+                      @can('viewAny', \App\Models\Central\Billing\SaasInvoice::class)
                         <flux:sidebar.item :href="route('central.invoices.index')" :current="request()->routeIs('central.invoices.*')" wire:navigate>
                             Factures SaaS
                         </flux:sidebar.item>
@@ -113,7 +116,10 @@
                     @can('viewAny', \App\Models\Central\Billing\SaasPayment::class)
                         <flux:sidebar.item :href="route('central.payments.index')" :current="request()->routeIs('central.payments.*')" wire:navigate>Paiements SaaS</flux:sidebar.item>
                     @endcan
-                    @can('viewOwn', \App\Models\Central\Billing\SaasPayment::class)
+                      @can('viewOwn', \App\Models\Central\Billing\SaasCreditNote::class)
+                            <flux:sidebar.item :href="route('owner.credit-notes.index')" :current="request()->routeIs('owner.credit-notes.*')" wire:navigate>Mes avoirs</flux:sidebar.item>
+                        @endcan
+                      @can('viewOwn', \App\Models\Central\Billing\SaasPayment::class)
                         <flux:sidebar.item :href="route('owner.payments.index')" :current="request()->routeIs('owner.payments.*')" wire:navigate>Mes paiements</flux:sidebar.item>
                     @endcan
                     @can('purchase', \App\Models\Central\Subscriptions\Subscription::class)

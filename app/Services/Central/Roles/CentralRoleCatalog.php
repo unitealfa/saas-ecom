@@ -11,6 +11,12 @@ use Spatie\Permission\Models\Permission as PackagePermission;
 
 class CentralRoleCatalog
 {
+    public const array CREDIT_NOTE_PERMISSIONS = [
+        'saas.credit-notes.view' => 'Consulter les avoirs',
+        'saas.credit-notes.create' => 'Préparer un avoir',
+        'saas.credit-notes.issue' => 'Émettre un avoir',
+    ];
+
     public const array PAYMENT_PERMISSIONS = [
         'saas.payments.view' => 'Consulter les paiements déclarés',
         'saas.payments.validate' => 'Valider un paiement après vérification',
@@ -121,6 +127,7 @@ class CentralRoleCatalog
     ];
 
     public const array PERMISSIONS = [
+        ...self::CREDIT_NOTE_PERMISSIONS,
         ...self::PAYMENT_PERMISSIONS,
         ...self::SUBSCRIPTION_PERMISSIONS,
         ...self::CARRIER_MAPPING_PERMISSIONS,

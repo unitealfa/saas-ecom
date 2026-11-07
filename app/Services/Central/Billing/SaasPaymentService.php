@@ -45,7 +45,8 @@ class SaasPaymentService
     private const string CASH_ACCOUNT = 'cash:central';
 
     public function __construct(private readonly AuthorizationMutation $mutations,
-        private readonly PaymentDocumentService $documents, private readonly PaidSubscriptionActivation $subscriptions) {}
+        private readonly PaymentDocumentService $documents, private readonly PaidSubscriptionActivation $subscriptions,
+        private readonly InvoicePaymentService $balances) {}
 
     /** @param array<string, mixed> $filters
      * @return LengthAwarePaginator<int, SaasPayment>
@@ -237,7 +238,8 @@ class SaasPaymentService
                         return $previous;
                     }
                 }
-                $anomaly = $amount !== $current->total_amount || $payments->contains(fn (SaasPayment $p): bool => $p->getAttribute('transfer_status') === TransferStatusEnum::VERIFIED);
+                $netDue = $this->balances->balance($actor, $current)['net_due'];
+                $anomaly = $amount !== $netDue || $payments->contains(fn (SaasPayment $p): bool => $p->getAttribute('transfer_status') === TransferStatusEnum::VERIFIED);
                 $payment = new SaasPayment;
                 $uuid = (string) Str::uuid();
                 $payment->forceFill(['uuid' => $uuid, 'user_id' => $current->user_id, 'document_id' => $current->id,
@@ -284,7 +286,7 @@ class SaasPaymentService
                     }
                     $invoice = $current->invoice;
                     $due = $invoice->installment;
-                    if ($invoice->status !== DocumentStatusEnum::ISSUED || $current->getAttribute('amount') !== $invoice->total_amount
+                    if ($invoice->status !== DocumentStatusEnum::ISSUED
                         || $current->getAttribute('currency') !== $invoice->currency) {
                         $this->fail('Cette obligation exige un seul paiement intégral non encore confirmé, dans la bonne devise.');
                     }
@@ -293,12 +295,13 @@ class SaasPaymentService
                         $this->fail('Les espèces utilisent leur référence interne et le registre central, sans référence bancaire.');
                     }
                     $this->documents->assertProof($current);
+                    $netDue = $this->balances->balance($actor, $invoice)['net_due'];
                     $received = ['occurred_at' => CarbonImmutable::parse($values['occurred_at']),
                         'transfer_reference' => $current->getAttribute('transfer_method') === TransferMethodEnum::CASH_IN_PERSON ? $current->getAttribute('transfer_reference') : $reference,
                         'financial_account_key' => $accountKey,
                         'encrypted_transfer_details' => [...($current->getAttribute('encrypted_transfer_details') ?? []),
-                            'account' => $account, 'receipt_reported_by_id' => $actor->id, 'receipt_reported_at' => now()->toISOString()]];
-                    if (! $due->matchesFullPeriod($invoice->subscription) || $due->installment_status !== InstallmentStatusEnum::PENDING
+                            'account' => $account, 'receipt_reported_by_id' => $actor->id, 'receipt_reported_at' => now()->toISOString(), 'settlement_total' => $netDue]];
+                    if ($current->getAttribute('amount') !== $netDue || ! $due->matchesFullPeriod($invoice->subscription) || $due->installment_status !== InstallmentStatusEnum::PENDING
                         || $invoice->subscription->period_ends_at?->lessThanOrEqualTo(now())
                         || $invoice->subscription->status === StatusEnum::CANCELLED
                         || SaasPayment::where('document_id', $invoice->id)->where('transfer_status', TransferStatusEnum::VERIFIED)->lockForUpdate()->first(['id']) !== null) {

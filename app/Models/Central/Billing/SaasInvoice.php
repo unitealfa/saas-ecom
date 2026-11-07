@@ -38,7 +38,7 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
  * @property array<string, mixed> $customer_identity_snapshot
  * @property CarbonImmutable $period_starts_at
  * @property CarbonImmutable $period_ends_at
- * @property CarbonImmutable $due_at
+ * @property CarbonImmutable|null $due_at
  * @property-read User $owner
  * @property-read Subscription $subscription
  * @property-read SubscriptionInstallment $installment
@@ -104,7 +104,7 @@ class SaasInvoice extends Model
     /** @return HasMany<SaasInvoiceLine, $this> */
     public function lines(): HasMany
     {
-        return $this->hasMany(SaasInvoiceLine::class, 'document_id')->orderBy('line_number');
+        return $this->hasMany($this instanceof SaasCreditNote ? SaasCreditNoteLine::class : SaasInvoiceLine::class, 'document_id')->orderBy('line_number');
     }
 
     /** @return BelongsTo<Media, $this> */

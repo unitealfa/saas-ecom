@@ -17,6 +17,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Fluent;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -40,12 +41,18 @@ class BillingRuleService
     /** @return array<string, mixed> */
     public static function contentRules(): array
     {
+        $creditEvent = static fn (Fluent $input): bool => in_array($input->get('trigger_event'),
+            [TriggerEventEnum::INVOICE_CORRECTION, TriggerEventEnum::INVOICE_CORRECTION->value], true);
+
         return [
             'code' => ['required', 'string', 'max:255', 'regex:/^[a-z0-9][a-z0-9_.-]*$/D'],
             'trigger_event' => ['required', Rule::enum(TriggerEventEnum::class)],
             'parameters' => ['required', 'array:document_type,payment_due_days'],
-            'parameters.document_type' => ['required', 'integer', Rule::in([DocumentTypeEnum::INVOICE->value])],
-            'parameters.payment_due_days' => ['required', 'integer', 'min:0'],
+            'parameters.document_type' => ['required', 'integer', Rule::when(
+                $creditEvent,
+                [Rule::in([DocumentTypeEnum::CREDIT_NOTE->value])], [Rule::in([DocumentTypeEnum::INVOICE->value])])],
+            'parameters.payment_due_days' => ['required', 'integer', 'min:0', Rule::when(
+                $creditEvent, [Rule::in([0])])],
         ];
     }
 
