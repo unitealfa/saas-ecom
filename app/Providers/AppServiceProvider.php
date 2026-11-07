@@ -39,6 +39,7 @@ use App\Models\User;
 use App\Policies\Central\BillingRulePolicy;
 use App\Policies\Central\BillingSequencePolicy;
 use App\Policies\Central\CarrierGeoMappingPolicy;
+use App\Policies\Central\ActivityPolicy;
 use App\Policies\Central\CountryPolicy;
 use App\Policies\Central\DomainPolicy;
 use App\Policies\Central\FeaturePolicy;
@@ -75,6 +76,7 @@ class AppServiceProvider extends ServiceProvider
 {
     /** @var array<class-string, class-string> Modèle => policy. */
     private const array POLICIES = [
+        Activity::class => ActivityPolicy::class,
         SaasCreditNote::class => SaasCreditNotePolicy::class,
         SaasInvoice::class => SaasInvoicePolicy::class,
         SaasPayment::class => SaasPaymentPolicy::class,

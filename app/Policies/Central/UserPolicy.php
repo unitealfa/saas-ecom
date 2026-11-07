@@ -16,6 +16,26 @@ class UserPolicy
         return $this->access->allows($actor, 'saas.users.view');
     }
 
+    public function viewAnyQuota(User $actor): bool
+    {
+        return $this->access->allows($actor, 'saas.quotas.view');
+    }
+
+    public function viewQuota(User $actor, User $target): bool
+    {
+        return $this->viewAnyQuota($actor);
+    }
+
+    public function reconcileQuota(User $actor, User $target): bool
+    {
+        return $this->access->allows($actor, 'saas.quotas.reconcile');
+    }
+
+    public function viewQuotaHistory(User $actor, User $target): bool
+    {
+        return $this->access->allows($actor, 'saas.quotas.history.view');
+    }
+
     public function updateProfilePhoto(User $actor, User $target): bool
     {
         return $this->updateOwnProfile($actor, $target);

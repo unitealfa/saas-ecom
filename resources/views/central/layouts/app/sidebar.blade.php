@@ -57,6 +57,10 @@
                         </flux:sidebar.item>
                     @endcan
 
+                    @can('viewAny', \App\Models\Central\Audit\Activity::class)
+                        <flux:sidebar.item :href="route('central.activity.index')" :current="request()->routeIs('central.activity.*')" wire:navigate>Journal d’activité</flux:sidebar.item>
+                    @endcan
+
                     @can('viewAny', \App\Models\Central\Tenants\Tenant::class)
                         <flux:sidebar.item
                             :href="route('central.tenants.index')"
@@ -64,6 +68,10 @@
                             wire:navigate>
                             {{ __('Boutiques') }}
                         </flux:sidebar.item>
+                    @endcan
+
+                    @can('viewAnyQuota', \App\Models\Central\Users\User::class)
+                        <flux:sidebar.item :href="route('central.quotas.index')" :current="request()->routeIs('central.quotas.*')" wire:navigate>Quotas</flux:sidebar.item>
                     @endcan
 
                     @can('viewAny', \App\Models\Central\Countries\Country::class)
