@@ -12,6 +12,7 @@
             @csrf
             <input type="hidden" name="operation_id" value="{{ $oldText('operation_id', (string) \Illuminate\Support\Str::uuid()) }}">
             <input type="hidden" name="currency" value="{{ $invoice->currency }}">
+            @if ($invoice->subscription->request)<input type="hidden" name="expected_request_state" value="{{ $invoice->subscription->request->managementState() }}">@endif
             <flux:input name="amount" label="Montant réellement reçu ou déclaré" inputmode="decimal" :value="$oldText('amount', $balance['net_due'])" required />
             <flux:input name="occurred_at" type="datetime-local" label="Date et heure réelles du paiement" :value="$oldText('occurred_at')" required />
             @if ($cash)

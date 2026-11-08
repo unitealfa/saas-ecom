@@ -2,7 +2,10 @@
 
 namespace App\Services\Central\Plans;
 
+use App\Enums\Central\Features\ValueTypeEnum;
+use App\Models\Central\Features\Feature;
 use App\Models\Central\Plans\Plan;
+use App\Models\Central\Plans\PlanFeature;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
@@ -33,14 +36,20 @@ class PublicPlanCatalog
 
     private function key(): string
     {
-        return 'public-plans:'.hash('sha256', (new Plan)->getConnection()->getDatabaseName());
+        return 'public-plans:v2:'.hash('sha256', (new Plan)->getConnection()->getDatabaseName());
     }
 
     /** @return list<array<string, mixed>> */
     private function rows(): array
     {
-        return array_values(Plan::active()->orderBy('code')->orderByDesc('version')
-            ->get(['uuid', 'code', 'version', 'name', 'description', 'monthly_price', 'annual_price'])
-            ->map(fn (Plan $plan): array => $plan->only(['uuid', 'code', 'version', 'name', 'description', 'monthly_price', 'annual_price']))->all());
+        return array_values(Plan::active()->with(['features' => fn ($query) => $query->where('is_active', true)
+            ->whereIn('feature_id', Feature::active()->select('id'))->with('feature')->orderBy('id')])
+            ->orderBy('code')->orderByDesc('version')
+            ->get(['id', 'uuid', 'code', 'version', 'name', 'description', 'monthly_price', 'annual_price'])
+            ->map(fn (Plan $plan): array => [...$plan->only(['uuid', 'code', 'version', 'name', 'description', 'monthly_price', 'annual_price']),
+                'features' => $plan->features->map(fn (PlanFeature $feature): array => [
+                    'name' => $feature->feature->name, 'value' => $feature->feature->value_type === ValueTypeEnum::BOOLEAN
+                        ? 'Inclus' : ($feature->limit === null ? 'Non précisé' : (string) $feature->limit),
+                ])->all()])->all());
     }
 }

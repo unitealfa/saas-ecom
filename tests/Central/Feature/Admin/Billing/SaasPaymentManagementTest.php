@@ -4,6 +4,7 @@ require_once dirname(__DIR__, 4).'/Support/ManualBillingFixtures.php';
 
 use App\Enums\Central\Billing\TransferStatusEnum;
 use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
+use App\Enums\Central\Subscriptions\PaymentChoiceEnum;
 use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Audit\Activity;
@@ -541,7 +542,8 @@ test('owner purchase validates current prices and preserves free rights without 
     $this->seed(FreePlanSeeder::class);
     $free = app(DefaultSubscription::class)->ensure($owner);
     $plan = Plan::factory()->create(['is_active' => true, 'monthly_price' => '3000.00', 'annual_price' => '36000.00']);
-    $data = ['plan_uuid' => $plan->uuid, 'period' => 2, 'operation_id' => (string) Str::uuid(), 'expected_amount' => '36000.00'];
+    $data = ['plan_uuid' => $plan->uuid, 'period' => 2, 'operation_id' => (string) Str::uuid(), 'expected_amount' => '36000.00',
+        'payment_choice' => PaymentChoiceEnum::CASH->value];
     $this->actingAs($owner, 'central')->get(route('owner.subscriptions.index'))->assertOk()->assertSee($plan->name);
     $this->post(route('owner.subscriptions.store'), [...$data, 'expected_amount' => '1.00'])->assertSessionHasErrors('plan_uuid');
     $this->post(route('owner.subscriptions.store'), $data)->assertSessionHasNoErrors()->assertRedirect();
@@ -637,9 +639,11 @@ test('public offer presentation is cached after commit and invalidated without c
         DB::flushQueryLog();
         DB::enableQueryLog();
         $first = $catalog->available();
+        expect(count(DB::getQueryLog()))->toBe(2);
+        DB::flushQueryLog();
         $catalog->available();
         $catalog->available();
-        expect(count(DB::getQueryLog()))->toBe(1)->and($first[0]['name'])->toBe('Before commit');
+        expect(DB::getQueryLog())->toBe([])->and($first[0]['name'])->toBe('Before commit');
         DB::disableQueryLog();
         $plan->forceFill(['name' => 'After commit'])->save();
         expect($catalog->available()[0]['name'])->toBe('After commit');

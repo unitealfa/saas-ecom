@@ -34,9 +34,12 @@ class PaymentController extends Controller
         return view('central.pages.admin.billing.payments.show', ['payment' => $payment->load(['invoice.subscription', 'owner']), 'ownerMode' => true, 'history' => null]);
     }
 
-    public function create(SaasInvoice $invoice): View
+    public function create(SaasInvoice $invoice): View|RedirectResponse
     {
         Gate::forUser($this->centralActor())->authorize('declarePayment', $invoice);
+        if ($invoice->subscription->request !== null) {
+            return to_route('owner.subscription-requests.show', $invoice->subscription->request);
+        }
 
         return view('central.pages.admin.billing.payments.create', ['invoice' => $invoice, 'cash' => false, 'balance' => $this->balances->balance($this->centralActor(), $invoice)]);
     }
@@ -71,6 +74,6 @@ class PaymentController extends Controller
     {
         Gate::forUser($this->centralActor())->authorize('viewOwn', SaasPayment::class);
 
-        return $this->documents->download($this->centralActor(), $payment, true);
+        return $this->documents->download($this->centralActor(), $payment, true, inline: request()->boolean('inline'));
     }
 }

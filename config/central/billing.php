@@ -10,6 +10,7 @@ if (! is_array($validatedCustomers)) {
 }
 
 return [
+    'request_rule_code' => env('BILLING_REQUEST_RULE_CODE'),
     'cash_instructions' => env('BILLING_CASH_INSTRUCTIONS'),
     'payment_instructions' => env('BILLING_PAYMENT_INSTRUCTIONS'),
     'issuer' => [

@@ -44,9 +44,21 @@ class SaasNumberingService
      */
     public function reserveNextNumber(User $actor, SaasInvoice $document, string $expected, Closure $validateDocument): SaasInvoice
     {
+        return $this->reserveDocument($actor, $document, $expected, $validateDocument, 'reserveNumber');
+    }
+
+    /** @param Closure(SaasInvoice): void $validateDocument */
+    public function reserveRequestNumber(User $actor, SaasInvoice $document, string $expected, Closure $validateDocument): SaasInvoice
+    {
+        return $this->reserveDocument($actor, $document, $expected, $validateDocument, 'reserveForRequest');
+    }
+
+    /** @param Closure(SaasInvoice): void $validateDocument */
+    private function reserveDocument(User $actor, SaasInvoice $document, string $expected, Closure $validateDocument, string $ability): SaasInvoice
+    {
         $this->assertCentralContext();
 
-        return $this->mutations->run($actor, 'reserveNumber', function () use ($document): SaasInvoice {
+        return $this->mutations->run($actor, $ability, function () use ($document): SaasInvoice {
             User::withTrashed()->whereKey($document->user_id)->lockForUpdate()->firstOrFail();
             Subscription::whereKey($document->subscription_id)->lockForUpdate()->firstOrFail();
             SubscriptionInstallment::whereKey($document->installment_id)->lockForUpdate()->firstOrFail();

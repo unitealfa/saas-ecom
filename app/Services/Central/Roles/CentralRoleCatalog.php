@@ -22,6 +22,8 @@ class CentralRoleCatalog
         'saas.payments.validate' => 'Valider un paiement après vérification',
         'saas.payments.reject' => 'Rejeter une déclaration de paiement',
         'saas.payments.reconcile' => 'Rapprocher un paiement avec les fonds et documents correspondants',
+    ];
+
     public const array ACTIVITY_PERMISSIONS = [
         'saas.activity.view' => 'Consulter et rechercher les activités centrales',
         'saas.activity.export' => 'Exporter les activités centrales autorisées',

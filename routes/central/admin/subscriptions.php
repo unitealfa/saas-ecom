@@ -1,7 +1,16 @@
 <?php
 
 use App\Http\Controllers\Central\Admin\Subscriptions\SubscriptionController;
+use App\Http\Controllers\Central\Admin\Subscriptions\SubscriptionRequestController;
 use Illuminate\Support\Facades\Route;
+
+Route::controller(SubscriptionRequestController::class)->prefix('subscriptions/requests')->name('subscription-requests.')->whereUuid('subscriptionRequest')->group(function (): void {
+    Route::get('/', 'index')->name('index');
+    Route::get('{subscriptionRequest}', 'show')->name('show');
+    Route::post('{subscriptionRequest}/invoice', 'prepareInvoice')->name('invoice');
+    Route::post('{subscriptionRequest}/accept', 'accept')->name('accept');
+    Route::post('{subscriptionRequest}/reject', 'reject')->name('reject');
+});
 
 Route::controller(SubscriptionController::class)->prefix('subscriptions')->name('subscriptions.')->group(function (): void {
     Route::get('/', 'index')->name('index');

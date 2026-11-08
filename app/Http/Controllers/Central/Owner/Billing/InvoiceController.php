@@ -46,6 +46,6 @@ class InvoiceController extends Controller
     {
         Gate::forUser($this->centralActor())->authorize('viewOwn', SaasInvoice::class);
 
-        return $issuance->download($this->centralActor(), $invoice);
+        return $issuance->download($this->centralActor(), $invoice, inline: request()->boolean('inline'));
     }
 }

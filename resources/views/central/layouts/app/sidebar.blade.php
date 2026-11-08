@@ -131,6 +131,7 @@
                         <flux:sidebar.item :href="route('owner.payments.index')" :current="request()->routeIs('owner.payments.*')" wire:navigate>Mes paiements</flux:sidebar.item>
                     @endcan
                     @can('purchase', \App\Models\Central\Subscriptions\Subscription::class)
+                        <flux:sidebar.item :href="route('owner.subscription-requests.index')" :current="request()->routeIs('owner.subscription-requests.*')" wire:navigate>Mes demandes d’abonnement</flux:sidebar.item>
                         <flux:sidebar.item :href="route('owner.subscriptions.index')" :current="request()->routeIs('owner.subscriptions.*')" wire:navigate>Mon abonnement et les offres</flux:sidebar.item>
                     @endcan
                       @can('viewOwn', \App\Models\Central\Billing\SaasInvoice::class)
@@ -207,6 +208,10 @@
                             wire:navigate>
                             {{ __('Abonnements') }}
                         </flux:sidebar.item>
+                    @endcan
+
+                    @can('viewAny', \App\Models\Central\Subscriptions\SubscriptionRequest::class)
+                        <flux:sidebar.item :href="route('central.subscription-requests.index')" :current="request()->routeIs('central.subscription-requests.*')" wire:navigate>Abonnements — Demandes</flux:sidebar.item>
                     @endcan
 
                 </flux:sidebar.group>

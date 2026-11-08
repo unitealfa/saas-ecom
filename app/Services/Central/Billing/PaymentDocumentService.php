@@ -185,13 +185,19 @@ class PaymentDocumentService
         }
     }
 
-    public function download(User $actor, SaasPayment $payment, bool $receipt): StreamedResponse
+    public function download(User $actor, SaasPayment $payment, bool $receipt, bool $inline = false): StreamedResponse
     {
         abort_if(tenancy()->initialized, 403);
         Gate::forUser($actor)->authorize($receipt ? 'receipt' : 'view', $payment);
         $media = $receipt ? $this->generatePaymentReceipt($actor, $payment) : $this->assertProof($payment);
 
-        return $this->files->download($actor, $media);
+        $response = $this->files->download($actor, $media);
+        if ($receipt && $inline) {
+            $response->headers->set('Content-Type', 'application/pdf');
+            $response->headers->set('Content-Disposition', $response->headers->makeDisposition('inline', 'recu-'.$payment->getAttribute('uuid').'.pdf'));
+        }
+
+        return $response;
     }
 
     private function attach(User $actor, SaasPayment $payment, Media $proof, ?Media $source): void

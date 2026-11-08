@@ -1,6 +1,11 @@
 <x-layouts::app :title="__('Abonnement')">
     <section class="flex flex-col gap-6">
         <flux:heading size="xl" level="1">Détail de l’abonnement</flux:heading>
+        @if ($subscription->request)
+            @can('viewAny', \App\Models\Central\Subscriptions\SubscriptionRequest::class)
+                <flux:button :href="route('central.subscription-requests.show', $subscription->request)">Consulter la demande et son paiement</flux:button>
+            @endcan
+        @endif
         @if (session('status'))<flux:text role="status">{{ session('status') }}</flux:text>@endif
         @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
         <dl class="grid gap-4 sm:grid-cols-2">

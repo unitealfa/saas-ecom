@@ -14,6 +14,7 @@ use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Media\Media;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Subscriptions\SubscriptionInstallment;
+use App\Models\Central\Subscriptions\SubscriptionRequest;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use App\Services\Central\Media\CentralMediaService;
@@ -53,8 +54,18 @@ class SaasInvoiceIssuanceService
 
     public function issue(User $actor, SaasInvoice $invoice, string $expected): SaasInvoice
     {
+        return $this->emit($actor, $invoice, $expected, 'issue');
+    }
+
+    public function issueForRequest(User $actor, SaasInvoice $invoice, string $expected): SaasInvoice
+    {
+        return $this->emit($actor, $invoice, $expected, 'issueForRequest');
+    }
+
+    private function emit(User $actor, SaasInvoice $invoice, string $expected, string $ability): SaasInvoice
+    {
         abort_if(tenancy()->initialized, 403);
-        Gate::forUser($actor)->authorize('issue', $invoice);
+        Gate::forUser($actor)->authorize($ability, $invoice);
         $lock = 'invoice:'.hash('sha256', DB::connection()->getDatabaseName().':'.$invoice->uuid);
         $lock = substr($lock, 0, 64);
         if ((int) DB::selectOne('SELECT GET_LOCK(?, ?) AS acquired', [$lock, self::LOCK_WAIT_SECONDS])->acquired !== 1) {
@@ -62,7 +73,7 @@ class SaasInvoiceIssuanceService
         }
         try {
             $current = $invoice->newQuery()->whereKey($invoice->id)->firstOrFail();
-            Gate::forUser($actor)->authorize('issue', $current);
+            Gate::forUser($actor)->authorize($ability, $current);
             if ($current->status === DocumentStatusEnum::ISSUED) {
                 $this->assertMedia($current);
 
@@ -71,11 +82,13 @@ class SaasInvoiceIssuanceService
             if ($current->saas_identity_snapshot['preparation_only'] ?? false) {
                 $this->fail('Cette préparation de démonstration ne peut pas être émise : elle ne contient pas les identités et paramètres fiscaux validés nécessaires.');
             }
-            $current = $this->numbering->reserveNextNumber($actor, $current, $expected, $this->assertIssuable(...));
+            $current = $ability === 'issueForRequest'
+                ? $this->numbering->reserveRequestNumber($actor, $current, $expected, $this->assertIssuable(...))
+                : $this->numbering->reserveNextNumber($actor, $current, $expected, $this->assertIssuable(...));
             $this->assertIssuable($current);
             $file = $this->pdf->generate($current);
 
-            return $this->finalize($actor, $current, $file);
+            return $this->finalize($actor, $current, $file, $ability);
         } catch (Throwable $exception) {
             activity('central')->causedBy($actor)->performedOn($invoice)->event($invoice instanceof SaasCreditNote ? self::CREDIT_FAILED : self::EVENT_FAILED)
                 ->tap(fn (Activity $activity) => $activity->forceFill(['correlation_id' => $invoice->getAttribute('correlation_id')]))
@@ -93,9 +106,9 @@ class SaasInvoiceIssuanceService
     }
 
     /** @param array{storage_key: string, file_hash: string, size_bytes: int} $file */
-    private function finalize(User $actor, SaasInvoice $invoice, array $file): SaasInvoice
+    private function finalize(User $actor, SaasInvoice $invoice, array $file, string $ability): SaasInvoice
     {
-        return $this->mutations->run($actor, 'issue', function () use ($invoice): SaasInvoice {
+        return $this->mutations->run($actor, $ability, function () use ($invoice): SaasInvoice {
             User::withTrashed()->whereKey($invoice->user_id)->lockForUpdate()->firstOrFail();
             Subscription::whereKey($invoice->subscription_id)->lockForUpdate()->firstOrFail();
             SubscriptionInstallment::whereKey($invoice->installment_id)->lockForUpdate()->firstOrFail();
@@ -145,14 +158,20 @@ class SaasInvoiceIssuanceService
         });
     }
 
-    public function download(User $actor, SaasInvoice $invoice): StreamedResponse
+    public function download(User $actor, SaasInvoice $invoice, bool $inline = false): StreamedResponse
     {
         abort_if(tenancy()->initialized, 403);
         $current = $invoice->newQuery()->whereKey($invoice->id)->firstOrFail();
         Gate::forUser($actor)->authorize('download', $current);
         $media = $this->assertMedia($current);
 
-        return $this->files->download($actor, $media);
+        $response = $this->files->download($actor, $media);
+        if ($inline) {
+            $response->headers->set('Content-Type', 'application/pdf');
+            $response->headers->set('Content-Disposition', $response->headers->makeDisposition('inline', 'facture-'.$current->uuid.'.pdf'));
+        }
+
+        return $response;
     }
 
     private function assertMedia(SaasInvoice $invoice): Media
@@ -186,6 +205,13 @@ class SaasInvoiceIssuanceService
             $this->credits->assertIssuable($invoice);
 
             return;
+        }
+        $requestId = $invoice->subscription->getAttribute('subscription_request_id');
+        if ($requestId !== null) {
+            $request = SubscriptionRequest::whereKey($requestId)->lockForUpdate()->firstOrFail();
+            if ($request->status->isFinal() || $request->current_subscription_id !== $invoice->subscription_id || $request->current_invoice_id !== $invoice->id) {
+                $this->fail('Cette facture ne correspond plus à la demande courante.');
+            }
         }
         if ($invoice->status === DocumentStatusEnum::DRAFT) {
             $rule = $invoice->billingRule;

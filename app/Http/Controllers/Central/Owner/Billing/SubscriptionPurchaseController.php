@@ -7,14 +7,14 @@ use App\Http\Requests\Central\Subscriptions\PurchaseSubscriptionRequest;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Subscriptions\SubscriptionInstallment;
 use App\Services\Central\Plans\PublicPlanCatalog;
-use App\Services\Central\Subscriptions\SubscriptionPurchaseService;
+use App\Services\Central\Subscriptions\SubscriptionRequestService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 
 class SubscriptionPurchaseController extends Controller
 {
-    public function __construct(private readonly SubscriptionPurchaseService $purchases, private readonly PublicPlanCatalog $plans) {}
+    public function __construct(private readonly SubscriptionRequestService $requests, private readonly PublicPlanCatalog $plans) {}
 
     public function index(): View
     {
@@ -26,9 +26,9 @@ class SubscriptionPurchaseController extends Controller
 
     public function store(PurchaseSubscriptionRequest $request): RedirectResponse
     {
-        $subscription = $this->purchases->choose($this->centralActor(), $request->validated());
+        $subscriptionRequest = $this->requests->create($this->centralActor(), $request->validated());
 
-        return to_route('owner.subscriptions.show', $subscription)->with('status', 'Offre choisie. La période sera activée après émission de la facture et confirmation intégrale du paiement.');
+        return to_route('owner.subscription-requests.show', $subscriptionRequest)->with('status', $subscriptionRequest->getAttribute('invoice_error') ?? 'Demande créée. Sa facture est disponible avant paiement ; aucun droit payant n’est encore activé.');
     }
 
     public function show(Subscription $subscription): View

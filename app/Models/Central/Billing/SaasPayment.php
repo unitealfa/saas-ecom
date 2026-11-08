@@ -73,6 +73,16 @@ class SaasPayment extends Model
         return $this->getAttribute('reversal_of_id') !== null ? 'Correction comptable' : $this->getAttribute('transfer_status')->label();
     }
 
+    /** Un signal de réception bloque une correction commerciale, même sans validation finale. */
+    public function hasReportedFunds(): bool
+    {
+        $details = $this->getAttribute('encrypted_transfer_details') ?? [];
+
+        return $this->getAttribute('transfer_method') === TransferMethodEnum::CASH_IN_PERSON
+            || in_array($this->getAttribute('transfer_status'), [TransferStatusEnum::VERIFIED, TransferStatusEnum::REVERSED], true)
+            || ($details['cash_received'] ?? false) === true || isset($details['receipt_reported_by_id']);
+    }
+
     /** @return MorphMany<Media, $this> */
     public function documents(): MorphMany
     {

@@ -1,8 +1,8 @@
 <x-layouts::app :title="__('Attribuer un abonnement')">
     <section class="mx-auto flex max-w-2xl flex-col gap-6">
         <flux:heading size="xl" level="1">Attribuer un abonnement</flux:heading>
-        <flux:text>L’abonnement commence immédiatement. Son montant correspond au tarif mensuel ou annuel de l’offre. Le renouvellement automatique est désactivé.</flux:text>
-        <flux:text>Une offre gratuite en cours sera remplacée et conservée dans l’historique. Un abonnement payant en cours ou prévu bloque l’attribution.</flux:text>
+        <flux:text>Une demande et une période sont réservées au tarif de l’offre. Aucun droit payant ne commence avant la réception intégrale confirmée. Le renouvellement automatique est désactivé.</flux:text>
+        <flux:text>Les droits actuels sont conservés. Une période déjà prévue bloque une seconde réservation ; un abonnement payant en cours doit suivre son parcours de changement à échéance.</flux:text>
         @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
         <form method="POST" action="{{ route('central.subscriptions.store') }}" class="flex flex-col gap-5">
             @csrf
@@ -23,7 +23,10 @@
                     <option value="{{ $period->value }}" @selected((string) old('period', 1) === (string) $period->value)>{{ $period->label() }}</option>
                 @endforeach
             </flux:select>
-            <div class="flex gap-3"><flux:button type="submit" variant="primary">Attribuer</flux:button>
+            <flux:select name="payment_choice" label="Moyen de paiement prévu" required>
+                @foreach (\App\Enums\Central\Subscriptions\PaymentChoiceEnum::cases() as $choice)<option value="{{ $choice->value }}" @selected((string) old('payment_choice', 1) === (string) $choice->value)>{{ $choice->label() }}</option>@endforeach
+            </flux:select>
+            <div class="flex gap-3"><flux:button type="submit" variant="primary">Créer la demande</flux:button>
                 @can('viewAny', \App\Models\Central\Subscriptions\Subscription::class)<flux:button :href="route('central.subscriptions.index')">Retour</flux:button>@endcan
             </div>
         </form>

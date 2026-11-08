@@ -1,5 +1,18 @@
 # Diagramme complet de la BDD centrale
 
+**Complément courant, 7 novembre 2026 :** `subscription_requests` est une nouvelle table de suivi centrale, distincte du journal financier. `user_id` référence users ; les pointeurs courants visent les types abonnement, facture et paiement du même propriétaire par FK composites. Le lien nullable `subscriptions.subscription_request_id` conserve les versions anciennes. État, choix espèces/externe, version, auteur/date/motif de décision et clé idempotente sont portés par la demande ; prix, preuves, numéros et écritures restent dans les tables existantes. Les historiques ci-dessous restent conservés. Aucun remboursement commercial ni avoir automatique. Voir [le rapport et les contraintes](Module-22-Parcours-Demandes.md) ; migration réelle non exécutée.
+
+```mermaid
+flowchart LR
+    U[users] --> R[subscription_requests]
+    R -->|période courante| S[subscriptions type 1]
+    S -->|origine permanente| R
+    R -->|facture courante| I[saas_invoices type 1]
+    R -->|paiement courant| P[saas_transfers type 1]
+    I -->|PDF privé| M[media]
+    P -->|preuve et reçu privés| M
+```
+
 **Décision courante Module 21, 6 novembre 2026 :** `saas_transfers` conserve les paiements manuels, sans table supplémentaire. Méthode 5 = espèces réellement reçues sur place ; montant intégral seulement. Nouvelle attribution payante, administrative comprise, en attente de confirmation. Un dépôt de preuve n'accorde aucun droit ; paiement, échéance et activation sont atomiques. Le reçu privé ne modifie pas la facture. Les mécanismes historiques restent lisibles sans activer de remboursement commercial. Voir [l'implémentation et ses contrôles](Module-21-Paiements-Manuels.md) ; migration réelle non exécutée pour cette mission.
 
 **Coordonnées centrales — décision du 19 octobre 2026 :** un e-mail et au maximum un téléphone par compte, directement dans users, avec unicité centrale et normalisation E.164. user_contacts et ses deux triggers sont retirés par migration corrective. Fortify utilise uniquement l’e-mail actuel ; changement soumis à vérification. Le téléphone reste obligatoire à l’inscription publique ; comptes historiques sans numéro conservés. Voir architecture §32–34.
