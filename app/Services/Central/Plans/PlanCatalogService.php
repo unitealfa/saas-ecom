@@ -17,8 +17,9 @@ class PlanCatalogService
     public function paginate(User $actor, ?string $search = null): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize('viewAny', Plan::class);
+
         $search = trim((string) $search);
-        $pattern = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
+        $pattern = '%'.addcslashes($search, '\\%_').'%';
 
         return Plan::withTrashed()
             ->when($search !== '', fn (Builder $query) => $query->where(

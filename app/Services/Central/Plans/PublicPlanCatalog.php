@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Services\Central\Plans;
@@ -5,6 +6,7 @@ namespace App\Services\Central\Plans;
 use App\Enums\Central\Features\ValueTypeEnum;
 use App\Models\Central\Features\Feature;
 use App\Models\Central\Plans\Plan;
+use App\Models\Central\Plans\PlanFeature;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
@@ -12,33 +14,68 @@ class PublicPlanCatalog
 {
     private const int TTL = 43200;
 
+    private const array FIELDS = [
+        'uuid',
+        'code',
+        'version',
+        'name',
+        'description',
+        'monthly_price',
+        'annual_price',
+    ];
+
     /** @return list<array<string, mixed>> */
     public function available(): array
     {
         abort_if(tenancy()->initialized, 403);
+
+        // Ne pas utiliser le cache pendant une transaction.
         if ((new Plan)->getConnection()->transactionLevel() > 0) {
             return $this->rows();
         }
-        $store = Cache::store('file');
-        $version = $store->get($this->key().':version', 'initial');
 
-        return $store->remember($this->key().':'.$version, self::TTL, fn (): array => $this->rows());
+        $store = Cache::store('file');
+        $version = $store->get($this->versionKey(), 'initial');
+
+        return $store->remember(
+            $this->entryKey($version),
+            self::TTL,
+            fn (): array => $this->rows()
+        );
     }
 
+    /** Invalide le cache après modification du catalogue. */
     public function invalidate(): void
     {
         $store = Cache::store('file');
-        $previous = $store->get($this->key().':version', 'initial');
-        $store->forever($this->key().':version', (string) Str::uuid());
-        $store->forget($this->key().':'.$previous);
+        $previous = $store->get($this->versionKey(), 'initial');
+
+        $store->forever(
+            $this->versionKey(),
+            (string) Str::uuid()
+        );
+
+        $store->forget($this->entryKey($previous));
     }
 
-    private function key(): string
+    private function versionKey(): string
     {
-        return 'public-plans:v2:'.hash('sha256', (new Plan)->getConnection()->getDatabaseName());
+        return $this->prefix().':version';
     }
 
-    /** @return list<array<string, mixed>> */
+    private function entryKey(string $version): string
+    {
+        return $this->prefix().':'.$version;
+    }
+
+    /** Le nom de la base isole les caches des environnements. */
+    private function prefix(): string
+    {
+        return 'public-plans:v2:'.hash(
+            'sha256',
+            (new Plan)->getConnection()->getDatabaseName()
+        );
+    }
 
     /** @return list<array<string, mixed>> */
     private function rows(): array
@@ -47,22 +84,16 @@ class PublicPlanCatalog
             ->with([
                 'features' => fn ($query) => $query
                     ->where('is_active', true)
-                    ->whereIn('feature_id', Feature::active()->select('id'))
+                    ->whereIn(
+                        'feature_id',
+                        Feature::active()->select('id')
+                    )
                     ->with('feature')
                     ->orderBy('id'),
             ])
             ->orderBy('code')
             ->orderByDesc('version')
-            ->get([
-                'id',
-                'uuid',
-                'code',
-                'version',
-                'name',
-                'description',
-                'monthly_price',
-                'annual_price',
-            ]);
+            ->get(['id', ...self::FIELDS]);
 
         $result = [];
 
@@ -70,34 +101,31 @@ class PublicPlanCatalog
             /** @var Plan $plan */
             $features = [];
 
-            foreach ($plan->features as $item) {
-                $isBoolean = (int) $item->feature->getRawOriginal('value_type')
-                    === ValueTypeEnum::BOOLEAN->value;
-
+            foreach ($plan->features as $feature) {
+                /** @var PlanFeature $feature */
                 $features[] = [
-                    'name' => $item->feature->name,
-                    'value' => $isBoolean
-                        ? 'Inclus'
-                        : ($item->limit === null
-                            ? 'Non précisé'
-                            : (string) $item->limit),
+                    'name' => $feature->feature->name,
+                    'value' => $this->valueLabel($feature),
                 ];
             }
 
             $result[] = [
-                ...$plan->only([
-                    'uuid',
-                    'code',
-                    'version',
-                    'name',
-                    'description',
-                    'monthly_price',
-                    'annual_price',
-                ]),
+                ...$plan->only(self::FIELDS),
                 'features' => $features,
             ];
         }
 
         return $result;
+    }
+
+    private function valueLabel(PlanFeature $feature): string
+    {
+        if ($feature->feature->value_type === ValueTypeEnum::BOOLEAN) {
+            return 'Inclus';
+        }
+
+        return $feature->limit === null
+            ? 'Non précisé'
+            : (string) $feature->limit;
     }
 }
