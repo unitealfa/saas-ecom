@@ -56,6 +56,7 @@ class Subscription extends Model
             'user_id' => 'integer',
             'plan_id' => 'integer',
             'assigned_by_id' => 'integer',
+            'subscription_request_id' => 'integer',
             'status' => StatusEnum::class,
             'period' => PeriodEnum::class,
             'agreed_amount' => 'decimal:2',
@@ -84,6 +85,12 @@ class Subscription extends Model
     public function assignedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_by_id')->withTrashed();
+    }
+
+    /** @return BelongsTo<SubscriptionRequest, $this> */
+    public function request(): BelongsTo
+    {
+        return $this->belongsTo(SubscriptionRequest::class, 'subscription_request_id');
     }
 
     public function transitionState(): string

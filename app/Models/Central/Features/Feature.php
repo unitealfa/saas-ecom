@@ -7,6 +7,7 @@ use App\Enums\Central\Features\PeriodEnum;
 use App\Enums\Central\Features\QuotaScopeEnum;
 use App\Enums\Central\Features\ValueTypeEnum;
 use App\Models\Central\Plans\PlanFeature;
+use App\Services\Central\Plans\PublicPlanCatalog;
 use Database\Factories\Central\FeatureFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
@@ -44,6 +45,12 @@ class Feature extends Model
 
     protected static function booted(): void
     {
+        $invalidate = static function (self $feature): void {
+            $feature->getConnection()->afterCommit(fn () => app(PublicPlanCatalog::class)->invalidate());
+        };
+        static::saved($invalidate);
+        static::deleted($invalidate);
+        static::restored($invalidate);
         static::updating(function (self $feature): void {
             if ($feature->isDirty('code')) {
                 throw new LogicException('A commercial feature code is immutable.');

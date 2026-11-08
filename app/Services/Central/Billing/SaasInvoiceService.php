@@ -12,6 +12,7 @@ use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Billing\SaasInvoiceLine;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Subscriptions\SubscriptionInstallment;
+use App\Models\Central\Subscriptions\SubscriptionRequest;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use Carbon\CarbonImmutable;
@@ -58,13 +59,36 @@ class SaasInvoiceService
 
     public function prepareInstallment(User $actor, Subscription $subscription, SubscriptionInstallment $installment, string $ruleUuid, string $expected): SaasInvoice
     {
+        return $this->prepare($actor, $subscription, $installment, $ruleUuid, $expected, null);
+    }
+
+    public function prepareForRequest(User $actor, SubscriptionRequest $request, string $ruleUuid): SaasInvoice
+    {
+        abort_if(tenancy()->initialized, 403);
+        Gate::forUser($actor)->authorize('prepareInvoice', $request);
+        $subscription = $request->subscription;
+        abort_unless($subscription instanceof Subscription, 422);
+        $due = SubscriptionInstallment::where('parent_subscription_id', $subscription->id)->sole();
+
+        return $this->prepare($actor, $subscription, $due, $ruleUuid, $due->managementState(), $request);
+    }
+
+    private function prepare(User $actor, Subscription $subscription, SubscriptionInstallment $installment, string $ruleUuid, string $expected, ?SubscriptionRequest $request): SaasInvoice
+    {
         abort_if(tenancy()->initialized, 403);
 
-        return $this->mutations->run($actor, 'create', fn () => SaasInvoice::class,
-            function () use ($actor, $subscription, $installment, $ruleUuid, $expected): SaasInvoice {
+        return $this->mutations->run($actor, $request === null ? 'create' : 'prepareInvoice', fn () => $request ?? SaasInvoice::class,
+            function () use ($actor, $subscription, $installment, $ruleUuid, $expected, $request): SaasInvoice {
                 $owner = User::withTrashed()->whereKey($subscription->user_id)->lockForUpdate()->firstOrFail();
                 $parent = Subscription::whereKey($subscription->id)->lockForUpdate()->firstOrFail();
                 $due = SubscriptionInstallment::whereKey($installment->id)->lockForUpdate()->firstOrFail();
+                if ($request !== null) {
+                    $currentRequest = SubscriptionRequest::whereKey($request->id)->lockForUpdate()->firstOrFail();
+                    Gate::forUser($actor)->authorize('prepareInvoice', $currentRequest);
+                    if ($currentRequest->current_subscription_id !== $parent->id || $parent->getAttribute('subscription_request_id') !== $currentRequest->id || $currentRequest->status->isFinal()) {
+                        $this->fail('request', 'La demande a changé. Aucune facture ne peut être créée pour son ancienne version.');
+                    }
+                }
                 if ($due->parent_subscription_id !== $parent->id || $due->user_id !== $owner->id
                     || $due->period_ends_at->lessThanOrEqualTo($due->period_starts_at)) {
                     $this->fail('installment', 'Cette échéance ne peut pas être facturée pour cet abonnement.');

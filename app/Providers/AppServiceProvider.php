@@ -25,6 +25,7 @@ use App\Models\Central\Shipping\PickupPoint;
 use App\Models\Central\Shipping\ShippingCarrier;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Subscriptions\SubscriptionInstallment;
+use App\Models\Central\Subscriptions\SubscriptionRequest;
 use App\Models\Central\Tenants\Tenant;
 use App\Models\Central\Users\User as CentralUser;
 use App\Models\Examples\Test;
@@ -36,10 +37,10 @@ use App\Models\Tenant\Roles\Role as TenantRole;
 use App\Models\Tenant\Shop\Shop;
 use App\Models\Tenant\Users\User as ShopUser;
 use App\Models\User;
+use App\Policies\Central\ActivityPolicy;
 use App\Policies\Central\BillingRulePolicy;
 use App\Policies\Central\BillingSequencePolicy;
 use App\Policies\Central\CarrierGeoMappingPolicy;
-use App\Policies\Central\ActivityPolicy;
 use App\Policies\Central\CountryPolicy;
 use App\Policies\Central\DomainPolicy;
 use App\Policies\Central\FeaturePolicy;
@@ -55,6 +56,7 @@ use App\Policies\Central\SaasPaymentPolicy;
 use App\Policies\Central\ShippingCarrierPolicy;
 use App\Policies\Central\SubscriptionInstallmentPolicy;
 use App\Policies\Central\SubscriptionPolicy;
+use App\Policies\Central\SubscriptionRequestPolicy;
 use App\Policies\Central\TenantPolicy;
 use App\Policies\Central\TenantSchemaDeploymentPolicy;
 use App\Policies\Central\UserPolicy;
@@ -89,6 +91,7 @@ class AppServiceProvider extends ServiceProvider
         Permission::class => PermissionPolicy::class,
         Plan::class => PlanPolicy::class,
         Subscription::class => SubscriptionPolicy::class,
+        SubscriptionRequest::class => SubscriptionRequestPolicy::class,
         Country::class => CountryPolicy::class,
         ShippingCarrier::class => ShippingCarrierPolicy::class,
         CarrierGeoMapping::class => CarrierGeoMappingPolicy::class,
@@ -121,6 +124,7 @@ class AppServiceProvider extends ServiceProvider
     private function registerMorphMap(): void
     {
         Relation::morphMap([
+            'subscription_request' => SubscriptionRequest::class,
             'saas_document_delivery' => SaasDocumentDelivery::class,
             'saas_credit_note' => SaasCreditNote::class,
             'saas_invoice' => SaasInvoice::class,

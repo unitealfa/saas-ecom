@@ -6,9 +6,24 @@ use App\Enums\Central\Billing\DocumentStatusEnum;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
+use Illuminate\Support\Facades\Gate;
 
 class SaasInvoicePolicy
 {
+    public function issueForRequest(User $actor, SaasInvoice $invoice): bool
+    {
+        $request = $invoice->subscription->request;
+
+        return $request !== null && $request->current_invoice_id === $invoice->id
+            && $request->current_subscription_id === $invoice->subscription_id
+            && Gate::forUser($actor)->allows('prepareInvoice', $request);
+    }
+
+    public function reserveForRequest(User $actor, SaasInvoice $invoice): bool
+    {
+        return in_array($invoice->status, [DocumentStatusEnum::DRAFT, DocumentStatusEnum::PREPARING], true) && $this->issueForRequest($actor, $invoice);
+    }
+
     public function synchronizeBalance(User $actor, SaasInvoice $invoice): bool
     {
         return ! tenancy()->initialized && ($this->access->allows($actor, 'saas.credit-notes.issue')

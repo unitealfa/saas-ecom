@@ -2,6 +2,7 @@
 
 namespace App\Services\Central\Subscriptions;
 
+use App\Enums\Central\Subscriptions\PaymentChoiceEnum;
 use App\Enums\Central\Subscriptions\PeriodEnum;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Users\User;
@@ -13,7 +14,7 @@ use Illuminate\Validation\ValidationException;
 
 class SubscriptionAssignmentService
 {
-    public function __construct(private readonly SubscriptionPurchaseService $purchases) {}
+    public function __construct(private readonly SubscriptionRequestService $requests) {}
 
     /** @return array<string, mixed> */
     public static function rules(): array
@@ -24,6 +25,7 @@ class SubscriptionAssignmentService
             'operation_key' => ['required', 'string', 'uuid:4'],
             'period' => ['required', 'integer', Rule::enum(PeriodEnum::class)],
             'expected_amount' => ['required', 'string', 'regex:/^\d{1,6}(?:\.\d{1,2})?$/D'],
+            'payment_choice' => ['sometimes', 'integer', Rule::enum(PaymentChoiceEnum::class)],
             ...array_fill_keys(['id', 'uuid', 'status', 'agreed_amount', 'period_starts_at', 'period_ends_at', 'auto_renew', 'assigned_by_id', 'tenant_id'], ['prohibited']),
         ];
     }
@@ -39,10 +41,13 @@ class SubscriptionAssignmentService
             throw ValidationException::withMessages(['owner_uuid' => 'Choisissez un commerçant actif.']);
         }
 
-        return $this->purchases->chooseFor($actor, $owner, [
+        $request = $this->requests->createFor($actor, $owner, [
             'plan_uuid' => $values['plan_uuid'], 'period' => $values['period'],
             'operation_id' => $values['operation_key'],
             'expected_amount' => (string) BigDecimal::of($values['expected_amount'])->toScale(2),
+            'payment_choice' => $values['payment_choice'] ?? PaymentChoiceEnum::CASH->value,
         ]);
+
+        return $request->subscription;
     }
 }

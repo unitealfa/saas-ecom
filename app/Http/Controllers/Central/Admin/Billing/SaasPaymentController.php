@@ -10,6 +10,7 @@ use App\Http\Requests\Central\Billing\StoreSaasPaymentRequest;
 use App\Models\Central\Audit\Activity;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Billing\SaasPayment;
+use App\Models\Central\Subscriptions\SubscriptionRequest;
 use App\Services\Central\Billing\InvoicePaymentService;
 use App\Services\Central\Billing\PaymentDocumentService;
 use App\Services\Central\Billing\SaasPaymentService;
@@ -36,9 +37,12 @@ class SaasPaymentController extends Controller
             'history' => Activity::forSubject($payment)->orderByDesc('id')->paginate(20)]);
     }
 
-    public function createCash(SaasInvoice $invoice): View
+    public function createCash(SaasInvoice $invoice): View|RedirectResponse
     {
         Gate::forUser($this->centralActor())->authorize('recordCashPayment', $invoice);
+        if ($invoice->subscription->request !== null && Gate::forUser($this->centralActor())->allows('viewAny', SubscriptionRequest::class)) {
+            return to_route('central.subscription-requests.show', $invoice->subscription->request);
+        }
 
         return view('central.pages.admin.billing.payments.create', ['invoice' => $invoice, 'cash' => true, 'balance' => $this->balances->balance($this->centralActor(), $invoice)]);
     }
@@ -94,7 +98,7 @@ class SaasPaymentController extends Controller
     {
         Gate::forUser($this->centralActor())->authorize('viewAny', SaasPayment::class);
 
-        return $this->documents->download($this->centralActor(), $payment, true);
+        return $this->documents->download($this->centralActor(), $payment, true, inline: request()->boolean('inline'));
     }
 
     private function redirectWithStatus(SaasPayment $payment, string $message): RedirectResponse

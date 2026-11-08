@@ -90,7 +90,7 @@ class SaasInvoiceController extends Controller
     {
         Gate::forUser($this->centralActor())->authorize('downloadAdmin', $invoice);
 
-        return $issuance->download($this->centralActor(), $invoice);
+        return $issuance->download($this->centralActor(), $invoice, inline: request()->boolean('inline'));
     }
 
     public function prepareInstallment(CreateInstallmentInvoiceRequest $request, Subscription $subscription, SubscriptionInstallment $installment): RedirectResponse

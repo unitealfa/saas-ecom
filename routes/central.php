@@ -6,6 +6,7 @@ use App\Http\Controllers\Central\Owner\Billing\CreditNoteController;
 use App\Http\Controllers\Central\Owner\Billing\InvoiceController;
 use App\Http\Controllers\Central\Owner\Billing\PaymentController;
 use App\Http\Controllers\Central\Owner\Billing\SubscriptionPurchaseController;
+use App\Http\Controllers\Central\Owner\Subscriptions\SubscriptionRequestController;
 use App\Http\Controllers\Central\Owner\Tenants\FirstTenantController;
 use App\Http\Controllers\Central\Owner\Tenants\TenantController as OwnerTenantController;
 use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
@@ -24,6 +25,15 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     Route::name('owner.')->group(function (): void {
+        Route::controller(SubscriptionRequestController::class)->prefix('demandes-abonnement')->name('subscription-requests.')->whereUuid('subscriptionRequest')->group(function (): void {
+            Route::get('/', 'index')->name('index');
+            Route::get('{subscriptionRequest}', 'show')->name('show');
+            Route::post('{subscriptionRequest}/invoice', 'prepareInvoice')->name('invoice');
+            Route::patch('{subscriptionRequest}/choice', 'choice')->name('choice');
+            Route::put('{subscriptionRequest}', 'revise')->name('revise');
+            Route::post('{subscriptionRequest}/cancel', 'cancel')->name('cancel');
+            Route::post('{subscriptionRequest}/proof', 'proof')->name('proof');
+        });
         Route::controller(CreditNoteController::class)->prefix('avoirs')->name('credit-notes.')->whereUuid('credit')->group(function (): void {
             Route::get('/', 'index')->name('index');
             Route::get('{credit}', 'show')->name('show');

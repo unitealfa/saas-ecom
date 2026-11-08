@@ -44,7 +44,7 @@
         @endforeach
         @if ($invoice->status === \App\Enums\Central\Billing\DocumentStatusEnum::ISSUED)
             @unless ($ownerMode)
-                @can('create', \App\Models\Central\Billing\SaasCreditNote::class)<flux:button :href="route('central.credit-notes.create', $invoice)">Préparer un avoir</flux:button>@endcan
+                @can('create', \App\Models\Central\Billing\SaasCreditNote::class)<flux:button :href="route('central.credit-notes.create', $invoice)">Préparer une correction documentaire manuelle</flux:button>@endcan
             @endunless
         @endif
         <flux:text>La facture indique le montant intégral dû pour cette période. Son émission n’active pas les droits payants.</flux:text>

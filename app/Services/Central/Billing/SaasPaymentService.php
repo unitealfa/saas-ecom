@@ -11,9 +11,11 @@ use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Subscriptions\SubscriptionInstallment;
+use App\Models\Central\Subscriptions\SubscriptionRequest;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use App\Services\Central\Subscriptions\PaidSubscriptionActivation;
+use App\Services\Central\Subscriptions\SubscriptionRequestPaymentState;
 use Brick\Math\BigDecimal;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -46,7 +48,7 @@ class SaasPaymentService
 
     public function __construct(private readonly AuthorizationMutation $mutations,
         private readonly PaymentDocumentService $documents, private readonly PaidSubscriptionActivation $subscriptions,
-        private readonly InvoicePaymentService $balances) {}
+        private readonly InvoicePaymentService $balances, private readonly SubscriptionRequestPaymentState $requests) {}
 
     /** @param array<string, mixed> $filters
      * @return LengthAwarePaginator<int, SaasPayment>
@@ -110,6 +112,7 @@ class SaasPaymentService
     public static function declarationRules(bool $cash): array
     {
         return ['amount' => ['required', 'string', 'regex:/^\d{1,12}(?:\.\d{1,2})?$/D', 'gt:0'],
+            'expected_request_state' => ['nullable', 'string', 'regex:'.SubscriptionRequest::STATE_PATTERN],
             'currency' => ['required', Rule::in([SaasInvoice::CURRENCY])], 'operation_id' => ['required', 'uuid:4'],
             'occurred_at' => ['required', 'date', 'before_or_equal:now'],
             ...($cash ? ['received' => ['required', 'accepted']] : [
@@ -190,6 +193,7 @@ class SaasPaymentService
                 if (! hash_equals($current->managementState(), $expected)) {
                     $this->fail('La déclaration a changé. Rechargez avant de compléter son justificatif.');
                 }
+                $this->requests->assertCurrentPayment($current);
                 $details = $current->getAttribute('encrypted_transfer_details') ?? [];
                 $payload = hash('sha256', json_encode([$current->invoice->uuid, $current->getAttribute('amount'), $current->getAttribute('currency'),
                     $current->getAttribute('transfer_method')->value, $current->getAttribute('occurred_at')->toISOString(), hash('sha256', $file->getContent()),
@@ -214,6 +218,7 @@ class SaasPaymentService
         return $this->mutations->run($actor, $cash ? 'recordCashPayment' : 'declarePayment', fn () => $this->lockInvoice($invoice),
             function (SaasInvoice $current) use ($actor, $data, $proof, $cash): SaasPayment {
                 $values = Validator::make($data, self::declarationRules($cash))->validate();
+                $this->requests->assertInvoice($current);
                 if ($current->status !== DocumentStatusEnum::ISSUED) {
                     $this->fail('Seule une facture émise peut recevoir une déclaration de paiement.');
                 }
@@ -232,9 +237,11 @@ class SaasPaymentService
 
                     return $replay;
                 }
+                $this->requests->assertDeclaration($actor, $current, $cash, $values['expected_request_state'] ?? null);
                 $payments = SaasPayment::where('document_id', $current->id)->orderBy('id')->lockForUpdate()->get();
                 foreach ($payments as $previous) {
-                    if (! $cash && ($previous->getAttribute('encrypted_transfer_details')['payload'] ?? null) === $payload) {
+                    if (! $cash && ! in_array($previous->getAttribute('transfer_status'), [TransferStatusEnum::REJECTED, TransferStatusEnum::CANCELLED], true)
+                        && ($previous->getAttribute('encrypted_transfer_details')['payload'] ?? null) === $payload) {
                         return $previous;
                     }
                 }
@@ -250,6 +257,7 @@ class SaasPaymentService
                     'transfer_reference' => $cash ? 'CASH-'.$uuid : ($values['reference'] ?? null),
                     'encrypted_transfer_details' => ['payload' => $payload, 'cash_received' => $cash, 'payment_required' => true],
                     'reason' => $anomaly ? 'Montant ou obligation à rapprocher ; aucun droit supplémentaire accordé.' : null])->save();
+                $this->requests->declared($actor, $current, $payment);
                 $this->audit($actor, $payment, $anomaly ? self::ANOMALY : self::DECLARED,
                     $cash ? 'Espèces déclarées reçues par l’administration ; contrôle du règlement intégral.' : 'Justificatif externe déclaré, sans confirmation des fonds.');
 
@@ -284,6 +292,7 @@ class SaasPaymentService
                     if (! hash_equals($current->managementState(), $values['expected_state'])) {
                         $this->fail('La déclaration a changé. Rechargez avant de prendre une décision.');
                     }
+                    $this->requests->assertCurrentPayment($current);
                     $invoice = $current->invoice;
                     $due = $invoice->installment;
                     if ($invoice->status !== DocumentStatusEnum::ISSUED
@@ -314,6 +323,7 @@ class SaasPaymentService
                     $current->forceFill([...$received, 'transfer_status' => TransferStatusEnum::VERIFIED, 'validated_by_id' => $actor->id,
                         'validated_at' => now(), 'transaction_fingerprint' => $fingerprint])->save();
                     $this->subscriptions->activatePaidSubscription($actor, $invoice->subscription, $due);
+                    $this->requests->verified($actor, $current);
                     $this->audit($actor, $current, self::VERIFIED, 'Réception intégrale des fonds confirmée ; période payée.');
 
                     return $current->refresh();
@@ -344,11 +354,13 @@ class SaasPaymentService
                 if (! hash_equals($current->managementState(), $expected)) {
                     $this->fail('La déclaration a changé. Rechargez avant de la refuser.');
                 }
+                $this->requests->assertCurrentPayment($current);
                 if ($current->getAttribute('transfer_method') === TransferMethodEnum::CASH_IN_PERSON) {
                     $this->fail('Des espèces déclarées reçues ne peuvent pas être effacées par un refus. Un rapprochement administratif est nécessaire.');
                 }
                 $current->forceFill(['transfer_status' => TransferStatusEnum::REJECTED, 'reason' => trim($reason),
                     'validated_by_id' => $actor->id, 'validated_at' => now()])->save();
+                $this->requests->rejected($actor, $current, trim($reason));
                 $this->audit($actor, $current, self::REJECTED, 'Déclaration refusée avec motif conservé sur l’opération.');
 
                 return $current;
