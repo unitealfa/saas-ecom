@@ -51,6 +51,7 @@ use App\Policies\Central\PickupPointPolicy;
 use App\Policies\Central\PlanPolicy;
 use App\Policies\Central\RolePolicy;
 use App\Policies\Central\SaasCreditNotePolicy;
+use App\Policies\Central\SaasDocumentDeliveryPolicy;
 use App\Policies\Central\SaasInvoicePolicy;
 use App\Policies\Central\SaasPaymentPolicy;
 use App\Policies\Central\ShippingCarrierPolicy;
@@ -80,6 +81,7 @@ class AppServiceProvider extends ServiceProvider
     private const array POLICIES = [
         Activity::class => ActivityPolicy::class,
         SaasCreditNote::class => SaasCreditNotePolicy::class,
+        SaasDocumentDelivery::class => SaasDocumentDeliveryPolicy::class,
         SaasInvoice::class => SaasInvoicePolicy::class,
         SaasPayment::class => SaasPaymentPolicy::class,
         SubscriptionInstallment::class => SubscriptionInstallmentPolicy::class,

@@ -29,6 +29,25 @@
             @endif
             @if ($history !== null)<flux:heading>Historique</flux:heading>@foreach ($history as $event)<flux:text>{{ $event->created_at->format('d/m/Y H:i') }} — {{ $event->description }}</flux:text>@endforeach{{ $history->links() }}@endif
         @endunless
+        @unless ($ownerMode)
+            @if ($credit->status === \App\Enums\Central\Billing\DocumentStatusEnum::ISSUED)
+                @can('send', \App\Models\Central\Billing\SaasDocumentDelivery::class)
+                    <form method="POST" action="{{ route('central.deliveries.send') }}">
+                        @csrf
+                        <input type="hidden" name="document_uuid" value="{{ $credit->uuid }}">
+                        <flux:button type="submit">
+                            Envoyer l'avoir par e-mail
+                        </flux:button>
+                    </form>
+                @endcan
+
+                @can('viewAny', \App\Models\Central\Billing\SaasDocumentDelivery::class)
+                    <flux:button :href="route('central.deliveries.index', ['document_uuid' => $credit->uuid])">
+                        Historique des envois
+                    </flux:button>
+                @endcan
+            @endif
+        @endunless
         @can($ownerMode ? 'viewOwnInvoice' : 'view', $credit->originalInvoice)
             <flux:button :href="route($ownerMode ? 'owner.invoices.show' : 'central.invoices.show', $credit->originalInvoice)">Facture originale</flux:button>
         @endcan

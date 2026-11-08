@@ -75,6 +75,25 @@
                     </form>
                 @endcan
             @endif
+            @unless ($ownerMode)
+                @if ($invoice->status === \App\Enums\Central\Billing\DocumentStatusEnum::ISSUED)
+                    @can('send', \App\Models\Central\Billing\SaasDocumentDelivery::class)
+                        <form method="POST" action="{{ route('central.deliveries.send') }}">
+                            @csrf
+                            <input type="hidden" name="document_uuid" value="{{ $invoice->uuid }}">
+                            <flux:button type="submit">
+                                Envoyer la facture par e-mail
+                            </flux:button>
+                        </form>
+                    @endcan
+
+                    @can('viewAny', \App\Models\Central\Billing\SaasDocumentDelivery::class)
+                        <flux:button :href="route('central.deliveries.index', ['document_uuid' => $invoice->uuid])">
+                            Historique des envois
+                        </flux:button>
+                    @endcan
+                @endif
+            @endunless
             @if ($invoice->relationLoaded('deliveries') && $invoice->deliveries->isNotEmpty())<flux:text>Transmission : intention enregistrée, sans preuve de remise.</flux:text>@endif
             @if ($history !== null)
                 <flux:heading>Historique</flux:heading>

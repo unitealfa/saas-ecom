@@ -1,3 +1,4 @@
+
 <?php
 
 namespace App\Services\Central\Plans;
@@ -13,14 +14,22 @@ class PublicPlanCatalog
 {
     private const int TTL = 43200;
 
-    private const array FIELDS = ['uuid', 'code', 'version', 'name', 'description', 'monthly_price', 'annual_price'];
+    private const array FIELDS = [
+        'uuid',
+        'code',
+        'version',
+        'name',
+        'description',
+        'monthly_price',
+        'annual_price',
+    ];
 
     /** @return list<array<string, mixed>> */
     public function available(): array
     {
         abort_if(tenancy()->initialized, 403);
 
-        // Dans une transaction, on lit toujours la base : le cache n'a pas encore vu les écritures en cours.
+        // Ne pas utiliser le cache pendant une transaction.
         if ((new Plan)->getConnection()->transactionLevel() > 0) {
             return $this->rows();
         }
@@ -28,16 +37,24 @@ class PublicPlanCatalog
         $store = Cache::store('file');
         $version = $store->get($this->versionKey(), 'initial');
 
-        return $store->remember($this->entryKey($version), self::TTL, fn (): array => $this->rows());
+        return $store->remember(
+            $this->entryKey($version),
+            self::TTL,
+            fn (): array => $this->rows()
+        );
     }
 
-    /** Change la version du cache et supprime l'entrée précédente. */
+    /** Invalide le cache après modification du catalogue. */
     public function invalidate(): void
     {
         $store = Cache::store('file');
         $previous = $store->get($this->versionKey(), 'initial');
 
-        $store->forever($this->versionKey(), (string) Str::uuid());
+        $store->forever(
+            $this->versionKey(),
+            (string) Str::uuid()
+        );
+
         $store->forget($this->entryKey($previous));
     }
 
@@ -51,31 +68,54 @@ class PublicPlanCatalog
         return $this->prefix().':'.$version;
     }
 
-    /** Le nom de la base évite de mélanger deux environnements. */
+    /** Le nom de la base isole les caches des environnements. */
     private function prefix(): string
     {
-        return 'public-plans:v2:'.hash('sha256', (new Plan)->getConnection()->getDatabaseName());
+        return 'public-plans:v2:'.hash(
+            'sha256',
+            (new Plan)->getConnection()->getDatabaseName()
+        );
     }
 
     /** @return list<array<string, mixed>> */
     private function rows(): array
     {
         $plans = Plan::active()
-            ->with(['features' => fn ($query) => $query
-                ->where('is_active', true)
-                ->whereIn('feature_id', Feature::active()->select('id'))
-                ->with('feature')
-                ->orderBy('id')])
-            ->orderBy('code')->orderByDesc('version')
+            ->with([
+                'features' => fn ($query) => $query
+                    ->where('is_active', true)
+                    ->whereIn(
+                        'feature_id',
+                        Feature::active()->select('id')
+                    )
+                    ->with('feature')
+                    ->orderBy('id'),
+            ])
+            ->orderBy('code')
+            ->orderByDesc('version')
             ->get(['id', ...self::FIELDS]);
 
-        return $plans->map(fn (Plan $plan): array => [
-            ...$plan->only(self::FIELDS),
-            'features' => $plan->features->map(fn (PlanFeature $feature): array => [
-                'name' => $feature->feature->name,
-                'value' => $this->valueLabel($feature),
-            ])->all(),
-        ])->all();
+        $result = [];
+
+        foreach ($plans as $plan) {
+            /** @var Plan $plan */
+            $features = [];
+
+            foreach ($plan->features as $feature) {
+                /** @var PlanFeature $feature */
+                $features[] = [
+                    'name' => $feature->feature->name,
+                    'value' => $this->valueLabel($feature),
+                ];
+            }
+
+            $result[] = [
+                ...$plan->only(self::FIELDS),
+                'features' => $features,
+            ];
+        }
+
+        return $result;
     }
 
     private function valueLabel(PlanFeature $feature): string
@@ -84,6 +124,8 @@ class PublicPlanCatalog
             return 'Inclus';
         }
 
-        return $feature->limit === null ? 'Non précisé' : (string) $feature->limit;
+        return $feature->limit === null
+            ? 'Non précisé'
+            : (string) $feature->limit;
     }
 }

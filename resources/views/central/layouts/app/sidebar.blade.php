@@ -121,6 +121,14 @@
                             Factures SaaS
                         </flux:sidebar.item>
                     @endcan
+                    @can('viewAny', \App\Models\Central\Billing\SaasDocumentDelivery::class)
+                        <flux:sidebar.item
+                            :href="route('central.deliveries.index')"
+                            :current="request()->routeIs('central.deliveries.*')"
+                            wire:navigate>
+                            Facturation — Envois
+                        </flux:sidebar.item>
+                    @endcan
                     @can('viewAny', \App\Models\Central\Billing\SaasPayment::class)
                         <flux:sidebar.item :href="route('central.payments.index')" :current="request()->routeIs('central.payments.*')" wire:navigate>Paiements SaaS</flux:sidebar.item>
                     @endcan

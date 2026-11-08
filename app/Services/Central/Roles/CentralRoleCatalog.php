@@ -24,6 +24,12 @@ class CentralRoleCatalog
         'saas.payments.reconcile' => 'Rapprocher un paiement avec les fonds et documents correspondants',
     ];
 
+    public const array DELIVERY_PERMISSIONS = [
+        'saas.deliveries.view' => 'Consulter les envois de documents SaaS',
+        'saas.deliveries.send' => 'Demander l’envoi d’un document SaaS',
+        'saas.deliveries.retry' => 'Relancer un envoi échoué autorisé',
+    ];
+
     public const array ACTIVITY_PERMISSIONS = [
         'saas.activity.view' => 'Consulter et rechercher les activités centrales',
         'saas.activity.export' => 'Exporter les activités centrales autorisées',
@@ -141,6 +147,7 @@ class CentralRoleCatalog
         ...self::CREDIT_NOTE_PERMISSIONS,
         ...self::PAYMENT_PERMISSIONS,
         ...self::ACTIVITY_PERMISSIONS,
+        ...self::DELIVERY_PERMISSIONS,
         ...self::QUOTA_PERMISSIONS,
         ...self::SUBSCRIPTION_PERMISSIONS,
         ...self::CARRIER_MAPPING_PERMISSIONS,
@@ -202,6 +209,7 @@ class CentralRoleCatalog
     ];
 
     public const array GROUPS = [
+        'Envois de documents SaaS' => ['saas.deliveries.view', 'saas.deliveries.send', 'saas.deliveries.retry'],
         'Journal d’activité' => ['saas.activity.view', 'saas.activity.export'],
         'Échéances de paiement' => ['saas.subscriptions.installments.view', 'saas.subscriptions.installments.create'],
         'Factures SaaS' => ['saas.invoices.view', 'saas.invoices.create', 'saas.invoices.issue'],
