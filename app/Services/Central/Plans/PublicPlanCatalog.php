@@ -67,6 +67,7 @@ class PublicPlanCatalog
         $result = [];
 
         foreach ($plans as $plan) {
+            /** @var Plan $plan */
             $features = [];
 
             foreach ($plan->features as $item) {
