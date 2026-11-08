@@ -14,10 +14,16 @@ class SendSaasDocumentJob implements ShouldQueue
 
     public int $timeout = 60;
 
-    public function __construct(public readonly int $deliveryId) {}
+    public function __construct(
+        public readonly int $deliveryId
+    ) {
+        $this->onConnection('database');
+        $this->onQueue('saas-documents');
+    }
 
-    public function handle(SaasDocumentDeliveryService $service): void
-    {
+    public function handle(
+        SaasDocumentDeliveryService $service
+    ): void {
         $service->process($this->deliveryId);
     }
 }

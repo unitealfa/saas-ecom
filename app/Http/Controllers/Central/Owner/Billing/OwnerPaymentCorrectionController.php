@@ -37,7 +37,7 @@ final class OwnerPaymentCorrectionController extends Controller
 
         return to_route('owner.billing.index')->with(
             'status',
-            'Signalement conservé dans l’historique. Seule l’administration peut examiner ou corriger l’opération. Aucun paiement n’a été modifié.',
+            'Signalement conservé dans l’historique. L’administration peut examiner la demande ; seule l’émission d’un avoir corrige la facture. Aucun paiement n’a été modifié.',
         );
     }
 }

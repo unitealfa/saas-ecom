@@ -90,27 +90,22 @@ class SaasDocumentDeliveryService
                 $delivery = $existing->first();
 
                 if ($delivery === null) {
-                    $delivery = new SaasDocumentDelivery;
+                    $this->fail(
+                        'Aucune intention d’envoi existante. '
+                        .'Le document doit disposer d’une intention créée lors de son émission.'
+                    );
+                }
 
-                    $delivery->forceFill([
-                        'user_id' => $document->user_id,
-                        'document_id' => $document->id,
-                        'created_by_id' => $actor->id,
-                        'document_type' => $document->document_type,
-                        'channel' => DeliveryChannelEnum::EMAIL,
-                        'encrypted_recipient' => $recipient,
-                        'delivery_status' => DeliveryStatusEnum::PENDING,
-                        'attempts_count' => 0,
-                        'operation_key' => 'saas:delivery:'.$document->uuid.':email:manual',
-                        'correlation_id' => $document->getAttribute('correlation_id'),
-                    ])->save();
-                } elseif (! in_array($delivery->delivery_status, [
+                if (! in_array($delivery->delivery_status, [
                     DeliveryStatusEnum::PENDING,
                     DeliveryStatusEnum::SENDING,
                     DeliveryStatusEnum::SENT,
                     DeliveryStatusEnum::DELIVERED,
                 ], true)) {
-                    $this->fail('Cette intention ne peut pas être redemandée. Utilisez la relance autorisée.');
+                    $this->fail(
+                        'Cette intention ne peut pas être redemandée. '
+                        .'Utilisez la relance autorisée.'
+                    );
                 }
 
                 $shouldDispatch =

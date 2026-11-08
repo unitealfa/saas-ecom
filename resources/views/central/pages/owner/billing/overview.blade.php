@@ -176,11 +176,24 @@
 
         <section class="flex flex-col gap-3" aria-labelledby="owner-corrections-heading">
             <flux:heading id="owner-corrections-heading" size="lg">5. Mes signalements récents</flux:heading>
-            <flux:text>Ces signalements sont conservés dans le journal du paiement et visibles par l'administration. Leur dépôt n'est pas une validation.</flux:text>
+            <flux:text>Ces signalements et les décisions administratives sont conservés dans le journal du paiement. Leur dépôt n'est pas une validation.</flux:text>
             @forelse ($reports as $report)
+                @php($decision = $reportDecisions->get($report->uuid))
                 <article class="rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
                     <flux:text>{{ $report->created_at->format('d/m/Y H:i') }} — paiement PAY-{{ $report->properties['payment_uuid'] ?? 'Inconnu' }}</flux:text>
                     <flux:text>{{ $report->properties['reason'] ?? '' }}</flux:text>
+                    <flux:text>
+                        @if ($decision === null)
+                            En attente
+                        @elseif (($decision->properties['decision'] ?? null) === \App\Services\Central\Billing\OwnerPaymentCorrectionService::DECISION_CREDIT_NOTE)
+                            Corrigé par avoir émis — {{ $decision->properties['credit_uuid'] ?? 'Avoir émis' }}
+                        @else
+                            Examiné — aucune correction nécessaire
+                        @endif
+                    </flux:text>
+                    @if ($decision !== null)
+                        <flux:text>{{ $decision->properties['note'] ?? '' }}</flux:text>
+                    @endif
                 </article>
             @empty
                 <flux:text>Aucune demande de correction signalée.</flux:text>

@@ -276,7 +276,19 @@ test('T19-11 another merchant cannot download an invoice even with its signed UR
     $invoice = app(SaasInvoiceIssuanceService::class)->issue($f['actor'], $invoice, $invoice->managementState());
     $url = URL::temporarySignedRoute('owner.invoices.download', now()->addMinutes(5), ['invoice' => $invoice]);
     $this->actingAs(User::factory()->create(), 'central')->get($url)->assertForbidden();
+
+    $this->actingAs($f['owner'], 'central')
+        ->get(URL::temporarySignedRoute('owner.invoices.download', now()->subMinute(), ['invoice' => $invoice]))
+        ->assertForbidden();
+
     $this->actingAs($f['actor'], 'central')->get(URL::temporarySignedRoute('central.invoices.download', now()->addMinutes(5), ['invoice' => $invoice]))->assertOk();
+
+    $draftFixture = issuanceFixture();
+    $draft = issuanceDraft($draftFixture);
+    $this->actingAs($draftFixture['owner'], 'central')
+        ->get(URL::temporarySignedRoute('owner.invoices.download', now()->addMinutes(5), ['invoice' => $draft]))
+        ->assertForbidden();
+
     Storage::disk('local')->put($invoice->media->storage_key, 'Altered');
     expect(fn () => app(SaasInvoiceIssuanceService::class)->download($f['owner'], $invoice))->toThrow(ValidationException::class);
 });

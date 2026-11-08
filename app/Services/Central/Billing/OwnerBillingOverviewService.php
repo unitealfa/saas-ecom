@@ -69,6 +69,15 @@ final readonly class OwnerBillingOverviewService
             ->limit(10)
             ->get();
 
+        $reportDecisions = Activity::query()
+            ->where('event', OwnerPaymentCorrectionService::REVIEWED_EVENT)
+            ->where('subject_type', (new SaasPayment)->getMorphClass())
+            ->whereIn('properties->report_uuid', $reports->pluck('uuid'))
+            ->orderByDesc('id')
+            ->get()
+            ->unique(fn (Activity $decision): string => (string) ($decision->properties['report_uuid'] ?? ''))
+            ->keyBy(fn (Activity $decision): string => (string) $decision->properties['report_uuid']);
+
         return [
             'dues' => $dues,
             'invoices' => $invoices,
@@ -76,6 +85,7 @@ final readonly class OwnerBillingOverviewService
             'payments' => $payments,
             'credits' => $credits,
             'reports' => $reports,
+            'reportDecisions' => $reportDecisions,
             'pendingDueCount' => SubscriptionInstallment::query()
                 ->where('user_id', $actor->id)
                 ->whereIn('installment_status', [
