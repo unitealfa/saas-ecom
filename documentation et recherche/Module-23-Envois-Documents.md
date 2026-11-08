@@ -2,9 +2,7 @@
 
 ## État au 8 novembre 2026
 
-Installation manuelle déclarée effectuée par l’utilisateur. Référence de préparation fournie : `unitealfa/saas-ecom`, branche `dev`, commit `b1ebe822e`. Lors de cette lecture locale : branche `dev`, HEAD `10329ec`. Aucun changement de branche, publication, migration, seeder ou envoi réel effectué pendant cette vérification.
-
-La préparation indiquait une syntaxe contrôlée sous PHP 8.4.24 : douze fichiers source PHP et un fichier de test. Ce résultat est rapporté, pas reproduit ici sous le PHP 8.5 du projet. Les tests locaux sont déclarés réalisés par l’utilisateur ; leurs sorties et résultats détaillés ne sont pas fournis dans cette intervention.
+Branche locale : `module-25-avec-documentation-du-module-23`. Les corrections ci-dessous sont apportées directement sur cette branche ; aucun changement de branche, publication, migration ou seeder n’a été effectué.
 
 ## Contrôle rapide effectué ici
 
@@ -14,19 +12,21 @@ La préparation indiquait une syntaxe contrôlée sous PHP 8.4.24 : douze fichie
 - Menu administratif et accès depuis factures et avoirs présents.
 - `DeliveryPermissionSeeder` utilise `firstOrCreate`, une transaction et l’invalidation native Spatie après commit. Il n’a pas été exécuté ici.
 - Huit statuts et quatre canaux déclarés dans les enums ; migration et check des huit statuts déjà présents dans le dépôt. Schéma MySQL installé non inspecté.
-- Job asynchrone, revendication sous verrou d’une ligne PENDING et incrément du nombre de tentatives.
+- Job asynchrone affecté à la connexion `database` et à la file `saas-documents`, revendication sous verrou d’une ligne PENDING et incrément du nombre de tentatives.
 - Le traitement distingue SMTP, résultat incertain et transport non SMTP. Aucune preuve de remise ou de lecture déduite du simple statut SENT.
 
-## Écarts confirmés à traiter
+## Corrections appliquées
 
-1. `routes/central/admin/deliveries.php` ajoute `throttle:6,1` sur send et `throttle:3,1` sur retry. Cela contredit la règle du projet interdisant les throttles administratifs. Aucune correction de code effectuée dans cette intervention documentaire.
-2. `SaasDocumentDeliveryService::request()` crée une nouvelle intention lorsqu’aucune n’existe, avec une clé suffixée `email:manual`. Cela diffère de la consigne fournie : reprendre uniquement une intention PENDING existante, sans création implicite. Le contrôle historique annoncé « aucune ligne supplémentaire » ne doit donc pas être présenté comme acquis pour ce cas.
-3. `SendSaasDocumentJob` ne définit pas explicitement sa connexion ou sa file. Sa compatibilité avec le worker installé reste à vérifier ; ne pas supposer que démarrer le worker de provisionnement traite ce job.
+1. Retrait des middlewares `throttle` des routes administratives d’envoi et de relance. Les protections d’authentification, Policy, CSRF, verrouillage et idempotence restent en place.
+2. `SaasDocumentDeliveryService::request()` refuse maintenant de créer une intention absente. Il reprend uniquement l’intention historique et refuse les états qui ne peuvent pas être redemandés ; la relance reste une action distincte autorisée.
+3. `SendSaasDocumentJob` force `database` et `saas-documents`. Le test de feature exécute le job par un worker Laravel `queue:work --once` avec SMTP simulé, sans envoyer de courriel réel.
+
+Configuration locale vérifiée sans afficher de secrets : `APP_ENV=local`, `QUEUE_CONNECTION=database`, `DB_CONNECTION=mysql` sur boucle locale ; `DB_QUEUE_CONNECTION` est absent et la connexion de queue `database` retombe donc sur `DB_CONNECTION`. Le mailer local est SMTP et son hôte n’est pas local ; un worker persistant peut donc envoyer les courriels réellement en attente.
 
 ## Fonctionnement attendu
 
 - Envoi des seuls PDF ISSUED, privés, intègres, vers le destinataire historique autorisé ; aucune adresse libre fournie par l’administrateur.
-- Réutilisation de l’intention PENDING créée à l’émission. Les tâches concurrentes ne doivent revendiquer qu’une tentative.
+- Réutilisation de l’intention PENDING créée à l’émission. Aucun enregistrement de remplacement pour les anciens documents ; ils nécessitent une régularisation administrative distincte. Les tâches concurrentes ne doivent revendiquer qu’une tentative.
 - SENT signifie accepté par SMTP, jamais remis ou lu. Une issue SMTP incertaine interdit une relance aveugle.
 - Relance manuelle limitée aux états FAILED/RETRYABLE autorisés, à moins de trois tentatives, avec état attendu.
 - Aucun changement de facture, avoir, abonnement ou paiement ; aucun reçu, remboursement, SMS ou WhatsApp automatique.
@@ -48,10 +48,22 @@ La préparation indiquait une syntaxe contrôlée sous PHP 8.4.24 : douze fichie
 
 Les raccordements existants sont le catalogue de permissions, le Provider, le chargeur de routes administratives, la sidebar et les fiches de facture/avoir. Aucune migration nouvelle ajoutée ici.
 
-## Contrôles non exécutés pendant cette intervention
+## Worker de développement
 
-Aucun test Laravel/Pest, PHPStan, Pint, lint PHP, build, serveur HTTP, SMTP, worker, CI ou contrôle MySQL. Aucun résultat fonctionnel attribué à cette simple lecture. Les preuves de tests de l’utilisateur restent distinctes des contrôles réalisés ici.
+Commande du worker secondaire :
 
-Pour une validation ultérieure : vérifier les accès sans permission, la lecture seule, le refus des brouillons, les doublons/concurrences, l’intégrité du PDF, les transports log/array, les issues SMTP incertaines, les limites de relance et l’isolation Central/Tenant. Utiliser exclusivement le PHP 8.5 documenté dans AGENTS.md. Toute écriture sur une base réelle exige un accord précis ; préférer le seeder dédié additif aux permissions pour une base existante.
+```powershell
+& 'C:\Users\habou\.config\herd\bin\php85\php.exe' artisan queue:work database --queue=saas-documents --sleep=2 --tries=1 --timeout=60
+```
 
-**Conclusion : intégration principale présente, deux divergences métier/configuration confirmées et compatibilité de queue non établie. Validation fonctionnelle non certifiée par cette intervention.**
+Ce worker est distinct du worker `tenant-provisioning`. Pour un usage permanent, l’installer comme service ou tâche supervisée. Le démarrer peut transmettre les documents déjà en attente par SMTP.
+
+Le worker `saas-documents` a été démarré en arrière-plan pour l’environnement local à la demande. Aucun service Windows ou mécanisme de supervision permanent n’a été installé.
+
+## Vérifications
+
+- Tests de gestion des envois : **14 réussis, 87 assertions**, incluant l’absence d’intention, la réutilisation et le double clic, la connexion/file du job et son exécution par `queue:work --once`.
+- Aperçu de facturation commerçant : **12 réussis, 106 assertions**.
+- Gestion des avoirs : **42 réussis, 218 assertions, 1 ignoré**.
+- Les trois scénarios T20-10 de processus concurrents (« reservations », « same-operation », « issue ») passent dans cette exécution. Leurs sorties enfants correspondent aux valeurs attendues (`conflict`/`ok`) ; les anomalies de sauts de ligne signalées antérieurement ne sont pas reproduites. Les tests n’ont pas été modifiés.
+- Aucun courriel réel ni changement de base réelle effectué par les tests. Les tests utilisent des bases MySQL temporaires isolées.
