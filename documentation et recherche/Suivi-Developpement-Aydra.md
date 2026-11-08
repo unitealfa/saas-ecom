@@ -1,5 +1,9 @@
 # Suivi de développement et audit Aydra
 
+## 8 novembre 2026 — Module 25, facturation commerçant
+
+Installation manuelle revue et documentée : [C-157/C-158/C-159/C-162](Module-25-Facturation-Commercant.md). Vue principale et test déplacés vers les chemins attendus ; validation et idempotence des signalements renforcées, sans mutation financière. Pint et PHPStan ciblé réussis ; aucun test BDD, seeder, migration, envoi ou action Git distante. Modification indépendante de PublicPlanCatalog préservée.
+
 ## 8 novembre 2026 — Module 23 installé manuellement
 
 Installation manuelle et tests déclarés par l’utilisateur. Lecture rapide des raccordements uniquement, sans tests ni écriture MySQL/SMTP/worker. Documentation dédupliquée : [Module-23-Envois-Documents.md](Module-23-Envois-Documents.md). Deux écarts confirmés : throttles administratifs et création implicite d’une intention absente ; connexion/file du job à vérifier. Aucun code modifié ; le changement déjà présent dans PublicPlanCatalog est préservé.
