@@ -16,6 +16,7 @@ use App\Services\Central\Billing\BillingRuleService;
 use App\Services\Central\Billing\SaasCreditNoteService;
 use App\Services\Central\Billing\SaasInvoiceIssuanceService;
 use Illuminate\Support\Str;
+use App\Models\User;
 
 it('keeps an issued document as a pending intent until an authorized administrator requests email', function (): void {
     Queue::fake();
@@ -103,7 +104,7 @@ it('does not modify a subscription, invoice or payment during delivery creation'
     Queue::fake();
     $f = manualPaymentFixture();
     $invoiceAttributes = $f['invoice']->getAttributes();
-    $subscriptionAttributes = $f['subscription']->getAttributes();
+    $subscriptionAttributes = $f['subscription']->refresh()->getAttributes();
     $this->actingAs($f['actor'], 'central')
         ->post(route('central.deliveries.send'), ['document_uuid' => $f['invoice']->uuid])
         ->assertSessionHasNoErrors();
@@ -136,6 +137,9 @@ it('marks the email as accepted only when the configured SMTP transport succeeds
 
 
 it('stops retrying after the third unsuccessful preparation', function (): void {
+    $this->withoutMiddleware(
+        \Illuminate\Routing\Middleware\ThrottleRequests::class
+    );
     Queue::fake();
     Mail::fake();
     config(['mail.default' => 'log']);

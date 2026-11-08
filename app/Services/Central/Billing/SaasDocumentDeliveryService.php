@@ -77,10 +77,10 @@ class SaasDocumentDeliveryService
                     ->lockForUpdate()
                     ->get();
 
-                if ($existing->contains(
-                    fn (SaasDocumentDelivery $row): bool => $row->encrypted_recipient !== $recipient
-                )) {
-                    $this->fail('Le destinataire historique est différent. Vérifiez le dossier avant toute transmission.');
+                foreach ($existing as $row) {
+                    if ($row->encrypted_recipient !== $recipient) {
+                        $this->fail('Le destinataire historique est différent. Vérifiez le dossier avant toute transmission.');
+                    }
                 }
 
                 if ($existing->count() > 1) {

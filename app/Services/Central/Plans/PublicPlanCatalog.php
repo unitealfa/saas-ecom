@@ -40,16 +40,65 @@ class PublicPlanCatalog
     }
 
     /** @return list<array<string, mixed>> */
+    
+/** @return list<array<string, mixed>> */
     private function rows(): array
     {
-        return array_values(Plan::active()->with(['features' => fn ($query) => $query->where('is_active', true)
-            ->whereIn('feature_id', Feature::active()->select('id'))->with('feature')->orderBy('id')])
-            ->orderBy('code')->orderByDesc('version')
-            ->get(['id', 'uuid', 'code', 'version', 'name', 'description', 'monthly_price', 'annual_price'])
-            ->map(fn (Plan $plan): array => [...$plan->only(['uuid', 'code', 'version', 'name', 'description', 'monthly_price', 'annual_price']),
-                'features' => $plan->features->map(fn (PlanFeature $feature): array => [
-                    'name' => $feature->feature->name, 'value' => $feature->feature->value_type === ValueTypeEnum::BOOLEAN
-                        ? 'Inclus' : ($feature->limit === null ? 'Non précisé' : (string) $feature->limit),
-                ])->all()])->all());
+        $plans = Plan::active()
+            ->with([
+                'features' => fn ($query) => $query
+                    ->where('is_active', true)
+                    ->whereIn('feature_id', Feature::active()->select('id'))
+                    ->with('feature')
+                    ->orderBy('id'),
+            ])
+            ->orderBy('code')
+            ->orderByDesc('version')
+            ->get([
+                'id',
+                'uuid',
+                'code',
+                'version',
+                'name',
+                'description',
+                'monthly_price',
+                'annual_price',
+            ]);
+
+        $result = [];
+
+        foreach ($plans as $plan) {
+            $features = [];
+
+            foreach ($plan->features as $item) {
+                $isBoolean = (int) $item->feature->getRawOriginal('value_type')
+                    === ValueTypeEnum::BOOLEAN->value;
+
+                $features[] = [
+                    'name' => $item->feature->name,
+                    'value' => $isBoolean
+                        ? 'Inclus'
+                        : ($item->limit === null
+                            ? 'Non précisé'
+                            : (string) $item->limit),
+                ];
+            }
+
+            $result[] = [
+                ...$plan->only([
+                    'uuid',
+                    'code',
+                    'version',
+                    'name',
+                    'description',
+                    'monthly_price',
+                    'annual_price',
+                ]),
+                'features' => $features,
+            ];
+        }
+
+        return $result;
     }
+
 }

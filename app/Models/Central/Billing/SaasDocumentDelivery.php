@@ -8,14 +8,44 @@ use App\Enums\Central\Billing\DeliveryStatusEnum;
 use App\Enums\Central\Billing\DocumentTypeEnum;
 use App\Models\Central\Media\Media;
 use App\Models\Central\Users\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
+/**
+ * @property int $id
+ * @property string $uuid
+ * @property int $user_id
+ * @property int $document_id
+ * @property int|null $created_by_id
+ * @property int|null $proof_media_id
+ * @property string $operation_key
+ * @property DocumentTypeEnum $document_type
+ * @property DeliveryChannelEnum $channel
+ * @property string $encrypted_recipient
+ * @property DeliveryStatusEnum $delivery_status
+ * @property int $attempts_count
+ * @property array<int, array<string, mixed>>|null $delivery_attempts
+ * @property CarbonImmutable|null $next_attempt_at
+ * @property CarbonImmutable|null $sent_at
+ * @property CarbonImmutable|null $delivered_at
+ * @property CarbonImmutable|null $sending_started_at
+ * @property string|null $provider_reference
+ * @property string|null $error_code
+ * @property string $correlation_id
+ */
 #[Fillable([])]
-#[Hidden(['id', 'user_id', 'document_id', 'created_by_id', 'proof_media_id', 'encrypted_recipient'])]
+#[Hidden([
+    'id',
+    'user_id',
+    'document_id',
+    'created_by_id',
+    'proof_media_id',
+    'encrypted_recipient',
+])]
 class SaasDocumentDelivery extends Model
 {
     use CentralConnection, HasPublicUuid;
@@ -41,19 +71,22 @@ class SaasDocumentDelivery extends Model
     /** @return BelongsTo<SaasInvoice, $this> */
     public function document(): BelongsTo
     {
-        return $this->belongsTo(SaasInvoice::class, 'document_id')->withoutGlobalScope('invoice');
+        return $this->belongsTo(SaasInvoice::class, 'document_id')
+            ->withoutGlobalScope('invoice');
     }
 
     /** @return BelongsTo<User, $this> */
     public function owner(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'user_id')->withTrashed();
+        return $this->belongsTo(User::class, 'user_id')
+            ->withTrashed();
     }
 
     /** @return BelongsTo<User, $this> */
     public function creator(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by_id')->withTrashed();
+        return $this->belongsTo(User::class, 'created_by_id')
+            ->withTrashed();
     }
 
     /** @return BelongsTo<Media, $this> */
@@ -65,8 +98,14 @@ class SaasDocumentDelivery extends Model
     public function managementState(): string
     {
         return hash('sha256', json_encode($this->only([
-            'uuid', 'delivery_status', 'attempts_count', 'sent_at', 'delivered_at',
-            'error_code', 'sending_started_at', 'updated_at',
+            'uuid',
+            'delivery_status',
+            'attempts_count',
+            'sent_at',
+            'delivered_at',
+            'error_code',
+            'sending_started_at',
+            'updated_at',
         ]), JSON_THROW_ON_ERROR));
     }
 
