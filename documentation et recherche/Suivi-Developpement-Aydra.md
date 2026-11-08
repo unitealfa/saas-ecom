@@ -1,4 +1,8 @@
 # Suivi de développement et audit Aydra
+
+## 8 novembre 2026 — Module 23 installé manuellement
+
+Installation manuelle et tests déclarés par l’utilisateur. Lecture rapide des raccordements uniquement, sans tests ni écriture MySQL/SMTP/worker. Documentation dédupliquée : [Module-23-Envois-Documents.md](Module-23-Envois-Documents.md). Deux écarts confirmés : throttles administratifs et création implicite d’une intention absente ; connexion/file du job à vérifier. Aucun code modifié ; le changement déjà présent dans PublicPlanCatalog est préservé.
 ## 6 novembre 2026 — Module 21 : paiements manuels intégraux
 
 Branche module21 avancée localement sur origin/dev 5d4cc62 après les fusions 18/19 confirmées par l'utilisateur. Demande module21, tests MySQL locaux temporaires et navigateur autorisés ; décision explicite : paiement exigé pour toute nouvelle attribution payante, administrative comprise, sans désactivation des abonnements historiques. Rapport et inventaire : [Module-21-Paiements-Manuels.md](Module-21-Paiements-Manuels.md). Aucun commit/push/fusion distante ni migration, seeder ou paiement réel exécuté pour cette mission.

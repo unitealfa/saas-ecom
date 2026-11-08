@@ -1,10 +1,15 @@
 <?php
 
 use App\Http\Controllers\Central\Admin\Billing\BillingRuleController;
+use App\Http\Controllers\Central\Admin\Billing\OwnerPaymentCorrectionReviewController;
 use App\Http\Controllers\Central\Admin\Billing\SaasCreditNoteController;
 use App\Http\Controllers\Central\Admin\Billing\SaasInvoiceController;
 use App\Http\Controllers\Central\Admin\Billing\SaasPaymentController;
 use Illuminate\Support\Facades\Route;
+
+// C-159: protected administrative correction-request inbox (existing payment permission).
+Route::get('billing/payments/correction-requests', OwnerPaymentCorrectionReviewController::class)
+    ->name('payments.corrections.index');
 
 Route::controller(SaasCreditNoteController::class)->prefix('billing/credit-notes')->name('credit-notes.')->whereUuid(['credit', 'invoice'])->group(function (): void {
     Route::get('/', 'index')->name('index');
