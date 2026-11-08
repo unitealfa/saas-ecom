@@ -176,12 +176,12 @@ class FeatureCatalogService
     }
 
     /** @return Builder<Permission> */
-/** @return Builder<Permission> */
-        private function permissions(Feature $feature): Builder
-        {
-            return Permission::query()
-                ->where('feature_code', $feature->code);
-        }
+    /** @return Builder<Permission> */
+    private function permissions(Feature $feature): Builder
+    {
+        return Permission::query()
+            ->where('feature_code', $feature->code);
+    }
 
     private function save(Feature $feature): void
     {

@@ -5,7 +5,6 @@ namespace App\Services\Central\Plans;
 use App\Enums\Central\Features\ValueTypeEnum;
 use App\Models\Central\Features\Feature;
 use App\Models\Central\Plans\Plan;
-use App\Models\Central\Plans\PlanFeature;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
@@ -40,8 +39,8 @@ class PublicPlanCatalog
     }
 
     /** @return list<array<string, mixed>> */
-    
-/** @return list<array<string, mixed>> */
+
+    /** @return list<array<string, mixed>> */
     private function rows(): array
     {
         $plans = Plan::active()
@@ -100,5 +99,4 @@ class PublicPlanCatalog
 
         return $result;
     }
-
 }
