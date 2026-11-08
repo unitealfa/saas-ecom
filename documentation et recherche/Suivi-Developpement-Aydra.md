@@ -1,8 +1,8 @@
 # Suivi de développement et audit Aydra
 
-## 8 novembre 2026 — Module 25, facturation commerçant
+## 8 novembre 2026 — owner-billing, facturation commerçant
 
-Installation manuelle revue et documentée : [C-157/C-158/C-159/C-162](Module-25-Facturation-Commercant.md). Vue principale et test déplacés vers les chemins attendus ; validation et idempotence des signalements renforcées, sans mutation financière. Pint et PHPStan ciblé réussis ; aucun test BDD, seeder, migration, envoi ou action Git distante. Modification indépendante de PublicPlanCatalog préservée.
+Installation manuelle revue et documentée : [C-157/C-158/C-159/C-162](owner-billing.md). Nom retenu : owner-billing, sans numéro de module. Vue principale et test déplacés vers les chemins attendus ; validation et idempotence des signalements renforcées, sans mutation financière. Pint et PHPStan ciblé réussis ; aucun test BDD, seeder, migration, envoi ou action Git distante. Modification indépendante de PublicPlanCatalog préservée.
 
 ## 8 novembre 2026 — Module 23 installé manuellement
 

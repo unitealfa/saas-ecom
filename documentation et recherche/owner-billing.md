@@ -1,4 +1,4 @@
-# Module 25 — Facturation du commerçant
+# owner-billing — Facturation du commerçant
 
 Date : 8 novembre 2026. Livraison C-157, C-158, C-159, C-162 installée manuellement. Base de préparation déclarée : dev, `10329ec2ce0ae15bee64ba296ccb8a39f60266b9`. Aucune branche créée, fusionnée ou publiée pendant cette revue.
 
