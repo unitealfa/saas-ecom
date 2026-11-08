@@ -27,6 +27,7 @@
         @can('receipt', $payment)
             <flux:button :href="\Illuminate\Support\Facades\URL::temporarySignedRoute($ownerMode ? 'owner.payments.receipt' : 'central.payments.receipt', now()->addMinutes(10), ['payment' => $payment])">Télécharger le reçu privé</flux:button>
         @endcan
+
         @if ($ownerMode)
             @can('supplyProof', $payment)
                 <form method="POST" enctype="multipart/form-data" action="{{ route('owner.payments.resume-proof', $payment) }}" class="flex flex-col gap-3">
@@ -35,7 +36,10 @@
                     <flux:button type="submit">Reprendre le dépôt sans nouvelle déclaration</flux:button>
                 </form>
             @endcan
+            <flux:button :href="route('owner.billing.corrections.create', $payment)">Signaler une erreur sur ce paiement</flux:button>
+            <flux:text>Ce signalement n'altère pas le paiement confirmé : l'administration doit examiner la demande.</flux:text>
         @endif
+
         @unless ($ownerMode)
             <flux:text>Enregistré par : {{ $payment->creator?->name ?? 'Auteur historique non renseigné' }}. Décision : {{ $payment->validator?->name ?? 'En attente' }}.</flux:text>
             @if ($payment->owner)
@@ -62,18 +66,18 @@
             @endif
             @if ($payment->getAttribute('transfer_status') === \App\Enums\Central\Billing\TransferStatusEnum::DECLARED)
                 @if ($payment->getAttribute('proof_media_id') !== null)
-                @foreach (['reconcile' => 'Enregistrer le rapprochement sans confirmer les fonds', 'verify' => 'Confirmer la réception intégrale des fonds'] as $action => $label)
-                    @can($action, $payment)
-                        <form method="POST" action="{{ route('central.payments.'.$action, $payment) }}" class="flex flex-col gap-3">
-                            @csrf<input type="hidden" name="expected_state" value="{{ $payment->managementState() }}">
-                            <flux:input name="account" label="Compte destinataire réellement contrôlé (IBAN ou CCP)" :value="$oldText('account', $payment->getAttribute('encrypted_transfer_details')['account'] ?? ($payment->getAttribute('transfer_method') === \App\Enums\Central\Billing\TransferMethodEnum::CASH_IN_PERSON ? 'cash:central' : ''))" required />
-                            <flux:input name="reference" label="Référence réelle contrôlée ou référence interne espèces" :value="$oldText('reference', $payment->getAttribute('transfer_reference'))" required />
-                            <flux:input type="datetime-local" name="occurred_at" label="Date réelle de réception" :value="$oldText('occurred_at', $payment->getAttribute('occurred_at')->format('Y-m-d\TH:i:s'))" required />
-                            @if ($action === 'verify')<flux:checkbox name="received" value="1" label="J’ai contrôlé la réception réelle du montant intégral, son destinataire et sa référence." required />@endif
-                            <flux:button type="submit" variant="primary">{{ $label }}</flux:button>
-                        </form>
-                    @endcan
-                @endforeach
+                    @foreach (['reconcile' => 'Enregistrer le rapprochement sans confirmer les fonds', 'verify' => 'Confirmer la réception intégrale des fonds'] as $action => $label)
+                        @can($action, $payment)
+                            <form method="POST" action="{{ route('central.payments.'.$action, $payment) }}" class="flex flex-col gap-3">
+                                @csrf<input type="hidden" name="expected_state" value="{{ $payment->managementState() }}">
+                                <flux:input name="account" label="Compte destinataire réellement contrôlé (IBAN ou CCP)" :value="$oldText('account', $payment->getAttribute('encrypted_transfer_details')['account'] ?? ($payment->getAttribute('transfer_method') === \App\Enums\Central\Billing\TransferMethodEnum::CASH_IN_PERSON ? 'cash:central' : ''))" required />
+                                <flux:input name="reference" label="Référence réelle contrôlée ou référence interne espèces" :value="$oldText('reference', $payment->getAttribute('transfer_reference'))" required />
+                                <flux:input type="datetime-local" name="occurred_at" label="Date réelle de réception" :value="$oldText('occurred_at', $payment->getAttribute('occurred_at')->format('Y-m-d\TH:i:s'))" required />
+                                @if ($action === 'verify')<flux:checkbox name="received" value="1" label="J’ai contrôlé la réception réelle du montant intégral, son destinataire et sa référence." required />@endif
+                                <flux:button type="submit" variant="primary">{{ $label }}</flux:button>
+                            </form>
+                        @endcan
+                    @endforeach
                 @endif
                 @can('reject', $payment)
                     <form method="POST" action="{{ route('central.payments.reject', $payment) }}" class="flex flex-col gap-3">
@@ -83,8 +87,15 @@
                     </form>
                 @endcan
             @endif
-            @if ($history !== null)<flux:heading>Historique</flux:heading>
-                @foreach ($history as $event)<flux:text>{{ $event->created_at->format('d/m/Y H:i') }} — {{ $event->description }}</flux:text>@endforeach
+
+            @if ($history !== null)
+                <flux:heading>Historique</flux:heading>
+                @foreach ($history as $event)
+                    <flux:text>{{ $event->created_at->format('d/m/Y H:i') }} — {{ $event->description }}</flux:text>
+                    @if ($event->event === \App\Services\Central\Billing\OwnerPaymentCorrectionService::EVENT)
+                        <flux:callout>Motif communiqué par le commerçant : {{ $event->properties['reason'] ?? 'Motif non renseigné' }}</flux:callout>
+                    @endif
+                @endforeach
                 {{ $history->links() }}
             @endif
         @endunless
