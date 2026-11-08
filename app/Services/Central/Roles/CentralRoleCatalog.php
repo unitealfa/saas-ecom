@@ -11,6 +11,11 @@ use Spatie\Permission\Models\Permission as PackagePermission;
 
 class CentralRoleCatalog
 {
+    public const array DASHBOARD_PERMISSIONS = [
+        'saas.dashboard.view' => 'Consulter le tableau de bord général',
+        'saas.dashboard.financial.view' => 'Consulter les indicateurs financiers globaux',
+    ];
+
     public const array CREDIT_NOTE_PERMISSIONS = [
         'saas.credit-notes.view' => 'Consulter les avoirs',
         'saas.credit-notes.create' => 'Préparer un avoir',
@@ -144,6 +149,7 @@ class CentralRoleCatalog
     ];
 
     public const array PERMISSIONS = [
+        ...self::DASHBOARD_PERMISSIONS,
         ...self::CREDIT_NOTE_PERMISSIONS,
         ...self::PAYMENT_PERMISSIONS,
         ...self::ACTIVITY_PERMISSIONS,
@@ -209,6 +215,7 @@ class CentralRoleCatalog
     ];
 
     public const array GROUPS = [
+        'Tableau de bord' => ['saas.dashboard.view', 'saas.dashboard.financial.view'],
         'Envois de documents SaaS' => ['saas.deliveries.view', 'saas.deliveries.send', 'saas.deliveries.retry'],
         'Journal d’activité' => ['saas.activity.view', 'saas.activity.export'],
         'Échéances de paiement' => ['saas.subscriptions.installments.view', 'saas.subscriptions.installments.create'],

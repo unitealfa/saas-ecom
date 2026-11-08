@@ -16,6 +16,10 @@
                         {{ __('Dashboard') }}
                     </flux:sidebar.item>
 
+                    @canany(['viewAdminDashboard', 'viewFinancialDashboard'], \App\Models\User::class)
+                        <flux:sidebar.item :href="route('central.admin-dashboard.index')" :current="request()->routeIs('central.admin-dashboard.*')" wire:navigate>Tableau de bord administratif</flux:sidebar.item>
+                    @endcanany
+
                     @can('viewAny', \App\Models\User::class)
                         <flux:sidebar.item :href="route('central.users.index')" :current="request()->routeIs('central.users.*')" wire:navigate>{{ __('Utilisateurs') }}</flux:sidebar.item>
                     @endcan
