@@ -88,7 +88,7 @@ class DefaultSubscription
 
                     continue;
                 }
-                $obligation = SubscriptionInstallment::where('parent_subscription_id', $next->id)
+                $obligation = SubscriptionInstallment::where('subscription_id', $next->id)
                     ->where('period_starts_at', $next->period_starts_at)->where('period_ends_at', $next->period_ends_at)->exists();
                 if ($obligation && ! $this->paidDocuments()->where('subscription_id', $next->id)
                     ->where('period_starts_at', $next->period_starts_at)->where('period_ends_at', $next->period_ends_at)->exists()) {

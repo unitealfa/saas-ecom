@@ -32,13 +32,13 @@ function manualPaymentFixture(bool $future = false, bool $purchase = false, arra
         $plan = Plan::factory()->create(['name' => 'Pro fictif', 'is_active' => true, 'monthly_price' => '3000.00', 'annual_price' => '36000.00']);
         $subscription = app(SubscriptionPurchaseService::class)->choose($owner,
             ['plan_uuid' => $plan->uuid, 'period' => 1, 'operation_id' => (string) Str::uuid(), 'expected_amount' => '3000.00']);
-        $due = SubscriptionInstallment::where('parent_subscription_id', $subscription->id)->sole();
+        $due = SubscriptionInstallment::where('subscription_id', $subscription->id)->sole();
     } else {
         $subscription = Subscription::factory()->create(['user_id' => $owner->id, 'agreed_amount' => '3000.00',
             'status' => StatusEnum::SCHEDULED, 'period_starts_at' => $future ? now()->addDays(2) : now()->subDay(),
             'period_ends_at' => $future ? now()->addDays(2)->addMonth() : now()->addMonth()]);
         $due = new SubscriptionInstallment;
-        $due->forceFill(['user_id' => $owner->id, 'parent_subscription_id' => $subscription->id,
+        $due->forceFill(['user_id' => $owner->id, 'subscription_id' => $subscription->id,
             'operation_key' => 'installment:manual:'.Str::uuid(), 'installment_number' => 'TEST-'.Str::uuid(),
             'installment_amount' => '3000.00', 'installment_status' => InstallmentStatusEnum::PENDING,
             'due_at' => now()->addDay(), 'period_starts_at' => $subscription->period_starts_at, 'period_ends_at' => $subscription->period_ends_at])->save();

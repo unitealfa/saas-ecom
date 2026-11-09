@@ -226,9 +226,9 @@ test('a document FK prevents archival even if its media still has the administra
     $media = app(CentralMediaService::class)->upload($actor, centralMediaPdf());
     $subscription = Subscription::factory()->create(['user_id' => $actor->id]);
     $periodEnd = now()->addMonth();
-    $installment = DB::table('subscriptions')->insertGetId([
-        'uuid' => (string) Str::uuid(), 'record_type' => 2, 'user_id' => $actor->id,
-        'parent_subscription_id' => $subscription->id, 'operation_key' => 'test:installment:'.Str::uuid(),
+    $installment = DB::table('subscription_installments')->insertGetId([
+        'uuid' => (string) Str::uuid(), 'user_id' => $actor->id,
+        'subscription_id' => $subscription->id, 'operation_key' => 'test:installment:'.Str::uuid(),
         'installment_number' => 'TEST-1', 'period_starts_at' => now(), 'period_ends_at' => $periodEnd,
         'installment_amount' => 0, 'due_at' => $periodEnd, 'installment_status' => 1,
     ]);

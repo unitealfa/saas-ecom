@@ -384,7 +384,7 @@ class SubscriptionRequestService
     private function cancelReservation(Subscription $subscription): void
     {
         $subscription->forceFill(['status' => StatusEnum::CANCELLED, 'ended_at' => now()])->save();
-        foreach (SubscriptionInstallment::where('parent_subscription_id', $subscription->id)->orderBy('id')->lockForUpdate()->get() as $due) {
+        foreach (SubscriptionInstallment::where('subscription_id', $subscription->id)->orderBy('id')->lockForUpdate()->get() as $due) {
             $due->forceFill(['installment_status' => InstallmentStatusEnum::CANCELLED])->save();
         }
     }

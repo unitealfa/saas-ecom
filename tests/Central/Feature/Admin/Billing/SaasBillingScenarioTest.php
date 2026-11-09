@@ -34,7 +34,7 @@ const INVOICE_TEST_PERMISSION_DAYS = 7;
 function fullPeriodDueForTest(array $scenario, string $amount, InstallmentStatusEnum $status = InstallmentStatusEnum::PENDING): SubscriptionInstallment
 {
     $due = new SubscriptionInstallment;
-    $due->forceFill(['user_id' => $scenario['owner']->id, 'parent_subscription_id' => $scenario['subscription']->id,
+    $due->forceFill(['user_id' => $scenario['owner']->id, 'subscription_id' => $scenario['subscription']->id,
         'operation_key' => 'test:period:'.Str::uuid(), 'installment_number' => 'TEST-'.Str::uuid(),
         'installment_amount' => $amount, 'installment_status' => $status, 'due_at' => now()->addDay(),
         'period_starts_at' => $scenario['subscription']->period_starts_at, 'period_ends_at' => $scenario['subscription']->period_ends_at])->save();

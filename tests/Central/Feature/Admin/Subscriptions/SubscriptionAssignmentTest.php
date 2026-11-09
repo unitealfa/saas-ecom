@@ -40,7 +40,7 @@ test('assignment preserves the free subscription and is idempotent', function ()
     expect($previous->fresh()->status)->toBe(StatusEnum::ACTIVE)
         ->and(Subscription::where('user_id', $owner->id)->where('status', StatusEnum::ACTIVE)->count())->toBe(1)
         ->and(Subscription::where('user_id', $owner->id)->where('plan_id', $plan->id)->sole()->status)->toBe(StatusEnum::SCHEDULED)
-        ->and(SubscriptionInstallment::where('parent_subscription_id', Subscription::where('plan_id', $plan->id)->sole()->id)->count())->toBe(1);
+        ->and(SubscriptionInstallment::where('subscription_id', Subscription::where('plan_id', $plan->id)->sole()->id)->count())->toBe(1);
 });
 
 test('assignment does not replace a paid subscription in progress', function (): void {

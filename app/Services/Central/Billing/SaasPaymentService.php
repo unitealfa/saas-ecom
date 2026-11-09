@@ -374,7 +374,7 @@ class SaasPaymentService
         $due = SubscriptionInstallment::whereKey($invoice->installment_id)->lockForUpdate()->firstOrFail();
         $current = SaasInvoice::whereKey($invoice->id)->lockForUpdate()->firstOrFail();
         $subscription = $subscriptions->firstWhere('id', $current->subscription_id);
-        if ($subscription === null || $due->parent_subscription_id !== $subscription->id || $due->user_id !== $owner->id) {
+        if ($subscription === null || $due->subscription_id !== $subscription->id || $due->user_id !== $owner->id) {
             $this->fail('La période et son propriétaire ne correspondent plus à la facture.');
         }
         // Réutiliser les lectures verrouillées, sans relire un ancien snapshot MySQL.

@@ -181,6 +181,7 @@ function assertDocumentedDatabaseSchema(string $context): void
                 $expectedType = match ($field['type']) {
                     'u64' => 'bigint unsigned',
                     'u16' => 'smallint unsigned',
+                    'u32' => 'int unsigned',
                     'u8' => 'tinyint unsigned',
                     'uuid' => 'char(36)',
                     'boolean' => 'tinyint(1)',

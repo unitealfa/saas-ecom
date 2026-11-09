@@ -12,6 +12,8 @@ Ce document contient **27 tables centrales cibles et 59 tables par boutique**. L
 
 Les diagrammes sont répartis en modules pour rester exploitables. **Les champs, les références et les contraintes écrites font ensemble le schéma** : Mermaid ne peut pas imposer toutes les règles transactionnelles. Ce document n’est pas une migration SQL déjà exécutée.
 
+> Évolution actuelle : abonnements et échéances dans deux tables, avec migration centrale dédiée conservant les identifiants historiques. Les prescriptions plus anciennes de table fusionnée dans ce document sont archivées et ne font pas autorité sur le nouveau schéma.
+
 ## 1. Décisions retenues
 
 | Sujet | Décision de conception |
@@ -753,40 +755,74 @@ erDiagram
         timestamp created_at "nullable"
         timestamp updated_at "nullable"
     }
-    subscriptions {
+subscriptions {
         bigint_unsigned id PK "AUTO_INCREMENT ; interne"
         uuid uuid UK "UUID v4 ; public"
-        tinyint_unsigned record_type "SubscriptionRecordTypeEnum ; NOT NULL"
-        bigint_unsigned user_id FK "users.id ; proprietaire des deux types"
-        bigint_unsigned parent_subscription_id FK "nullable ; subscriptions.id ; obligatoire pour echeance"
-        tinyint_unsigned parent_record_type "generated STORED ; 1 pour echeance, sinon NULL"
-        bigint_unsigned tenant_id FK "nullable ; tenants.id ; abonnement seulement"
-        bigint_unsigned plan_id FK "nullable ; plans.id ; abonnement seulement"
-        tinyint_unsigned status "nullable ; SubscriptionStatusEnum ; abonnement seulement"
-        tinyint_unsigned period "nullable ; BillingPeriodEnum ; abonnement seulement"
-        decimal agreed_amount "nullable ; abonnement seulement"
-        datetime started_at "nullable ; abonnement seulement"
-        datetime period_starts_at "requis ; periode de droit ou periode facturee"
-        datetime period_ends_at "nullable pour abonnement gratuit ; requis pour echeance"
-        datetime trial_ends_at "nullable ; abonnement seulement"
-        datetime ended_at "nullable ; abonnement seulement"
-        boolean auto_renew "nullable ; abonnement seulement"
-        bigint_unsigned assigned_by_id FK "nullable ; users.id ; attribution abonnement"
-        varchar installment_number UK "nullable ; echeance seulement"
-        decimal installment_amount "nullable ; echeance seulement ; DZD"
-        datetime due_at "nullable ; echeance seulement"
-        tinyint_unsigned installment_status "nullable ; InstallmentStatusEnum ; echeance seulement"
-        tinyint_unsigned active_owner_slot "generated STORED ; 1 si record_type=1 et status=3, sinon NULL"
+        bigint_unsigned user_id FK "users.id ; proprietaire"
+        bigint_unsigned tenant_id FK "nullable ; tenants.id"
+        bigint_unsigned plan_id FK "nullable physique ; requis par CHECK"
+        bigint_unsigned assigned_by_id FK "nullable ; users.id"
+        bigint_unsigned subscription_request_id FK "nullable ; FK composite sur subscription_requests"
         varchar operation_key UK
+        tinyint_unsigned status "nullable physique ; SubscriptionStatusEnum ; requis par CHECK"
+        tinyint_unsigned period "nullable physique ; BillingPeriodEnum ; requis par CHECK"
+        decimal agreed_amount "nullable physique ; requis par CHECK"
+        datetime started_at "nullable physique ; requis par CHECK"
+        datetime period_starts_at
+        datetime period_ends_at "nullable pour offre gratuite"
+        datetime trial_ends_at "nullable"
+        datetime ended_at "nullable"
+        boolean auto_renew "nullable physique ; requis par CHECK"
+        tinyint_unsigned active_owner_slot "generated STORED ; 1 si status=3 sinon NULL ; nullable"
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    subscription_installments {
+        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
+        uuid uuid UK "UUID v4 ; public"
+        bigint_unsigned user_id FK "users.id ; meme proprietaire que l'abonnement"
+        bigint_unsigned subscription_id FK "subscriptions.id ; abonnement parent"
+        varchar installment_number UK
+        varchar operation_key UK
+        decimal installment_amount
+        tinyint_unsigned installment_status "InstallmentStatusEnum"
+        datetime period_starts_at
+        datetime period_ends_at
+        datetime due_at
+        timestamp created_at "nullable"
+        timestamp updated_at "nullable"
+    }
+    subscription_requests {
+        bigint_unsigned id PK "AUTO_INCREMENT ; interne"
+        uuid uuid UK "UUID v4 ; public"
+        bigint_unsigned user_id FK "users.id"
+        bigint_unsigned current_subscription_id FK "nullable ; FK composite"
+        bigint_unsigned current_invoice_id FK "nullable ; FK composite"
+        bigint_unsigned current_payment_id FK "nullable ; FK composite"
+        bigint_unsigned decided_by_id FK "nullable ; users.id"
+        tinyint_unsigned status "RequestStatusEnum"
+        tinyint_unsigned payment_choice "PaymentChoiceEnum"
+        u32 reference_version
+        char(3) currency
+        varchar operation_key UK
+        char(64) initial_payload_hash
+        datetime submitted_at
+        datetime decided_at "nullable"
+        text decision_reason "nullable"
+        varchar invoice_error "nullable"
+        tinyint_unsigned document_type "generated STORED ; nullable si current_invoice_id NULL"
+        tinyint_unsigned payment_record_type "generated STORED ; nullable si current_payment_id NULL"
         timestamp created_at "nullable"
         timestamp updated_at "nullable"
     }
 
     plans ||--o{ plan_features : plan_id
     users ||--o{ subscriptions : user_id
+    users ||--o{ subscription_installments : user_id
+    users ||--o{ subscription_requests : user_id
     tenants |o--o{ subscriptions : tenant_id
     plans |o--o{ subscriptions : plan_id
-    subscriptions |o--o{ subscriptions : parent_subscription_id
+    subscriptions ||--o{ subscription_installments : subscription_id
 ```
 
 #### Explication très simple des champs
@@ -817,19 +853,7 @@ erDiagram
 - **`created_at`** : la date où cette ligne a été créée dans la base.
 - **`updated_at`** : la date de la dernière modification de cette ligne. Exemple : si tu modifies l’élément aujourd’hui, cette date devient celle d’aujourd’hui.
 
-**subscriptions, explication des champs fusionnés :**
-
-| Groupe | Contenu |
-|---|---|
-| id, uuid, record_type | Identité propre et nature de la ligne : 1 SUBSCRIPTION ou 2 INSTALLMENT |
-| user_id | Propriétaire central ; identique entre une échéance et son abonnement |
-| parent_subscription_id, parent_record_type | L’échéance retrouve son abonnement parent, obligatoirement de type 1 ; NULL pour l’abonnement |
-| tenant_id, plan_id | Boutique ciblée facultative et offre choisie, seulement sur la ligne abonnement ; une échéance les obtient depuis son parent |
-| status, period, agreed_amount | État du droit, durée mensuelle/annuelle et prix convenu de l’abonnement |
-| started_at, period_starts_at, period_ends_at, trial_ends_at, ended_at | Début/fin du droit ou période de dette ; essai et clôture seulement sur l’abonnement |
-| auto_renew, assigned_by_id | Préparation du prochain renouvellement payant et auteur de l’attribution ; aucun prélèvement bancaire automatique |
-| installment_number, installment_amount, due_at, installment_status | Numéro de dette unique, montant dû, date limite et état PENDING/PARTIALLY_PAID/PAID/CANCELLED de chaque échéance |
-| active_owner_slot, operation_key, created_at, updated_at | Une seule attribution active par propriétaire, déduplication des créations/renouvellements et historique technique |
+**subscriptions et subscription_installments — deux tables :** `subscriptions` porte exclusivement l'abonnement, l'offre, sa période, ses droits et son statut. `subscription_installments` porte l'obligation de règlement intégral, son montant, sa date et son statut. Les lignes précédemment en `subscriptions.record_type=2` ont été déplacées avec ID et UUID conservés ; `subscription_installments.subscription_id` référence `subscriptions.id`, avec la même identité de propriétaire imposée en FK composite. `saas_invoices.installment_id` référence désormais la table dédiée. Aucun `SubscriptionRecordTypeEnum` n'est nécessaire. `subscription_requests` représente séparément le dossier commercial de demande. Les états d'abonnement et d'échéance restent deux enums distincts.
 
 Les références vers un autre module sont indiquées sur les champs, même si leur flèche n’est pas redessinée ici.
 
@@ -837,15 +861,15 @@ Les références vers un autre module sont indiquées sur les champs, même si l
 
 - **`plan_features` :** Une fonctionnalité ne peut apparaître qu’une seule fois dans un même plan. Pour un quota : `is_active=false` signifie que la fonction est interdite ; `is_active=true` avec `limit=NULL` signifie qu’elle est illimitée ; sinon `limit` contient le maximum autorisé et doit être positif ou nul. Pour une fonctionnalité oui/non, `limit` reste vide. Si une fonctionnalité n’apparaît pas dans le plan, elle est considérée comme désactivée. Quand un plan a déjà été utilisé, ces règles restent figées avec cette version du plan.
 
-- **subscriptions — types et rattachements :** record_type=1 SUBSCRIPTION ou 2 INSTALLMENT est immuable. UNIQUE(id,user_id,record_type), UNIQUE(id,parent_subscription_id,user_id,record_type), UNIQUE(user_id,active_owner_slot), UNIQUE(installment_number) hors NULL et UNIQUE(operation_key). parent_record_type est GENERATED ALWAYS AS (CASE WHEN record_type=2 THEN 1 ELSE NULL END) STORED. La FK(parent_subscription_id,user_id,parent_record_type) → subscriptions(id,user_id,record_type) impose le même propriétaire et un vrai abonnement parent. Pour type 1 : parent_subscription_id=NULL, plan_id/status/period/agreed_amount/started_at/auto_renew requis et tous les champs installment_* / due_at NULL. Pour type 2 : parent_subscription_id/parent_record_type/installment_number/installment_amount/due_at/installment_status requis ; tenant_id/plan_id/status/period/agreed_amount/started_at/trial_ends_at/ended_at/auto_renew/assigned_by_id NULL. Les états restent deux enums distincts. Les références à un abonnement ciblent toujours type 1, jamais une échéance ; tenant_id facultatif reste protégé par FK(tenant_id,user_id) → tenants(id,user_id).
+- **subscriptions et échéances :** UNIQUE(subscriptions.id,user_id), UNIQUE(subscriptions.user_id,active_owner_slot) ; UNIQUE(subscription_installments.id,subscription_id,user_id). FK(subscription_installments.subscription_id,user_id) → subscriptions(id,user_id). Les états et les champs de dette appartiennent exclusivement à subscription_installments.
 
 **Abonnement et droits inchangés :** attribution payante par un administrateur autorisé, gratuit à la création et à l’expiration du payant, historique des anciennes attributions, arrêt du renouvellement sans perdre une période déjà payée. Verrouiller users du propriétaire puis l’abonnement avant activation/rétrogradation ; fermer l’ancien type 1 avant d’activer le nouveau, avec UNIQUE(user_id,active_owner_slot) où active_owner_slot=1 uniquement pour type 1/status=3. Dates [period_starts_at,period_ends_at), droits contrôlés à chaque action sans dépendre d’un cron. Les requêtes de plan/quota/gratuit et les modèles Eloquent d’abonnement filtrent impérativement record_type=1. Les comptes, permissions, quotas et choix des boutiques restent ceux de §7.
 
-**Échéances dans la même table :** un abonnement peut avoir autant de lignes type 2 que nécessaire ; ne pas écraser septembre par octobre. installment_number reste globalement unique ; installment_amount>=0, period_ends_at>period_starts_at et due_at non NULL. Une occurrence utilise une operation_key stable contenant le UUID de l’abonnement et la période/occurrence. Deux occurrences commerciales distinctes peuvent couvrir la même période, par exemple une option, mais leurs clés sont différentes. Échéance et intention de facture sont écrites dans une transaction centrale ; un balayage retrouve les types 2 sans facture attendue et reprend avec la même clé. La FK d’une facture vers son échéance conserve le parent abonnement et le propriétaire exacts (C8/§6.7).
+**Échéances dédiées :** les obligations portent leur propre historique dans subscription_installments ; leur clé operation_key est stable. Le MVP impose un règlement intégral. Plusieurs lignes historiques peuvent exister, mais le service refuse de facturer une période ambiguë.
 
 **État du dû :** installment_status est une projection reconstruisible depuis factures/avoirs émis et virements vérifiés C8. Le montant initial de dette et sa période restent historiques ; un avoir réduit le dû documenté, un paiement prouvé l’acquitte, un remboursement diminue les fonds conservés. Une annulation d’échéance exige que ses pièces et obligations soient traitées, sans effacer facture ou paiement. Sous les mêmes verrous, 1 PENDING avant règlement, 2 PARTIALLY_PAID pour une part acquittée, 3 PAID lorsque le dû net est soldé, 4 CANCELLED pour dette annulée ; zéro dû documenté est soldé sans inventer un paiement. L’échéance ne se confond jamais avec le document ni avec l’argent transféré.
 
-**Modèles logiques :** Subscription (type 1) et SubscriptionInstallment (type 2) utilisent tous deux subscriptions et la connexion centrale, avec scopes, créations typées et Policies distincts. Une route de plan refuse le UUID d’une échéance. Les Resource publient des UUID ; les lignes de type 2 ne créent pas un deuxième abonnement actif. Paiement client et remboursement admin s’effectuent à distance hors application, puis sont déclarés/vérifiés avec preuve PDF dans C8 ; aucun virement automatique n’est supposé.
+**Modèles :** Subscription lit subscriptions ; SubscriptionInstallment lit subscription_installments. Les relations Eloquent et les FK garantissent les liens. Les identifiants historiques restent inchangés.
 
 - **Droits d’usage par offre :** les possibilités et quotas viennent uniquement du plan applicable et de ses plan_features. Pour accorder une composition particulière, créer/versionner une offre adaptée puis l’attribuer via subscriptions. Aucune exception par propriétaire/boutique ni date parallèle ne passe devant le plan. Les permissions datées d’une personne ne modifient aucun quota commercial.
 
@@ -1030,14 +1054,12 @@ erDiagram
         uuid uuid UK "UUID v4 ; public"
         bigint_unsigned user_id FK "users.id ; proprietaire"
         bigint_unsigned subscription_id FK "subscriptions.id ; abonnement type 1"
-        bigint_unsigned installment_id FK "subscriptions.id ; echeance type 2"
+        bigint_unsigned installment_id FK "subscription_installments.id ; echeance integrale"
         bigint_unsigned billing_rule_id FK "saas_billing_settings.id ; regle type 2"
         bigint_unsigned original_invoice_id FK "nullable facture ; requis avoir ; saas_invoices.id"
         bigint_unsigned sequence_id FK "nullable avant reservation ; saas_billing_settings.id ; compteur type 1"
         bigint_unsigned document_media_id FK "nullable avant generation ; media.id ; PDF prive"
         tinyint_unsigned document_type "DocumentTypeEnum ; 1 INVOICE / 2 CREDIT_NOTE seulement"
-        tinyint_unsigned subscription_record_type "generated STORED ; 1"
-        tinyint_unsigned installment_record_type "generated STORED ; 2"
         tinyint_unsigned billing_rule_record_type "generated STORED ; 2"
         tinyint_unsigned original_invoice_document_type "generated STORED ; nullable ; 1 si original_invoice_id non NULL, sinon NULL"
         tinyint_unsigned sequence_record_type "generated STORED ; nullable ; 1 si sequence_id non NULL, sinon NULL"
@@ -1182,7 +1204,7 @@ erDiagram
     }
     users ||..o{ saas_invoices : "FK user_id"
     subscriptions ||..o{ saas_invoices : "FK subscription_id"
-    subscriptions ||..o{ saas_invoices : "FK installment_id"
+    subscription_installments ||..o{ saas_invoices : "FK installment_id"
     saas_billing_settings ||..o{ saas_invoices : "FK billing_rule_id"
     saas_invoices |o..o{ saas_invoices : "FK original_invoice_id"
     saas_billing_settings |o..o{ saas_invoices : "FK sequence_id"
@@ -1271,9 +1293,9 @@ Chaque ancien champ est conservé, redistribué ou remplacé par sa métadonnée
 | `record_type` | `saas_invoices.document_type` ; `saas_invoice_lines.document_type` ; `saas_billing_settings.record_type` ; `saas_document_deliveries (table dédiée)` ; `saas_transfers.record_type` |
 | `user_id` | `saas_invoices.user_id` ; `saas_invoice_lines.user_id` ; `saas_document_deliveries.user_id` ; `saas_transfers.user_id` |
 | `subscription_id` | `saas_invoices.subscription_id` |
-| `subscription_record_type` | `saas_invoices.subscription_record_type` |
+| `subscription_record_type` | supprimée : la table abonnement est dédiée |
 | `installment_id` | `saas_invoices.installment_id` |
-| `installment_record_type` | `saas_invoices.installment_record_type` |
+| `installment_record_type` | supprimée : la table échéance est dédiée |
 | `billing_rule_id` | `saas_invoices.billing_rule_id` |
 | `billing_rule_record_type` | `saas_invoices.billing_rule_record_type` |
 | `billing_rule_snapshot` | `saas_invoices.billing_rule_snapshot` |
@@ -4714,8 +4736,8 @@ Les PK/FK sont BIGINT UNSIGNED, les types TINYINT UNSIGNED. Les colonnes génér
 
 | Clé parent UNIQUE à créer | FK enfant exacte |
 |---|---|
-| subscriptions(id,user_id,record_type) | subscriptions(parent_subscription_id,user_id,parent_record_type=1) ; saas_invoices(subscription_id,user_id,subscription_record_type=1) |
-| subscriptions(id,parent_subscription_id,user_id,record_type) | saas_invoices(installment_id,subscription_id,user_id,installment_record_type=2) |
+| subscriptions(id,user_id) | subscription_installments(subscription_id,user_id) ; saas_invoices(subscription_id,user_id) ; subscription_requests(current_subscription_id,user_id) |
+| subscription_installments(id,subscription_id,user_id) | saas_invoices(installment_id,subscription_id,user_id) |
 | geographic_areas(id,country_id,type) | geographic_areas(parent_id,country_id,parent_type=1) |
 | saas_billing_settings(id,record_type) | saas_invoices(billing_rule_id,billing_rule_record_type=2) |
 | saas_billing_settings(id,document_type,fiscal_year,record_type) | saas_invoices(sequence_id,document_type,fiscal_year,sequence_record_type=1) |
@@ -4728,7 +4750,7 @@ Les PK/FK sont BIGINT UNSIGNED, les types TINYINT UNSIGNED. Les colonnes génér
 
 Chaque index parent UNIQUE est créé une seule fois même s’il reçoit plusieurs FK. Conserver aussi la FK simple de chaque colonne FK du diagramme ; notamment original_invoice_id de saas_invoice_lines vise un en-tête existant. Les FK composites ajoutent propriétaire/type/origine aux FK simples. Pour une ligne d’avoir, la FK composite vers le parent impose son original_invoice_id exact ; la FK vers la ligne originale impose une ligne de facture de cette même origine. Une ligne de facture n’a pas d’origine et est déjà protégée par sa FK document_id/user_id/document_type non NULL. L’état ISSUED d’un parent, la devise, les sommes et les plafonds demandent des contrôles sous verrou, en plus des FK.
 
-**Expressions générées :** subscriptions.parent_record_type=CASE WHEN record_type=2 THEN 1 ELSE NULL END ; active_owner_slot=CASE WHEN record_type=1 AND status=3 THEN 1 ELSE NULL END. geographic_areas.parent_type=CASE WHEN type=2 THEN 1 ELSE NULL END et parent_key=COALESCE(parent_id,0). Dans saas_invoices : subscription_record_type=1, installment_record_type=2 et billing_rule_record_type=2, les trois FK de base étant requises ; original_invoice_document_type=CASE WHEN original_invoice_id IS NOT NULL THEN 1 ELSE NULL END ; sequence_record_type=CASE WHEN sequence_id IS NOT NULL THEN 1 ELSE NULL END. Dans saas_invoice_lines : original_line_document_type=CASE WHEN original_invoice_line_id IS NOT NULL THEN 1 ELSE NULL END. Dans saas_billing_settings : sequence_slot=CASE WHEN record_type=1 THEN 1 ELSE NULL END. Dans saas_transfers : document_type=1 ; original_payment_record_type=CASE WHEN original_payment_id IS NOT NULL THEN 1 ELSE NULL END ; credit_note_document_type=CASE WHEN credit_note_id IS NOT NULL THEN 2 ELSE NULL END ; active_transaction_fingerprint=CASE WHEN transfer_status=3 AND reversal_of_id IS NULL THEN transaction_fingerprint ELSE NULL END. Les champs document_type de ligne/envoi sont ordinaires, fixés par le serveur à 1/2 et contrôlés contre le parent ; ils ne sont pas des expressions inter-tables.
+**Expressions générées :** subscriptions.active_owner_slot=CASE WHEN status=3 THEN 1 ELSE NULL END. geographic_areas.parent_type=CASE WHEN type=2 THEN 1 ELSE NULL END et parent_key=COALESCE(parent_id,0). Dans saas_invoices : billing_rule_record_type=2, les trois FK de base étant requises ; original_invoice_document_type=CASE WHEN original_invoice_id IS NOT NULL THEN 1 ELSE NULL END ; sequence_record_type=CASE WHEN sequence_id IS NOT NULL THEN 1 ELSE NULL END. Dans saas_invoice_lines : original_line_document_type=CASE WHEN original_invoice_line_id IS NOT NULL THEN 1 ELSE NULL END. Dans saas_billing_settings : sequence_slot=CASE WHEN record_type=1 THEN 1 ELSE NULL END. Dans saas_transfers : document_type=1 ; original_payment_record_type=CASE WHEN original_payment_id IS NOT NULL THEN 1 ELSE NULL END ; credit_note_document_type=CASE WHEN credit_note_id IS NOT NULL THEN 2 ELSE NULL END ; active_transaction_fingerprint=CASE WHEN transfer_status=3 AND reversal_of_id IS NULL THEN transaction_fingerprint ELSE NULL END. Les champs document_type de ligne/envoi sont ordinaires, fixés par le serveur à 1/2 et contrôlés contre le parent ; ils ne sont pas des expressions inter-tables.
 
 **Forme et phases :** la facture/avoir possède ses FK requises et document_type=1/2. Avoir : origine/motif non NULL, due_at NULL ; facture : origine NULL et date limite requise. Lignes de facture : origines/motif NULL, prix/remise non NULL ; lignes d’avoir : origines/motif requis, prix/remise NULL. Réglage SEQUENCE : tous les champs métiers de RULE NULL ; RULE : tous les champs de compteur NULL. Les FK/année/numéro de réservation d’un document sont tous NULL avant réservation, puis tous renseignés ensemble ; média/date d’émission requis pour ISSUED. PAYMENT interdit les champs propres au remboursement ; REFUND exige source/motif/auteur, puis exécutant/preuve/référence après transfert effectif. Les préfixes d’operation_key sont validés côté serveur et par le contrôle de forme, pas par convention de navigateur. Les réservations en cours, montants, identités, JSON taxes et médias suivent C8 ; même en SQL direct, déclencheurs de forme/immutabilité refusent les combinaisons interdites.
 

@@ -37,6 +37,6 @@ class SubscriptionPurchaseController extends Controller
         abort_unless($subscription->user_id === $this->centralActor()->id, 403);
 
         return view('central.pages.owner.billing.subscriptions.show', ['subscription' => $subscription->load('plan'),
-            'installments' => SubscriptionInstallment::where('parent_subscription_id', $subscription->id)->with('invoices')->orderBy('id')->get()]);
+            'installments' => SubscriptionInstallment::where('subscription_id', $subscription->id)->with('invoices')->orderBy('id')->get()]);
     }
 }

@@ -116,7 +116,7 @@ class SaasInvoiceController extends Controller
             'rules' => BillingRule::where('policy_status', PolicyStatusEnum::ACTIVE)->where('parameters->document_type', DocumentTypeEnum::INVOICE->value)->orderBy('code')->get()
                 ->filter(fn (BillingRule $rule): bool => $rule->isActiveAt(now())
                     && Validator::make($rule->only(['code', 'trigger_event', 'parameters']), BillingRuleService::contentRules())->passes()),
-            'installments' => SubscriptionInstallment::where('parent_subscription_id', $subscription->id)->with('invoices')
+            'installments' => SubscriptionInstallment::where('subscription_id', $subscription->id)->with('invoices')
                 ->orderByDesc('id')->paginate(self::PER_PAGE),
         ]);
     }

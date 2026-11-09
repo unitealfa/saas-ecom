@@ -245,9 +245,9 @@ test('a draft already referenced by an invoice is immutable', function (): void 
     $rule = billingDraft();
     $subscription = Subscription::factory()->create(['user_id' => $this->admin->id]);
     $end = now()->addMonth();
-    $installment = DB::table('subscriptions')->insertGetId([
-        'uuid' => (string) Str::uuid(), 'record_type' => 2, 'user_id' => $this->admin->id,
-        'parent_subscription_id' => $subscription->id, 'operation_key' => 'test:installment:'.Str::uuid(),
+    $installment = DB::table('subscription_installments')->insertGetId([
+        'uuid' => (string) Str::uuid(), 'user_id' => $this->admin->id,
+        'subscription_id' => $subscription->id, 'operation_key' => 'test:installment:'.Str::uuid(),
         'installment_number' => 'BILLING-TEST-1', 'period_starts_at' => now(), 'period_ends_at' => $end,
         'installment_amount' => 0, 'due_at' => $end, 'installment_status' => 1,
     ]);

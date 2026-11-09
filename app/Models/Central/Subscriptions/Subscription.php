@@ -15,12 +15,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
 /**
  * @property StatusEnum $status
  * @property PeriodEnum $period
- * @property string $agreed_amount
  * @property string $agreed_amount
  * @property CarbonImmutable $period_starts_at
  * @property CarbonImmutable|null $period_ends_at
@@ -36,19 +36,7 @@ class Subscription extends Model
     /** @use HasFactory<SubscriptionFactory> */
     use CentralConnection, HasFactory, HasPublicUuid;
 
-    public const int RECORD_TYPE = 1;
-
-    public const string SCOPE = 'subscription';
-
-    protected $attributes = ['record_type' => self::RECORD_TYPE];
-
-    protected static function booted(): void
-    {
-        static::addGlobalScope(
-            self::SCOPE,
-            fn (Builder $query) => $query->where('record_type', self::RECORD_TYPE),
-        );
-    }
+    // Table dédiée : tous les enregistrements sont des abonnements, sans record_type.
 
     protected function casts(): array
     {
@@ -91,6 +79,12 @@ class Subscription extends Model
     public function request(): BelongsTo
     {
         return $this->belongsTo(SubscriptionRequest::class, 'subscription_request_id');
+    }
+
+    /** @return HasMany<SubscriptionInstallment, $this> */
+    public function installments(): HasMany
+    {
+        return $this->hasMany(SubscriptionInstallment::class, 'subscription_id');
     }
 
     public function transitionState(): string
