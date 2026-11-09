@@ -5972,7 +5972,7 @@ Aucune seconde approbation administrative d’une boutique : création explicite
 
 Le job termine l’initialisation technique par une transaction centrale : état d’opération SUCCEEDED et activation automatique si propriétaire/quota éligibles. Les contrôles d’état et de quota restent nécessaires ; suspension, inactivité et dépassement ne sont pas une nouvelle validation de boutique. Réactivation administrative conservée pour ces situations légitimes, pas pour PROVISIONING. Échecs et reprises réutilisent la réservation, les paramètres et la base ; verrou MySQL de provisionnement et clé d’idempotence empêchent les doubles créations. Aucune colonne ou table ajoutée.
 
-Connexion de queue central-provisioning, file tenant-provisioning, jobs/failed_jobs dans la BDD centrale. Worker local géré par une tâche Windows propre au projet et à l’utilisateur ; Supervisor prévu en production Linux. Commandes, garde-fous et fichiers dans architecture §33 ; les scripts et le terminal manuels ne remplacent pas cette supervision.
+Les workers centrales partagent la table jobs de la BDD centrale avec des connexions/files distinctes : `central-provisioning` / `tenant-provisioning` et `database` / `saas-documents`. La connexion `database` utilise `DB_QUEUE_CONNECTION`, avec repli sur `DB_CONNECTION` ; les deux doivent sélectionner la base centrale. Les tâches Windows locales propres au projet sont gérées par `aydra:local-queue` ; Supervisor Linux utilise une configuration par worker. Commandes, garde-fous, journaux et fichiers dans architecture §33 ; les scripts et le terminal manuels ne remplacent pas cette supervision.
 
 ### Politique de cache de lecture — décision du 20 octobre 2026
 
