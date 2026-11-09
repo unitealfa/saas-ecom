@@ -16,6 +16,16 @@ class UserPolicy
         return $this->access->allows($actor, 'saas.users.view');
     }
 
+    public function viewAdminDashboard(User $actor): bool
+    {
+        return $this->access->allows($actor, 'saas.dashboard.view');
+    }
+
+    public function viewFinancialDashboard(User $actor): bool
+    {
+        return $this->access->allows($actor, 'saas.dashboard.financial.view');
+    }
+
     public function viewAnyQuota(User $actor): bool
     {
         return $this->access->allows($actor, 'saas.quotas.view');

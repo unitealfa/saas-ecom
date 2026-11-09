@@ -782,7 +782,7 @@ saas.dashboard.view	Consulter le tableau de bord général
 saas.dashboard.financial.view	Consulter les indicateurs financiers globaux
 Fichiers :
 app/Http/Controllers/Central/Admin/
-    DashboardController.php
+    Dashboard/DashboardController.php
 
 app/Services/Central/Dashboard/
     AdminDashboardService.php
@@ -792,6 +792,7 @@ resources/views/central/pages/admin/dashboard/
 
 
 Les graphiques et indicateurs s'appuient sur les données disponibles. Ils n'exigent pas de nouvelle table dashboard.
+La page administrative distincte affiche, sous saas.dashboard.view, les comptes centraux non archivés sans rôle SaaS, les boutiques non archivées et les états d'abonnement enregistrés. Sous saas.dashboard.financial.view, elle affiche séparément par devise les paiements de type PAYMENT au statut VERIFIED, datés et non contrepassés : ces montants sont bruts et n'intègrent pas les remboursements. Les permissions sont indépendantes ; le tableau de bord commerçant existant reste distinct. Implémentation préparée, contrôles PHP 8.5 encore à terminer.
 Module 26 — Opérations techniques centrales
 Tables : dépendantes des opérations.
 Interface : Administration → Exploitation
