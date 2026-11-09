@@ -116,11 +116,25 @@ npm.cmd run build
 
 ### 7. Installer et démarrer le worker Windows
 
+Cette commande gère deux tâches du Planificateur Windows, chacune identifiée par le chemin du projet :
+
+- `Aydra-Provisioning-<suffixe>` : connexion `central-provisioning`, file `tenant-provisioning`.
+- `Aydra-Documents-<suffixe>` : connexion `database`, file `saas-documents`.
+
+Avant le démarrage, vérifier que `DB_CONNECTION` et `DB_QUEUE_CONNECTION` ciblent la base centrale. Si `DB_QUEUE_CONNECTION` est absent, la connexion de queue `database` reprend `DB_CONNECTION`. Le worker de documents peut envoyer les courriels SMTP en attente : valider d’abord le parcours avec une base isolée et un transport mail simulé.
+
 ```powershell
 & $aydraPhp artisan aydra:local-queue install --no-interaction
 & $aydraPhp artisan aydra:local-queue start --no-interaction
 & $aydraPhp artisan aydra:local-queue status --no-interaction
 ```
+
+`install` enregistre les tâches ; `start` les active et les démarre. Vérifier que les deux tâches apparaissent Enabled et Running. `stop` arrête et désactive les deux tâches. Journaux :
+
+- `storage/logs/local-provisioning-worker.log`
+- `storage/logs/local-documents-worker.log`
+
+Le worker de documents traite une tentative Laravel (`--tries=1`) ; ne pas relancer à l’aveugle un envoi au résultat `UNCERTAIN`.
 
 ### 8. Démarrer le serveur local
 
@@ -164,6 +178,7 @@ $aydraPhp = "$env:USERPROFILE\.config\herd\bin\php85\php.exe"
 
 - Ouvrir `/register`, créer un compte, vérifier l'e-mail, attendre l'approbation administrative, puis configurer la première boutique.
 - Après modification de `.env`, exécuter `& $aydraPhp artisan config:clear --no-interaction`, puis arrêter et redémarrer le worker avec `aydra:local-queue stop` et `aydra:local-queue start`.
+- Pour l’exploitation, consulter `& $aydraPhp artisan queue:failed --no-interaction` et la page administrative des transmissions SaaS. Le détail des contrôles et la procédure Linux/Supervisor figurent dans [Module 23 — Envois de documents](<documentation et recherche/Module-23-Envois-Documents.md>).
 
 ## Installer les dépendances après un clonage
 
@@ -210,4 +225,3 @@ composer config --global home
 ```
 
 Références officielles : [limites GitHub et OAuth](https://getcomposer.org/doc/articles/troubleshooting.md#api-rate-limit-and-oauth-tokens), [authentification Composer](https://getcomposer.org/doc/articles/authentication-for-private-packages.md#github-oauth).
-

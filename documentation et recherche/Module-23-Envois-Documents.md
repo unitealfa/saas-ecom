@@ -48,22 +48,65 @@ Configuration locale vérifiée sans afficher de secrets : `APP_ENV=local`, `QUE
 
 Les raccordements existants sont le catalogue de permissions, le Provider, le chargeur de routes administratives, la sidebar et les fiches de facture/avoir. Aucune migration nouvelle ajoutée ici.
 
-## Worker de développement
+## Supervision locale — Windows / Herd
 
-Commande du worker secondaire :
+La commande `app/Console/Commands/Central/LocalProvisioningWorker.php` gère les deux tâches propres au chemin du projet, avec suffixe dérivé de son SHA-256 :
+
+- `Aydra-Provisioning-<suffixe>` : `central-provisioning` / `tenant-provisioning`.
+- `Aydra-Documents-<suffixe>` : `database` / `saas-documents`, une tentative Laravel, timeout 60 secondes et redémarrage du worker après une heure.
+
+Depuis la racine du projet, avec PHP 8.5 Herd :
 
 ```powershell
-& 'C:\Users\habou\.config\herd\bin\php85\php.exe' artisan queue:work database --queue=saas-documents --sleep=2 --tries=1 --timeout=60
+$aydraPhp = "$env:USERPROFILE\.config\herd\bin\php85\php.exe"
+& $aydraPhp artisan test tests/Central/Unit/LocalProvisioningWorkerTest.php
+& $aydraPhp artisan test tests/Central/Feature/Admin/Billing/SaasDocumentDeliveryManagementTest.php
+& $aydraPhp artisan aydra:local-queue install --no-interaction
+& $aydraPhp artisan aydra:local-queue start --no-interaction
+& $aydraPhp artisan aydra:local-queue status --no-interaction
 ```
 
-Ce worker est distinct du worker `tenant-provisioning`. Pour un usage permanent, l’installer comme service ou tâche supervisée. Le démarrer peut transmettre les documents déjà en attente par SMTP.
+Vérifier que les deux tâches sont Enabled/Running. `install` crée les tâches sans les démarrer ; `start` les active et les lance ; `stop` arrête et désactive les deux. Journaux :
+
+- `storage/logs/local-provisioning-worker.log`
+- `storage/logs/local-documents-worker.log`
+
+Avant le démarrage, vérifier que `DB_CONNECTION` et `DB_QUEUE_CONNECTION` pointent vers la base centrale. La connexion Laravel `database` utilise `DB_QUEUE_CONNECTION` et, si elle n’est pas définie, retombe sur `DB_CONNECTION`. Vérifier ces noms sans afficher ni partager les valeurs secrètes de `.env`.
+
+Les tests feature peuvent créer et supprimer une base MySQL temporaire via `tests/TestCase.php`. Vérifier que la configuration de test cible uniquement une base isolée ; ne jamais lancer ces commandes en les reliant à une base réelle.
+
+Le worker de documents peut envoyer les courriels SMTP déjà en attente. Tester les transmissions avec une base isolée et un transport SMTP simulé avant de le démarrer sur une base habituelle. Après modification de `.env`, exécuter `& $aydraPhp artisan config:clear --no-interaction`, puis `aydra:local-queue stop` et `aydra:local-queue start`.
 
 Le worker `saas-documents` a été démarré en arrière-plan pour l’environnement local à la demande. Aucun service Windows ou mécanisme de supervision permanent n’a été installé.
 
-## Vérifications
+## Supervision de production — Linux / Supervisor
 
-- Tests de gestion des envois : **14 réussis, 87 assertions**, incluant l’absence d’intention, la réutilisation et le double clic, la connexion/file du job et son exécution par `queue:work --once`.
-- Aperçu de facturation commerçant : **12 réussis, 106 assertions**.
-- Gestion des avoirs : **42 réussis, 218 assertions, 1 ignoré**.
-- Les trois scénarios T20-10 de processus concurrents (« reservations », « same-operation », « issue ») passent dans cette exécution. Leurs sorties enfants correspondent aux valeurs attendues (`conflict`/`ok`) ; les anomalies de sauts de ligne signalées antérieurement ne sont pas reproduites. Les tests n’ont pas été modifiés.
-- Aucun courriel réel ni changement de base réelle effectué par les tests. Les tests utilisent des bases MySQL temporaires isolées.
+Installer [aydra-documents.conf](../deployment/supervisor/aydra-documents.conf) dans `/etc/supervisor/conf.d/`, avec les variables `AYDRA_ROOT`, `AYDRA_PHP` et `AYDRA_USER` déjà utilisées par [aydra-provisioning.conf](../deployment/supervisor/aydra-provisioning.conf). Le worker documents écoute `database` / `saas-documents`, avec `--tries=1`.
+
+Après vérification de la configuration sur l’hôte :
+
+```shell
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo supervisorctl status
+```
+
+Les journaux Supervisor sont `storage/logs/provisioning-worker.log` et `storage/logs/documents-worker.log` (distincts des journaux des wrappers Windows).
+
+## Contrôles d’exploitation
+
+- Examiner les échecs avec `php artisan queue:failed`.
+- Sur la base centrale, compter les jobs en attente en lecture seule :
+
+  ```sql
+  SELECT queue, COUNT(*) AS total
+  FROM jobs
+  GROUP BY queue;
+  ```
+
+- Dans l’administration, vérifier la page des transmissions SaaS et les états `RETRYABLE`, `SENT` et `UNCERTAIN`.
+- `SENT` indique l’acceptation par le transport, pas la remise au destinataire. Ne pas relancer aveuglément un état `UNCERTAIN` ni un job échoué si le courriel a pu partir.
+
+## Vérifications de cette documentation
+
+La livraison de supervision indique un contrôle de syntaxe `php -l` ; il n’a pas été reproduit dans cette mise à jour documentaire. Les tests Laravel/Windows/Supervisor et l’installation de ces tâches ne sont pas certifiés par cette mise à jour. Les tests des envois, de l’aperçu commerçant et des avoirs exécutés lors de la tâche précédente sont consignés dans [owner-billing.md](./owner-billing.md) ; ils ne valident pas l’installation Windows ou Supervisor.

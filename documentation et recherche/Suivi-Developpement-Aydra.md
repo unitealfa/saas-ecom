@@ -1,5 +1,12 @@
 # Suivi de développement et audit Aydra
 
+## 9 novembre 2026 — Documentation de supervision des deux files centrales
+
+- Documentation d’exploitation consolidée dans le README, le dossier Module 23 et l’architecture §33 : tâches Windows Provisioning/Documents, prérequis `DB_CONNECTION` / `DB_QUEUE_CONNECTION`, précaution SMTP, journaux, échecs, files en attente et statuts administratifs ; ajout de la procédure Supervisor Linux avec les deux configurations existantes.
+- Le schéma principal précise désormais que les deux files partagent la table `jobs` centrale tout en restant traitées par des connexions/files séparées.
+- Dans l’arbre de travail à la vérification, `LocalProvisioningWorker.php`, son test et `deployment/supervisor/aydra-documents.conf` étaient déjà modifiés ou non suivis. Ces changements d’implémentation n’ont pas été faits ni installés par cette mise à jour documentaire ; ne pas les confondre avec des tâches Windows/Supervisor effectivement configurées.
+- Aucune installation, activation, reprise ou vérification Windows/Supervisor n’a été exécutée dans cette tâche. Les instructions détaillées et les précautions sont dans [architecture §33](<architecture a suivre pour faire le code.txt>) et [Module 23](<Module-23-Envois-Documents.md>).
+
 ## 8 novembre 2026 — owner-billing, facturation commerçant
 
 Installation manuelle revue et documentée : [C-157/C-158/C-159/C-162](owner-billing.md). Nom retenu : owner-billing, sans numéro de module. Vue principale et test déplacés vers les chemins attendus ; validation et idempotence des signalements renforcées, sans mutation financière. Pint et PHPStan ciblé réussis ; aucun test BDD, seeder, migration, envoi ou action Git distante. Modification indépendante de PublicPlanCatalog préservée.
