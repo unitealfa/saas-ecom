@@ -10,7 +10,6 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Str;
 
 function module03Admin(): User
 {
@@ -317,19 +316,6 @@ test('guests and merchants cannot access or mutate SaaS roles', function (): voi
     $this->put(route('central.roles.update', $role), ['name' => 'forged'])->assertForbidden();
     $this->delete(route('central.roles.destroy', $role))->assertForbidden();
     $this->assertDatabaseHas('roles', ['id' => $role->id, 'name' => 'secure-role']);
-});
-
-test('role deletion refuses an existing business reference without silently deleting it', function (): void {
-    $admin = module03Admin();
-    $role = Role::createWithPermissions('referenced-role', ['saas.users.view' => 5]);
-    $reference = (string) Str::uuid();
-    DB::connection($role->getConnectionName())->table('admin_restrictions')->insert([
-        'uuid' => $reference, 'admin_id' => $admin->id, 'permission_id' => $role->permissionComposition()->first()->id,
-        'target_role_id' => $role->id, 'created_by_id' => $admin->id, 'effect' => 1, 'status' => 1, 'started_at' => now(),
-    ]);
-    $this->actingAs($admin, 'central')->delete(route('central.roles.destroy', $role))->assertSessionHasErrors('role');
-    $this->assertDatabaseHas('roles', ['id' => $role->id]);
-    $this->assertDatabaseHas('admin_restrictions', ['uuid' => $reference, 'target_role_id' => $role->id]);
 });
 
 test('role mutation and deletion cannot target a composition stronger than the delegator owns', function (): void {

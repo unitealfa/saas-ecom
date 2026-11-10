@@ -465,7 +465,7 @@ test('T25 T35 two independent processes cannot accept an obsolete request or act
         foreach ($processes as $process) {
             $process->wait();
             expect($process->isSuccessful())->toBeTrue($process->getErrorOutput().$process->getOutput());
-            $outcomes[] = $process->getOutput();
+            $outcomes[] = trim($process->getOutput());
         }
         expect($outcomes)->toContain('applied');
         if ($edit) {

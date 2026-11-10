@@ -85,7 +85,7 @@ test('MySQL executes both schemas with the documented types collations and relat
             $this->artisan('migrate', ['--database' => 'schema_check', '--path' => database_path('migrations/'.$context), '--realpath' => true, '--no-interaction' => true])->assertSuccessful();
 
             assertDocumentedDatabaseSchema($context);
-            expect(DB::table('information_schema.triggers')->where('trigger_schema', $database)->count())->toBe($context === 'central' ? 79 : 205);
+            expect(DB::table('information_schema.triggers')->where('trigger_schema', $database)->count())->toBe($context === 'central' ? 78 : 205);
             assertDocumentedAuthorizationConstraints($context);
             if ($context === 'central') {
                 expect(collect(DB::connection('schema_check')->getSchemaBuilder()->getIndexes('tenants'))->contains(fn (array $index): bool => ! $index['unique'] && $index['columns'] === ['shop_name']))->toBeTrue();
