@@ -134,7 +134,7 @@ function assertDocumentedDatabaseSchema(string $context): void
     $driver = $schema->getConnection()->getDriverName();
     $technical = ['migrations', 'password_reset_tokens', 'sessions', 'cache', 'cache_locks', 'jobs', 'job_batches', 'failed_jobs'];
     // admin_restrictions is a preserved historical table, outside the target business diagram.
-    $technical = array_merge($technical, $context === 'central' ? ['passkeys', 'admin_restrictions'] : ['tenants', 'domains']);
+    $technical = array_merge($technical, $context === 'central' ? ['passkeys'] : ['tenants', 'domains']);
     $databaseSchema = $driver === 'mysql' ? $schema->getConnection()->getDatabaseName() : null;
     $actualTables = array_column($schema->getTables($databaseSchema), 'name');
     $expectedTables = array_merge(array_keys($tables), $technical);
@@ -181,6 +181,7 @@ function assertDocumentedDatabaseSchema(string $context): void
                 $expectedType = match ($field['type']) {
                     'u64' => 'bigint unsigned',
                     'u16' => 'smallint unsigned',
+                    'u32' => 'int unsigned',
                     'u8' => 'tinyint unsigned',
                     'uuid' => 'char(36)',
                     'boolean' => 'tinyint(1)',

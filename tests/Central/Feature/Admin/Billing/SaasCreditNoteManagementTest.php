@@ -366,7 +366,7 @@ test('T20-10 two real processes serialize reservations and duplicate creation or
         foreach ($processes as $process) {
             $process->wait();
             expect($process->isSuccessful())->toBeTrue($process->getErrorOutput().$process->getOutput());
-            $outcomes[] = $process->getOutput();
+            $outcomes[] = trim($process->getOutput());
         }
         sort($outcomes);
         expect($outcomes)->toBe($scenario === 'reservations' ? ['conflict', 'ok'] : ['ok', 'ok'])

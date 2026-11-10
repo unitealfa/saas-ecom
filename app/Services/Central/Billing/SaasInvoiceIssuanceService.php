@@ -222,7 +222,7 @@ class SaasInvoiceIssuanceService
             }
         }
         $installment = $invoice->installment;
-        if ($installment->user_id !== $invoice->user_id || $installment->parent_subscription_id !== $invoice->subscription_id
+        if ($installment->user_id !== $invoice->user_id || $installment->subscription_id !== $invoice->subscription_id
             || ! BigDecimal::of($invoice->total_amount)->isEqualTo($installment->installment_amount)
             || ! $invoice->period_starts_at->equalTo($installment->period_starts_at)
             || ! $invoice->period_ends_at->equalTo($installment->period_ends_at)) {

@@ -68,7 +68,7 @@ class SaasInvoiceService
         Gate::forUser($actor)->authorize('prepareInvoice', $request);
         $subscription = $request->subscription;
         abort_unless($subscription instanceof Subscription, 422);
-        $due = SubscriptionInstallment::where('parent_subscription_id', $subscription->id)->sole();
+        $due = SubscriptionInstallment::where('subscription_id', $subscription->id)->sole();
 
         return $this->prepare($actor, $subscription, $due, $ruleUuid, $due->managementState(), $request);
     }
@@ -89,7 +89,7 @@ class SaasInvoiceService
                         $this->fail('request', 'La demande a changé. Aucune facture ne peut être créée pour son ancienne version.');
                     }
                 }
-                if ($due->parent_subscription_id !== $parent->id || $due->user_id !== $owner->id
+                if ($due->subscription_id !== $parent->id || $due->user_id !== $owner->id
                     || $due->period_ends_at->lessThanOrEqualTo($due->period_starts_at)) {
                     $this->fail('installment', 'Cette échéance ne peut pas être facturée pour cet abonnement.');
                 }
@@ -211,7 +211,7 @@ class SaasInvoiceService
             $owner = $subscription->owner;
             abort_unless($owner instanceof User, 404);
             $due = now()->startOfSecond()->addDays($rule->parameters['payment_due_days']);
-            $obligations = SubscriptionInstallment::where('parent_subscription_id', $subscription->id)
+            $obligations = SubscriptionInstallment::where('subscription_id', $subscription->id)
                 ->where('period_starts_at', $subscription->period_starts_at)->where('period_ends_at', $subscription->period_ends_at)
                 ->orderBy('id')->lockForUpdate()->get();
             if ($obligations->count() > 1) {
@@ -228,7 +228,7 @@ class SaasInvoiceService
             if ($installment === null) {
                 $installment = new SubscriptionInstallment;
                 $installment->forceFill([
-                    'user_id' => $owner->id, 'parent_subscription_id' => $subscription->id,
+                    'user_id' => $owner->id, 'subscription_id' => $subscription->id,
                     'operation_key' => 'installment:'.$key, 'installment_number' => 'ECH-'.Str::uuid(),
                     'installment_amount' => $subscription->agreed_amount, 'due_at' => $due,
                     'installment_status' => InstallmentStatusEnum::PENDING,
@@ -295,7 +295,7 @@ class SaasInvoiceService
 
     private function assertFullPeriod(Subscription $subscription, SubscriptionInstallment $installment): void
     {
-        $obligations = SubscriptionInstallment::where('parent_subscription_id', $subscription->id)
+        $obligations = SubscriptionInstallment::where('subscription_id', $subscription->id)
             ->where('period_starts_at', $installment->period_starts_at)->where('period_ends_at', $installment->period_ends_at)
             ->orderBy('id')->lockForUpdate()->get(['id']);
         if ($obligations->count() !== 1 || ! $installment->matchesFullPeriod($subscription)

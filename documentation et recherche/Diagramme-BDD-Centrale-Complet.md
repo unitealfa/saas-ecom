@@ -1,5 +1,7 @@
 # Diagramme complet de la BDD centrale
 
+**Architecture centrale revue :** abonnements dans `subscriptions`, échéances dans `subscription_installments`, demandes dans `subscription_requests`. Le référentiel et l'historique des factures restent conservés.
+
 **Complément courant, 7 novembre 2026 :** `subscription_requests` est une nouvelle table de suivi centrale, distincte du journal financier. `user_id` référence users ; les pointeurs courants visent les types abonnement, facture et paiement du même propriétaire par FK composites. Le lien nullable `subscriptions.subscription_request_id` conserve les versions anciennes. État, choix espèces/externe, version, auteur/date/motif de décision et clé idempotente sont portés par la demande ; prix, preuves, numéros et écritures restent dans les tables existantes. Les historiques ci-dessous restent conservés. Aucun remboursement commercial ni avoir automatique. Voir [le rapport et les contraintes](Module-22-Parcours-Demandes.md) ; migration réelle non exécutée.
 
 ```mermaid
@@ -289,14 +291,11 @@ subscriptions {
   u64 id PK "AUTO_INCREMENT ; interne"
   uuid uuid UK "UUID v4 ; public"
   u64 user_id FK
-  u64 parent_subscription_id FK "?"
   u64 tenant_id FK "?"
   u64 plan_id FK "?"
   u64 assigned_by_id FK "?"
-  varchar installment_number UK "?"
+  u64 subscription_request_id FK "?"
   varchar operation_key UK
-  u8 record_type
-  u8 parent_record_type "?"
   u8 status "?"
   u8 period "?"
   decimal agreed_amount "?"
@@ -306,10 +305,47 @@ subscriptions {
   datetime trial_ends_at "?"
   datetime ended_at "?"
   boolean auto_renew "?"
-  decimal installment_amount "?"
-  datetime due_at "?"
-  u8 installment_status "?"
   u8 active_owner_slot "?"
+  timestamp created_at "?"
+  timestamp updated_at "?"
+}
+
+subscription_installments {
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
+  u64 user_id FK
+  u64 subscription_id FK
+  varchar installment_number UK
+  varchar operation_key UK
+  decimal installment_amount
+  u8 installment_status
+  datetime period_starts_at
+  datetime period_ends_at
+  datetime due_at
+  timestamp created_at "?"
+  timestamp updated_at "?"
+}
+
+subscription_requests {
+  u64 id PK "AUTO_INCREMENT ; interne"
+  uuid uuid UK "UUID v4 ; public"
+  u64 user_id FK
+  u64 current_subscription_id FK "?"
+  u64 current_invoice_id FK "?"
+  u64 current_payment_id FK "?"
+  u64 decided_by_id FK "?"
+  u8 status
+  u8 payment_choice
+  u32 reference_version
+  char(3) currency
+  varchar operation_key UK
+  char(64) initial_payload_hash
+  datetime submitted_at
+  datetime decided_at "?"
+  text decision_reason "?"
+  varchar invoice_error "?"
+  u8 document_type "?"
+  u8 payment_record_type "?"
   timestamp created_at "?"
   timestamp updated_at "?"
 }
@@ -400,8 +436,6 @@ saas_invoices {
   varchar number UK "?"
   varchar operation_key UK
   u8 document_type
-  u8 subscription_record_type
-  u8 installment_record_type
   u8 billing_rule_record_type
   u8 original_invoice_document_type "?"
   u8 sequence_record_type "?"
@@ -638,7 +672,9 @@ permissions ||--o{ model_has_permissions : "FK permission_id"
 plans ||..o{ plan_features : "FK plan_id"
 features ||..o{ plan_features : "FK feature_id"
 users ||..o{ subscriptions : "FK user_id"
-subscriptions |o..o{ subscriptions : "FK parent_subscription_id"
+users ||..o{ subscription_installments : "FK user_id"
+users ||..o{ subscription_requests : "FK user_id"
+subscriptions ||..o{ subscription_installments : "FK subscription_id"
 tenants |o..o{ subscriptions : "FK tenant_id"
 plans |o..o{ subscriptions : "FK plan_id"
 users |o..o{ subscriptions : "FK assigned_by_id"
@@ -651,12 +687,15 @@ tenants |o..o{ activity_log : "FK tenant_id"
 tenants ||..o{ tenant_schema_deployments : "FK tenant_id"
 users ||..o{ saas_invoices : "FK user_id"
 subscriptions ||..o{ saas_invoices : "FK subscription_id"
-subscriptions ||..o{ saas_invoices : "FK installment_id"
+subscriptions |o..o{ subscription_requests : "COMPOSITE current_subscription_id,user_id"
+subscription_requests |o..o{ subscriptions : "COMPOSITE subscription_request_id,user_id"
+subscription_installments ||..o{ saas_invoices : "FK installment_id"
 saas_billing_settings ||..o{ saas_invoices : "FK billing_rule_id"
 saas_invoices |o..o{ saas_invoices : "FK original_invoice_id"
 saas_billing_settings |o..o{ saas_invoices : "FK sequence_id"
 media |o..o{ saas_invoices : "FK document_media_id"
 saas_invoices ||..o{ saas_invoice_lines : "FK document_id"
+saas_invoices |o..o{ subscription_requests : "COMPOSITE current_invoice_id"
 users ||..o{ saas_invoice_lines : "FK user_id"
 saas_invoices |o..o{ saas_invoice_lines : "FK original_invoice_id"
 saas_invoice_lines |o..o{ saas_invoice_lines : "FK original_invoice_line_id"
@@ -965,38 +1004,38 @@ Indique ce que chaque offre permet et ses limites. Exemple : l’offre Gratuit a
 | `created_at` | La date et l’heure où cette ligne a été créée. |
 | `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
 
-### 14. `subscriptions` — 26 champs
+### 14. `subscriptions` — abonnements (une table dédiée)
 
-Une seule table contient les abonnements et leurs échéances. Une ligne de type 1 décrit « Karim a le plan Pro ». Ses lignes de type 2 décrivent « Karim doit payer 3 000 DA pour septembre », puis octobre, etc. Les échéances gardent leurs propres UUID, montants, dates et états ; elles ne remplacent pas la ligne d’abonnement. tenant_id reste facultatif sur l’abonnement et désigne une boutique du même propriétaire.
+Un abonnement représente une offre et sa période de droits. Il appartient à un commerçant. Il n'a plus de `record_type` et ne stocke aucun montant/état d'échéance. `active_owner_slot` garantit un seul abonnement actif par commerçant. Les champs `plan_id`, `status`, `period`, `agreed_amount`, `started_at` et `auto_renew` restent physiquement nullable pour préserver les migrations historiques, mais sont obligatoires via CHECK SQL.
 
-| Champ | Explication très simple |
+| Champ | Signification |
 |---|---|
-| `id` | Le numéro interne de cette ligne, attribué par auto-incrémentation : 1, 2, 3… Il n’est jamais envoyé au client. |
-| `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
-| `user_id` | Le propriétaire de l’abonnement et de ses échéances, à retrouver dans users. |
-| `parent_subscription_id` | Pour une échéance, l’abonnement auquel elle appartient. Ce champ reste vide sur la ligne d’abonnement. |
-| `tenant_id` | La boutique spécialement visée par l’abonnement, si l’on en choisit une. Vide signifie un abonnement au niveau du propriétaire. |
-| `plan_id` | L’offre choisie sur la ligne d’abonnement. Une échéance retrouve l’offre depuis son abonnement parent. |
-| `assigned_by_id` | L’administrateur qui a attribué l’abonnement. |
-| `record_type` | Indique ce que représente la ligne : un abonnement ou une échéance à payer. Choix : 1 = abonnement ; 2 = échéance. |
-| `parent_record_type` | Vaut automatiquement 1 pour une échéance, pour garantir que son parent est bien un abonnement. |
-| `status` | L’état de l’abonnement. Il reste vide sur une échéance. Choix : 1 = prévu pour plus tard ; 2 = en essai ; 3 = actif ; 4 = expiré ; 5 = annulé. |
-| `period` | Indique si l’abonnement suit une période mensuelle ou annuelle. Choix : 1 = par mois ; 2 = par année. |
-| `agreed_amount` | Le prix convenu pour l’abonnement lors de son attribution. |
-| `started_at` | La date de début de l’abonnement. |
-| `period_starts_at` | Le début de la période de droits pour un abonnement, ou de la période facturée pour une échéance. |
-| `period_ends_at` | La fin de cette période. Elle peut rester vide pour l’abonnement gratuit ; une échéance garde sa date de fin. |
-| `trial_ends_at` | La date de fin de l’essai, lorsque l’abonnement en possède un. |
-| `ended_at` | La date où cette attribution d’abonnement a été clôturée. |
-| `auto_renew` | Indique si le prochain renouvellement doit être préparé. Les virements restent effectués manuellement. |
-| `installment_number` | Le numéro unique et lisible de l’échéance à payer. |
-| `installment_amount` | La somme initialement due pour cette échéance, en dinars algériens. |
-| `due_at` | La date limite pour régler cette échéance. |
-| `installment_status` | Indique si l’échéance attend son règlement, est partiellement payée, soldée ou annulée. Choix : 1 = en attente ; 2 = partiellement payé ; 3 = soldé ; 4 = annulé. |
-| `active_owner_slot` | Vaut automatiquement 1 sur l’abonnement actif du propriétaire et reste vide sur les autres lignes. Il empêche deux abonnements actifs en même temps. |
-| `operation_key` | Un code stable qui permet de reconnaître une opération déjà traitée. Une demande répétée retrouve la même opération. |
-| `created_at` | La date et l’heure où cette ligne a été créée. |
-| `updated_at` | La date et l’heure de la dernière modification de cette ligne. |
+| `id`, `uuid` | Identifiants interne et public conservés. |
+| `user_id`, `tenant_id`, `plan_id` | Propriétaire, boutique ciblée facultative, offre choisie. |
+| `assigned_by_id`, `subscription_request_id` | Administrateur et demande à l'origine de l'abonnement, si renseignés. |
+| `operation_key` | Idempotence de l'attribution. |
+| `status`, `period`, `agreed_amount` | État, période mensuelle/annuelle, prix convenu. |
+| `started_at`, `period_starts_at`, `period_ends_at` | Dates de début et de fin des droits. |
+| `trial_ends_at`, `ended_at`, `auto_renew` | Essai, clôture, renouvellement. |
+| `active_owner_slot` | Colonne calculée UNIQUE pour l'abonnement actif. |
+| `created_at`, `updated_at` | Historique technique. |
+
+### 14 bis. `subscription_installments` — échéances intégrales
+
+Chaque échéance a son propre ID/UUID, son montant, sa date limite et son statut. Elle pointe vers `subscriptions.id` par `subscription_id`. Le propriétaire est aussi vérifié par FK composite `(subscription_id,user_id)` ; un enfant d'un autre propriétaire est interdit. Le montant actuel couvre **100 % de la période** ; aucune carte ni paiement fractionné dans le MVP. Les anciennes échéances ont été copiées en conservant leurs IDs/UUID pour que les références des factures et les audits ne changent pas.
+
+| Champ | Signification |
+|---|---|
+| `id`, `uuid` | Identifiants de l'échéance. |
+| `user_id`, `subscription_id` | Propriétaire et abonnement parent. |
+| `installment_number`, `operation_key` | Numéro et clé idempotente. |
+| `installment_amount`, `installment_status` | Montant dû et état de paiement. |
+| `period_starts_at`, `period_ends_at`, `due_at` | Période facturée et date limite. |
+| `created_at`, `updated_at` | Historique technique. |
+
+### 14 ter. `subscription_requests` — demandes d'abonnement
+
+La table, ajoutée en novembre 2026, pointe vers l'abonnement, la facture et le paiement courants ; les décisions et versions sont conservées. Ses FK composites contrôlent le même propriétaire. Le détail des validations métier figure dans le rapport du module 22.
 
 ### 15. `feature_usage` — 10 champs
 
@@ -1099,14 +1138,14 @@ Les factures et les avoirs du SaaS. Chaque fiche indique qui doit payer, pour qu
 | `uuid` | Un code public unique qui reconnaît cette ligne dans les liens, formulaires et exports. |
 | `user_id` | Le propriétaire qui reçoit cette facture ou cet avoir, à retrouver dans users. |
 | `subscription_id` | L’abonnement lié à la facture ou à l’avoir. Le lien vise une ligne abonnement de subscriptions. |
-| `installment_id` | L’échéance précise facturée, à retrouver parmi les lignes échéance de subscriptions. |
+| `installment_id` | L’échéance précise facturée, à retrouver dans subscription_installments. |
 | `billing_rule_id` | La version de règle qui a servi au document. Elle vise une ligne RULE, de type 2, dans saas_billing_settings. |
 | `original_invoice_id` | La facture d’origine que cet avoir ou sa ligne vient corriger, à retrouver dans saas_invoices. |
 | `sequence_id` | Le compteur qui a donné le numéro au document. Il vise une ligne SEQUENCE, de type 1, dans saas_billing_settings. |
 | `document_media_id` | Le fichier PDF privé de la facture ou de l’avoir, à retrouver dans media. Sa clé et son empreinte y restent protégées. |
 | `document_type` | Le genre de document : 1 = facture ; 2 = avoir. Un avoir réduit le montant d’une facture. |
-| `subscription_record_type` | Vaut automatiquement 1 si subscription_id est rempli, pour imposer un vrai abonnement. |
-| `installment_record_type` | Vaut automatiquement 2 si installment_id est rempli, pour imposer une vraie échéance. |
+| `subscription_record_type` | Ancienne colonne supprimée : la FK vers subscriptions suffit. |
+| `installment_record_type` | Ancienne colonne supprimée : la FK vers subscription_installments suffit. |
 | `billing_rule_record_type` | Vaut automatiquement 2 pour imposer une vraie règle de facturation. |
 | `original_invoice_document_type` | Vaut automatiquement 1 quand une facture d’origine est indiquée, pour imposer une vraie facture ; reste vide sans cette origine. |
 | `sequence_record_type` | Vaut automatiquement 1 quand un compteur de numérotation est indiqué ; reste vide avant réservation du numéro. |

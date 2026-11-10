@@ -8,7 +8,6 @@ use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Users\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -18,7 +17,7 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
  * @property int $id
  * @property string $uuid
  * @property int $user_id
- * @property int $parent_subscription_id
+ * @property int $subscription_id
  * @property string $installment_number
  * @property string $installment_amount
  * @property string $operation_key
@@ -34,20 +33,14 @@ class SubscriptionInstallment extends Model
 {
     use CentralConnection, HasPublicUuid;
 
-    public const int RECORD_TYPE = 2;
-
-    protected $table = 'subscriptions';
-
-    protected $attributes = ['record_type' => self::RECORD_TYPE];
-
-    protected static function booted(): void
-    {
-        static::addGlobalScope('installment', fn (Builder $query) => $query->where('record_type', self::RECORD_TYPE));
-    }
+    // Échéances intégrales dans leur propre table. Aucun record_type nécessaire.
+    protected $table = 'subscription_installments';
 
     protected function casts(): array
     {
         return [
+            'user_id' => 'integer',
+            'subscription_id' => 'integer',
             'installment_status' => InstallmentStatusEnum::class,
             'installment_amount' => 'decimal:2',
             'period_starts_at' => 'immutable_datetime',
@@ -59,7 +52,7 @@ class SubscriptionInstallment extends Model
     /** @return BelongsTo<Subscription, $this> */
     public function subscription(): BelongsTo
     {
-        return $this->belongsTo(Subscription::class, 'parent_subscription_id');
+        return $this->belongsTo(Subscription::class, 'subscription_id');
     }
 
     /** @return BelongsTo<User, $this> */
@@ -76,6 +69,7 @@ class SubscriptionInstallment extends Model
 
     public function getMorphClass(): string
     {
+        // Stable : conserve la résolution des anciennes entrées ActivityLog.
         return 'subscription_installment';
     }
 
@@ -87,7 +81,7 @@ class SubscriptionInstallment extends Model
     public function matchesFullPeriod(Subscription $subscription): bool
     {
         return $subscription->period_ends_at !== null
-            && $this->parent_subscription_id === $subscription->id
+            && $this->subscription_id === $subscription->id
             && $this->user_id === $subscription->user_id
             && $this->installment_amount === $subscription->agreed_amount
             && $this->period_starts_at->equalTo($subscription->period_starts_at)

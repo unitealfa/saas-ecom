@@ -275,10 +275,6 @@ class RoleManager
             throw ValidationException::withMessages(['role' => 'Ce rôle est encore attribué. Retirez ses attributions avant de le supprimer.']);
         }
 
-        if ($connection->getSchemaBuilder()->hasTable('admin_restrictions')
-            && $connection->table('admin_restrictions')->where('target_role_id', $role->id)->exists()) {
-            throw ValidationException::withMessages(['role' => self::REFERENCE_MESSAGE]);
-        }
     }
 
     /** @return Durations */

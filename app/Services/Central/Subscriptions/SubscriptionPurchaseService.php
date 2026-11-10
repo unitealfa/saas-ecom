@@ -108,7 +108,7 @@ class SubscriptionPurchaseService
                     'status' => StatusEnum::SCHEDULED, 'period' => $period, 'agreed_amount' => $amount,
                     'assigned_by_id' => $administrative ? $actor->id : null,
                     'started_at' => $start, 'period_starts_at' => $start, 'period_ends_at' => $end, 'auto_renew' => false])->save();
-                (new SubscriptionInstallment)->forceFill(['user_id' => $owner->id, 'parent_subscription_id' => $subscription->getKey(),
+                (new SubscriptionInstallment)->forceFill(['user_id' => $owner->id, 'subscription_id' => $subscription->getKey(),
                     'operation_key' => 'installment:'.$subscription->uuid.':full-period', 'installment_number' => 'ECH-'.Str::uuid(),
                     'installment_amount' => $amount, 'installment_status' => InstallmentStatusEnum::PENDING,
                     'period_starts_at' => $start, 'period_ends_at' => $end, 'due_at' => $start])->save();

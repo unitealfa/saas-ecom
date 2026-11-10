@@ -205,7 +205,7 @@ test('new administrative paid assignments wait for payment without granting prem
         'owner_uuid' => $owner->uuid, 'plan_uuid' => $plan->uuid, 'period' => 1, 'expected_amount' => '3000.00', 'operation_key' => (string) Str::uuid()]);
 
     expect($assigned->status)->toBe(StatusEnum::SCHEDULED)
-        ->and(SubscriptionInstallment::where('parent_subscription_id', $assigned->getKey())->sole()->installment_status)->toBe(InstallmentStatusEnum::PENDING);
+        ->and(SubscriptionInstallment::where('subscription_id', $assigned->getKey())->sole()->installment_status)->toBe(InstallmentStatusEnum::PENDING);
     $this->actingAs($f['actor'], 'central')->get(route('central.subscriptions.show', $assigned))->assertOk()
         ->assertSee('ses droits attendent la confirmation du paiement intégral')->assertDontSee('Préparer l’échéance et la facture');
 });
@@ -504,7 +504,7 @@ test('a full renewal is paid once and takes over only at the end of the current 
     $service->recordCashPayment($f['actor'], $f['invoice'], [...manualExternalPayload(), 'received' => true]);
     $next = app(SubscriptionPurchaseService::class)->choose($f['owner'], ['plan_uuid' => $f['subscription']->plan->uuid,
         'period' => 1, 'expected_amount' => '3000.00', 'operation_id' => (string) Str::uuid()]);
-    $due = SubscriptionInstallment::where('parent_subscription_id', $next->id)->sole();
+    $due = SubscriptionInstallment::where('subscription_id', $next->id)->sole();
     $rule = $f['invoice']->billingRule;
     $draft = app(SaasInvoiceService::class)->prepareInstallment($f['actor'], $next, $due, $rule->uuid, $due->managementState());
     $invoice = app(SaasInvoiceIssuanceService::class)->issue($f['actor'], $draft, $draft->managementState());
@@ -552,7 +552,7 @@ test('owner purchase validates current prices and preserves free rights without 
     expect($paid->agreed_amount)->toBe('36000.00')->and($paid->status)->toBe(StatusEnum::SCHEDULED)
         ->and($paid->period_ends_at->equalTo($paid->period_starts_at->addYearNoOverflow()))->toBeTrue()
         ->and($free->refresh()->status)->toBe(StatusEnum::ACTIVE)
-        ->and(SubscriptionInstallment::where('parent_subscription_id', $free->id)->count())->toBe(0);
+        ->and(SubscriptionInstallment::where('subscription_id', $free->id)->count())->toBe(0);
     $this->get(route('owner.subscriptions.show', $paid))->assertOk();
 });
 

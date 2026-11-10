@@ -154,7 +154,7 @@ class SaasNumberingService
             $this->fail('rule', 'La règle n’est plus applicable. Aucune réservation effectuée.');
         }
         $installment = $invoice->installment;
-        $obligations = SubscriptionInstallment::where('parent_subscription_id', $invoice->subscription_id)
+        $obligations = SubscriptionInstallment::where('subscription_id', $invoice->subscription_id)
             ->where('period_starts_at', $installment->period_starts_at)->where('period_ends_at', $installment->period_ends_at)
             ->orderBy('id')->lockForUpdate()->get(['id']);
         if ($obligations->count() !== 1 || ! $installment->matchesFullPeriod($invoice->subscription)

@@ -129,7 +129,7 @@ class SubscriptionTransitionService
                     'auto_renew' => false,
                 ]);
                 (new SubscriptionInstallment)->forceFill([
-                    'user_id' => $current->user_id, 'parent_subscription_id' => $next->id,
+                    'user_id' => $current->user_id, 'subscription_id' => $next->id,
                     'operation_key' => 'installment:'.$next->uuid.':full-period', 'installment_number' => 'ECH-'.Str::uuid(),
                     'installment_amount' => $amount, 'installment_status' => InstallmentStatusEnum::PENDING,
                     'period_starts_at' => $next->period_starts_at, 'period_ends_at' => $next->period_ends_at, 'due_at' => $next->period_starts_at,

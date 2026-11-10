@@ -53,7 +53,7 @@ function issuanceFixture(): array
     $subscription = Subscription::factory()->create(['user_id' => $owner->id, 'agreed_amount' => '3000.00',
         'period_starts_at' => now()->subDay(), 'period_ends_at' => now()->addMonth()]);
     $installment = new SubscriptionInstallment;
-    $installment->forceFill(['user_id' => $owner->id, 'parent_subscription_id' => $subscription->id,
+    $installment->forceFill(['user_id' => $owner->id, 'subscription_id' => $subscription->id,
         'operation_key' => 'installment:test:'.Str::uuid(), 'installment_number' => 'TEST-'.Str::uuid(),
         'installment_amount' => '3000.00', 'due_at' => now()->addDays(10), 'installment_status' => InstallmentStatusEnum::PENDING,
         'period_starts_at' => $subscription->period_starts_at, 'period_ends_at' => $subscription->period_ends_at])->save();
@@ -101,7 +101,7 @@ test('full period invoicing refuses fractional or partially paid obligations', f
 
 test('another obligation for the same period prevents a second invoice', function (): void {
     $f = issuanceFixture();
-    $duplicate = $f['installment']->replicate(['uuid', 'operation_key', 'installment_number', 'parent_record_type', 'active_owner_slot']);
+    $duplicate = $f['installment']->replicate(['uuid', 'operation_key', 'installment_number']);
     $duplicate->forceFill(['operation_key' => 'installment:test:'.Str::uuid(), 'installment_number' => 'TEST-'.Str::uuid()])->save();
 
     expect(fn () => issuanceDraft($f))->toThrow(ValidationException::class);
