@@ -109,14 +109,16 @@ MAIL_FROM_NAME="${APP_NAME}"
 npm.cmd run build
 ```
 
-- Ne pas lancer `migrate:fresh` ni `db:wipe`.
-- Pour une base centrale déjà utilisée, ne pas traiter cette commande
-  d’installation comme une procédure de mise à niveau. La migration de
-  séparation des échéances est centrale, comporte des DDL MySQL à commits
-  implicites et ne possède pas de rollback automatique. Lire la
-  [procédure de validation de la séparation des échéances](documentation%20et%20recherche/Proposition-separation-echeances-SaaS.md)
-  et ne la valider que sur une copie restaurable MySQL 8.4 avant toute décision
-  de déploiement.
+- Ne pas lancer `migrate:fresh` ni `db:wipe` sur une base existante.
+- Installation neuve : `subscriptions` et `subscription_installments` sont créées
+  directement dans la migration de création initiale. `admin_restrictions` n'est
+  jamais créée. Les migrations correctives du 09 et 10 novembre ont été retirées.
+- BASE EXISTANTE : cette version exige que les migrations du 09 et du 10 novembre
+  aient DÉJÀ été appliquées. Une installation ancienne non convertie doit d'abord
+  passer par la version historique du dépôt et faire une sauvegarde MySQL 8.4.
+  Ne jamais utiliser le baseline direct comme une migration de données.
+- Les trois anciennes entrées dans la table `migrations` d'une base déjà convertie
+  peuvent rester comme historique ; ne pas les supprimer directement en SQL.
 - Ne pas lancer les migrations Tenant dans la base centrale ; créer une boutique depuis le parcours Aydra pour déclencher son provisionnement.
 - Le seeder normal prépare les pays et l'offre gratuite ; `AuthorizationSeeder` prépare les rôles et permissions, sans créer de compte Super Admin.
 - Pour l'accès administratif initial, faire préparer un Super Admin par le responsable du projet ; aucune commande dédiée de création de ce compte n'est actuellement fournie.
