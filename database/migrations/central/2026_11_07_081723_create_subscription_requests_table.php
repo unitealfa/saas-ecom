@@ -30,15 +30,15 @@ return new class extends Migration
             $table->dateTime('decided_at')->nullable();
             $table->text('decision_reason')->nullable();
             $table->string('invoice_error')->nullable();
-            $table->unsignedTinyInteger('subscription_record_type')->nullable()->storedAs('CASE WHEN current_subscription_id IS NOT NULL THEN 1 ELSE NULL END');
             $table->unsignedTinyInteger('document_type')->nullable()->storedAs('CASE WHEN current_invoice_id IS NOT NULL THEN 1 ELSE NULL END');
             $table->unsignedTinyInteger('payment_record_type')->nullable()->storedAs('CASE WHEN current_payment_id IS NOT NULL THEN 1 ELSE NULL END');
             $table->timestamps();
             $table->unique(['id', 'user_id'], 'uq_subscription_requests_owner');
             $table->index(['user_id', 'status', 'id']);
             $table->index(['status', 'submitted_at', 'id']);
-            $table->foreign(['current_subscription_id', 'user_id', 'subscription_record_type'], 'fk_request_subscription')
-                ->references(['id', 'user_id', 'record_type'])->on('subscriptions')->restrictOnDelete()->restrictOnUpdate();
+            $table->index(['current_subscription_id', 'user_id'], 'ix_request_subscription_owner');
+            $table->foreign(['current_subscription_id', 'user_id'], 'fk_request_subscription')
+                ->references(['id', 'user_id'])->on('subscriptions')->restrictOnDelete()->restrictOnUpdate();
             $table->foreign(['current_payment_id', 'current_invoice_id', 'user_id', 'payment_record_type'], 'fk_request_payment')
                 ->references(['id', 'document_id', 'user_id', 'record_type'])->on('saas_transfers')->restrictOnDelete()->restrictOnUpdate();
         });
@@ -55,7 +55,6 @@ return new class extends Migration
                 ->on('subscription_requests')->restrictOnDelete()->restrictOnUpdate();
         });
         DB::statement("ALTER TABLE subscription_requests ADD CONSTRAINT ck_subscription_request_shape CHECK (status IN (1,2,3,4,5,6) AND payment_choice IN (1,2) AND reference_version > 0 AND currency='DZD' AND (current_invoice_id IS NULL OR current_subscription_id IS NOT NULL) AND (current_payment_id IS NULL OR current_invoice_id IS NOT NULL) AND (status<>4 OR (decision_reason IS NOT NULL AND CHAR_LENGTH(TRIM(decision_reason))>0 AND decided_by_id IS NOT NULL AND decided_at IS NOT NULL)) AND (status<>5 OR (current_subscription_id IS NOT NULL AND current_invoice_id IS NOT NULL AND current_payment_id IS NOT NULL AND decided_by_id IS NOT NULL AND decided_at IS NOT NULL AND decision_reason IS NULL)))");
-        DB::statement('ALTER TABLE subscriptions ADD CONSTRAINT ck_subscription_request_type CHECK (subscription_request_id IS NULL OR record_type=1)');
         DB::unprepared("CREATE TRIGGER guard_subscription_request_update BEFORE UPDATE ON subscription_requests FOR EACH ROW BEGIN
             IF OLD.status IN (5,6) OR NOT (OLD.user_id <=> NEW.user_id) OR NOT (OLD.uuid <=> NEW.uuid) OR NOT (OLD.operation_key <=> NEW.operation_key) OR NOT (OLD.initial_payload_hash <=> NEW.initial_payload_hash)
             THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Subscription request history is immutable'; END IF; END");
@@ -77,7 +76,6 @@ return new class extends Migration
         DB::unprepared('DROP TRIGGER IF EXISTS guard_subscription_request_update');
         DB::unprepared('DROP TRIGGER IF EXISTS guard_subscription_request_delete');
         DB::unprepared('DROP TRIGGER IF EXISTS guard_subscription_request_link');
-        DB::statement('ALTER TABLE subscriptions DROP CHECK ck_subscription_request_type');
         Schema::table('subscriptions', function (Blueprint $table): void {
             $table->dropForeign('fk_subscription_request_owner');
             $table->dropColumn('subscription_request_id');

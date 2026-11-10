@@ -133,7 +133,6 @@ function assertDocumentedDatabaseSchema(string $context): void
     $schema = Schema::getFacadeRoot();
     $driver = $schema->getConnection()->getDriverName();
     $technical = ['migrations', 'password_reset_tokens', 'sessions', 'cache', 'cache_locks', 'jobs', 'job_batches', 'failed_jobs'];
-    // admin_restrictions is a preserved historical table, outside the target business diagram.
     $technical = array_merge($technical, $context === 'central' ? ['passkeys'] : ['tenants', 'domains']);
     $databaseSchema = $driver === 'mysql' ? $schema->getConnection()->getDatabaseName() : null;
     $actualTables = array_column($schema->getTables($databaseSchema), 'name');

@@ -51,7 +51,16 @@ test('the existing MySQL central and tenant databases match the documented migra
 
             $expected = array_map(fn (string $file): string => basename($file, '.php'), glob(database_path('migrations/'.$context.'/*.php')));
             sort($expected);
-            expect(DB::table('migrations')->orderBy('migration')->pluck('migration')->all())->toBe($expected);
+            // Ces trois anciennes migrations existent encore dans la table
+            // migrations d'une base déjà mise à niveau, mais ne font plus partie
+            // du baseline pour les installations neuves.
+            $historical = [
+                '2026_10_06_090515_create_admin_restrictions_table',
+                '2026_11_09_160000_split_subscription_installments',
+                '2026_11_10_000000_drop_admin_restrictions_table',
+            ];
+            $applied = DB::table('migrations')->orderBy('migration')->pluck('migration')->all();
+            expect(array_values(array_diff($applied, $historical)))->toBe($expected);
             expect(DB::table('information_schema.triggers')->where('trigger_schema', $database)->count())->toBe($context === 'central' ? 78 : 205);
             expect(DB::table('information_schema.table_constraints')->where('constraint_schema', $database)->where('constraint_type', 'CHECK')->where('enforced', 'YES')->count())->toBe($context === 'central' ? 79 : 151);
         }

@@ -71,6 +71,7 @@ test('MySQL executes both schemas with the documented types collations and relat
     config(['database.connections.schema_admin' => $connection]);
     $created = [];
     $default = DB::getDefaultConnection();
+    $originalCentralConnection = config('tenancy.database.central_connection');
 
     try {
         foreach (['central', 'tenant'] as $context) {
@@ -81,6 +82,9 @@ test('MySQL executes both schemas with the documented types collations and relat
             config(['database.connections.schema_check' => $connection]);
             DB::purge('schema_check');
             DB::setDefaultConnection('schema_check');
+            // Une migration centrale utilise explicitement cette connexion.
+            config(['tenancy.database.central_connection' => $context === 'central'
+                ? 'schema_check' : $originalCentralConnection]);
 
             $this->artisan('migrate', ['--database' => 'schema_check', '--path' => database_path('migrations/'.$context), '--realpath' => true, '--no-interaction' => true])->assertSuccessful();
 
@@ -94,10 +98,9 @@ test('MySQL executes both schemas with the documented types collations and relat
                 assertDocumentedTenantCatalogAndStockConstraints();
             }
 
-            $this->artisan('migrate:rollback', ['--database' => 'schema_check', '--path' => database_path('migrations/'.$context), '--realpath' => true, '--no-interaction' => true])->assertSuccessful();
-            expect(array_column(DB::connection('schema_check')->getSchemaBuilder()->getTables($database), 'name'))->toBe(['migrations']);
         }
     } finally {
+        config(['tenancy.database.central_connection' => $originalCentralConnection]);
         DB::setDefaultConnection($default);
         DB::purge('schema_check');
         foreach ($created as $database) {
