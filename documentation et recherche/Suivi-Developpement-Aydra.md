@@ -1,4 +1,10 @@
 # Suivi de développement et audit Aydra
+## 10 novembre 2026 — séparation physique des échéances SaaS
+
+Documentation intégrée dans [la procédure de validation](Proposition-separation-echeances-SaaS.md), l’architecture §57, le schéma principal, le diagramme central et le README. Le checkout observé est `fix-enum` au HEAD `8e04dfaea521d1e4c38eb1ecf15aab55a3a401dd` ; le code de séparation est déjà présent dans le commit local `9391b0d` (26 fichiers). Le commit source du paquet `d38c293284a96524cca234660c401e8a950a9994` n’est pas un ancêtre du checkout ; ne pas réappliquer son script sur cette branche.
+
+Aucun test, contrôle navigateur, migration ou accès aux bases n’a été exécuté pour cette mise à jour documentaire. Le statut des migrations et données des bases réelles reste inconnu. La validation MySQL 8.4 doit être faite sur une copie cohérente restaurable, selon le rapport ; aucune mise à niveau réelle n’est autorisée par cette note.
+
 ## 6 novembre 2026 — Module 21 : paiements manuels intégraux
 
 Branche module21 avancée localement sur origin/dev 5d4cc62 après les fusions 18/19 confirmées par l'utilisateur. Demande module21, tests MySQL locaux temporaires et navigateur autorisés ; décision explicite : paiement exigé pour toute nouvelle attribution payante, administrative comprise, sans désactivation des abonnements historiques. Rapport et inventaire : [Module-21-Paiements-Manuels.md](Module-21-Paiements-Manuels.md). Aucun commit/push/fusion distante ni migration, seeder ou paiement réel exécuté pour cette mission.

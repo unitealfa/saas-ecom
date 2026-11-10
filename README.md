@@ -110,6 +110,13 @@ npm.cmd run build
 ```
 
 - Ne pas lancer `migrate:fresh` ni `db:wipe`.
+- Pour une base centrale déjà utilisée, ne pas traiter cette commande
+  d’installation comme une procédure de mise à niveau. La migration de
+  séparation des échéances est centrale, comporte des DDL MySQL à commits
+  implicites et ne possède pas de rollback automatique. Lire la
+  [procédure de validation de la séparation des échéances](documentation%20et%20recherche/Proposition-separation-echeances-SaaS.md)
+  et ne la valider que sur une copie restaurable MySQL 8.4 avant toute décision
+  de déploiement.
 - Ne pas lancer les migrations Tenant dans la base centrale ; créer une boutique depuis le parcours Aydra pour déclencher son provisionnement.
 - Le seeder normal prépare les pays et l'offre gratuite ; `AuthorizationSeeder` prépare les rôles et permissions, sans créer de compte Super Admin.
 - Pour l'accès administratif initial, faire préparer un Super Admin par le responsable du projet ; aucune commande dédiée de création de ce compte n'est actuellement fournie.
@@ -210,4 +217,3 @@ composer config --global home
 ```
 
 Références officielles : [limites GitHub et OAuth](https://getcomposer.org/doc/articles/troubleshooting.md#api-rate-limit-and-oauth-tokens), [authentification Composer](https://getcomposer.org/doc/articles/authentication-for-private-packages.md#github-oauth).
-
