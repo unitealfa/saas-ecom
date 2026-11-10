@@ -139,10 +139,15 @@ test('credit HTTP workflow supports preparation issuance private download and th
     $this->get(route('owner.credit-notes.index'))->assertOk()->assertDontSee('Brouillon');
     $this->actingAs($f['actor'], 'central')->post(route('central.credit-notes.prepare', $credit), ['expected_state' => $credit->managementState()])->assertSessionHasNoErrors();
     $credit->refresh();
+    $this->actingAs($f['owner'], 'central')
+        ->get(URL::temporarySignedRoute('owner.credit-notes.download', now()->addMinutes(5), ['credit' => $credit]))
+        ->assertForbidden();
+    $this->actingAs($f['actor'], 'central');
     $this->post(route('central.credit-notes.issue', $credit), ['expected_state' => $credit->managementState()])->assertSessionHasNoErrors();
     $credit->refresh();
     $this->actingAs($f['owner'], 'central')->get(route('owner.credit-notes.show', $credit))->assertOk()->assertSee($credit->number)->assertDontSee('Annuler le brouillon');
     $this->get(URL::temporarySignedRoute('owner.credit-notes.download', now()->addMinutes(5), ['credit' => $credit]))->assertOk();
+    $this->get(URL::temporarySignedRoute('owner.credit-notes.download', now()->subMinute(), ['credit' => $credit]))->assertForbidden();
     $this->get(route('central.credit-notes.index'))->assertForbidden();
     $this->actingAs(User::factory()->create(), 'central')->get(route('owner.credit-notes.show', $credit))->assertForbidden();
     $this->get(URL::temporarySignedRoute('owner.credit-notes.download', now()->addMinutes(5), ['credit' => $credit]))->assertForbidden();

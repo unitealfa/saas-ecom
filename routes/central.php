@@ -4,6 +4,8 @@ use App\Http\Controllers\Central\Auth\RegistrationStatusController;
 use App\Http\Controllers\Central\Dashboard\DashboardController;
 use App\Http\Controllers\Central\Owner\Billing\CreditNoteController;
 use App\Http\Controllers\Central\Owner\Billing\InvoiceController;
+use App\Http\Controllers\Central\Owner\Billing\OwnerBillingOverviewController;
+use App\Http\Controllers\Central\Owner\Billing\OwnerPaymentCorrectionController;
 use App\Http\Controllers\Central\Owner\Billing\PaymentController;
 use App\Http\Controllers\Central\Owner\Billing\SubscriptionPurchaseController;
 use App\Http\Controllers\Central\Owner\Subscriptions\SubscriptionRequestController;
@@ -25,6 +27,17 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     Route::name('owner.')->group(function (): void {
+        // C-157/C-158/C-159/C-162: owner overview and append-only correction requests.
+        Route::get('facturation', OwnerBillingOverviewController::class)->name('billing.index');
+        Route::controller(OwnerPaymentCorrectionController::class)
+            ->prefix('facturation/corrections/{payment}')
+            ->whereUuid('payment')
+            ->name('billing.corrections.')
+            ->group(function (): void {
+                Route::get('/', 'create')->name('create');
+                Route::post('/', 'store')->middleware('throttle:3,1')->name('store');
+            });
+
         Route::controller(SubscriptionRequestController::class)->prefix('demandes-abonnement')->name('subscription-requests.')->whereUuid('subscriptionRequest')->group(function (): void {
             Route::get('/', 'index')->name('index');
             Route::get('{subscriptionRequest}', 'show')->name('show');
@@ -64,7 +77,6 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
             Route::get('/', 'create')->name('first-shop');
             Route::post('/', 'store')->middleware('throttle:6,1')->name('first-shop.store');
         });
-
         Route::controller(OwnerTenantController::class)->prefix('boutiques')->name('shops.')->group(function (): void {
             Route::get('creer', 'create')->name('create');
             Route::post('/', 'store')->middleware('throttle:6,1')->name('store');

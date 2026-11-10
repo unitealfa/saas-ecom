@@ -5,6 +5,21 @@ Documentation intégrée dans [la procédure de validation](Proposition-separati
 
 Aucun test, contrôle navigateur, migration ou accès aux bases n’a été exécuté pour cette mise à jour documentaire. Le statut des migrations et données des bases réelles reste inconnu. La validation MySQL 8.4 doit être faite sur une copie cohérente restaurable, selon le rapport ; aucune mise à niveau réelle n’est autorisée par cette note.
 
+
+## 9 novembre 2026 — Documentation de supervision des deux files centrales
+
+- Documentation d’exploitation consolidée dans le README, le dossier Module 23 et l’architecture §33 : tâches Windows Provisioning/Documents, prérequis `DB_CONNECTION` / `DB_QUEUE_CONNECTION`, précaution SMTP, journaux, échecs, files en attente et statuts administratifs ; ajout de la procédure Supervisor Linux avec les deux configurations existantes.
+- Le schéma principal précise désormais que les deux files partagent la table `jobs` centrale tout en restant traitées par des connexions/files séparées.
+- Dans l’arbre de travail à la vérification, `LocalProvisioningWorker.php`, son test et `deployment/supervisor/aydra-documents.conf` étaient déjà modifiés ou non suivis. Ces changements d’implémentation n’ont pas été faits ni installés par cette mise à jour documentaire ; ne pas les confondre avec des tâches Windows/Supervisor effectivement configurées.
+- Aucune installation, activation, reprise ou vérification Windows/Supervisor n’a été exécutée dans cette tâche. Les instructions détaillées et les précautions sont dans [architecture §33](<architecture a suivre pour faire le code.txt>) et [Module 23](<Module-23-Envois-Documents.md>).
+
+## 8 novembre 2026 — owner-billing, facturation commerçant
+
+Installation manuelle revue et documentée : [C-157/C-158/C-159/C-162](owner-billing.md). Nom retenu : owner-billing, sans numéro de module. Vue principale et test déplacés vers les chemins attendus ; validation et idempotence des signalements renforcées, sans mutation financière. Pint et PHPStan ciblé réussis ; aucun test BDD, seeder, migration, envoi ou action Git distante. Modification indépendante de PublicPlanCatalog préservée.
+
+## 8 novembre 2026 — Module 23 installé manuellement
+
+Installation manuelle et tests déclarés par l’utilisateur. Lecture rapide des raccordements uniquement, sans tests ni écriture MySQL/SMTP/worker. Documentation dédupliquée : [Module-23-Envois-Documents.md](Module-23-Envois-Documents.md). Deux écarts confirmés : throttles administratifs et création implicite d’une intention absente ; connexion/file du job à vérifier. Aucun code modifié ; le changement déjà présent dans PublicPlanCatalog est préservé.
 ## 6 novembre 2026 — Module 21 : paiements manuels intégraux
 
 Branche module21 avancée localement sur origin/dev 5d4cc62 après les fusions 18/19 confirmées par l'utilisateur. Demande module21, tests MySQL locaux temporaires et navigateur autorisés ; décision explicite : paiement exigé pour toute nouvelle attribution payante, administrative comprise, sans désactivation des abonnements historiques. Rapport et inventaire : [Module-21-Paiements-Manuels.md](Module-21-Paiements-Manuels.md). Aucun commit/push/fusion distante ni migration, seeder ou paiement réel exécuté pour cette mission.

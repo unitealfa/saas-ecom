@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
+use App\Http\Controllers\Central\Admin\Dashboard\DashboardController as AdminDashboardController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class])
@@ -19,6 +20,7 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
         'subscription',
     ])
     ->group(function (): void {
+        Route::get('dashboard', AdminDashboardController::class)->name('admin-dashboard.index');
         require __DIR__.'/admin/carriers.php';
         require __DIR__.'/admin/carrier-mappings.php';
         require __DIR__.'/admin/pickup-points.php';
@@ -33,6 +35,7 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
         require __DIR__.'/admin/features.php';
         require __DIR__.'/admin/plans.php';
         require __DIR__.'/admin/subscriptions.php';
+        require __DIR__.'/admin/billing.php';
         require __DIR__.'/admin/activity.php';
         require __DIR__.'/admin/quotas.php';
         require __DIR__.'/admin/roles.php';

@@ -3,20 +3,20 @@
 require_once dirname(__DIR__, 4).'/Support/ManualBillingFixtures.php';
 
 use App\Enums\Central\Billing\DeliveryStatusEnum;
+use App\Enums\Central\Billing\DocumentTypeEnum;
+use App\Enums\Central\Billing\TriggerEventEnum;
 use App\Jobs\Central\SendSaasDocumentJob;
 use App\Models\Central\Billing\SaasDocumentDelivery;
+use App\Models\Central\Roles\Role;
+use App\Models\User;
+use App\Services\Central\Billing\BillingRuleService;
+use App\Services\Central\Billing\SaasCreditNoteService;
 use App\Services\Central\Billing\SaasDocumentDeliveryService;
+use App\Services\Central\Billing\SaasInvoiceIssuanceService;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
-use App\Enums\Central\Billing\DocumentTypeEnum;
-use App\Enums\Central\Billing\TriggerEventEnum;
-use App\Models\Central\Roles\Role;
-use App\Services\Central\Billing\BillingRuleService;
-use App\Services\Central\Billing\SaasCreditNoteService;
-use App\Services\Central\Billing\SaasInvoiceIssuanceService;
 use Illuminate\Support\Str;
-use App\Models\User;
 
 it('keeps an issued document as a pending intent until an authorized administrator requests email', function (): void {
     Queue::fake();
@@ -35,6 +35,12 @@ it('keeps an issued document as a pending intent until an authorized administrat
 
     expect(SaasDocumentDelivery::count())->toBe(1)
         ->and($delivery->refresh()->delivery_status)->toBe(DeliveryStatusEnum::PENDING);
+    Queue::assertPushedOn(
+        'saas-documents',
+        SendSaasDocumentJob::class,
+        fn (SendSaasDocumentJob $job): bool => $job->connection === 'database'
+            && $job->deliveryId === $delivery->id,
+    );
     Queue::assertPushed(SendSaasDocumentJob::class, 1);
 });
 
@@ -58,6 +64,51 @@ it('refuses to send a draft document before issue', function (): void {
         ->assertSessionHasErrors('document_uuid');
     expect(SaasDocumentDelivery::count())->toBe(0);
     Queue::assertNotPushed(SendSaasDocumentJob::class);
+});
+
+it('does not create an intent when an issued document has no existing intent', function (): void {
+    Queue::fake();
+    $f = manualPaymentFixture();
+    SaasDocumentDelivery::sole()->delete();
+
+    $this->actingAs($f['actor'], 'central')
+        ->post(route('central.deliveries.send'), ['document_uuid' => $f['invoice']->uuid])
+        ->assertSessionHasErrors('document_uuid');
+
+    expect(SaasDocumentDelivery::where('document_id', $f['invoice']->id)->count())
+        ->toBe(0);
+    Queue::assertNotPushed(SendSaasDocumentJob::class);
+});
+
+it('processes the queued delivery through the dedicated database worker', function (): void {
+    Mail::fake();
+    config([
+        'mail.default' => 'smtp',
+        'queue.default' => 'database',
+        'queue.connections.database.connection' => DB::getDefaultConnection(),
+    ]);
+
+    $f = manualPaymentFixture();
+    $delivery = SaasDocumentDelivery::sole();
+
+    SendSaasDocumentJob::dispatch($delivery->id);
+
+    expect(DB::table('jobs')->where('queue', 'saas-documents')->count())
+        ->toBe(1);
+
+    $this->artisan('queue:work', [
+        'connection' => 'database',
+        '--queue' => 'saas-documents',
+        '--once' => true,
+        '--sleep' => 0,
+        '--tries' => 1,
+        '--timeout' => 60,
+    ])->assertExitCode(0);
+
+    expect($delivery->refresh()->delivery_status)->toBe(DeliveryStatusEnum::SENT)
+        ->and($delivery->attempts_count)->toBe(1);
+    expect(DB::table('jobs')->where('queue', 'saas-documents')->count())
+        ->toBe(0);
 });
 
 it('preserves a damaged PDF and allows a controlled retry without sending it', function (): void {
@@ -135,11 +186,7 @@ it('marks the email as accepted only when the configured SMTP transport succeeds
     Queue::assertPushed(SendSaasDocumentJob::class, 1);
 });
 
-
 it('stops retrying after the third unsuccessful preparation', function (): void {
-    $this->withoutMiddleware(
-        \Illuminate\Routing\Middleware\ThrottleRequests::class
-    );
     Queue::fake();
     Mail::fake();
     config(['mail.default' => 'log']);

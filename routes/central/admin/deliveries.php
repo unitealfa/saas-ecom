@@ -1,4 +1,3 @@
-
 <?php
 
 use App\Http\Controllers\Central\Admin\Billing\SaasDocumentDeliveryController;
@@ -11,13 +10,9 @@ Route::controller(SaasDocumentDeliveryController::class)
     ->group(function (): void {
         Route::get('/', 'index')->name('index');
 
-        Route::post('/send', 'send')
-            ->middleware('throttle:6,1')
-            ->name('send');
+        Route::post('/send', 'send')->name('send');
 
         Route::get('/{delivery}', 'show')->name('show');
 
-        Route::post('/{delivery}/retry', 'retry')
-            ->middleware('throttle:3,1')
-            ->name('retry');
+        Route::post('/{delivery}/retry', 'retry')->name('retry');
     });

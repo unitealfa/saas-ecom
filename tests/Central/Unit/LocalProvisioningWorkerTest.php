@@ -46,3 +46,17 @@ test('the Windows wrapper restarts a failed listener and logs its exit without c
         rmdir($directory);
     }
 });
+
+test('the documents worker consumes only saas-documents without automatic SMTP retries', function (): void {
+    $script = (new ReflectionMethod(LocalProvisioningWorker::class, 'documentWorkerScript'))
+        ->invoke(new LocalProvisioningWorker);
+
+    expect($script)->toContain(
+        'queue:work database --queue=saas-documents',
+        '--tries=1',
+        '--timeout=60',
+        '--max-time=3600',
+        'local-documents-worker.log',
+        'Start-Sleep -Seconds 60',
+    )->not->toContain('tenant-provisioning');
+});
