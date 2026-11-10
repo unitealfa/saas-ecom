@@ -35,7 +35,6 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
         require __DIR__.'/admin/features.php';
         require __DIR__.'/admin/plans.php';
         require __DIR__.'/admin/subscriptions.php';
-        require __DIR__.'/admin/billing.php';
         require __DIR__.'/admin/activity.php';
         require __DIR__.'/admin/quotas.php';
         require __DIR__.'/admin/roles.php';
