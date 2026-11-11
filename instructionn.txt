@@ -801,7 +801,7 @@ saas.operations.view	Consulter les opérations techniques centrales
 saas.operations.subscriptions.reconcile	Lancer une réconciliation des abonnements
 saas.operations.payments.reconcile	Lancer un rapprochement financier central
 Les relances de déploiement utilisent les permissions du module 07. Il n'est pas nécessaire de créer une permission supplémentaire qui ferait exactement la même chose.
-Première étape : consultation paginée sous saas.operations.view des déploiements de boutiques et envois de documents existants. Identifiants publics, types, états, tentatives et dates seulement ; diagnostics détaillés, destinataires et documents restent protégés par leurs modules. Aucune relance ni réconciliation n'est ajoutée à cette étape.
+Consultation paginée sous saas.operations.view des déploiements de boutiques et envois de documents existants. Identifiants publics, types, états, tentatives et dates seulement ; diagnostics détaillés, destinataires et documents restent protégés par leurs modules. Les deux droits de réconciliation permettent chacun de lancer un traitement par lots de 50 et de consulter son résultat, indépendamment du droit de consultation des opérations. Abonnements : transitions échues et quotas via les services existants, avec verrouillage et audit. Paiements : signalement des états incertains, paiements vérifiés incohérents avec leur facture et doublons vérifiés, sans modification financière ; ce contrôle ne prouve pas la réception bancaire et n'est pas exhaustif.
 Fichiers de consultation :
 app/Http/Controllers/Central/Admin/Operations/OperationsController.php
 app/Services/Central/Operations/OperationsReader.php
