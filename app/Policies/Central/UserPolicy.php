@@ -21,6 +21,21 @@ class UserPolicy
         return $this->access->allows($actor, 'saas.dashboard.view');
     }
 
+    public function viewOperations(User $actor): bool
+    {
+        return $this->access->allows($actor, 'saas.operations.view');
+    }
+
+    public function reconcileSubscriptions(User $actor): bool
+    {
+        return $this->access->allows($actor, 'saas.operations.subscriptions.reconcile');
+    }
+
+    public function reconcilePayments(User $actor): bool
+    {
+        return $this->access->allows($actor, 'saas.operations.payments.reconcile');
+    }
+
     public function viewFinancialDashboard(User $actor): bool
     {
         return $this->access->allows($actor, 'saas.dashboard.financial.view');

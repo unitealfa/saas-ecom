@@ -1,5 +1,17 @@
 # Suivi de développement et audit Aydra
 
+## 11 novembre 2026 — Module 26, réconciliations centrales
+
+Décisions utilisateur : appliquer les transitions d'abonnements échues et recalculer les boutiques ; détecter les anomalies financières sans confirmer ni modifier les paiements. Droits saas.operations.subscriptions.reconcile et saas.operations.payments.reconcile indépendants, ajoutés au catalogue et au seeder additif existant. Traitements bornés à 50 éléments avec continuation explicite ; abonnements verrouillés et audités par compte commerçant, échecs isolés. Contrôle financier limité aux paiements incertains, vérifications incohérentes et doublons vérifiés, avec bilan audité ; ce contrôle n'est pas exhaustif et ne prouve pas l'encaissement.
+
+Tests ciblés MySQL local temporaire autorisés : dix tests, 66 assertions réussis sous PHP 8.4.4 fourni ; autorisations, parcours, quotas, annulation en cas d'échec, audit, bilan protégé et continuation couverts. Les tests existants de documents simulent le PDF. Neuf routes chargées sur trois domaines centraux. Aucun test navigateur ni PHP 8.5 ; aucun lancement réel, attribution ou seeder sur la base existante.
+
+## 11 novembre 2026 — Module 26, consultation des opérations
+
+À la demande de l'utilisateur : lecture paginée des déploiements de boutiques et envois de documents existants, sous saas.operations.view. Affichage limité aux UUID publics, types, états, tentatives et dates ; diagnostics, destinataires et données documentaires restent protégés. Aucun lancement, rapprochement ni réconciliation. Permission ajoutée au catalogue et seeder additif préparé, sans attribution ni écriture dans la base réelle.
+
+Contrôles avec PHP 8.4.4 fourni et MySQL local temporaire autorisé : quatre tests réussis, 28 assertions (droits, menu, données sensibles, pagination et seeder idempotent), rendu PDF de fixture simulé. Route chargée sur les trois domaines centraux ; aucun navigateur, PHP 8.5, seeder réel ni modification des données centrales.
+
 ## 11 novembre 2026 — correction du dashboard après séparation des échéances
 
 Après migration de la structure par l'utilisateur, le tableau de bord lit subscriptions sans l'ancien record_type ; les échéances restent dans subscription_installments. Vue et donnée de test alignées. Vérification en lecture seule de la structure et de la requête sur la base centrale ; quatre tests ciblés réussis, 18 assertions, avec PHP 8.4.4 et base MySQL isolée. PDF financier simulé ; aucun parcours navigateur ni migration exécuté par cette intervention.
