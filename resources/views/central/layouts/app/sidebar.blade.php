@@ -1,3 +1,4 @@
+@php($dashboardRoute = \Illuminate\Support\Facades\Gate::any(['viewAdminDashboard', 'viewFinancialDashboard'], \App\Models\User::class) ? 'central.admin-dashboard.index' : 'dashboard')
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
     <head>
@@ -6,19 +7,15 @@
     <body class="min-h-screen bg-white dark:bg-zinc-800">
         <flux:sidebar sticky collapsible="mobile" class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
             <flux:sidebar.header>
-                <x-app-logo :sidebar="true" href="{{ route('dashboard') }}" wire:navigate />
+                <x-app-logo :sidebar="true" href="{{ route($dashboardRoute) }}" wire:navigate />
                 <flux:sidebar.collapse class="lg:hidden" />
             </flux:sidebar.header>
 
             <flux:sidebar.nav>
                 <flux:sidebar.group :heading="__('Platform')" class="grid">
-                    <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
+                    <flux:sidebar.item icon="home" :href="route($dashboardRoute)" :current="request()->routeIs($dashboardRoute === 'dashboard' ? 'dashboard' : 'central.admin-dashboard.*')" wire:navigate>
                         {{ __('Dashboard') }}
                     </flux:sidebar.item>
-
-                    @canany(['viewAdminDashboard', 'viewFinancialDashboard'], \App\Models\User::class)
-                        <flux:sidebar.item :href="route('central.admin-dashboard.index')" :current="request()->routeIs('central.admin-dashboard.*')" wire:navigate>Tableau de bord administratif</flux:sidebar.item>
-                    @endcanany
 
                     @can('viewAny', \App\Models\User::class)
                         <flux:sidebar.item :href="route('central.users.index')" :current="request()->routeIs('central.users.*')" wire:navigate>{{ __('Utilisateurs') }}</flux:sidebar.item>

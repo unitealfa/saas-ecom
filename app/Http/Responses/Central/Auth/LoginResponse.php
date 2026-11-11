@@ -5,6 +5,7 @@ namespace App\Http\Responses\Central\Auth;
 use App\Enums\Central\Users\JourneyState;
 use App\Models\Central\Users\User;
 use App\Services\Central\Auth\RegistrationJourney;
+use Illuminate\Support\Facades\Gate;
 use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
 use Laravel\Fortify\Contracts\TwoFactorLoginResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -23,6 +24,12 @@ class LoginResponse implements LoginResponseContract, TwoFactorLoginResponse
 
         $state = $this->journey->state($user);
         $destination = route($state->routeName());
+
+        if ($state === JourneyState::READY && Gate::forUser($user)->any(
+            ['viewAdminDashboard', 'viewFinancialDashboard'], \App\Models\User::class
+        )) {
+            $destination = route('central.admin-dashboard.index');
+        }
 
         if ($this->shouldFollowIntended($state, $intended)) {
             $destination = $intended;

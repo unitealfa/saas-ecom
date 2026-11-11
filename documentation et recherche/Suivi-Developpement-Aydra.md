@@ -13,6 +13,18 @@ Aucun test, contrôle navigateur, migration ou accès aux bases n’a été exé
 - Dans l’arbre de travail à la vérification, `LocalProvisioningWorker.php`, son test et `deployment/supervisor/aydra-documents.conf` étaient déjà modifiés ou non suivis. Ces changements d’implémentation n’ont pas été faits ni installés par cette mise à jour documentaire ; ne pas les confondre avec des tâches Windows/Supervisor effectivement configurées.
 - Aucune installation, activation, reprise ou vérification Windows/Supervisor n’a été exécutée dans cette tâche. Les instructions détaillées et les précautions sont dans [architecture §33](<architecture a suivre pour faire le code.txt>) et [Module 23](<Module-23-Envois-Documents.md>).
 
+## 11 novembre 2026 — destination de connexion administrative
+
+La connexion centrale dirige directement vers /admin/dashboard les comptes READY autorisés à consulter l'un des deux tableaux de bord ; une destination interne demandée avant connexion reste prioritaire. Le logo et le lien Dashboard utilisent la même destination selon les droits. Les autres comptes et les étapes commerçantes gardent leurs destinations, ainsi que /dashboard en compatibilité. À la demande de l'utilisateur, la page d'accueil publique est reportée : / continue de rediriger vers la connexion.
+
+Vérification ciblée avec le PHP 8.4.4 explicitement fourni : 14 scénarios réussis, 70 assertions, bases MySQL temporaires isolées. Permissions générales et financières, liens, destination initialement demandée, comptes limités et parcours commerçants couverts ; aucun navigateur ni PHP 8.5. Aucun seeder réel exécuté.
+
+## 11 novembre 2026 — reprise du routage du tableau de bord
+
+Demande : ouvrir le tableau de bord administratif depuis /dashboard pour les membres du personnel autorisés, en conservant l'accueil et le parcours commerçant. Cause relevée : /dashboard affichait toujours central.dashboard ; les indicateurs administratifs sont sur /admin/dashboard. Le contrôleur redirige désormais sous l'une des deux permissions du tableau de bord et conserve les messages de session ; l'accueil reste disponible sans ces droits. Les permissions doivent exister dans la base, y compris pour root. Aucun seeder réel exécuté.
+
+Contrôles ciblés exécutés avec C:\php\php.exe explicitement fourni par l'utilisateur : PHP 8.4.4, à distinguer du PHP 8.5 prévu pour le projet. Le test de redirection échouait avant correction ; après correction, six scénarios réussis, 22 assertions : permissions distinctes, destination finale, message de session, accès visiteur et parcours initial commerçant. Cinq scénarios supplémentaires réussis, 31 assertions : rôles, root avec et sans catalogue, et commerçant avec boutique. Aucune validation navigateur ni PHP 8.5 ; la dépendance PDF d'un test financier existant reste absente.
+
 ## 8 novembre 2026 — owner-billing, facturation commerçant
 
 Installation manuelle revue et documentée : [C-157/C-158/C-159/C-162](owner-billing.md). Nom retenu : owner-billing, sans numéro de module. Vue principale et test déplacés vers les chemins attendus ; validation et idempotence des signalements renforcées, sans mutation financière. Pint et PHPStan ciblé réussis ; aucun test BDD, seeder, migration, envoi ou action Git distante. Modification indépendante de PublicPlanCatalog préservée.
