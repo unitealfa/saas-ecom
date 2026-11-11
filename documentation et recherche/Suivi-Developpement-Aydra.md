@@ -1,5 +1,11 @@
 # Suivi de développement et audit Aydra
 
+## 11 novembre 2026 — lectures du tableau de bord en Query Builder
+
+À la demande de l'utilisateur, les agrégats administratifs utilisent le Query Builder sur la connexion centrale. Les filtres auparavant fournis par Eloquent restent explicites : archives, type d'abonnement, type de paiement, rôle central et morph central_user. Les permissions sont inchangées.
+
+Contrôle ciblé MySQL temporaire avec le PHP 8.4.4 fourni : quatre scénarios réussis et 18 assertions, couvrant les droits, archives, échéances, paiement, remboursement et écriture d'annulation. Le contrôle financier remplace uniquement le rendu PDF par un fichier de test ; le test financier complet reste bloqué par l'absence de Dompdf. Aucun test navigateur ni validation PHP 8.5, aucun changement réel de données.
+
 ## 11 novembre 2026 — destination de connexion administrative
 
 La connexion centrale dirige directement vers /admin/dashboard les comptes READY autorisés à consulter l'un des deux tableaux de bord ; une destination interne demandée avant connexion reste prioritaire. Le logo et le lien Dashboard utilisent la même destination selon les droits. Les autres comptes et les étapes commerçantes gardent leurs destinations, ainsi que /dashboard en compatibilité. À la demande de l'utilisateur, la page d'accueil publique est reportée : / continue de rediriger vers la connexion.
