@@ -21,6 +21,11 @@ class UserPolicy
         return $this->access->allows($actor, 'saas.dashboard.view');
     }
 
+    public function viewOperations(User $actor): bool
+    {
+        return $this->access->allows($actor, 'saas.operations.view');
+    }
+
     public function viewFinancialDashboard(User $actor): bool
     {
         return $this->access->allows($actor, 'saas.dashboard.financial.view');

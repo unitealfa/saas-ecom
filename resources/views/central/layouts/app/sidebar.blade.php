@@ -17,6 +17,10 @@
                         {{ __('Dashboard') }}
                     </flux:sidebar.item>
 
+                    @can('viewOperations', \App\Models\User::class)
+                        <flux:sidebar.item icon="server" :href="route('central.operations.index')" :current="request()->routeIs('central.operations.*')" wire:navigate>Exploitation</flux:sidebar.item>
+                    @endcan
+
                     @can('viewAny', \App\Models\User::class)
                         <flux:sidebar.item :href="route('central.users.index')" :current="request()->routeIs('central.users.*')" wire:navigate>{{ __('Utilisateurs') }}</flux:sidebar.item>
                     @endcan

@@ -21,6 +21,7 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
     ])
     ->group(function (): void {
         Route::get('dashboard', AdminDashboardController::class)->name('admin-dashboard.index');
+        require __DIR__.'/admin/operations.php';
         require __DIR__.'/admin/carriers.php';
         require __DIR__.'/admin/carrier-mappings.php';
         require __DIR__.'/admin/pickup-points.php';
