@@ -25,6 +25,7 @@ test('central catalogue seeds the three agreed roles without creating accounts',
 });
 
 test('agreed staff roles can view the central user list', function (string $name): void {
+    $this->withoutVite();
     $this->seed(AuthorizationSeeder::class);
     $user = User::factory()->create();
     $user->assignRole(Role::findByName($name, 'central'));
@@ -32,10 +33,15 @@ test('agreed staff roles can view the central user list', function (string $name
     expect(Gate::forUser($user)->allows('viewAny', User::class))->toBeTrue();
     $this->actingAs($user, 'central')->get(route('central.users.index'))
         ->assertOk()->assertSee($user->email);
-    $this->get(route('dashboard'))->assertOk()->assertSee('Consulter les utilisateurs');
+    if ($name === 'root') {
+        $this->get(route('dashboard'))->assertRedirect(route('central.admin-dashboard.index'));
+    } else {
+        $this->get(route('dashboard'))->assertOk()->assertSee('Consulter les utilisateurs');
+    }
 })->with(['root', 'user-manager', 'user-reader']);
 
 test('merchant dashboard shows only the owners shops and refuses the administration URL', function (): void {
+    $this->withoutVite();
     $this->seed(AuthorizationSeeder::class);
     $reviewer = User::factory()->create();
     $owner = User::factory()->create(['first_name' => 'Karim', 'last_name' => 'Benameur',

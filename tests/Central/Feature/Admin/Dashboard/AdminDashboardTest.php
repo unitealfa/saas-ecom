@@ -30,6 +30,61 @@ beforeEach(function (): void {
     $this->withoutVite();
 });
 
+test('staff with either dashboard permission land directly on the administrative page after login', function (string $permission): void {
+    $actor = adminDashboardActor([$permission]);
+
+    $this->postJson(route('login.store'), ['email' => $actor->email, 'password' => 'password'])
+        ->assertOk()->assertJsonPath('redirect', route('central.admin-dashboard.index'));
+})->with(['saas.dashboard.view', 'saas.dashboard.financial.view']);
+
+test('administrative login preserves an intended internal destination', function (): void {
+    $actor = adminDashboardActor(['saas.dashboard.view']);
+    $destination = route('appearance.edit');
+
+    $this->withSession(['url.intended' => $destination])
+        ->postJson(route('login.store'), ['email' => $actor->email, 'password' => 'password'])
+        ->assertOk()->assertJsonPath('redirect', $destination);
+});
+
+test('staff without dashboard permissions keep their existing login destination', function (): void {
+    $actor = adminDashboardActor(['saas.users.view']);
+
+    $this->postJson(route('login.store'), ['email' => $actor->email, 'password' => 'password'])
+        ->assertOk()->assertJsonPath('redirect', route('dashboard'));
+});
+
+test('administrative navigation points directly to the administrative dashboard', function (): void {
+    $actor = adminDashboardActor(['saas.dashboard.view']);
+
+    $this->actingAs($actor, 'central')->get(route('central.admin-dashboard.index'))
+        ->assertOk()->assertSee('href="'.route('central.admin-dashboard.index').'"', false)
+        ->assertDontSee('href="'.route('dashboard').'"', false);
+});
+
+test('the dashboard entry redirects authorized staff to their administrative indicators', function (): void {
+    foreach ([['saas.dashboard.view'], ['saas.dashboard.financial.view']] as $permissions) {
+        $actor = adminDashboardActor($permissions);
+
+        $this->actingAs($actor, 'central')->get(route('dashboard'))
+            ->assertRedirect(route('central.admin-dashboard.index'));
+    }
+});
+
+test('staff without dashboard permissions keep their existing welcome page', function (): void {
+    $actor = adminDashboardActor(['saas.users.view']);
+
+    $this->actingAs($actor, 'central')->get(route('dashboard'))
+        ->assertOk()->assertViewIs('central.dashboard');
+});
+
+test('the dashboard entry reaches the administrative page and preserves feedback', function (): void {
+    $actor = adminDashboardActor(['saas.dashboard.view']);
+    session()->flash('status', 'Opération enregistrée.');
+
+    $this->actingAs($actor, 'central')->followingRedirects()->get(route('dashboard'))
+        ->assertOk()->assertSee('Comptes commerçants')->assertSee('Opération enregistrée.');
+});
+
 test('the general and financial dashboard permissions protect their own indicators', function (): void {
     $general = adminDashboardActor(['saas.dashboard.view']);
     $financial = adminDashboardActor(['saas.dashboard.financial.view']);

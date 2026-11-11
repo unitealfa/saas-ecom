@@ -5,6 +5,13 @@
             <flux:text>Consultation effectuée le {{ now()->utc()->format('d/m/Y à H:i') }} UTC. Indicateurs calculés depuis les données centrales, sans accès aux bases des boutiques ni instantané comptable garanti.</flux:text>
         </div>
 
+        @if (session('status'))
+            <flux:callout>{{ session('status') }}</flux:callout>
+        @endif
+        @if (session('warning'))
+            <flux:callout variant="warning">{{ session('warning') }}</flux:callout>
+        @endif
+
         @if ($overview !== null)
             @php
                 $groups = [
