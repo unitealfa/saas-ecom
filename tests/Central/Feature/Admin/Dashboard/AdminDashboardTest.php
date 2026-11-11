@@ -115,7 +115,7 @@ test('general counts exclude staff and installments while preserving shop status
     Tenant::factory()->create(['user_id' => $owner->id, 'status' => TenantStatus::SUSPENDED]);
     $subscription = Subscription::factory()->create(['user_id' => $owner->id, 'period_ends_at' => now()->addMonth()]);
     $installment = new SubscriptionInstallment;
-    $installment->forceFill(['user_id' => $owner->id, 'parent_subscription_id' => $subscription->id,
+    $installment->forceFill(['user_id' => $owner->id, 'subscription_id' => $subscription->id,
         'operation_key' => 'dashboard-test:'.Str::uuid(), 'installment_number' => 'TEST-'.Str::uuid(),
         'installment_amount' => '10.00', 'installment_status' => InstallmentStatusEnum::PENDING,
         'due_at' => now()->addDay(), 'period_starts_at' => $subscription->period_starts_at,

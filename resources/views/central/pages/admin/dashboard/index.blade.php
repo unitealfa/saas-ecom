@@ -31,7 +31,7 @@
                         'title' => 'Abonnements',
                         'counts' => $overview['subscriptions'],
                         'statuses' => \App\Enums\Central\Subscriptions\StatusEnum::cases(),
-                        'source' => 'Source : subscriptions, type abonnement uniquement (record_type = 1). Les échéances ne sont pas comptées.',
+                        'source' => 'Source : subscriptions. Les échéances sont stockées séparément et ne sont pas comptées.',
                     ],
                 ];
             @endphp

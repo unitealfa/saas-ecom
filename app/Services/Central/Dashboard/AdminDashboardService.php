@@ -5,7 +5,6 @@ namespace App\Services\Central\Dashboard;
 use App\Enums\Central\Billing\TransferStatusEnum;
 use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Roles\Role;
-use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Users\User;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +32,7 @@ class AdminDashboardService
                 ->selectRaw('status, COUNT(*) AS total')->groupBy('status')->pluck('total', 'status')->all(),
             'shops' => $connection->table('tenants')->whereNull('deleted_at')
                 ->selectRaw('status, COUNT(*) AS total')->groupBy('status')->pluck('total', 'status')->all(),
-            'subscriptions' => $connection->table('subscriptions')->where('record_type', Subscription::RECORD_TYPE)
+            'subscriptions' => $connection->table('subscriptions')
                 ->selectRaw('status, COUNT(*) AS total')->groupBy('status')->pluck('total', 'status')->all(),
         ];
     }

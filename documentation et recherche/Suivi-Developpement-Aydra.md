@@ -1,4 +1,9 @@
 # Suivi de développement et audit Aydra
+
+## 11 novembre 2026 — correction du dashboard après séparation des échéances
+
+Après migration de la structure par l'utilisateur, le tableau de bord lit subscriptions sans l'ancien record_type ; les échéances restent dans subscription_installments. Vue et donnée de test alignées. Vérification en lecture seule de la structure et de la requête sur la base centrale ; quatre tests ciblés réussis, 18 assertions, avec PHP 8.4.4 et base MySQL isolée. PDF financier simulé ; aucun parcours navigateur ni migration exécuté par cette intervention.
+
 ## 10 novembre 2026 — séparation physique des échéances SaaS
 
 Documentation intégrée dans [la procédure de validation](Proposition-separation-echeances-SaaS.md), l’architecture §57, le schéma principal, le diagramme central et le README. Le checkout observé est `fix-enum` au HEAD `8e04dfaea521d1e4c38eb1ecf15aab55a3a401dd` ; le code de séparation est déjà présent dans le commit local `9391b0d` (26 fichiers). Le commit source du paquet `d38c293284a96524cca234660c401e8a950a9994` n’est pas un ancêtre du checkout ; ne pas réappliquer son script sur cette branche.
