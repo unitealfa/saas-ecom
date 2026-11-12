@@ -99,7 +99,7 @@ test('mapping creation uses actual foreign keys and a reader sees the connected 
         ->and($mapping->external_code)->toBe('016')->and($mapping->mapping_version)->toBe(1)
         ->and($mapping->is_active)->toBeTrue()->and($mapping->verified_at)->not->toBeNull();
     $this->actingAs(mappingStaff('saas.carrier-mappings.view'), 'central')
-        ->get(route('central.carrier-mappings.index'))->assertOk()->assertSee('Yalidine')
+        ->get(route('central.carrier-mappings.index'))->assertOk()->assertSee($carrier->name)
         ->assertSee($area->name_fr)->assertSee('016')->assertDontSee('Créer une correspondance')
         ->assertDontSee('>Modifier<', false)->assertDontSee('>Archiver<', false);
     $this->get(route('central.carrier-mappings.edit', $mapping->id))->assertNotFound();

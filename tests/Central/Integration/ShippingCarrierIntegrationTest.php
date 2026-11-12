@@ -26,7 +26,7 @@ test('carrier cache avoids repeated queries and follows committed changes withou
     $carrier = ShippingCarrier::factory()->create(['is_active' => true]);
     $catalog = app(ShippingCarrierCatalog::class);
     $expected = $catalog->active();
-    expect($expected)->toBe([['uuid' => $carrier->uuid, 'code' => $carrier->code, 'name' => 'Yalidine']]);
+    expect($expected)->toBe([['uuid' => $carrier->uuid, 'code' => $carrier->code, 'name' => $carrier->name]]);
     $connection = $carrier->getConnection();
     $connection->enableQueryLog();
     $connection->flushQueryLog();
