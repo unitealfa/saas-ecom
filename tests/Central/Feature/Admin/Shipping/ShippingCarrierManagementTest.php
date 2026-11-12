@@ -35,16 +35,20 @@ function shippingStaff(string $permission): User
     return $actor;
 }
 
-test('carrier seeding adds only Yalidine and preserves identities and administrative choices', function (): void {
+test('carrier seeding adds Yalidine and Samex and preserves identities and administrative choices', function (): void {
     $this->seed([ShippingCarrierSeeder::class, CarrierPermissionSeeder::class]);
-    $carrier = ShippingCarrier::sole();
+    $carrier = ShippingCarrier::where('code', 'yalidine')->sole();
     $uuid = $carrier->uuid;
     $carrier->forceFill(['name' => 'Nom personnalisé', 'is_active' => true])->save();
     $carrier->delete();
     $this->seed([ShippingCarrierSeeder::class, CarrierPermissionSeeder::class]);
 
-    expect(ShippingCarrier::withTrashed()->count())->toBe(1);
-    $carrier = ShippingCarrier::withTrashed()->sole();
+    expect(ShippingCarrier::withTrashed()->count())->toBe(2);
+    $samex = ShippingCarrier::where('code', 'samex')->sole();
+    expect($samex->is_active)->toBeFalse()
+        ->and($samex->adapter)->toBe(ShippingCarrier::UNCONFIGURED_ADAPTER)
+        ->and($samex->default_api_url)->toBeNull();
+    $carrier = ShippingCarrier::withTrashed()->where('code', 'yalidine')->sole();
     expect($carrier->uuid)->toBe($uuid)->and($carrier->trashed())->toBeTrue()
         ->and($carrier->name)->toBe('Nom personnalisé')
         ->and($carrier->default_api_url)->toBeNull();
@@ -89,7 +93,7 @@ test('carrier reader sees navigation list and details without mutation buttons',
     $carrier = ShippingCarrier::factory()->create();
     $reader = shippingStaff('saas.carriers.view');
     $this->actingAs($reader, 'central')->get(route('central.carriers.index'))
-        ->assertOk()->assertSee('Yalidine')->assertSee('Transporteurs')
+        ->assertOk()->assertSee($carrier->name)->assertSee('Transporteurs')
         ->assertDontSee('Ajouter un transporteur')->assertDontSee('>Modifier<', false);
     $this->get(route('central.carriers.show', $carrier))->assertOk()
         ->assertSee('Non configurée')->assertDontSee('>Activer<', false)->assertDontSee('>Archiver<', false);
@@ -101,14 +105,14 @@ test('carrier creation is inactive and rejects invalid codes duplicates or injec
     $admin = shippingAdmin();
     $this->actingAs($admin, 'central')->get(route('central.carriers.create'))->assertOk();
     $this->post(route('central.carriers.store'), ['code' => 'invalid code', 'name' => 'Inconnu'])->assertSessionHasErrors('code');
-    $this->post(route('central.carriers.store'), ['code' => ShippingCarrier::YALIDINE, 'name' => 'Yalidine', 'is_active' => true])
+    $this->post(route('central.carriers.store'), ['code' => 'yalidine', 'name' => 'Yalidine', 'is_active' => true])
         ->assertSessionHasErrors('is_active');
-    $this->post(route('central.carriers.store'), ['code' => ShippingCarrier::YALIDINE, 'name' => 'Yalidine'])
+    $this->post(route('central.carriers.store'), ['code' => 'yalidine', 'name' => 'Yalidine'])
         ->assertSessionHasNoErrors()->assertRedirect();
     $carrier = ShippingCarrier::sole();
-    expect($carrier->is_active)->toBeFalse()->and($carrier->adapter)->toBe(ShippingCarrier::YALIDINE)
+    expect($carrier->is_active)->toBeFalse()->and($carrier->adapter)->toBe(ShippingCarrier::UNCONFIGURED_ADAPTER)
         ->and($carrier->default_api_url)->toBeNull();
-    $this->post(route('central.carriers.store'), ['code' => ShippingCarrier::YALIDINE, 'name' => 'Doublon'])
+    $this->post(route('central.carriers.store'), ['code' => 'yalidine', 'name' => 'Doublon'])
         ->assertSessionHasErrors('code');
     expect(ShippingCarrier::count())->toBe(1);
     expect(Activity::forSubject($carrier)->where('event', 'carrier_created')->count())->toBe(1);
@@ -172,7 +176,7 @@ test('carrier archival is logical and reserves its code without changing existin
     ])->assertRedirect()->assertSessionHasNoErrors();
     expect($carrier->fresh()->trashed())->toBeTrue();
     $this->get(route('central.carriers.show', $carrier))->assertOk()->assertSee('Archivé')->assertDontSee('>Modifier<', false);
-    $this->get(route('central.carriers.index', ['archived' => true]))->assertOk()->assertSee('Yalidine');
+    $this->get(route('central.carriers.index', ['archived' => true]))->assertOk()->assertSee($carrier->name);
     $this->post(route('central.carriers.store'), ['code' => $carrier->code, 'name' => 'Yalidine'])->assertSessionHasErrors('code');
     expect(ShippingCarrier::withTrashed()->count())->toBe(1);
 });
@@ -207,4 +211,15 @@ test('central geographic references prevent carrier archival', function (): void
         'expected_state' => $carrier->managementState(),
     ])->assertSessionHasErrors('carrier');
     expect($carrier->refresh()->trashed())->toBeFalse()->and($carrier->reference_version)->toBe(1);
+});
+
+test('carrier factories generate independent fictitious companies', function (): void {
+    $carriers = ShippingCarrier::factory()->count(2)->create();
+
+    expect($carriers->pluck('code')->unique())->toHaveCount(2);
+    foreach ($carriers as $carrier) {
+        expect($carrier->code)->not->toBeIn(['samex', 'yalidine'])
+            ->and($carrier->adapter)->toBe(ShippingCarrier::UNCONFIGURED_ADAPTER)
+            ->and($carrier->default_api_url)->toBeNull();
+    }
 });

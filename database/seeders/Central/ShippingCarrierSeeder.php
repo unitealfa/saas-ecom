@@ -9,6 +9,12 @@ use LogicException;
 
 class ShippingCarrierSeeder extends Seeder
 {
+    public const string SAMEX = 'samex';
+
+    public const string YALIDINE = 'yalidine';
+
+    private const string YALIDINE_SOURCE = 'https://www.yalidine.com/';
+
     public function run(): void
     {
         if (tenancy()->initialized) {
@@ -17,13 +23,25 @@ class ShippingCarrierSeeder extends Seeder
 
         DB::transaction(function (): void {
             ShippingCarrier::unguarded(fn () => ShippingCarrier::withTrashed()->firstOrCreate(
-                ['code' => ShippingCarrier::YALIDINE],
+                ['code' => self::SAMEX],
                 [
-                    'name' => 'Yalidine',
-                    'adapter' => ShippingCarrier::YALIDINE,
+                    'name' => 'Samex',
+                    'adapter' => ShippingCarrier::UNCONFIGURED_ADAPTER,
                     'default_api_url' => null,
                     'is_active' => false,
-                    'reference_source' => ShippingCarrier::YALIDINE_SOURCE,
+                    'reference_source' => 'lefichiers.txt — grille Samex fournie',
+                    'reference_version' => 1,
+                ]
+            ));
+
+            ShippingCarrier::unguarded(fn () => ShippingCarrier::withTrashed()->firstOrCreate(
+                ['code' => self::YALIDINE],
+                [
+                    'name' => 'Yalidine',
+                    'adapter' => self::YALIDINE,
+                    'default_api_url' => null,
+                    'is_active' => false,
+                    'reference_source' => self::YALIDINE_SOURCE,
                     'reference_version' => 1,
                 ]
             ));

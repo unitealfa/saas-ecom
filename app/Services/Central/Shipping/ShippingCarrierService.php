@@ -60,14 +60,12 @@ class ShippingCarrierService
 
         return $this->mutations->run($actor, 'create', fn () => ShippingCarrier::class,
             function () use ($actor, $code, $name): ShippingCarrier {
-                $isYalidine = $code === ShippingCarrier::YALIDINE;
-
                 $carrier = new ShippingCarrier(['name' => $name]);
                 $carrier->forceFill([
                     'code' => $code,
-                    'adapter' => $isYalidine ? ShippingCarrier::YALIDINE : ShippingCarrier::UNCONFIGURED_ADAPTER,
+                    'adapter' => ShippingCarrier::UNCONFIGURED_ADAPTER,
                     'default_api_url' => null,
-                    'reference_source' => $isYalidine ? ShippingCarrier::YALIDINE_SOURCE : ShippingCarrier::MANUAL_SOURCE,
+                    'reference_source' => ShippingCarrier::MANUAL_SOURCE,
                 ]);
 
                 try {
@@ -169,6 +167,7 @@ class ShippingCarrierService
         $central = $carrier->getConnection();
 
         return $central->table('carrier_geo_mappings')->where('carrier_id', $carrier->id)->exists()
+            || $central->table('shipping_rates')->where('carrier_id', $carrier->id)->exists()
             || $central->table('pickup_points')->where('carrier_id', $carrier->id)->exists();
     }
 
