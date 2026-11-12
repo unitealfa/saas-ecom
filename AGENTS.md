@@ -2,6 +2,8 @@
 
 ## Avant chaque tâche
 
+- Nommage des tests : tout fichier contenant des scénarios Pest/PHPUnit porte le suffixe `Test.php` (exemple : `ShippingCarrierManagementTest.php`). Conserver les noms techniques Laravel/Pest, les factories, seeders, fixtures et helpers ; ne pas leur ajouter ce suffixe, qui pourrait modifier la découverte des tests.
+
 - Lire ce fichier et les éventuels AGENTS.override.md ou instructions de sous-dossier applicables. Vérifier racine Git, dossier courant et diff ; préserver le travail existant et signaler les conflits de priorité.
 - Après la reconnaissance initiale, consulter seulement le code et les références utiles. Lire .ai/rules/index.md et les règles applicables si elles existent, rechercher les mots-clés avec rg et activer les skills pertinents disponibles.
 - Respecter le périmètre : expliquer une demande d'explication, réaliser entièrement une demande d'implémentation. Décider les choix techniques courants et réversibles ; clarifier une information métier importante ou une contradiction non résolue.

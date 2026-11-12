@@ -93,7 +93,7 @@ test('carrier reader sees navigation list and details without mutation buttons',
     $carrier = ShippingCarrier::factory()->create();
     $reader = shippingStaff('saas.carriers.view');
     $this->actingAs($reader, 'central')->get(route('central.carriers.index'))
-        ->assertOk()->assertSee('Yalidine')->assertSee('Transporteurs')
+        ->assertOk()->assertSee($carrier->name)->assertSee('Transporteurs')
         ->assertDontSee('Ajouter un transporteur')->assertDontSee('>Modifier<', false);
     $this->get(route('central.carriers.show', $carrier))->assertOk()
         ->assertSee('Non configurée')->assertDontSee('>Activer<', false)->assertDontSee('>Archiver<', false);
@@ -176,7 +176,7 @@ test('carrier archival is logical and reserves its code without changing existin
     ])->assertRedirect()->assertSessionHasNoErrors();
     expect($carrier->fresh()->trashed())->toBeTrue();
     $this->get(route('central.carriers.show', $carrier))->assertOk()->assertSee('Archivé')->assertDontSee('>Modifier<', false);
-    $this->get(route('central.carriers.index', ['archived' => true]))->assertOk()->assertSee('Yalidine');
+    $this->get(route('central.carriers.index', ['archived' => true]))->assertOk()->assertSee($carrier->name);
     $this->post(route('central.carriers.store'), ['code' => $carrier->code, 'name' => 'Yalidine'])->assertSessionHasErrors('code');
     expect(ShippingCarrier::withTrashed()->count())->toBe(1);
 });
@@ -211,4 +211,15 @@ test('central geographic references prevent carrier archival', function (): void
         'expected_state' => $carrier->managementState(),
     ])->assertSessionHasErrors('carrier');
     expect($carrier->refresh()->trashed())->toBeFalse()->and($carrier->reference_version)->toBe(1);
+});
+
+test('carrier factories generate independent fictitious companies', function (): void {
+    $carriers = ShippingCarrier::factory()->count(2)->create();
+
+    expect($carriers->pluck('code')->unique())->toHaveCount(2);
+    foreach ($carriers as $carrier) {
+        expect($carrier->code)->not->toBeIn(['samex', 'yalidine'])
+            ->and($carrier->adapter)->toBe(ShippingCarrier::UNCONFIGURED_ADAPTER)
+            ->and($carrier->default_api_url)->toBeNull();
+    }
 });
