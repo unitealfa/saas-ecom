@@ -37,7 +37,10 @@ class SamexShippingRateSeeder extends Seeder
         ])->validate();
 
         DB::transaction(function () use ($rows): void {
-            $carrier = ShippingCarrier::where('code', 'samex')->lockForUpdate()->sole();
+            $carrier = ShippingCarrier::withTrashed()->where('code', ShippingCarrierSeeder::SAMEX)->lockForUpdate()->sole();
+            if ($carrier->trashed()) {
+                return;
+            }
             $country = Country::where('code', 'DZ')->lockForUpdate()->sole();
             $areas = GeographicArea::where('country_id', $country->id)
                 ->where('type', GeoZoneTypeEnum::PROVINCE)->lockForUpdate()->get()

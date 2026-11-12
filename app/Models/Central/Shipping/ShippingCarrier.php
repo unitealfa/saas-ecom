@@ -36,10 +36,6 @@ class ShippingCarrier extends Model
     /** @use HasFactory<ShippingCarrierFactory> */
     use CentralConnection, HasFactory, HasPublicUuid, SoftDeletes;
 
-    public const string YALIDINE = 'yalidine';
-
-    public const string YALIDINE_SOURCE = 'https://www.yalidine.com/';
-
     public const string UNCONFIGURED_ADAPTER = 'unconfigured';
 
     public const string MANUAL_SOURCE = 'administration';

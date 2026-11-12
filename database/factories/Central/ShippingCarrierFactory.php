@@ -14,12 +14,12 @@ class ShippingCarrierFactory extends Factory
     public function definition(): array
     {
         return [
-            'code' => ShippingCarrier::YALIDINE,
+            'code' => 'yalidine',
             'name' => 'Yalidine',
-            'adapter' => ShippingCarrier::YALIDINE,
+            'adapter' => 'yalidine',
             'default_api_url' => null,
             'is_active' => false,
-            'reference_source' => ShippingCarrier::YALIDINE_SOURCE,
+            'reference_source' => 'https://www.yalidine.com/',
             'reference_version' => 1,
             'synced_at' => null,
         ];
