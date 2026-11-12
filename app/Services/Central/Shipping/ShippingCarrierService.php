@@ -169,6 +169,7 @@ class ShippingCarrierService
         $central = $carrier->getConnection();
 
         return $central->table('carrier_geo_mappings')->where('carrier_id', $carrier->id)->exists()
+            || $central->table('shipping_rates')->where('carrier_id', $carrier->id)->exists()
             || $central->table('pickup_points')->where('carrier_id', $carrier->id)->exists();
     }
 

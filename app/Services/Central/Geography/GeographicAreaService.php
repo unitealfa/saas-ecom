@@ -205,6 +205,7 @@ class GeographicAreaService
 
         return $area->children()->withTrashed()->exists()
             || $connection->table('carrier_geo_mappings')->where('geographic_area_id', $area->id)->exists()
+            || $connection->table('shipping_rates')->where('geographic_area_id', $area->id)->exists()
             || $connection->table('pickup_points')->where('province_id', $area->id)->orWhere('municipality_id', $area->id)->exists();
     }
 

@@ -1,0 +1,1426 @@
+[
+    {
+        "code":  "1",
+        "name":  "Adrar",
+        "rates":  {
+                      "collection":  {
+                                         "office":  1000,
+                                         "home":  1400
+                                     },
+                      "pickup":  {
+                                     "office":  1000,
+                                     "home":  1400
+                                 },
+                      "exchange":  {
+                                       "office":  1000,
+                                       "home":  1400
+                                   },
+                      "delivery":  {
+                                       "office":  1000,
+                                       "home":  1400
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "2",
+        "name":  "Chlef",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "3",
+        "name":  "Laghouat",
+        "rates":  {
+                      "collection":  {
+                                         "office":  600,
+                                         "home":  900
+                                     },
+                      "pickup":  {
+                                     "office":  600,
+                                     "home":  900
+                                 },
+                      "exchange":  {
+                                       "office":  600,
+                                       "home":  900
+                                   },
+                      "delivery":  {
+                                       "office":  600,
+                                       "home":  900
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "4",
+        "name":  "Oum El Bouaghi",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "5",
+        "name":  "Batna",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "6",
+        "name":  "Béjaïa",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "7",
+        "name":  "Biskra",
+        "rates":  {
+                      "collection":  {
+                                         "office":  550,
+                                         "home":  900
+                                     },
+                      "pickup":  {
+                                     "office":  550,
+                                     "home":  900
+                                 },
+                      "exchange":  {
+                                       "office":  550,
+                                       "home":  900
+                                   },
+                      "delivery":  {
+                                       "office":  550,
+                                       "home":  900
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "8",
+        "name":  "Béchar",
+        "rates":  {
+                      "collection":  {
+                                         "office":  800,
+                                         "home":  1400
+                                     },
+                      "pickup":  {
+                                     "office":  800,
+                                     "home":  1400
+                                 },
+                      "exchange":  {
+                                       "office":  800,
+                                       "home":  1400
+                                   },
+                      "delivery":  {
+                                       "office":  800,
+                                       "home":  1400
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "9",
+        "name":  "Blida",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  650
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  650
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  650
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  650
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "10",
+        "name":  "Bouira",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "11",
+        "name":  "Tamanrasset",
+        "rates":  {
+                      "collection":  {
+                                         "office":  1000,
+                                         "home":  2000
+                                     },
+                      "pickup":  {
+                                     "office":  1000,
+                                     "home":  2000
+                                 },
+                      "exchange":  {
+                                       "office":  1000,
+                                       "home":  2000
+                                   },
+                      "delivery":  {
+                                       "office":  1000,
+                                       "home":  2000
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "12",
+        "name":  "Tébessa",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "13",
+        "name":  "Tlemcen",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "14",
+        "name":  "Tiaret",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  900
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  900
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  900
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  900
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "15",
+        "name":  "Tizi Ouzou",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "16",
+        "name":  "Alger",
+        "rates":  {
+                      "collection":  {
+                                         "office":  250,
+                                         "home":  450
+                                     },
+                      "pickup":  {
+                                     "office":  250,
+                                     "home":  450
+                                 },
+                      "exchange":  {
+                                       "office":  250,
+                                       "home":  450
+                                   },
+                      "delivery":  {
+                                       "office":  250,
+                                       "home":  450
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "17",
+        "name":  "Djelfa",
+        "rates":  {
+                      "collection":  {
+                                         "office":  550,
+                                         "home":  900
+                                     },
+                      "pickup":  {
+                                     "office":  550,
+                                     "home":  900
+                                 },
+                      "exchange":  {
+                                       "office":  550,
+                                       "home":  900
+                                   },
+                      "delivery":  {
+                                       "office":  550,
+                                       "home":  900
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "18",
+        "name":  "Jijel",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "19",
+        "name":  "Sétif",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "20",
+        "name":  "Saïda",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  900
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  900
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  900
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  900
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "21",
+        "name":  "Skikda",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "22",
+        "name":  "Sidi Bel Abbès",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "23",
+        "name":  "Annaba",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "24",
+        "name":  "Guelma",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "25",
+        "name":  "Constantine",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "26",
+        "name":  "Médéa",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  750
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  750
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  750
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  750
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "27",
+        "name":  "Mostaganem",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "28",
+        "name":  "M\u0027Sila",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "29",
+        "name":  "Mascara",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  900
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  900
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  900
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  900
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "30",
+        "name":  "Ouargla",
+        "rates":  {
+                      "collection":  {
+                                         "office":  600,
+                                         "home":  990
+                                     },
+                      "pickup":  {
+                                     "office":  600,
+                                     "home":  990
+                                 },
+                      "exchange":  {
+                                       "office":  600,
+                                       "home":  990
+                                   },
+                      "delivery":  {
+                                       "office":  600,
+                                       "home":  990
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "31",
+        "name":  "Oran",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "32",
+        "name":  "El Bayadh",
+        "rates":  {
+                      "collection":  {
+                                         "office":  650,
+                                         "home":  990
+                                     },
+                      "pickup":  {
+                                     "office":  650,
+                                     "home":  990
+                                 },
+                      "exchange":  {
+                                       "office":  650,
+                                       "home":  990
+                                   },
+                      "delivery":  {
+                                       "office":  650,
+                                       "home":  990
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "33",
+        "name":  "Illizi",
+        "rates":  {
+                      "collection":  {
+                                         "office":  1200,
+                                         "home":  1400
+                                     },
+                      "pickup":  {
+                                     "office":  1200,
+                                     "home":  1400
+                                 },
+                      "exchange":  {
+                                       "office":  1200,
+                                       "home":  1400
+                                   },
+                      "delivery":  {
+                                       "office":  1200,
+                                       "home":  1400
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "34",
+        "name":  "Bordj Bou Arreridj",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "35",
+        "name":  "Boumerdès",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  650
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  650
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  650
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  650
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "36",
+        "name":  "El Tarf",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "37",
+        "name":  "Tindouf",
+        "rates":  {
+                      "collection":  {
+                                         "office":  1000,
+                                         "home":  1600
+                                     },
+                      "pickup":  {
+                                     "office":  1000,
+                                     "home":  1600
+                                 },
+                      "exchange":  {
+                                       "office":  1000,
+                                       "home":  1600
+                                   },
+                      "delivery":  {
+                                       "office":  1000,
+                                       "home":  1600
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "38",
+        "name":  "Tissemsilt",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  900
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  900
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  900
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  900
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "39",
+        "name":  "El Oued",
+        "rates":  {
+                      "collection":  {
+                                         "office":  600,
+                                         "home":  990
+                                     },
+                      "pickup":  {
+                                     "office":  600,
+                                     "home":  990
+                                 },
+                      "exchange":  {
+                                       "office":  600,
+                                       "home":  990
+                                   },
+                      "delivery":  {
+                                       "office":  600,
+                                       "home":  990
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "40",
+        "name":  "Khenchela",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "41",
+        "name":  "Souk Ahras",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "42",
+        "name":  "Tipaza",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  650
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  650
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  650
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  650
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "43",
+        "name":  "Mila",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "44",
+        "name":  "Aïn Defla",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "45",
+        "name":  "Naâma",
+        "rates":  {
+                      "collection":  {
+                                         "office":  650,
+                                         "home":  1200
+                                     },
+                      "pickup":  {
+                                     "office":  650,
+                                     "home":  1200
+                                 },
+                      "exchange":  {
+                                       "office":  650,
+                                       "home":  1200
+                                   },
+                      "delivery":  {
+                                       "office":  650,
+                                       "home":  1200
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "46",
+        "name":  "Aïn Témouchent",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "47",
+        "name":  "Ghardaïa",
+        "rates":  {
+                      "collection":  {
+                                         "office":  600,
+                                         "home":  990
+                                     },
+                      "pickup":  {
+                                     "office":  600,
+                                     "home":  990
+                                 },
+                      "exchange":  {
+                                       "office":  600,
+                                       "home":  990
+                                   },
+                      "delivery":  {
+                                       "office":  600,
+                                       "home":  990
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "48",
+        "name":  "Relizane",
+        "rates":  {
+                      "collection":  {
+                                         "office":  450,
+                                         "home":  800
+                                     },
+                      "pickup":  {
+                                     "office":  450,
+                                     "home":  800
+                                 },
+                      "exchange":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "delivery":  {
+                                       "office":  450,
+                                       "home":  800
+                                   },
+                      "return":  {
+                                     "office":  0,
+                                     "home":  0
+                                 }
+                  }
+    },
+    {
+        "code":  "49",
+        "name":  "Timimoun",
+        "rates":  {
+                      "collection":  {
+                                         "office":  1000,
+                                         "home":  1400
+                                     },
+                      "pickup":  {
+                                     "office":  1000,
+                                     "home":  1400
+                                 },
+                      "exchange":  {
+                                       "office":  1000,
+                                       "home":  1400
+                                   },
+                      "delivery":  {
+                                       "office":  1000,
+                                       "home":  1400
+                                   }
+                  }
+    },
+    {
+        "code":  "51",
+        "name":  "Ouled Djellal",
+        "rates":  {
+                      "collection":  {
+                                         "office":  600,
+                                         "home":  900
+                                     },
+                      "pickup":  {
+                                     "office":  600,
+                                     "home":  900
+                                 },
+                      "exchange":  {
+                                       "office":  600,
+                                       "home":  900
+                                   },
+                      "delivery":  {
+                                       "office":  600,
+                                       "home":  900
+                                   }
+                  }
+    },
+    {
+        "code":  "52",
+        "name":  "Beni Abbes",
+        "rates":  {
+                      "collection":  {
+                                         "office":  800,
+                                         "home":  1400
+                                     },
+                      "pickup":  {
+                                     "office":  800,
+                                     "home":  1400
+                                 },
+                      "exchange":  {
+                                       "office":  800,
+                                       "home":  1400
+                                   },
+                      "delivery":  {
+                                       "office":  800,
+                                       "home":  1400
+                                   }
+                  }
+    },
+    {
+        "code":  "53",
+        "name":  "In Salah",
+        "rates":  {
+                      "collection":  {
+                                         "office":  1200,
+                                         "home":  1400
+                                     },
+                      "pickup":  {
+                                     "office":  1200,
+                                     "home":  1400
+                                 },
+                      "exchange":  {
+                                       "office":  1200,
+                                       "home":  1400
+                                   },
+                      "delivery":  {
+                                       "office":  1200,
+                                       "home":  1400
+                                   }
+                  }
+    },
+    {
+        "code":  "55",
+        "name":  "Touggourt",
+        "rates":  {
+                      "collection":  {
+                                         "office":  600,
+                                         "home":  990
+                                     },
+                      "pickup":  {
+                                     "office":  600,
+                                     "home":  990
+                                 },
+                      "exchange":  {
+                                       "office":  600,
+                                       "home":  990
+                                   },
+                      "delivery":  {
+                                       "office":  600,
+                                       "home":  990
+                                   }
+                  }
+    },
+    {
+        "code":  "56",
+        "name":  "Djanet",
+        "rates":  {
+                      "collection":  {
+                                         "office":  1400,
+                                         "home":  1700
+                                     },
+                      "pickup":  {
+                                     "office":  1400,
+                                     "home":  1700
+                                 },
+                      "exchange":  {
+                                       "office":  1400,
+                                       "home":  1700
+                                   },
+                      "delivery":  {
+                                       "office":  1400,
+                                       "home":  1700
+                                   }
+                  }
+    },
+    {
+        "code":  "57",
+        "name":  "El M\u0027Ghair",
+        "rates":  {
+                      "collection":  {
+                                         "office":  600,
+                                         "home":  990
+                                     },
+                      "pickup":  {
+                                     "office":  600,
+                                     "home":  990
+                                 },
+                      "exchange":  {
+                                       "office":  600,
+                                       "home":  990
+                                   },
+                      "delivery":  {
+                                       "office":  600,
+                                       "home":  990
+                                   }
+                  }
+    },
+    {
+        "code":  "58",
+        "name":  "El Meniaa",
+        "rates":  {
+                      "collection":  {
+                                         "office":  600,
+                                         "home":  1200
+                                     },
+                      "pickup":  {
+                                     "office":  600,
+                                     "home":  1200
+                                 },
+                      "exchange":  {
+                                       "office":  600,
+                                       "home":  1200
+                                   },
+                      "delivery":  {
+                                       "office":  600,
+                                       "home":  1200
+                                   }
+                  }
+    }
+]
