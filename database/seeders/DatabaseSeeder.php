@@ -8,6 +8,8 @@ use Database\Seeders\Central\FreePlanSeeder;
 use Database\Seeders\Central\GeographicAreaSeeder;
 use Database\Seeders\Central\LocalAuthenticationSeeder;
 use Database\Seeders\Central\LocalDevelopmentSeeder;
+use Database\Seeders\Central\SamexGeoMappingSeeder;
+use Database\Seeders\Central\SamexShippingRateSeeder;
 use Database\Seeders\Central\ShippingCarrierSeeder;
 use Illuminate\Database\Seeder;
 use LogicException;
@@ -23,6 +25,8 @@ class DatabaseSeeder extends Seeder
         $this->call(CountrySeeder::class);
         $this->call(ShippingCarrierSeeder::class);
         $this->call(GeographicAreaSeeder::class);
+        $this->call(SamexGeoMappingSeeder::class);
+        $this->call(SamexShippingRateSeeder::class);
         $this->call(FreePlanSeeder::class);
         $this->call(AuthorizationSeeder::class);
 

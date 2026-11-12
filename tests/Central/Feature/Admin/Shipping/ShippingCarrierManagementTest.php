@@ -35,16 +35,16 @@ function shippingStaff(string $permission): User
     return $actor;
 }
 
-test('carrier seeding adds only Yalidine and preserves identities and administrative choices', function (): void {
+test('carrier seeding adds Yalidine and Samex and preserves identities and administrative choices', function (): void {
     $this->seed([ShippingCarrierSeeder::class, CarrierPermissionSeeder::class]);
-    $carrier = ShippingCarrier::sole();
+    $carrier = ShippingCarrier::where('code', 'yalidine')->sole();
     $uuid = $carrier->uuid;
     $carrier->forceFill(['name' => 'Nom personnalisé', 'is_active' => true])->save();
     $carrier->delete();
     $this->seed([ShippingCarrierSeeder::class, CarrierPermissionSeeder::class]);
 
-    expect(ShippingCarrier::withTrashed()->count())->toBe(1);
-    $carrier = ShippingCarrier::withTrashed()->sole();
+    expect(ShippingCarrier::withTrashed()->count())->toBe(2);
+    $carrier = ShippingCarrier::withTrashed()->where('code', 'yalidine')->sole();
     expect($carrier->uuid)->toBe($uuid)->and($carrier->trashed())->toBeTrue()
         ->and($carrier->name)->toBe('Nom personnalisé')
         ->and($carrier->default_api_url)->toBeNull();
