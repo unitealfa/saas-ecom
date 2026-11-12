@@ -8,9 +8,6 @@
             @can('create', \App\Models\Central\Shipping\CarrierGeoMapping::class)
                 <flux:button :href="route('central.carrier-mappings.create', ['carrier_uuid' => request('carrier_uuid')])" variant="primary">Créer une correspondance</flux:button>
             @endcan
-            @can('import', \App\Models\Central\Shipping\CarrierGeoMapping::class)
-                <flux:button :href="route('central.carrier-mappings.import', ['carrier_uuid' => request('carrier_uuid')])">Importer un CSV</flux:button>
-            @endcan
         </div>
         <form method="GET" action="{{ route('central.carrier-mappings.index') }}" class="flex flex-wrap items-end gap-3">
             <flux:select name="carrier_uuid" label="Transporteur">

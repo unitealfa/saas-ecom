@@ -30,11 +30,6 @@ class CarrierGeoMappingPolicy
         return $this->canManage($actor, $mapping, 'archive');
     }
 
-    public function import(User $actor): bool
-    {
-        return $this->has($actor, 'import');
-    }
-
     /** Une correspondance archivée (inactive) n'est plus modifiable. */
     private function canManage(User $actor, CarrierGeoMapping $mapping, string $ability): bool
     {

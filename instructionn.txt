@@ -504,12 +504,11 @@ resources/views/central/pages/admin/shipping/carriers/
 Module 15 — Gestion des codes géographiques des transporteurs
 Table : carrier_geo_mappings
 Interface : Administration → Transporteurs → Correspondances géographiques
-Implémentation : administration centrale, liens réels vers shipping_carriers et geographic_areas, code/type de zone dérivés côté serveur. Import CSV UTF-8 avec aperçu lié au compte, confirmation atomique et expiration après quinze minutes ; aucun appel API ni code transporteur déduit des codes postaux. Archivage par is_active=false, sans suppression de la ligne ni remplacement des UUID ; aucune réactivation automatique par import. Architecture §48.
+Implémentation : administration centrale, liens réels vers shipping_carriers et geographic_areas, code/type de zone dérivés côté serveur. Aucun appel API ni code transporteur déduit des codes postaux. Archivage par is_active=false, sans suppression de la ligne ni remplacement des UUID ; aucune réactivation automatique des archives. Architecture §48.
 Permission	Fonctionnalité
 saas.carrier-mappings.view	Consulter les correspondances géographiques
 saas.carrier-mappings.create	Créer une correspondance
 saas.carrier-mappings.update	Modifier une correspondance
-saas.carrier-mappings.import	Importer les codes des transporteurs
 saas.carrier-mappings.archive	Archiver une correspondance
 Fichiers :
 app/Models/Central/Shipping/CarrierGeoMapping.php
@@ -519,13 +518,11 @@ app/Http/Controllers/Central/Admin/Shipping/
 
 app/Services/Central/Shipping/
     CarrierGeoMappingService.php
-    CarrierGeoImportService.php
     CarrierGeoMappingCatalog.php
 
 app/Policies/Central/CarrierGeoMappingPolicy.php
 app/Http/Requests/Central/Shipping/StoreCarrierGeoMappingRequest.php
 app/Http/Requests/Central/Shipping/CarrierGeoMappingActionRequest.php
-app/Http/Requests/Central/Shipping/ImportCarrierGeoMappingRequest.php
 database/seeders/Central/CarrierMappingPermissionSeeder.php
 routes/central/admin/carrier-mappings.php
 
@@ -533,7 +530,7 @@ resources/views/central/pages/admin/shipping/geo-mappings/
     index.blade.php
     create.blade.php
     edit.blade.php
-    import.blade.php
+    
 
 
 Module 16 — Gestion des bureaux de retrait

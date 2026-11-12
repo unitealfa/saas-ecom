@@ -9,9 +9,6 @@ Route::controller(CarrierGeoMappingController::class)
         Route::get('/', 'index')->name('index');
         Route::get('create', 'create')->name('create');
         Route::post('/', 'store')->name('store');
-        Route::get('import', 'import')->name('import');
-        Route::post('import/preview', 'preview')->name('preview');
-        Route::post('import/confirm', 'confirm')->name('confirm');
         Route::get('{mapping}/edit', 'edit')->name('edit');
         Route::put('{mapping}', 'update')->name('update');
         Route::delete('{mapping}', 'archive')->name('archive');
