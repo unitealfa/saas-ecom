@@ -42,7 +42,7 @@ class SamexShippingRateSeeder extends Seeder
                 return;
             }
             $country = Country::where('code', 'DZ')->lockForUpdate()->sole();
-            $areas = GeographicArea::where('country_id', $country->id)
+            $areas = GeographicArea::withTrashed()->where('country_id', $country->id)
                 ->where('type', GeoZoneTypeEnum::PROVINCE)->lockForUpdate()->get()
                 ->keyBy(fn (GeographicArea $area): int => (int) $area->code);
             $existing = ShippingRate::where('carrier_id', $carrier->id)->lockForUpdate()->get()
@@ -68,7 +68,7 @@ class SamexShippingRateSeeder extends Seeder
                             'amount' => $amount,
                             'currency' => 'DZD',
                             'reference_source' => 'lefichiers.txt — grille Samex fournie',
-                            'is_active' => false,
+                            'is_active' => $carrier->is_active && $area->is_active && ! $area->trashed(),
                         ])->save();
                     }
                 }

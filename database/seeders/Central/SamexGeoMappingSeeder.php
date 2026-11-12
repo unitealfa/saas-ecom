@@ -27,7 +27,7 @@ class SamexGeoMappingSeeder extends Seeder
                 return;
             }
             $country = Country::where('code', 'DZ')->lockForUpdate()->sole();
-            $areas = GeographicArea::where('country_id', $country->id)
+            $areas = GeographicArea::withTrashed()->where('country_id', $country->id)
                 ->where('type', GeoZoneTypeEnum::PROVINCE)->lockForUpdate()->get()
                 ->keyBy(fn (GeographicArea $area): int => (int) $area->code);
 
@@ -37,7 +37,15 @@ class SamexGeoMappingSeeder extends Seeder
                     throw new LogicException('Wilaya absente du référentiel : '.$row['code']);
                 }
 
-                if (CarrierGeoMapping::where('carrier_id', $carrier->id)->where('geographic_area_id', $area->id)->exists()) {
+                $active = $carrier->is_active && $area->is_active && ! $area->trashed();
+                $existing = CarrierGeoMapping::where('carrier_id', $carrier->id)->where('geographic_area_id', $area->id)->lockForUpdate()->first();
+                if ($existing !== null) {
+                    if ($active && ! $existing->is_active && $existing->mapping_version === 1
+                        && $existing->verified_at === null
+                        && $existing->verification_source === 'lefichiers.txt — grille Samex fournie') {
+                        $existing->forceFill(['is_active' => true, 'mapping_version' => 2, 'verified_at' => now()])->save();
+                    }
+
                     continue;
                 }
 
@@ -51,7 +59,8 @@ class SamexGeoMappingSeeder extends Seeder
                     'external_province_code' => $row['code'],
                     'verification_source' => 'lefichiers.txt — grille Samex fournie',
                     'mapping_version' => 1,
-                    'is_active' => false,
+                    'is_active' => $active,
+                    'verified_at' => $active ? now() : null,
                 ])->save();
             }
         }, 3);

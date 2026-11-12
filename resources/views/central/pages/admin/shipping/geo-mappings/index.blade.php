@@ -8,9 +8,6 @@
             @can('create', \App\Models\Central\Shipping\CarrierGeoMapping::class)
                 <flux:button :href="route('central.carrier-mappings.create', ['carrier_uuid' => request('carrier_uuid')])" variant="primary">Créer une correspondance</flux:button>
             @endcan
-            @can('import', \App\Models\Central\Shipping\CarrierGeoMapping::class)
-                <flux:button :href="route('central.carrier-mappings.import', ['carrier_uuid' => request('carrier_uuid')])">Importer un CSV</flux:button>
-            @endcan
         </div>
         <form method="GET" action="{{ route('central.carrier-mappings.index') }}" class="flex flex-wrap items-end gap-3">
             <flux:select name="carrier_uuid" label="Transporteur">
@@ -39,9 +36,11 @@
                             <td class="p-3">{{ $mapping->verification_source }}<div>Version {{ $mapping->mapping_version }} — {{ $mapping->verified_at?->format('d/m/Y H:i') ?? 'Non vérifiée' }}</div></td>
                             <td class="p-3">{{ $mapping->is_active ? 'Active' : 'Inactive / archivée' }}</td>
                             <td class="p-3"><div class="flex flex-wrap gap-2">
-                                @can('update', $mapping)<flux:button :href="route('central.carrier-mappings.edit', $mapping)">Modifier</flux:button>@endcan
+                                @can('update', $mapping)
+                                    <flux:button :href="route('central.carrier-mappings.edit', $mapping)">Modifier une correspondance</flux:button>
+                                @endcan
                                 @can('archive', $mapping)
-                                    <flux:modal.trigger :name="'archive-mapping-'.$mapping->uuid"><flux:button variant="danger">Archiver</flux:button></flux:modal.trigger>
+                                    <flux:modal.trigger :name="'archive-mapping-'.$mapping->uuid"><flux:button variant="danger">Archiver une correspondance</flux:button></flux:modal.trigger>
                                     <flux:modal :name="'archive-mapping-'.$mapping->uuid">
                                         <form method="POST" action="{{ route('central.carrier-mappings.archive', $mapping) }}" class="space-y-4">
                                             @csrf @method('DELETE')
@@ -52,6 +51,14 @@
                                         </form>
                                     </flux:modal>
                                 @endcan
+                                @if (! $mapping->is_active)
+                                    @can('saas.carrier-mappings.update')
+                                        <flux:button disabled>Modifier une correspondance</flux:button>
+                                    @endcan
+                                    @can('saas.carrier-mappings.archive')
+                                        <flux:button disabled>Archiver une correspondance</flux:button>
+                                    @endcan
+                                @endif
                             </div></td>
                         </tr>
                     @empty

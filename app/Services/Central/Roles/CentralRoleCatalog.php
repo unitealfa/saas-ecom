@@ -99,7 +99,6 @@ class CentralRoleCatalog
         'saas.carrier-mappings.view' => 'Consulter les correspondances géographiques',
         'saas.carrier-mappings.create' => 'Créer une correspondance',
         'saas.carrier-mappings.update' => 'Modifier une correspondance',
-        'saas.carrier-mappings.import' => 'Importer les codes des transporteurs',
         'saas.carrier-mappings.archive' => 'Archiver une correspondance',
     ];
 
@@ -232,7 +231,7 @@ class CentralRoleCatalog
         'Compteurs de facturation' => ['saas.billing-sequences.view'],
         'Fichiers centraux' => ['saas.media.view', 'saas.media.upload', 'saas.media.download', 'saas.media.archive'],
         'Bureaux de retrait' => ['saas.pickup-points.view', 'saas.pickup-points.create', 'saas.pickup-points.update', 'saas.pickup-points.import', 'saas.pickup-points.activate', 'saas.pickup-points.archive'],
-        'Correspondances géographiques des transporteurs' => ['saas.carrier-mappings.view', 'saas.carrier-mappings.create', 'saas.carrier-mappings.update', 'saas.carrier-mappings.import', 'saas.carrier-mappings.archive'],
+        'Correspondances géographiques des transporteurs' => ['saas.carrier-mappings.view', 'saas.carrier-mappings.create', 'saas.carrier-mappings.update', 'saas.carrier-mappings.archive'],
         'Transporteurs' => ['saas.carriers.view', 'saas.carriers.create', 'saas.carriers.update', 'saas.carriers.activate', 'saas.carriers.archive'],
         'Wilayas et communes' => ['saas.geography.view', 'saas.geography.create', 'saas.geography.update', 'saas.geography.activate', 'saas.geography.archive'],
         'Fonctionnalités commerciales' => ['saas.features.view', 'saas.features.create', 'saas.features.update', 'saas.features.activate', 'saas.features.archive'],

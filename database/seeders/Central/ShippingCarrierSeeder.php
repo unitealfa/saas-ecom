@@ -22,17 +22,21 @@ class ShippingCarrierSeeder extends Seeder
         }
 
         DB::transaction(function (): void {
-            ShippingCarrier::unguarded(fn () => ShippingCarrier::withTrashed()->firstOrCreate(
+            $samex = ShippingCarrier::unguarded(fn () => ShippingCarrier::withTrashed()->firstOrCreate(
                 ['code' => self::SAMEX],
                 [
                     'name' => 'Samex',
                     'adapter' => ShippingCarrier::UNCONFIGURED_ADAPTER,
                     'default_api_url' => null,
-                    'is_active' => false,
+                    'is_active' => true,
                     'reference_source' => 'lefichiers.txt — grille Samex fournie',
                     'reference_version' => 1,
                 ]
             ));
+
+            if (! $samex->trashed() && ! $samex->is_active && $samex->reference_version === 1) {
+                $samex->forceFill(['is_active' => true, 'reference_version' => 2])->save();
+            }
 
             ShippingCarrier::unguarded(fn () => ShippingCarrier::withTrashed()->firstOrCreate(
                 ['code' => self::YALIDINE],
@@ -40,7 +44,7 @@ class ShippingCarrierSeeder extends Seeder
                     'name' => 'Yalidine',
                     'adapter' => self::YALIDINE,
                     'default_api_url' => null,
-                    'is_active' => false,
+                    'is_active' => true,
                     'reference_source' => self::YALIDINE_SOURCE,
                     'reference_version' => 1,
                 ]

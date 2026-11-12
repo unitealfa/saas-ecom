@@ -29,8 +29,6 @@ class CarrierGeoMappingService
 
     private const string ARCHIVED = 'carrier_mapping_archived';
 
-    private const string IMPORTED = 'carrier_mapping_imported';
-
     private const array AUDITED = [
         'uuid', 'carrier_id', 'geographic_area_id', 'zone_type', ...CarrierGeoMapping::EDITABLE,
         'is_active', 'mapping_version', 'verified_at', 'synced_at',
@@ -89,7 +87,7 @@ class CarrierGeoMappingService
                 }
             }
 
-            return $this->write($actor, $carrier, $data, $current, false);
+            return $this->write($actor, $carrier, $data, $current);
         }, self::ATTEMPTS);
     }
 
@@ -110,62 +108,14 @@ class CarrierGeoMappingService
         }, self::ATTEMPTS);
     }
 
-    /**
-     * @param  list<array<string, mixed>>  $rows
-     * @return array{created: int, updated: int, unchanged: int}
-     */
-    public function import(User $actor, string $carrierUuid, array $rows): array
-    {
-        $this->authorize($actor, 'import');
-
-        return DB::transaction(function () use ($actor, $carrierUuid, $rows): array {
-            $carrier = $this->lockCarrier($carrierUuid);
-            $this->authorize($actor, 'import');
-
-            $areas = $this->lockAreas(array_column($rows, 'geographic_area_uuid'));
-            $existing = CarrierGeoMapping::query()->where('carrier_id', $carrier->id)
-                ->whereIn('geographic_area_id', $areas->pluck('id'))
-                ->orderBy('geographic_area_id')->lockForUpdate()->get()->keyBy('geographic_area_id');
-
-            $counts = ['created' => 0, 'updated' => 0, 'unchanged' => 0];
-
-            foreach ($rows as $row) {
-                $data = $this->validated([...$row, 'carrier_uuid' => $carrierUuid]);
-                $area = $areas->get($data['geographic_area_uuid'])
-                    ?? $this->fail('geographic_area_uuid', 'La zone de l’aperçu n’existe plus. Recommencez l’import.');
-
-                $current = $existing->get($area->id);
-                $expected = $row['expected_state'] ?? null;
-
-                if ($current !== null) {
-                    $this->assertCurrent($current, $expected);
-
-                    if (! $current->is_active) {
-                        $this->fail('file', 'Une correspondance archivée ne peut pas être remplacée par un import.');
-                    }
-                } elseif ($expected !== null) {
-                    $this->fail('conflict', 'Une correspondance de l’aperçu a disparu. Recommencez l’import.');
-                }
-
-                $before = $current?->mapping_version;
-                $saved = $this->write($actor, $carrier, $data, $current, true, $area);
-                $counts[$this->outcome($before, $saved->mapping_version)]++;
-            }
-
-            return $counts;
-        }, self::ATTEMPTS);
-    }
-
     /** @param array<string, mixed> $data */
     private function write(
         User $actor,
         ShippingCarrier $carrier,
         array $data,
         ?CarrierGeoMapping $current,
-        bool $import,
-        ?GeographicArea $lockedArea = null,
     ): CarrierGeoMapping {
-        $area = $lockedArea ?? $this->lockAreas([$data['geographic_area_uuid']])->get($data['geographic_area_uuid'])
+        $area = $this->lockAreas([$data['geographic_area_uuid']])->get($data['geographic_area_uuid'])
             ?? $this->fail('geographic_area_uuid', 'Sélectionnez une zone active dont le pays et la wilaya sont disponibles.');
 
         $mapping = $current ?? new CarrierGeoMapping;
@@ -184,7 +134,6 @@ class CarrierGeoMappingService
             'mapping_version' => ($mapping->mapping_version ?? 0) + 1,
             'is_active' => true,
             'verified_at' => now(),
-            'synced_at' => $import ? now() : $mapping->synced_at,
         ]);
 
         try {
@@ -194,7 +143,6 @@ class CarrierGeoMappingService
         }
 
         $event = match (true) {
-            $import => self::IMPORTED,
             $before === null => self::CREATED,
             default => self::UPDATED,
         };
@@ -216,16 +164,6 @@ class CarrierGeoMappingService
         $data['geographic_area_uuid'] = strtolower($data['geographic_area_uuid']);
 
         return $data;
-    }
-
-    /** @return 'created'|'updated'|'unchanged' */
-    private function outcome(?int $before, int $after): string
-    {
-        return match (true) {
-            $before === null => 'created',
-            $before === $after => 'unchanged',
-            default => 'updated',
-        };
     }
 
     /**

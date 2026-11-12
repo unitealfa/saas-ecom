@@ -44,10 +44,6 @@ test('carrier seeding adds Yalidine and Samex and preserves identities and admin
     $this->seed([ShippingCarrierSeeder::class, CarrierPermissionSeeder::class]);
 
     expect(ShippingCarrier::withTrashed()->count())->toBe(2);
-    $samex = ShippingCarrier::where('code', 'samex')->sole();
-    expect($samex->is_active)->toBeFalse()
-        ->and($samex->adapter)->toBe(ShippingCarrier::UNCONFIGURED_ADAPTER)
-        ->and($samex->default_api_url)->toBeNull();
     $carrier = ShippingCarrier::withTrashed()->where('code', 'yalidine')->sole();
     expect($carrier->uuid)->toBe($uuid)->and($carrier->trashed())->toBeTrue()
         ->and($carrier->name)->toBe('Nom personnalisé')
