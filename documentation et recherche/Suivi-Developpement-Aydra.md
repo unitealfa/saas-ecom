@@ -2408,3 +2408,15 @@ Consultation et export CSV sous les deux droits saas.activity.view et saas.activ
 Trois erreurs de syntaxe préexistantes dans le catalogue de permissions, BillingRule et SubscriptionPolicy ont été corrigées pour permettre le chargement du module et du layout ; les définitions existantes sont conservées. Aucun seeder n'a été exécuté sur la base réelle.
 
 Vérifications : 5 tests ciblés réussis, 27 assertions, sur MySQL local temporaire autorisé ; périmètre, droits distincts, recherche par UUID, données sensibles absentes, audit d'accès, formules CSV et export de 501 lignes couverts. PHPStan ciblé sans erreur, routes chargées pour les trois domaines centraux, syntaxe et diff vérifiés. Aucun navigateur authentifié ni test de charge/concurrence revendiqué. Graphify indisponible dans cet environnement ; aucun graphe actualisé.
+
+<!-- AYDRA-T012-T015-SUIVI-20261114 -->
+### Point de reprise proposé — Profil de la boutique — 14 novembre 2026
+
+| Ticket | Statut à conserver | Code proposé | Conditions pour cocher terminé |
+|---|---|---|---|
+| T-012 | À faire (proposé, non validé) | Singleton `shop` ; Form Request, Policy, service et vue | Accès T-001, rôles, CSRF, formulaire périmé, projection centrale, parcours UI vérifiés |
+| T-013 | À faire (proposé, non validé) | CRUD soft delete `shop_addresses` ADDRESS, géographie centrale, horaires | Deux boutiques MySQL, UTC/fuseau/chevauchements, adresse principale et archive vérifiés |
+| T-014 | À faire (proposé, non validé) | CRUD SOCIAL sur `shop_addresses`, liens multiples et adresse facultative | Validation URLs, parent tenant, statut public, autorisations, édition et archive vérifiés |
+| T-015 | À faire (proposé, non validé) | Contacts, couleurs, thème, image de marque `media`, cache public | Validation image, accès fichiers, cache/commit/rollback, parcours humain vérifiés |
+
+Ce lot n'a ni exécuté migrations ni seeders en BDD réelle. PHP `-l` seulement dans l'environnement de préparation ; tests Pest/MySQL et navigateur non exécutés. T-001 et T-010 restent des dépendances à terminer. Aucun statut « fait » ni coche n'est revendiqué.

@@ -22,6 +22,12 @@
                 <flux:sidebar.item icon="home" :href="route('tenant.home', absolute: false)">
                     {{ __('Voir la boutique') }}
                 </flux:sidebar.item>
+
+                @if (auth('tenant')->check() && auth('tenant')->user()->can('shop.profile.view'))
+                    <flux:sidebar.item icon="store" :href="route('tenant.admin.shop.profile', absolute: false)">
+                        {{ __('Profil de la boutique') }}
+                    </flux:sidebar.item>
+                @endif
             </flux:sidebar.nav>
 
             <flux:spacer />

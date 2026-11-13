@@ -35,6 +35,8 @@ use App\Models\Tenant\Media\Media as TenantMedia;
 use App\Models\Tenant\Permissions\Permission as TenantPermission;
 use App\Models\Tenant\Roles\Role as TenantRole;
 use App\Models\Tenant\Shop\Shop;
+use App\Models\Tenant\Shop\ShopAddress;
+use App\Models\Tenant\Shop\ShopSocialLink;
 use App\Models\Tenant\Users\User as ShopUser;
 use App\Models\User;
 use App\Policies\Central\ActivityPolicy;
@@ -61,6 +63,9 @@ use App\Policies\Central\SubscriptionRequestPolicy;
 use App\Policies\Central\TenantPolicy;
 use App\Policies\Central\TenantSchemaDeploymentPolicy;
 use App\Policies\Central\UserPolicy;
+use App\Policies\Tenant\ShopAddressPolicy;
+use App\Policies\Tenant\ShopPolicy;
+use App\Policies\Tenant\ShopSocialLinkPolicy;
 use App\Services\Central\Subscriptions\DefaultSubscription;
 use App\Services\Central\Tenants\TenantStatusService;
 use App\Services\SchemaBlueprint;
@@ -104,6 +109,9 @@ class AppServiceProvider extends ServiceProvider
         Feature::class => FeaturePolicy::class,
         TenantSchemaDeployment::class => TenantSchemaDeploymentPolicy::class,
         Tenant::class => TenantPolicy::class,
+        Shop::class => ShopPolicy::class,
+        ShopAddress::class => ShopAddressPolicy::class,
+        ShopSocialLink::class => ShopSocialLinkPolicy::class,
     ];
 
     public function register(): void
@@ -136,6 +144,9 @@ class AppServiceProvider extends ServiceProvider
             'saas_sequence' => BillingSequence::class,
             'central_user' => User::class,
             'shop_user' => ShopUser::class,
+            'shop' => Shop::class,
+            'shop_address' => ShopAddress::class,
+            'shop_social_link' => ShopSocialLink::class,
 
             // Alias historiques : ils sont déjà stockés en base, ne pas les renommer.
             'App\\Models\\Central\\Country' => Country::class,
