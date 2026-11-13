@@ -3,6 +3,7 @@
 use App\Enums\Tenant\Users\MembershipStatusEnum;
 use App\Enums\Tenant\Users\StatusEnum;
 use App\Models\Central\Tenants\Tenant;
+use App\Models\Tenant\Audit\Activity;
 use App\Models\Tenant\Media\Media;
 use App\Models\Tenant\Permissions\Permission;
 use App\Models\Tenant\Shop\Shop;
@@ -10,6 +11,7 @@ use App\Models\Tenant\Users\User;
 use App\Services\Tenant\Shop\ShopProfileCatalog;
 use App\Services\Tenant\Shop\ShopProfileService;
 use Database\Seeders\Tenant\ShopProfilePermissionSeeder;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -61,6 +63,10 @@ test('shop profile is isolated; name stays central and public cache changes only
     $second = Tenant::factory()->create();
     $first->run(function (): void {
         $actor = profileEditor();
+        $permissionIds = Permission::pluck('uuid', 'id')->all();
+        app(ShopProfilePermissionSeeder::class)->run();
+        expect(Permission::pluck('uuid', 'id')->all())->toBe($permissionIds)
+            ->and(App\Models\Central\Permissions\Permission::where('name', 'like', 'shop.%')->exists())->toBeFalse();
         $shop = Shop::query()->sole();
         $catalog = app(ShopProfileCatalog::class);
         $before = $catalog->publicProfile();
@@ -69,9 +75,21 @@ test('shop profile is isolated; name stays central and public cache changes only
         $payload['description'] = 'Description publique A';
         $payload['contact_phone'] = '0550000000';
         app(ShopProfileService::class)->update($actor, $payload, null, null);
+        expect(Activity::where('event', 'shop_profile_updated')->count())->toBe(1)
+            ->and(App\Models\Central\Audit\Activity::where('event', 'shop_profile_updated')->count())->toBe(0);
         expect(Shop::query()->sole()->description)->toBe('Description publique A')
             ->and(Shop::query()->sole()->shop_name)->toBe($shop->shop_name)
             ->and($catalog->publicProfile()['description'])->toBe('Description publique A');
+        $committedShop = Shop::sole();
+        $rollbackData = profilePayload($committedShop);
+        $rollbackData['description'] = 'Must roll back';
+        expect(fn () => $committedShop->getConnection()->transaction(function () use ($actor, $rollbackData): void {
+            app(ShopProfileService::class)->update($actor, $rollbackData, null, null);
+            throw new RuntimeException('Rollback probe');
+        }))->toThrow(RuntimeException::class, 'Rollback probe');
+        expect(Shop::sole()->description)->toBe('Description publique A')
+            ->and($catalog->publicProfile()['description'])->toBe('Description publique A')
+            ->and(Activity::where('event', 'shop_profile_updated')->count())->toBe(1);
         expect(fn () => app(ShopProfileService::class)->update($actor, $payload, null, null))
             ->toThrow(ValidationException::class); // old form state
     });
@@ -92,14 +110,14 @@ test('shop profile update rejects a user without local permission', function ():
         $data = profilePayload($shop);
         $data['about'] = 'Unauthorized';
         expect(fn () => app(ShopProfileService::class)->update($actor, $data, null, null))
-            ->toThrow(\Illuminate\Auth\Access\AuthorizationException::class);
+            ->toThrow(AuthorizationException::class);
         expect($shop->fresh()->about)->not->toBe('Unauthorized');
     });
 });
 
 test('branding stores only accepted image bytes under tenant-local storage and media relation', function (): void {
     $tenant = Tenant::factory()->create();
-    $tenant->run(function (): void {
+    $tenant->run(function () use ($tenant): void {
         Storage::fake('local');
         $actor = profileEditor();
         $actor->givePermissionTo(Permission::findByName('shop.branding.update', 'tenant'));

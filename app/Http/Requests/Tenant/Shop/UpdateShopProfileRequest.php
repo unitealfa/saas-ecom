@@ -30,7 +30,7 @@ class UpdateShopProfileRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'expected_state' => ['required', 'regex:/^[0-9a-f]{64}$/D'],
+            'expected_state' => ['required', 'string', 'regex:/^[0-9a-f]{64}$/D'],
             'description' => ['nullable', 'string', 'max:2000'],
             'about' => ['nullable', 'string', 'max:10000'],
             'business_type' => ['required', 'string', 'max:255'],

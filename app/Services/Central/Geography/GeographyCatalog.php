@@ -51,6 +51,20 @@ class GeographyCatalog
         ));
     }
 
+    /** @return array{provinces: array<int, array<string, mixed>>, municipalities: array<array-key, mixed>} */
+    public function shopAddressOptions(): array
+    {
+        return $this->remember('shop-address-options', function (): array {
+            $areas = GeographicArea::selectable()->with('parent:id,uuid')->orderBy('name_fr')->get();
+
+            return [
+                'provinces' => $areas->where('type', GeoZoneTypeEnum::PROVINCE)->map($this->row(...))->values()->all(),
+                'municipalities' => $areas->where('type', GeoZoneTypeEnum::MUNICIPALITY)
+                    ->map($this->row(...))->groupBy('parent_uuid')->toArray(),
+            ];
+        });
+    }
+
     public function belongsTo(string $communeUuid, string $provinceUuid): bool
     {
         return GeographicArea::selectable()
@@ -80,8 +94,10 @@ class GeographyCatalog
     }
 
     /**
-     * @param  Closure(): array<string, mixed>  $read
-     * @return array<string, mixed>
+     * @template T of array<string, mixed>
+     *
+     * @param  Closure(): T  $read
+     * @return T
      */
     private function remember(string $key, Closure $read): array
     {

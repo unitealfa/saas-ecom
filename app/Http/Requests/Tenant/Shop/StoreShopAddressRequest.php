@@ -48,11 +48,11 @@ class StoreShopAddressRequest extends FormRequest
         $editing = $this->route('address') !== null;
 
         return [
-            'expected_state' => [$editing ? 'required' : 'prohibited', 'regex:/^[0-9a-f]{64}$/D'],
+            'expected_state' => [$editing ? 'required' : 'prohibited', 'string', 'regex:/^[0-9a-f]{64}$/D'],
             'label' => ['required', 'string', 'max:255'],
             'address' => ['required', 'string', 'max:8000'],
-            'province_uuid' => ['nullable', 'uuid'],
-            'municipality_uuid' => ['nullable', 'uuid'],
+            'province_uuid' => ['required', 'uuid'],
+            'municipality_uuid' => ['required', 'uuid'],
             'postal_code' => ['nullable', 'string', 'max:255'],
             'latitude' => ['nullable', 'required_with:longitude', 'numeric', 'between:-90,90', 'regex:/^-?[0-9]{1,3}(?:\.[0-9]{1,7})?$/D'],
             'longitude' => ['nullable', 'required_with:latitude', 'numeric', 'between:-180,180', 'regex:/^-?[0-9]{1,3}(?:\.[0-9]{1,7})?$/D'],
@@ -64,7 +64,7 @@ class StoreShopAddressRequest extends FormRequest
             'visible' => ['required', 'boolean'],
             'uuid' => ['prohibited'], 'shop_id' => ['prohibited'],
             'shop_address_id' => ['prohibited'], 'record_type' => ['prohibited'],
-            'payload' => ['prohibited'], 'is_primary_slot' => ['prohibited'],
+            'payload' => ['prohibited'], 'primary_slot' => ['prohibited'],
         ];
     }
 }

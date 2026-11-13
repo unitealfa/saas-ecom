@@ -3,6 +3,7 @@
 namespace App\Services\Tenant\Shop;
 
 use App\DTOs\Tenant\Shop\ShopSettings;
+use App\Enums\MediaVisibilityEnum;
 use App\Models\Tenant\Media\Media;
 use App\Models\Tenant\Shop\Shop;
 use App\Models\Tenant\Users\User;
@@ -41,10 +42,18 @@ class ShopProfileService
     /** @param array<string, mixed> $data */
     public function update(User $actor, array $data, ?UploadedFile $logo, ?UploadedFile $favicon): void
     {
+        abort_unless(tenancy()->initialized, 403);
+
         $written = [];
+        $committed = false;
         try {
-            DB::connection('tenant')->transaction(function () use ($actor, $data, $logo, $favicon, &$written): void {
+            DB::connection('tenant')->transaction(function () use ($actor, $data, $logo, $favicon, &$written, &$committed): void {
+                foreach ($written as $path) {
+                    Storage::disk('local')->delete($path);
+                }
+                $written = [];
                 $shop = Shop::query()->where('singleton', 1)->lockForUpdate()->firstOrFail();
+                $actor = User::whereKey($actor->getKey())->where('uuid', $actor->uuid)->lockForUpdate()->firstOrFail();
                 abort_unless($shop->tenant_uuid === tenant()->uuid, 403);
                 Gate::forUser($actor)->authorize('update', $shop);
 
@@ -68,11 +77,16 @@ class ShopProfileService
                 $shop->forceFill($values)->save();
                 activity()->causedBy($actor)->performedOn($shop)->event('shop_profile_updated')
                     ->withProperties(['changed_fields' => array_keys($values)])->log('Profil de la boutique modifié.');
+                $shop->getConnection()->afterCommit(function () use (&$committed): void {
+                    $committed = true;
+                });
                 $this->catalog->invalidateAfterCommit($shop);
             }, 3);
         } catch (Throwable $exception) {
-            foreach ($written as $path) {
-                Storage::disk('local')->delete($path);
+            if (! $committed) {
+                foreach ($written as $path) {
+                    Storage::disk('local')->delete($path);
+                }
             }
             throw $exception;
         }
@@ -114,7 +128,7 @@ class ShopProfileService
             'size_bytes' => $file->getSize(),
             'width' => $size[0],
             'height' => $size[1],
-            'visibility' => 1,
+            'visibility' => MediaVisibilityEnum::PUBLIC->value,
             'position' => 0,
             'is_primary' => true,
             'file_hash' => hash_file('sha256', $file->getRealPath()),
@@ -132,6 +146,7 @@ class ShopProfileService
         abort_unless($media instanceof Media && ! $media->trashed()
             && $media->model_type === $shop->getMorphClass() && (int) $media->model_id === $shop->id
             && $media->collection_name === $collection && $media->disk === 'local'
+            && $media->visibility === MediaVisibilityEnum::PUBLIC->value
             && in_array($media->mime_type, ['image/png', 'image/jpeg', 'image/webp'], true)
             && Storage::disk('local')->exists($media->storage_key), 404);
 

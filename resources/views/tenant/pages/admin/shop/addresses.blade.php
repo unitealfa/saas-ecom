@@ -37,21 +37,21 @@
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <label class="text-sm">Nom du lieu <input required name="label" maxlength="255" value="{{ old('label', $editing?->label) }}" class="mt-1 w-full rounded border p-2 text-zinc-900"></label>
                         <label class="text-sm">Téléphone du lieu <input name="phone" maxlength="255" value="{{ old('phone', $editing?->payload['phone'] ?? '') }}" class="mt-1 w-full rounded border p-2 text-zinc-900"></label>
-                        <label class="text-sm">Wilaya officielle (facultatif)
-                            <select name="province_uuid" class="mt-1 w-full rounded border p-2 text-zinc-900">
-                                <option value="">Non renseignée</option>
+                        <label class="text-sm">Wilaya officielle
+                            <select required name="province_uuid" class="mt-1 w-full rounded border p-2 text-zinc-900">
+                                <option value="">Choisir</option>
                                 @foreach ($provinces as $province)
-                                    <option value="{{ $province->uuid }}" @selected(old('province_uuid', $editing?->province_uuid ?? '') === $province->uuid)>{{ $province->name_fr }}</option>
+                                    <option value="{{ $province['uuid'] }}" @selected(old('province_uuid', $editing?->province_uuid ?? '') === $province['uuid'])>{{ $province['name_fr'] }}</option>
                                 @endforeach
                             </select>
                         </label>
-                        <label class="text-sm">Commune officielle (facultatif)
-                            <select name="municipality_uuid" class="mt-1 w-full rounded border p-2 text-zinc-900">
-                                <option value="">Non renseignée</option>
+                        <label class="text-sm">Commune officielle
+                            <select required name="municipality_uuid" class="mt-1 w-full rounded border p-2 text-zinc-900">
+                                <option value="">Choisir</option>
                                 @foreach ($provinces as $province)
-                                    <optgroup label="{{ $province->name_fr }}">
-                                        @foreach (($municipalitiesByProvince[$province->uuid] ?? []) as $municipality)
-                                                <option value="{{ $municipality->uuid }}" @selected(old('municipality_uuid', $editing?->municipality_uuid ?? '') === $municipality->uuid)>{{ $municipality->name_fr }}</option>
+                                    <optgroup label="{{ $province['name_fr'] }}">
+                                        @foreach (($municipalitiesByProvince[$province['uuid']] ?? []) as $municipality)
+                                                <option value="{{ $municipality['uuid'] }}" @selected(old('municipality_uuid', $editing?->municipality_uuid ?? '') === $municipality['uuid'])>{{ $municipality['name_fr'] }}</option>
                                         @endforeach
                                     </optgroup>
                                 @endforeach

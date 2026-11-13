@@ -12,6 +12,8 @@ use Database\Seeders\Tenant\ShopProfilePermissionSeeder;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
+require_once __DIR__.'/../../../Support/ShopProfileFixtures.php';
+
 beforeEach(function (): void {
     $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
 });
@@ -43,7 +45,7 @@ function addressPayload(string $label, bool $primary): array
 {
     return [
         'label' => $label, 'address' => 'Rue des Tests, Alger', 'postal_code' => '16000',
-        'province_uuid' => null, 'municipality_uuid' => null, 'latitude' => null,
+        ...shopProfileGeography(), 'latitude' => null,
         'longitude' => null, 'map_url' => null, 'phone' => null,
         'opening_hours' => ['mon' => [['opens_at' => '22:00', 'closes_at' => '01:00', 'closes_next_day' => true]]],
         'position' => 0, 'visible' => true, 'is_primary' => $primary,

@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Shop\ShopProfileActionRequest;
 use App\Http\Requests\Tenant\Shop\StoreShopSocialLinkRequest;
 use App\Models\Tenant\Shop\ShopSocialLink;
-use App\Models\Tenant\Users\User;
 use App\Services\Tenant\Shop\ShopProfileService;
 use App\Services\Tenant\Shop\ShopSocialLinkService;
 use Illuminate\Contracts\View\View;
@@ -30,14 +29,13 @@ class ShopSocialLinkController extends Controller
 
     private function page(Request $request, ?string $uuid = null): View
     {
+        $actor = $this->tenantActor();
         $shop = $this->profiles->shop();
-        $actor = $request->user('tenant');
         Gate::forUser($actor)->authorize('viewAny', [ShopSocialLink::class, $shop]);
         $editing = $uuid === null ? null : ShopSocialLink::query()->where('shop_id', $shop->id)->where('uuid', $uuid)->firstOrFail();
         if ($editing !== null) {
             Gate::forUser($actor)->authorize('update', $editing);
         }
-        /** @var User $actor */
         $items = $shop->socialLinks()->orderBy('position')->orderBy('id')->get();
 
         return view('tenant.pages.admin.shop.social-links', [
@@ -50,8 +48,7 @@ class ShopSocialLinkController extends Controller
 
     public function store(StoreShopSocialLinkRequest $request): RedirectResponse
     {
-        /** @var User $actor */
-        $actor = $request->user('tenant');
+        $actor = $this->tenantActor();
         $this->links->save($actor, $request->validated());
 
         return redirect()->route('tenant.admin.shop.social-links.index')->with('status', 'Lien social enregistré.');
@@ -59,8 +56,7 @@ class ShopSocialLinkController extends Controller
 
     public function update(StoreShopSocialLinkRequest $request, string $link): RedirectResponse
     {
-        /** @var User $actor */
-        $actor = $request->user('tenant');
+        $actor = $this->tenantActor();
         $this->links->save($actor, $request->validated(), $link);
 
         return redirect()->route('tenant.admin.shop.social-links.index')->with('status', 'Lien social modifié.');
@@ -68,8 +64,7 @@ class ShopSocialLinkController extends Controller
 
     public function destroy(ShopProfileActionRequest $request, string $link): RedirectResponse
     {
-        /** @var User $actor */
-        $actor = $request->user('tenant');
+        $actor = $this->tenantActor();
         $this->links->archive($actor, $link, $request->validated('expected_state'));
 
         return redirect()->route('tenant.admin.shop.social-links.index')->with('status', 'Lien social archivé.');

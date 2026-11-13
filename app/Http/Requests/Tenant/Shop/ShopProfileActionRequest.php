@@ -35,6 +35,6 @@ class ShopProfileActionRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return ['expected_state' => ['required', 'regex:/^[0-9a-f]{64}$/D']];
+        return ['expected_state' => ['required', 'string', 'regex:/^[0-9a-f]{64}$/D']];
     }
 }

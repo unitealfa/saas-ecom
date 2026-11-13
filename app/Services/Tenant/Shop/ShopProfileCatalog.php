@@ -4,6 +4,7 @@ namespace App\Services\Tenant\Shop;
 
 use App\Models\Central\Tenants\Tenant;
 use App\Models\Tenant\Shop\Shop;
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use LogicException;
@@ -29,16 +30,21 @@ class ShopProfileCatalog
 
     public function invalidate(): void
     {
-        $this->assertTenant();
-        $cache = Cache::store('file');
-        $old = (string) $cache->get($this->versionKey(), 'initial');
-        $cache->forever($this->versionKey(), (string) Str::uuid());
-        $cache->forget($this->dataKey($old));
+        $this->invalidateStore(Cache::store('file'), $this->prefix());
     }
 
     public function invalidateAfterCommit(Shop $shop): void
     {
-        $shop->getConnection()->afterCommit(fn () => $this->invalidate());
+        $cache = Cache::store('file');
+        $prefix = $this->prefix();
+        $shop->getConnection()->afterCommit(fn () => $this->invalidateStore($cache, $prefix));
+    }
+
+    private function invalidateStore(Repository $cache, string $prefix): void
+    {
+        $old = (string) $cache->get($prefix.':version', 'initial');
+        $cache->forever($prefix.':version', (string) Str::uuid());
+        $cache->forget($prefix.':'.$old);
     }
 
     /** @return array<string, mixed> */
@@ -46,6 +52,8 @@ class ShopProfileCatalog
     {
         $shop = Shop::query()->with(['logoMedia', 'faviconMedia'])->sole();
         abort_unless($shop->tenant_uuid === tenant()->uuid, 403);
+
+        $addresses = $shop->addresses()->where('visible', true)->orderBy('position')->get()->keyBy('id');
 
         return [
             'shop_name' => $shop->shop_name,
@@ -61,14 +69,14 @@ class ShopProfileCatalog
             'colors' => $shop->colors,
             'logo_url' => $shop->logoMedia === null ? null : route('tenant.shop-profile.branding', ['kind' => 'logo', 'v' => $shop->logoMedia->uuid], false),
             'favicon_url' => $shop->faviconMedia === null ? null : route('tenant.shop-profile.branding', ['kind' => 'favicon', 'v' => $shop->faviconMedia->uuid], false),
-            'addresses' => $shop->addresses()->where('visible', true)->orderBy('position')->get()
+            'addresses' => $addresses->values()
                 ->map(fn ($a): array => ['uuid' => $a->uuid, 'label' => $a->label, 'province_uuid' => $a->province_uuid,
                     'municipality_uuid' => $a->municipality_uuid, 'is_primary' => $a->is_primary, 'payload' => $a->payload])->all(),
             'social_links' => $shop->socialLinks()->where('visible', true)->orderBy('position')->get()
                 ->filter(fn ($link): bool => $link->shop_address_id === null
-                    || $shop->addresses()->whereKey($link->shop_address_id)->where('visible', true)->exists())
+                    || $addresses->has($link->shop_address_id))
                 ->map(fn ($link): array => ['uuid' => $link->uuid, 'label' => $link->label,
-                    'address_uuid' => $link->shop_address_id === null ? null : $shop->addresses()->whereKey($link->shop_address_id)->value('uuid'),
+                    'address_uuid' => $link->shop_address_id === null ? null : $addresses->get($link->shop_address_id)?->uuid,
                     'payload' => $link->payload])->values()->all(),
         ];
     }
@@ -86,8 +94,11 @@ class ShopProfileCatalog
     private function prefix(): string
     {
         $tenant = $this->assertTenant();
+        $connection = (new Shop)->getConnection();
 
-        return 'public-shop-profile:v1:'.hash('sha256', $tenant->uuid.'|'.(new Shop)->getConnection()->getDatabaseName());
+        return 'public-shop-profile:v1:'.hash('sha256', json_encode([
+            $tenant->uuid, $connection->getConfig('host'), $connection->getConfig('port'), $connection->getDatabaseName(),
+        ], JSON_THROW_ON_ERROR));
     }
 
     private function assertTenant(): Tenant

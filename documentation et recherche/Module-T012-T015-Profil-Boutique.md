@@ -36,3 +36,21 @@ Le seeder additif est appelé sur les nouvelles boutiques par le provisionneur ;
 ## Mise en service
 
 Voir `README_INSTALLATION.md` à la racine de ce package. Installer sur une **branche neuve depuis `dev`**, après validation des empreintes du dépôt. Ne pas fusionner vers `dev` avant intégration avec T-001 et T-010, tests sur MySQL et parcours UI complet.
+
+## Revue d'integration T-012 a T-015 — 13 novembre 2026
+
+- Les permissions shop.* appartiennent au guard tenant et a chaque BDD boutique. ShopProfilePermissionSeeder est volontairement local et appele dans le contexte initialise par TenantProvisioner. CentralRoleCatalog reste exclusivement SaaS ; aucun deplacement vers le central ni attribution automatique de droits au proprietaire invite.
+- Les controleurs utilisent un acteur Tenant type et refusent explicitement une valeur absente/incompatible. Les services relisent cet acteur sous verrou dans la BDD courante avant la Policy ; une instance obsolete ou issue d'une autre boutique ne suffit pas.
+- Catalogue public : listes d'adresses chargees une seule fois, aucun acces SQL par lien social. Cache isole par UUID, serveur, port et BDD ; invalidation apres commit avec store/prefixe captures avant un changement de contexte. Les selecteurs geographiques reutilisent GeographyCatalog ; validation metier toujours fraiche.
+- SpatieContextBootstrapper selectionne deja Activity Tenant puis restaure le central. Ne pas modifier globalement activitylog pour un module, ni dupliquer ce mecanisme.
+- Logo/favicon : conserver la validation MIME/dimensions et la propriete du media ; verifier sa visibilite publique avant diffusion. Nettoyer les fichiers d'une tentative SQL annulee avant une nouvelle tentative.
+
+### A reprendre dans les prochains prompts externes
+
+Avant de generer : examiner les versions installees, le code reel, les appelants et le provisionnement. Ne pas confondre le catalogue de permissions SaaS centrales avec les permissions privees Tenant. Verifier les bootstrappers avant d'affirmer qu'un contexte ou un audit est incorrect. Garder les controles d'acteur, Policies, verrous et etat attendu cote serveur ; une annotation PHPDoc ne remplace pas instanceof. Cacher seulement la presentation avec invalidation apres commit et isolation complete, sans N+1 ni cache de decision. Les tests doivent prouver isolation, refus d'acces, rollback et absence de fuite d'audit. Signaler les prerequis d'authentification Tenant encore reportes ; ne pas les contourner ni attribuer de droits automatiquement. Respecter les migrations deployees et documenter uniquement les controles vraiment executes.
+- Incoherence confirmee entre formulaire et SQL : la contrainte ck_shop_addresses_4c7351308c exige une wilaya ET une commune pour ADDRESS. Le formulaire et le service les exigent maintenant ; les migrations existantes sont conservees. Les fixtures de tests creent de vraies references dans la base centrale temporaire. Le test logo capture explicitement son tenant dans la closure.
+- Avant de generer formulaire, service ou fixtures : lire les migrations de creation ET leurs contraintes CHECK, cles composites et triggers ulterieurs. Nullable dans le CREATE TABLE ne signifie pas facultatif pour tous les record_type. Ne pas affaiblir une contrainte metier pour faire passer un formulaire ou un test incorrect.
+
+### Controles executes pendant cette revue
+
+Premier passage des sept tests : quatre reussites, trois erreurs (deux adresses sans geographie obligatoire et une variable de closure absente). Apres corrections, scenario profil/isolation/rollback/audit rejoue avec succes ; les trois scenarios adresses/liens/logo rejoues ensemble passent (19 assertions). Le controle des liens inclut un budget de cinq requetes maximum pour le profil public, independamment des deux liens lies au meme lieu. PHPStan cible sur services, controleurs, Requests et seeder du module, ainsi que GeographyCatalog : zero erreur. Pint et diff verifies. Routes administratives Tenant inspectees avec auth:tenant. Aucune ecriture dans les bases ou fichiers reels ; tests MySQL locaux temporaires uniquement. La suite globale et le parcours navigateur avec authentification Tenant ne sont pas valides par cette revue.

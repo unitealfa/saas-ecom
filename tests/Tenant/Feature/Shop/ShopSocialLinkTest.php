@@ -8,11 +8,15 @@ use App\Models\Tenant\Shop\ShopAddress;
 use App\Models\Tenant\Shop\ShopSocialLink;
 use App\Models\Tenant\Users\User;
 use App\Services\Tenant\Shop\ShopAddressService;
+use App\Services\Tenant\Shop\ShopProfileCatalog;
 use App\Services\Tenant\Shop\ShopPublicUrl;
 use App\Services\Tenant\Shop\ShopSocialLinkService;
 use Database\Seeders\Tenant\ShopProfilePermissionSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
+
+require_once __DIR__.'/../../../Support/ShopProfileFixtures.php';
 
 beforeEach(function (): void {
     $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
@@ -53,6 +57,7 @@ test('many links may share a network, and a linked address stays in the same ten
     $tenant->run(function (): void {
         $actor = socialEditor();
         app(ShopAddressService::class)->save($actor, [
+            ...shopProfileGeography(),
             'label' => 'Showroom', 'address' => 'Alger', 'position' => 0,
             'visible' => true, 'is_primary' => true, 'opening_hours' => null,
         ]);
@@ -65,6 +70,13 @@ test('many links may share a network, and a linked address stays in the same ten
         $service->save($actor, $payload);
         expect(ShopSocialLink::query()->count())->toBe(2)
             ->and(ShopAddress::query()->count())->toBe(1);
+        $connection = DB::connection('tenant');
+        $connection->enableQueryLog();
+        $connection->flushQueryLog();
+        $profile = app(ShopProfileCatalog::class)->publicProfile();
+        expect($profile['social_links'])->toHaveCount(2)
+            ->and(count($connection->getQueryLog()))->toBeLessThanOrEqual(5);
+        $connection->disableQueryLog();
         $first = ShopSocialLink::query()->firstOrFail();
         $service->archive($actor, $first->uuid, $service->token($first));
         expect(ShopSocialLink::query()->count())->toBe(1)

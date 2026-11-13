@@ -24,8 +24,11 @@ class ShopAddressService
     /** @param array<string, mixed> $data */
     public function save(User $actor, array $data, ?string $uuid = null): void
     {
+        abort_unless(tenancy()->initialized, 403);
+
         DB::connection('tenant')->transaction(function () use ($actor, $data, $uuid): void {
             $shop = Shop::query()->where('singleton', 1)->lockForUpdate()->firstOrFail();
+            $actor = User::whereKey($actor->getKey())->where('uuid', $actor->uuid)->lockForUpdate()->firstOrFail();
             abort_unless($shop->tenant_uuid === tenant()->uuid, 403);
             $address = $uuid === null ? null : ShopAddress::query()->where('shop_id', $shop->id)
                 ->where('uuid', $uuid)->lockForUpdate()->firstOrFail();
@@ -72,8 +75,11 @@ class ShopAddressService
 
     public function archive(User $actor, string $uuid, string $expectedState): void
     {
+        abort_unless(tenancy()->initialized, 403);
+
         DB::connection('tenant')->transaction(function () use ($actor, $uuid, $expectedState): void {
             $shop = Shop::query()->where('singleton', 1)->lockForUpdate()->firstOrFail();
+            $actor = User::whereKey($actor->getKey())->where('uuid', $actor->uuid)->lockForUpdate()->firstOrFail();
             abort_unless($shop->tenant_uuid === tenant()->uuid, 403);
             $address = ShopAddress::query()->where('shop_id', $shop->id)->where('uuid', $uuid)
                 ->lockForUpdate()->firstOrFail();
@@ -93,18 +99,15 @@ class ShopAddressService
     {
         $province = $data['province_uuid'] ?? null;
         $municipality = $data['municipality_uuid'] ?? null;
-        if ($municipality !== null && $province === null) {
-            throw ValidationException::withMessages(['province_uuid' => 'La wilaya est obligatoire si une commune est choisie.']);
-        }
-        if ($province === null) {
-            return;
+        if (! filled($province) || ! filled($municipality)) {
+            throw ValidationException::withMessages(['province_uuid' => 'La wilaya et la commune sont obligatoires pour une adresse.']);
         }
         $parent = GeographicArea::query()->selectable()
             ->where('uuid', $province)->where('type', GeoZoneTypeEnum::PROVINCE)->first();
         if ($parent === null) {
             throw ValidationException::withMessages(['province_uuid' => 'Wilaya inconnue ou inactive.']);
         }
-        if ($municipality !== null && ! GeographicArea::query()->selectable()
+        if (! GeographicArea::query()->selectable()
             ->where('uuid', $municipality)->where('type', GeoZoneTypeEnum::MUNICIPALITY)
             ->where('parent_id', $parent->id)->exists()) {
             throw ValidationException::withMessages(['municipality_uuid' => 'Commune inconnue, inactive ou hors de cette wilaya.']);

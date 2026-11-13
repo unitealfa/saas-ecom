@@ -4,7 +4,9 @@ namespace Database\Seeders\Tenant;
 
 use App\Models\Tenant\Permissions\Permission;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use LogicException;
+use Spatie\Permission\PermissionRegistrar;
 
 /** Additive and idempotent: neither modifies existing labels nor assigns rights. */
 class ShopProfilePermissionSeeder extends Seeder
@@ -29,8 +31,13 @@ class ShopProfilePermissionSeeder extends Seeder
             throw new LogicException('Shop profile permissions must be seeded inside a tenant database.');
         }
 
-        foreach (self::RIGHTS as $name => $label) {
-            Permission::firstOrCreate(['name' => $name, 'guard_name' => 'tenant'], ['label' => $label]);
-        }
+        DB::transaction(function (): void {
+            foreach (self::RIGHTS as $name => $label) {
+                Permission::firstOrCreate(['name' => $name, 'guard_name' => Permission::GUARD], ['label' => $label]);
+            }
+
+            $registrar = app(PermissionRegistrar::class);
+            DB::afterCommit(fn () => $registrar->forgetCachedPermissions());
+        }, 3);
     }
 }

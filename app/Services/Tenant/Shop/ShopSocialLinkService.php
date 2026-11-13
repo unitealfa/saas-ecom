@@ -23,8 +23,11 @@ class ShopSocialLinkService
     /** @param array<string, mixed> $data */
     public function save(User $actor, array $data, ?string $uuid = null): void
     {
+        abort_unless(tenancy()->initialized, 403);
+
         DB::connection('tenant')->transaction(function () use ($actor, $data, $uuid): void {
             $shop = Shop::query()->where('singleton', 1)->lockForUpdate()->firstOrFail();
+            $actor = User::whereKey($actor->getKey())->where('uuid', $actor->uuid)->lockForUpdate()->firstOrFail();
             abort_unless($shop->tenant_uuid === tenant()->uuid, 403);
             $link = $uuid === null ? null : ShopSocialLink::query()->where('shop_id', $shop->id)
                 ->where('uuid', $uuid)->lockForUpdate()->firstOrFail();
@@ -61,8 +64,11 @@ class ShopSocialLinkService
 
     public function archive(User $actor, string $uuid, string $expectedState): void
     {
+        abort_unless(tenancy()->initialized, 403);
+
         DB::connection('tenant')->transaction(function () use ($actor, $uuid, $expectedState): void {
             $shop = Shop::query()->where('singleton', 1)->lockForUpdate()->firstOrFail();
+            $actor = User::whereKey($actor->getKey())->where('uuid', $actor->uuid)->lockForUpdate()->firstOrFail();
             abort_unless($shop->tenant_uuid === tenant()->uuid, 403);
             $link = ShopSocialLink::query()->where('shop_id', $shop->id)->where('uuid', $uuid)->lockForUpdate()->firstOrFail();
             Gate::forUser($actor)->authorize('archive', $link);

@@ -41,7 +41,7 @@ class StoreShopSocialLinkRequest extends FormRequest
         $editing = $this->route('link') !== null;
 
         return [
-            'expected_state' => [$editing ? 'required' : 'prohibited', 'regex:/^[0-9a-f]{64}$/D'],
+            'expected_state' => [$editing ? 'required' : 'prohibited', 'string', 'regex:/^[0-9a-f]{64}$/D'],
             'label' => ['nullable', 'string', 'max:255'],
             'network' => ['required', 'string', 'max:255', 'regex:/^[\pL\pN][\pL\pN ._-]*$/u'],
             'url' => ['required', 'url:http,https', 'max:255'],

@@ -63,7 +63,7 @@ class TenantProfileProjection
                     'central_profile_version' => $tenant->profile_version,
                 ])->save();
                 // A central rename must not leave stale public profile cache entries.
-                $shop->getConnection()->afterCommit(fn () => app(ShopProfileCatalog::class)->invalidate());
+                app(ShopProfileCatalog::class)->invalidateAfterCommit($shop);
             }, self::ATTEMPTS);
         });
     }
