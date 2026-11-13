@@ -9,6 +9,7 @@ use App\Models\Central\Tenants\Tenant;
 use App\Models\Central\Users\User as CentralUser;
 use App\Models\Tenant\Shop\Shop;
 use App\Models\Tenant\Users\User;
+use Database\Seeders\Tenant\ShopProfilePermissionSeeder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -49,6 +50,8 @@ class TenantProvisioner
             DB::transaction(function () use ($owner, $tenant): void {
                 $this->ensureShop($tenant, $owner);
                 $this->ensureLocalOwner($owner);
+                // Only additive local permissions; no implicit role assignment.
+                app(ShopProfilePermissionSeeder::class)->run();
             }, attempts: self::ATTEMPTS);
 
             $this->markPrepared($tenant);

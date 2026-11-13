@@ -5,6 +5,8 @@
             <flux:text>{{ $dashboard->shopName }}</flux:text>
         </div>
 
-        @include('tenant.partials.preparation-notice')
+        @can('view', \App\Models\Tenant\Shop\Shop::sole())
+            <flux:button :href="route('tenant.admin.shop.profile', absolute: false)">Profil de la boutique</flux:button>
+        @endcan
     </div>
 </x-tenant::layouts.app>

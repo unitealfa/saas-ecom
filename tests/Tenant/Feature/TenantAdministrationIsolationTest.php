@@ -98,7 +98,7 @@ test('tenant administration provisions isolated databases rebalances dated quota
         $this->actingAs($admin, 'central')->post(route('central.tenants.activate', $shops[1]), ['expected_status' => StatusEnum::SUSPENDED->value])->assertSessionHasNoErrors();
         expect($shops[1]->fresh()->status)->toBe(StatusEnum::ACTIVE)
             ->and($shops[2]->fresh()->status)->toBe(StatusEnum::OVER_QUOTA);
-        $this->get('http://'.$shops[1]->domains()->firstOrFail()->domain.'/')->assertStatus(503);
+        $this->get('http://'.$shops[1]->domains()->firstOrFail()->domain.'/')->assertOk();
         expect(tenancy()->initialized)->toBeFalse();
 
         $identity = $shops[0]->fresh()->only(['id', 'uuid', 'user_id', 'slug', 'data', 'document_prefix', 'creation_key', 'creation_hash']);

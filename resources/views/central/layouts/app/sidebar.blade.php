@@ -73,6 +73,7 @@
 
                     {{-- Nouveau tableau de bord commerçant : C-157/C-158/C-159/C-162. --}}
                     @can('viewOwn', \App\Models\Central\Billing\SaasInvoice::class)
+                        <flux:sidebar.item icon="building-storefront" :href="route('dashboard').'#mes-boutiques'">Mes boutiques</flux:sidebar.item>
                         <flux:sidebar.item :href="route('owner.billing.index')" :current="request()->routeIs('owner.billing.*')" wire:navigate>Ma facturation</flux:sidebar.item>
                     @endcan
                     @can('viewOwn', \App\Models\Central\Billing\SaasCreditNote::class)

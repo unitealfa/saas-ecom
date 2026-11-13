@@ -10,6 +10,7 @@ use App\Http\Controllers\Central\Owner\Billing\PaymentController;
 use App\Http\Controllers\Central\Owner\Billing\SubscriptionPurchaseController;
 use App\Http\Controllers\Central\Owner\Subscriptions\SubscriptionRequestController;
 use App\Http\Controllers\Central\Owner\Tenants\FirstTenantController;
+use App\Http\Controllers\Central\Owner\Tenants\TenantAccessController;
 use App\Http\Controllers\Central\Owner\Tenants\TenantController as OwnerTenantController;
 use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
 use Illuminate\Support\Facades\Route;
@@ -82,6 +83,8 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
             Route::post('/', 'store')->middleware('throttle:6,1')->name('store');
             Route::post('{tenant}/reessayer', 'retry')->whereUuid('tenant')->middleware('throttle:3,1')->name('retry');
         });
+        Route::get('boutiques/{tenant}/administrer', TenantAccessController::class)
+            ->whereUuid('tenant')->name('shops.access');
     });
 });
 

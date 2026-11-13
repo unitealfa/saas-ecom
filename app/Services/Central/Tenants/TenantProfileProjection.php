@@ -6,6 +6,7 @@ use App\Models\Central\Tenants\Tenant;
 use App\Models\Central\Users\User;
 use App\Models\Tenant\Shop\Shop;
 use App\Models\Tenant\Users\User as ShopUser;
+use App\Services\Tenant\Shop\ShopProfileCatalog;
 use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -61,6 +62,8 @@ class TenantProfileProjection
                     'shop_name' => $tenant->shop_name,
                     'central_profile_version' => $tenant->profile_version,
                 ])->save();
+                // A central rename must not leave stale public profile cache entries.
+                app(ShopProfileCatalog::class)->invalidateAfterCommit($shop);
             }, self::ATTEMPTS);
         });
     }
