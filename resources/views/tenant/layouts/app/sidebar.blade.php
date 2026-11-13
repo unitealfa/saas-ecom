@@ -19,15 +19,23 @@
             <flux:sidebar.nav>
                 {{ $navigation ?? '' }}
 
+                <flux:sidebar.item icon="home" :href="route('tenant.dashboard', absolute: false)" :current="request()->routeIs('tenant.dashboard')">
+                    {{ __('Tableau de bord boutique') }}
+                </flux:sidebar.item>
+
                 <flux:sidebar.item icon="home" :href="route('tenant.home', absolute: false)">
                     {{ __('Voir la boutique') }}
                 </flux:sidebar.item>
 
                 @if (auth('tenant')->check() && auth('tenant')->user()->can('shop.profile.view'))
-                    <flux:sidebar.item icon="store" :href="route('tenant.admin.shop.profile', absolute: false)">
+                    <flux:sidebar.item icon="building-storefront" :href="route('tenant.admin.shop.profile', absolute: false)">
                         {{ __('Profil de la boutique') }}
                     </flux:sidebar.item>
                 @endif
+
+                <flux:sidebar.item icon="arrow-left" :href="route('dashboard')">
+                    {{ __('Mon espace Aydra') }}
+                </flux:sidebar.item>
             </flux:sidebar.nav>
 
             <flux:spacer />

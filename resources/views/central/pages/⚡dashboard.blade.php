@@ -6,7 +6,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 new class extends Component {
-    /** @return array{shops: \Illuminate\Support\Collection<int, string>, staff: bool} */
+    /** @return array{shops: \Illuminate\Support\Collection<string, string>, staff: bool} */
     #[Computed]
     public function overview(): array
     {
@@ -37,14 +37,17 @@ new class extends Component {
         @endcan
         <flux:callout>
             <flux:callout.heading>{{ __('Bienvenue dans votre espace commerçant.') }}</flux:callout.heading>
-            <flux:callout.text>{{ __('Votre compte est actif. Vous trouverez vos boutiques ci-dessous. La gestion interne des boutiques sera disponible dans une prochaine étape.') }}</flux:callout.text>
+            <flux:callout.text>{{ __('Votre compte est actif. Retrouvez vos boutiques ci-dessous et ouvrez leur administration.') }}</flux:callout.text>
         </flux:callout>
         @if ($this->overview['shops']->isNotEmpty())
-            <div class="space-y-3">
+            <div id="mes-boutiques" class="space-y-3">
                 <flux:heading level="2">{{ __('Vos boutiques') }}</flux:heading>
                 <ul class="space-y-2">
                     @foreach ($this->overview['shops'] as $index => $shopName)
-                        <li wire:key="shop-name-{{ $index }}"><flux:text>{{ $shopName }}</flux:text></li>
+                        <li wire:key="shop-name-{{ $index }}">
+                            <flux:text>{{ $shopName }}</flux:text>
+                            <flux:button :href="route('owner.shops.access', $index)">Administrer</flux:button>
+                        </li>
                     @endforeach
                 </ul>
             </div>

@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Storefront\ShopBrandingController;
+use App\Http\Controllers\Tenant\Admin\Dashboard\DashboardController;
+use App\Http\Controllers\Tenant\Auth\OwnerLoginController;
 use App\Http\Controllers\Tenant\Diagnostics\DatabaseDiagnosticsController;
 use App\Http\Middleware\EnsureLocalDiagnostics;
 use App\Http\Middleware\Tenant\EnsureTenantAvailable;
@@ -17,6 +19,13 @@ Route::middleware([
     'web',
 ])->name('tenant.')->group(function (): void {
     require __DIR__.'/storefront.php';
+    Route::get('login', [OwnerLoginController::class, 'show'])->name('login');
+    Route::get('auth/owner', [OwnerLoginController::class, 'accept'])
+        ->middleware('signed:relative')->block(10, 10)->name('owner-login');
+    Route::post('logout', [OwnerLoginController::class, 'logout'])
+        ->middleware('auth:tenant')->name('logout');
+    Route::get('admin', DashboardController::class)
+        ->middleware('auth:tenant')->name('dashboard');
 
     // Public images only: the controller verifies the image belongs to this shop.
     Route::get('/branding/{kind}', ShopBrandingController::class)

@@ -6,7 +6,7 @@ use App\Http\Controllers\Tenant\Admin\Shop\ShopSocialLinkController;
 use Illuminate\Support\Facades\Route;
 
 // This file is loaded only from routes/tenant.php, AFTER tenant initialization.
-// Auth is mandatory. T-001 must provide the tenant login flow before this UI becomes usable.
+// Auth is mandatory; the owner signs in through the central account handoff.
 Route::middleware('auth:tenant')->prefix('admin/shop')->name('admin.shop.')->group(function (): void {
     Route::get('profile', [ShopProfileController::class, 'index'])->name('profile');
     Route::put('profile', [ShopProfileController::class, 'update'])->name('profile.update');

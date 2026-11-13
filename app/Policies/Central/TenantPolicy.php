@@ -28,6 +28,16 @@ class TenantPolicy
         return $this->viewAny($actor);
     }
 
+    public function accessOwn(User $actor, Tenant $tenant): bool
+    {
+        return $this->canOwnShops($actor) && $actor->hasVerifiedEmail()
+            && $actor->legal_verification_status === VerificationStatusEnum::VERIFIED
+            && $actor->legal_verified_at !== null && $actor->legal_profile_version !== null
+            && $tenant->user_id === $actor->id && ! $tenant->trashed()
+            && $tenant->status === TenantStatus::ACTIVE
+            && $tenant->provisioned_at !== null && filled($tenant->schema_version);
+    }
+
     public function create(User $actor, ?User $owner = null): bool
     {
         return $this->allows($actor, 'saas.tenants.create')

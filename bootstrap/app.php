@@ -1,12 +1,12 @@
 <?php
 
 use App\Http\Middleware\EnsureApplicationDomain;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Routing\Exceptions\InvalidSignatureException;
 use Stancl\Tenancy\Exceptions\TenantCouldNotBeIdentifiedOnDomainException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(prepend: [EnsureApplicationDomain::class]);
+        $middleware->redirectGuestsTo(fn (Request $request): string => route($request->routeIs('tenant.*') ? 'tenant.login' : 'login'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (HttpException $exception, Request $request) {

@@ -374,13 +374,11 @@ test('each domain selects its own database and restores the central context afte
         $captured[] = [ShopUser::firstOrFail()->email, DB::connection('tenant')->getDatabaseName(), Auth::getDefaultDriver()];
     });
 
-    $this->get('http://boutique1.aydra.localhost/')->assertServiceUnavailable()
-        ->assertContent("Cette boutique est en préparation.\nID de la boutique : 1\nID du propriétaire (compte central) : 1")
-        ->assertHeader('Content-Type', 'text/plain; charset=UTF-8')
-        ->assertHeader('Cache-Control', 'no-store, private');
+    $this->get('http://boutique1.aydra.localhost/')->assertOk()->assertSee('Boutique 1')
+        ->assertDontSee('ID du propriétaire');
     expect(tenancy()->initialized)->toBeFalse();
-    $this->get('http://boutique2.aydra.localhost/')->assertServiceUnavailable()
-        ->assertContent("Cette boutique est en préparation.\nID de la boutique : 2\nID du propriétaire (compte central) : 2");
+    $this->get('http://boutique2.aydra.localhost/')->assertOk()->assertSee('Boutique 2')
+        ->assertDontSee('ID du propriétaire');
     expect(tenancy()->initialized)->toBeFalse();
 
     expect(array_column($captured, 0))->toBe(['boutique1@test.com', 'boutique2@test.com']);
@@ -390,15 +388,15 @@ test('each domain selects its own database and restores the central context afte
     expect(User::count())->toBe(2);
 
     config(['app.debug' => false]);
-    $this->get('http://boutique1.aydra.localhost/')->assertContent('Cette boutique est en préparation.');
+    $this->get('http://boutique1.aydra.localhost/')->assertOk()->assertSee('Boutique 1')->assertDontSee('ID du propriétaire');
 
     config(['app.debug' => true]);
     $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.1'])
-        ->get('http://boutique1.aydra.localhost/')->assertContent('Cette boutique est en préparation.');
+        ->get('http://boutique1.aydra.localhost/')->assertOk()->assertSee('Boutique 1')->assertDontSee('ID du propriétaire');
 
     $this->app['env'] = 'production';
     $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
-        ->get('http://boutique1.aydra.localhost/')->assertContent('Cette boutique est en préparation.');
+        ->get('http://boutique1.aydra.localhost/')->assertOk()->assertSee('Boutique 1')->assertDontSee('ID du propriétaire');
 });
 
 test('the tenant base derives from APP_URL and the central domains stay explicit', function (): void {

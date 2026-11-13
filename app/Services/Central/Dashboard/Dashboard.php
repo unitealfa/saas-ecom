@@ -10,13 +10,13 @@ class Dashboard
 {
     public function __construct(private CentralUserAccess $access) {}
 
-    /** @return array{shops: Collection<int, string>, staff: bool} */
+    /** @return array{shops: Collection<string, string>, staff: bool} */
     public function forUser(User $user): array
     {
         $staff = $this->access->isStaff($user);
 
         return [
-            'shops' => $staff ? collect() : $user->tenants()->orderBy('id')->pluck('shop_name'),
+            'shops' => $staff ? collect() : $user->tenants()->orderBy('id')->pluck('shop_name', 'uuid'),
             'staff' => $staff,
         ];
     }
