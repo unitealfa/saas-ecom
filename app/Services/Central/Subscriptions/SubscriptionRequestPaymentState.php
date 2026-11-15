@@ -13,6 +13,7 @@ use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Subscriptions\SubscriptionRequest;
 use App\Models\Central\Users\User;
+use App\Services\Central\Billing\PaymentDocumentService;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
@@ -110,8 +111,12 @@ class SubscriptionRequestPaymentState
         if ($request === null) {
             return;
         }
-        Gate::forUser($actor)->authorize('accept', $request);
-        if ($payment->getAttribute('transfer_status') !== TransferStatusEnum::VERIFIED) {
+        Gate::forUser($actor)->authorize('verify', $payment);
+        if ($payment->getAttribute('transfer_status') !== TransferStatusEnum::VERIFIED
+            || $payment->invoice->status !== DocumentStatusEnum::ISSUED
+            || $payment->invoice->installment->installment_status !== InstallmentStatusEnum::PAID
+            || ! in_array($payment->invoice->subscription->status, [StatusEnum::ACTIVE, StatusEnum::SCHEDULED], true)
+            || ! $payment->documents()->where('collection_name', PaymentDocumentService::RECEIPT)->exists()) {
             $this->fail('Une demande ne peut être acceptée sans encaissement intégral vérifié.');
         }
         $request->forceFill(['status' => RequestStatusEnum::ACCEPTED, 'decided_by_id' => $actor->id, 'decided_at' => now(),

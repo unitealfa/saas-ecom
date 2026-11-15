@@ -95,3 +95,10 @@ Trois migrations additives sont préparées : notifications natives, submitted_p
 Les références actives du modèle Examples/Test, de SchemaBlueprint, des diagnostics locaux et des API de plans ont été conservées. Le seul index généré graphify-out/cache/stat-index.json est retiré du suivi Git, sans supprimer le fichier local.
 
 Validation en cours : contrôles ciblés et suites MySQL locales temporaires autorisés ; aucune écriture sur les bases réelles, aucun SMTP réel, aucune dépendance installée. Les résultats des sections précédentes concernent l’ancienne version et ne constituent pas la validation de cette refonte.
+
+
+### Finalisation des raccordements — 15 novembre 2026
+
+Autorisation d’accepter contrôlée sous verrou avant l’activation ; la projection finale contrôle le paiement confirmé, la facture émise, l’échéance réglée et le reçu existant. La lecture du statut de paiement utilise le droit de consultation du dossier, sans étendre les droits sur les données fiscales ou les PDF. Le test de reprise initialise désormais son offre gratuite explicitement.
+
+Tests arrêtés à la demande de l’utilisateur : dernier résultat disponible, 269 réussis, 12 échecs, 7 erreurs et 7 ignorés sur 295 tests. Ces derniers raccordements ne sont pas retestés ; validation fonctionnelle non acquise. Aucune migration ni écriture appliquée à la base réelle.

@@ -382,6 +382,7 @@ class SaasPaymentService
             if ($current->invoice->status !== DocumentStatusEnum::ISSUED || $current->getAttribute('transfer_status') !== TransferStatusEnum::VERIFIED) {
                 $this->fail('La facture définitive doit être émise avant l’activation.');
             }
+            Gate::forUser($actor)->authorize('accept', $request);
             $this->subscriptions->activatePaidSubscription($actor, $current->invoice->subscription, $current->invoice->installment);
             $this->requests->verified($actor, $current);
         });

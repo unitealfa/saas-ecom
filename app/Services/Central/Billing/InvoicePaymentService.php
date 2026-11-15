@@ -219,7 +219,7 @@ class InvoicePaymentService
 
     private function authorize(User $actor, SaasInvoice $invoice): void
     {
-        if (! Gate::forUser($actor)->allows('view', $invoice)) {
+        if (! Gate::forUser($actor)->allows('viewBillingDossier', $invoice)) {
             Gate::forUser($actor)->authorize('viewOwnInvoice', $invoice);
         }
     }

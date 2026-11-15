@@ -11,6 +11,7 @@ use App\Models\Central\Audit\Activity;
 use App\Models\Central\Billing\SaasCreditNote;
 use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Features\Feature;
+use App\Models\Central\Media\Media;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Plans\PlanFeature;
 use App\Models\Central\Roles\Role;
@@ -29,6 +30,7 @@ use App\Services\Central\Subscriptions\SubscriptionRequestPaymentState;
 use App\Services\Central\Subscriptions\SubscriptionRequestService;
 use App\Services\Central\Subscriptions\SubscriptionWorkflowNotifier;
 use Database\Factories\Central\MediaFactory;
+use Database\Seeders\Central\FreePlanSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
@@ -375,6 +377,7 @@ test('T43 receipt failure preserves confirmed funds and resumes documents before
         ->and($request->payment->getAttribute('transfer_status'))->toBe(TransferStatusEnum::VERIFIED)
         ->and($request->subscription->status)->toBe(StatusEnum::SCHEDULED)
         ->and($request->payment->documents()->where('collection_name', PaymentDocumentService::RECEIPT)->count())->toBe(0);
+    $this->seed(FreePlanSeeder::class);
     app(DefaultSubscription::class)->ensure($f['owner']);
     expect($request->subscription->refresh()->status)->toBe(StatusEnum::SCHEDULED);
     $this->app->forgetInstance(PaymentDocumentService::class);
@@ -628,7 +631,6 @@ test('demande notifications are central private and can be marked read idempoten
     expect($notification->refresh()->read_at->equalTo($readAt))->toBeTrue()->and($owner->unreadNotifications()->count())->toBe(0);
 });
 
-
 test('initial bank proofs require financial reading rather than subscription reading alone', function (): void {
     $f = requestFixture();
     $request = requestWithInitialProof($f);
@@ -636,6 +638,6 @@ test('initial bank proofs require financial reading rather than subscription rea
     $reader->assignRole(Role::createWithPermissions('subscription-reader-no-proofs', ['saas.subscriptions.view' => 7]));
     $this->actingAs($reader, 'central')->get(route('central.subscription-requests.show', $request))->assertOk()->assertDontSee('Consulter le justificatif initial');
     $this->get(URL::temporarySignedRoute('central.subscription-requests.initial-proof', now()->addMinutes(5), ['subscriptionRequest' => $request]))->assertForbidden();
-    $proof = App\Models\Central\Media\Media::where('uuid', $request->getAttribute('submitted_payment')['proof_uuid'])->sole();
+    $proof = Media::where('uuid', $request->getAttribute('submitted_payment')['proof_uuid'])->sole();
     expect(Gate::forUser($reader)->allows('download', $proof))->toBeFalse();
 });

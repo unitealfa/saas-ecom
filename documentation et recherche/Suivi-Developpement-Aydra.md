@@ -2425,3 +2425,10 @@ Ce lot n'a ni exécuté migrations ni seeders en BDD réelle. PHP `-l` seulement
 ### Reprise — demande.txt — 15 novembre 2026
 
 Refonte en cours : préparation DRAFT avant paiement, PDF définitif et reçu après confirmation, puis acceptation/droits ; preuve bancaire initiale privée, modes immédiat/différé, réservation refusée libérée, notifications natives en base et par mail. Interfaces de facturation regroupées ; règles et compteurs conservés en interne, anciennes pages retirées. Voir le complément courant du rapport Module-22-Parcours-Demandes.md. Trois migrations additives préparées, aucune appliquée à la base réelle. Tests locaux isolés autorisés. La première suite a atteint 128 Mo pendant les PDF ; relance avec memory_limit=1G limitée au processus de test. Résultats finaux encore à compléter ; ne pas annoncer cette refonte validée à partir des anciennes passes.
+
+
+### Finalisation des raccordements — 15 novembre 2026
+
+Autorisation d’accepter contrôlée sous verrou avant l’activation ; la projection finale contrôle le paiement confirmé, la facture émise, l’échéance réglée et le reçu existant. La lecture du statut de paiement utilise le droit de consultation du dossier, sans étendre les droits sur les données fiscales ou les PDF. Le test de reprise initialise désormais son offre gratuite explicitement.
+
+Tests arrêtés à la demande de l’utilisateur : dernier résultat disponible, 269 réussis, 12 échecs, 7 erreurs et 7 ignorés sur 295 tests. Ces derniers raccordements ne sont pas retestés ; validation fonctionnelle non acquise. Aucune migration ni écriture appliquée à la base réelle.
