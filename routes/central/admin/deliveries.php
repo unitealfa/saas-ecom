@@ -8,11 +8,7 @@ Route::controller(SaasDocumentDeliveryController::class)
     ->name('deliveries.')
     ->whereUuid('delivery')
     ->group(function (): void {
-        Route::get('/', 'index')->name('index');
-
         Route::post('/send', 'send')->name('send');
-
-        Route::get('/{delivery}', 'show')->name('show');
-
         Route::post('/{delivery}/retry', 'retry')->name('retry');
+        Route::post('/{delivery}/resend', 'resend')->name('resend');
     });

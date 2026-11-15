@@ -35,7 +35,7 @@ class InvoiceController extends Controller
         Gate::forUser($actor)->authorize('viewOwnInvoice', $invoice);
 
         return view('central.pages.admin.billing.invoices.show', [
-            'invoice' => $invoice->load(['installment', 'sequence', 'lines', 'media']), 'ownerMode' => true, 'history' => null,
+            'invoice' => $invoice->load(['installment', 'sequence', 'lines', 'media', 'payments']), 'ownerMode' => true, 'history' => null,
             'paymentState' => $this->payments->states($actor, collect([$invoice]))[$invoice->id],
             'balance' => $this->payments->balance($actor, $invoice),
             'credits' => SaasCreditNote::where('original_invoice_id', $invoice->id)->where('status', DocumentStatusEnum::ISSUED)->get(),

@@ -60,6 +60,12 @@ class SubscriptionRequest extends Model
         return $this->belongsTo(User::class, 'user_id')->withTrashed();
     }
 
+    /** @return BelongsTo<User, $this> */
+    public function decider(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'decided_by_id')->withTrashed();
+    }
+
     /** @return BelongsTo<Subscription, $this> */
     public function subscription(): BelongsTo
     {

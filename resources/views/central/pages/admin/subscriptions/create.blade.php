@@ -7,7 +7,7 @@
         <form method="POST" action="{{ route('central.subscriptions.store') }}" class="flex flex-col gap-5">
             @csrf
             <input type="hidden" name="operation_key" value="{{ old('operation_key', $operationKey) }}">
-            <flux:input name="owner_uuid" label="UUID du commerçant" :value="old('owner_uuid', request('owner'))" required />
+            <livewire:central::components.subscriptions.owner-selector :owner-uuid="$selectedUuid" :search="$search" />
             <flux:select name="plan_uuid" label="Offre commercialisée" required>
                 <option value="">Choisir une offre</option>
                 @foreach ($plans as $plan)

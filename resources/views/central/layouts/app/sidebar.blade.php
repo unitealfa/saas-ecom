@@ -63,9 +63,6 @@
                     @can('viewAny', \App\Models\Central\Billing\SaasInvoice::class)
                         <flux:sidebar.item :href="route('central.invoices.index')" :current="request()->routeIs('central.invoices.*')" wire:navigate>Factures SaaS</flux:sidebar.item>
                     @endcan
-                    @can('viewAny', \App\Models\Central\Billing\SaasDocumentDelivery::class)
-                        <flux:sidebar.item :href="route('central.deliveries.index')" :current="request()->routeIs('central.deliveries.*')" wire:navigate>Facturation — Envois</flux:sidebar.item>
-                    @endcan
                     @can('viewAny', \App\Models\Central\Billing\SaasPayment::class)
                         <flux:sidebar.item :href="route('central.payments.index')" :current="request()->routeIs('central.payments.index', 'central.payments.show')" wire:navigate>Paiements SaaS</flux:sidebar.item>
                         <flux:sidebar.item :href="route('central.payments.corrections.index')" :current="request()->routeIs('central.payments.corrections.*')" wire:navigate>Signalements de paiements</flux:sidebar.item>
@@ -87,7 +84,7 @@
                         <flux:sidebar.item :href="route('owner.subscriptions.index')" :current="request()->routeIs('owner.subscriptions.*')" wire:navigate>Mon abonnement et les offres</flux:sidebar.item>
                     @endcan
                     @can('viewOwn', \App\Models\Central\Billing\SaasInvoice::class)
-                        <flux:sidebar.item :href="route('owner.invoices.index')" :current="request()->routeIs('owner.invoices.*')" wire:navigate>Mes factures</flux:sidebar.item>
+                        <flux:sidebar.item :href="route('owner.invoices.index')" :current="request()->routeIs('owner.invoices.*')" wire:navigate>Mes factures et avoirs</flux:sidebar.item>
                     @endcan
 
                     @can('viewAny', \App\Models\Central\Shipping\PickupPoint::class)

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Central\Subscriptions;
 
+use App\Enums\Central\Subscriptions\RequestFilterEnum;
 use App\Enums\Central\Subscriptions\RequestStatusEnum;
 use App\Models\Central\Subscriptions\SubscriptionRequest;
 use App\Models\Central\Users\User;
@@ -28,6 +29,7 @@ class SearchSubscriptionRequestsRequest extends FormRequest
      */
     public function rules(): array
     {
-        return ['search' => ['nullable', 'string', 'max:100'], 'status' => ['nullable', 'integer', Rule::enum(RequestStatusEnum::class)]];
+        return ['search' => ['nullable', 'string', 'max:100'], 'status' => ['nullable', 'integer', Rule::enum(RequestStatusEnum::class)],
+            'filter' => ['nullable', Rule::enum(RequestFilterEnum::class)], 'page' => ['sometimes', 'integer', 'min:1']];
     }
 }

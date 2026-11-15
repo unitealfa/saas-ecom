@@ -3,6 +3,8 @@
 namespace App\Services\Central\Billing;
 
 use App\Enums\Central\Billing\DocumentStatusEnum;
+use App\Enums\Central\Billing\DocumentTypeEnum;
+use App\Enums\Central\Billing\InvoiceListFilterEnum;
 use App\Enums\Central\Billing\PaymentStateEnum;
 use App\Enums\Central\Billing\TransferStatusEnum;
 use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
@@ -20,6 +22,80 @@ use Illuminate\Validation\ValidationException;
 class InvoicePaymentService
 {
     public const int REFUND_RECORD_TYPE = 2;
+
+    /**
+     * Filtre SQL avant pagination ; une dette annulée par avoir ne devient pas un paiement.
+     *
+     * @param  Builder<SaasInvoice>  $query
+     */
+    public function filter(Builder $query, InvoiceListFilterEnum $filter): void
+    {
+        $credits = DB::table('saas_invoices as invoice_credits')->whereColumn('invoice_credits.original_invoice_id', 'saas_invoices.id')
+            ->where('invoice_credits.document_type', DocumentTypeEnum::CREDIT_NOTE->value)->where('invoice_credits.status', DocumentStatusEnum::ISSUED->value);
+        if ($filter === InvoiceListFilterEnum::CORRECTED) {
+            $query->whereExists($credits->selectRaw('1'));
+        } elseif ($filter === InvoiceListFilterEnum::CANCELLED) {
+            $query->where('status', DocumentStatusEnum::CANCELLED);
+        } elseif ($filter === InvoiceListFilterEnum::PREPARING) {
+            $query->whereIn('status', [DocumentStatusEnum::DRAFT, DocumentStatusEnum::PREPARING]);
+        } elseif (in_array($filter, [InvoiceListFilterEnum::PAID, InvoiceListFilterEnum::UNPAID], true)) {
+            $query->where('status', DocumentStatusEnum::ISSUED);
+            $paid = $this->paidInvoices();
+            if ($filter === InvoiceListFilterEnum::PAID) {
+                $query->whereIn('id', $paid);
+            } else {
+                $sum = $credits->selectRaw('COALESCE(SUM(invoice_credits.total_amount), 0)');
+                $query->whereNotIn('id', $paid)->where('saas_invoices.total_amount', '>', $sum);
+            }
+        }
+    }
+
+    /** @return Builder<SaasInvoice> */
+    private function paidInvoices(): Builder
+    {
+        $credits = DB::table('saas_invoices as invoice_credits')->whereColumn('invoice_credits.original_invoice_id', 'saas_invoices.id')
+            ->where('invoice_credits.document_type', DocumentTypeEnum::CREDIT_NOTE->value)->where('invoice_credits.status', DocumentStatusEnum::ISSUED->value);
+        $transfers = DB::table('saas_transfers as invoice_transfers')->whereColumn('invoice_transfers.document_id', 'saas_invoices.id');
+        $verified = (clone $transfers)->where('transfer_status', TransferStatusEnum::VERIFIED->value);
+        $settled = (clone $verified)->where('record_type', SaasPayment::RECORD_TYPE)->whereNull('reversal_of_id')
+            ->whereColumn('invoice_transfers.user_id', 'saas_invoices.user_id')->whereColumn('invoice_transfers.currency', 'saas_invoices.currency');
+        $foreign = (clone $transfers)->where(fn ($q) => $q->whereColumn('invoice_transfers.user_id', '!=', 'saas_invoices.user_id')
+            ->orWhereColumn('invoice_transfers.currency', '!=', 'saas_invoices.currency'));
+        $creditSum = (clone $credits)->selectRaw('COALESCE(SUM(invoice_credits.total_amount), 0)');
+        $cash = (clone $transfers)->whereIn('transfer_status', [TransferStatusEnum::VERIFIED->value, TransferStatusEnum::REVERSED->value])
+            ->whereIn('record_type', [SaasPayment::RECORD_TYPE, self::REFUND_RECORD_TYPE])
+            ->selectRaw('COALESCE(SUM(CASE WHEN record_type = ? THEN amount ELSE -amount END), 0)
+                + (SELECT COALESCE(SUM(credit.total_amount), 0) FROM saas_invoices AS credit
+                   WHERE credit.original_invoice_id = saas_invoices.id AND credit.document_type = ? AND credit.status = ?)',
+                [SaasPayment::RECORD_TYPE, DocumentTypeEnum::CREDIT_NOTE->value, DocumentStatusEnum::ISSUED->value]);
+        $brokenReversals = (clone $transfers)->where(function ($q): void {
+            $q->where(fn ($reversed) => $reversed->where('transfer_status', TransferStatusEnum::REVERSED->value)
+                ->whereNotExists(fn ($inverse) => $inverse->selectRaw('1')->from('saas_transfers as inverse')
+                    ->whereColumn('inverse.reversal_of_id', 'invoice_transfers.id')->where('inverse.transfer_status', TransferStatusEnum::VERIFIED->value)
+                    ->whereColumn('inverse.record_type', 'invoice_transfers.record_type')->whereColumn('inverse.document_id', 'invoice_transfers.document_id')
+                    ->whereRaw('inverse.amount = -invoice_transfers.amount')))
+                ->orWhere(fn ($inverse) => $inverse->whereNotNull('invoice_transfers.reversal_of_id')
+                    ->where('transfer_status', TransferStatusEnum::VERIFIED->value)
+                    ->whereNotExists(fn ($original) => $original->selectRaw('1')->from('saas_transfers as original')
+                        ->whereColumn('original.id', 'invoice_transfers.reversal_of_id')->where('original.transfer_status', TransferStatusEnum::REVERSED->value)
+                        ->whereColumn('original.record_type', 'invoice_transfers.record_type')->whereColumn('original.document_id', 'invoice_transfers.document_id')
+                        ->whereRaw('original.amount = -invoice_transfers.amount')));
+        });
+
+        return SaasInvoice::select('id')->where('status', DocumentStatusEnum::ISSUED)->where(function (Builder $query) use ($credits, $verified, $settled, $foreign, $creditSum, $cash, $brokenReversals): void {
+            $query->where(function (Builder $plain) use ($credits, $verified, $settled): void {
+                $count = (clone $verified)->selectRaw('COUNT(*)');
+                $plain->whereNotExists((clone $credits)->selectRaw('1'))->where(DB::raw('1'), '=', $count)
+                    ->whereExists((clone $settled)->whereColumn('invoice_transfers.amount', 'saas_invoices.total_amount')->whereNotNull('validated_at')->selectRaw('1'));
+            })->orWhere(function (Builder $corrected) use ($credits, $settled, $foreign, $creditSum, $cash, $brokenReversals): void {
+                $count = (clone $settled)->selectRaw('COUNT(*)');
+                $corrected->whereExists((clone $credits)->selectRaw('1'))->whereNotExists((clone $foreign)->selectRaw('1'))
+                    ->whereNotExists((clone $brokenReversals)->selectRaw('1'))->where(DB::raw('1'), '=', $count)
+                    ->where('saas_invoices.total_amount', '>', $creditSum)
+                    ->where('saas_invoices.total_amount', '<=', $cash);
+            });
+        });
+    }
 
     /** @return array<string, string> */
     public function balance(User $actor, SaasInvoice $invoice): array

@@ -29,7 +29,8 @@ class DefaultSubscription
     private const int ATTEMPTS = 3;
 
     public function __construct(
-        private FreePlanCatalog $catalog
+        private FreePlanCatalog $catalog,
+        private readonly SubscriptionWorkflowNotifier $notifications,
     ) {}
 
     public function ensure(
@@ -107,6 +108,7 @@ class DefaultSubscription
                         'effective_at' => $next->period_starts_at->toISOString(),
                     ])
                     ->log('Abonnement programmé activé.');
+                $this->notifications->activated($next);
 
                 return $this->resolved($owner, $next, $assignedBy);
             }

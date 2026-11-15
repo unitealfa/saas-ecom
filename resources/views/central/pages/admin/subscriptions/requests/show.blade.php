@@ -10,12 +10,21 @@
         @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
         @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
         <dl class="grid gap-4 sm:grid-cols-2">
+            <div><dt>Référence de demande</dt><dd class="break-all">{{ $item->uuid }}</dd></div>
+            <div><dt>Date de soumission</dt><dd>{{ $item->submitted_at?->format('d/m/Y H:i') }}</dd></div>
             <div><dt>Commerçant</dt><dd>{{ $item->owner?->name }}</dd></div>
+            <div><dt>E-mail</dt><dd>{{ $item->owner?->email }}</dd></div>
             <div><dt>État</dt><dd>{{ $item->status->label() }}</dd></div>
+            <div><dt>Abonnement actuel</dt><dd>{{ $currentSubscription?->plan?->name ?? 'Aucun abonnement actif' }}</dd></div>
+            <div><dt>Nouvelle offre demandée</dt><dd>{{ $item->subscription?->plan?->name }}</dd></div>
+            <div><dt>Périodicité</dt><dd>{{ $item->subscription?->period?->label() }}</dd></div>
             <div><dt>Montant TTC</dt><dd>{{ $item->subscription?->agreed_amount }} DZD</dd></div>
             <div><dt>Moyen choisi</dt><dd>{{ $item->payment_choice->label() }}</dd></div>
             <div><dt>Période</dt><dd>{{ $item->subscription?->period_starts_at?->format('d/m/Y') }} — {{ $item->subscription?->period_ends_at?->format('d/m/Y') }}</dd></div>
-            <div><dt>Abonnement</dt><dd>{{ $item->subscription?->status->label() }}</dd></div>
+            <div><dt>Statut de l’abonnement demandé</dt><dd>{{ $item->subscription?->status->label() }}</dd></div>
+            @if ($item->decided_at)
+                <div><dt>Décision administrative</dt><dd>{{ $item->decider?->name }} — {{ $item->decided_at->format('d/m/Y H:i') }}</dd></div>
+            @endif
         </dl>
         @if ($item->getAttribute('decision_reason'))<flux:callout heading="Motif du refus">{{ $item->getAttribute('decision_reason') }}</flux:callout>@endif
         @if ($issued)
@@ -42,6 +51,9 @@
             @endif
             @can('view', $item->payment)
                 <flux:button :href="route($prefix.'.payments.show', $item->payment)">Consulter le paiement et son justificatif</flux:button>
+                @if ($item->payment->getAttribute('proof_media_id'))
+                    <flux:button :href="\Illuminate\Support\Facades\URL::temporarySignedRoute($prefix.'.payments.proof', now()->addMinutes(10), ['payment' => $item->payment])">Télécharger le justificatif</flux:button>
+                @endif
             @endcan
             @can('receipt', $item->payment)
                 <flux:button :href="\Illuminate\Support\Facades\URL::temporarySignedRoute($prefix.'.payments.receipt', now()->addMinutes(10), ['payment' => $item->payment, 'inline' => 1])" target="_blank">Ouvrir le reçu pour télécharger ou imprimer</flux:button>
@@ -125,7 +137,7 @@
         @if ($history !== null)
             <flux:heading>Historique des décisions et corrections</flux:heading>
             @foreach ($history as $event)
-                <flux:text>{{ $event->created_at->format('d/m/Y H:i') }} — {{ $event->description }}</flux:text>
+                <flux:text>{{ $event->created_at->format('d/m/Y H:i') }} — {{ $event->causer?->name ?? 'Système' }} — {{ $event->description }}</flux:text>
                 @if (is_string($event->getProperty('reason')) && $event->getProperty('reason') !== '')<flux:text>Motif conservé : {{ $event->getProperty('reason') }}</flux:text>@endif
             @endforeach
             {{ $history->links() }}

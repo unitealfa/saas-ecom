@@ -71,7 +71,7 @@ class SaasInvoiceController extends Controller
         Gate::forUser($this->centralActor())->authorize('view', $invoice);
 
         return view('central.pages.admin.billing.invoices.show', [
-            'invoice' => $invoice->load(['owner', 'installment', 'billingRule', 'sequence', 'lines', 'media', 'deliveries']),
+            'invoice' => $invoice->load(['owner', 'installment', 'billingRule', 'sequence', 'lines', 'media', 'deliveries', 'payments']),
             'ownerMode' => false, 'history' => Activity::forSubject($invoice)->orderByDesc('id')->paginate(20),
             'paymentState' => $this->payments->states($this->centralActor(), collect([$invoice]))[$invoice->id],
             'balance' => $this->payments->balance($this->centralActor(), $invoice),

@@ -60,7 +60,16 @@
             @can('viewAny', \App\Models\Central\Billing\SaasPayment::class)<flux:button :href="route('central.payments.index')">Paiements et reçus</flux:button>@endcan
         @endunless
         @foreach ($invoice->getAttribute('taxes') as $tax)<flux:text>{{ $tax['code'] }} : {{ $tax['rate'] }} % — {{ $tax['amount'] }} {{ $invoice->currency }}</flux:text>@endforeach
+        @foreach ($invoice->payments as $payment)
+            @can('view', $payment)
+                <flux:button :href="route($ownerMode ? 'owner.payments.show' : 'central.payments.show', $payment)">Consulter le paiement — {{ $payment->statusLabel() }}</flux:button>
+            @endcan
+            @can('receipt', $payment)
+                <flux:button :href="\Illuminate\Support\Facades\URL::temporarySignedRoute(($ownerMode ? 'owner' : 'central').'.payments.receipt', now()->addMinutes(10), ['payment' => $payment])">Télécharger le reçu</flux:button>
+            @endcan
+        @endforeach
         @can('download', $invoice)
+            <flux:button :href="\Illuminate\Support\Facades\URL::temporarySignedRoute($ownerMode ? 'owner.invoices.download' : 'central.invoices.download', now()->addMinutes(10), ['invoice' => $invoice, 'inline' => 1])" target="_blank" rel="noopener">Voir / imprimer la facture</flux:button>
             <flux:button :href="\Illuminate\Support\Facades\URL::temporarySignedRoute($ownerMode ? 'owner.invoices.download' : 'central.invoices.download', now()->addMinutes(10), ['invoice' => $invoice])">Télécharger le PDF privé</flux:button>
         @endcan
         @unless ($ownerMode)
@@ -76,25 +85,8 @@
                 @endcan
             @endif
             @unless ($ownerMode)
-                @if ($invoice->status === \App\Enums\Central\Billing\DocumentStatusEnum::ISSUED)
-                    @can('send', \App\Models\Central\Billing\SaasDocumentDelivery::class)
-                        <form method="POST" action="{{ route('central.deliveries.send') }}">
-                            @csrf
-                            <input type="hidden" name="document_uuid" value="{{ $invoice->uuid }}">
-                            <flux:button type="submit">
-                                Envoyer la facture par e-mail
-                            </flux:button>
-                        </form>
-                    @endcan
-
-                    @can('viewAny', \App\Models\Central\Billing\SaasDocumentDelivery::class)
-                        <flux:button :href="route('central.deliveries.index', ['document_uuid' => $invoice->uuid])">
-                            Historique des envois
-                        </flux:button>
-                    @endcan
-                @endif
+                @include('central.pages.admin.billing.document-delivery', ['document' => $invoice])
             @endunless
-            @if ($invoice->relationLoaded('deliveries') && $invoice->deliveries->isNotEmpty())<flux:text>Transmission : intention enregistrée, sans preuve de remise.</flux:text>@endif
             @if ($history !== null)
                 <flux:heading>Historique</flux:heading>
                 @foreach ($history as $event)<flux:text>{{ $event->created_at->format('d/m/Y H:i') }} — {{ $event->description }}</flux:text>@endforeach

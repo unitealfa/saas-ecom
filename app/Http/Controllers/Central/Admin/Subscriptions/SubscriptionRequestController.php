@@ -29,9 +29,10 @@ class SubscriptionRequestController extends Controller
         Gate::forUser($actor)->authorize('viewAny', SubscriptionRequest::class);
         Gate::forUser($actor)->authorize('view', $subscriptionRequest);
 
-        return view('central.pages.admin.subscriptions.requests.show', ['subscriptionRequest' => $subscriptionRequest->load(['owner', 'subscription.plan', 'invoice.media', 'payment']),
+        return view('central.pages.admin.subscriptions.requests.show', ['subscriptionRequest' => $subscriptionRequest->load(['owner', 'subscription.plan', 'invoice.media', 'payment', 'decider']),
+            'currentSubscription' => $this->requests->currentSubscription($actor, $subscriptionRequest),
             'ownerMode' => false, 'history' => Gate::forUser($actor)->allows('history', $subscriptionRequest)
-                ? Activity::forSubject($subscriptionRequest)->orderByDesc('id')->paginate(20) : null]);
+                ? Activity::forSubject($subscriptionRequest)->with('causer')->orderByDesc('id')->paginate(20) : null]);
     }
 
     public function accept(SubscriptionRequestActionRequest $request, SubscriptionRequest $subscriptionRequest): RedirectResponse

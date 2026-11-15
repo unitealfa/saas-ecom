@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Central\Billing;
 
 use App\Enums\Central\Billing\DocumentStatusEnum;
+use App\Enums\Central\Billing\InvoiceListFilterEnum;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Users\User;
 use Illuminate\Foundation\Http\FormRequest;
@@ -25,6 +26,8 @@ class SearchSaasInvoicesRequest extends FormRequest
     {
         return ['search' => ['nullable', 'string', 'max:255'], 'owner' => ['nullable', 'uuid:4'],
             'status' => ['nullable', 'integer', Rule::enum(DocumentStatusEnum::class)],
+            'filter' => ['nullable', Rule::enum(InvoiceListFilterEnum::class)],
+            'page' => ['sometimes', 'integer', 'min:1'],
             'period_start' => ['nullable', 'required_with:period_end', 'date'],
             'period_end' => ['nullable', 'required_with:period_start', 'date', 'after:period_start']];
     }

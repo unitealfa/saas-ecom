@@ -63,7 +63,7 @@ class SaasCreditNoteController extends Controller
     {
         Gate::forUser($this->centralActor())->authorize('view', $credit);
 
-        return view('central.pages.admin.billing.credit-notes.show', ['credit' => $credit->load(['originalInvoice', 'lines', 'media']), 'ownerMode' => false,
+        return view('central.pages.admin.billing.credit-notes.show', ['credit' => $credit->load(['originalInvoice', 'lines', 'media', 'deliveries']), 'ownerMode' => false,
             'balance' => $this->balances->balance($this->centralActor(), $credit->originalInvoice),
             'available' => $this->credits->availableLines($this->centralActor(), $credit->originalInvoice),
             'history' => Activity::forSubject($credit)->latest('id')->paginate(20)]);

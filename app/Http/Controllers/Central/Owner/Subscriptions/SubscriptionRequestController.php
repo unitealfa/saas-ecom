@@ -29,8 +29,9 @@ class SubscriptionRequestController extends Controller
         abort_unless($actor->id === $subscriptionRequest->user_id, 403);
         Gate::forUser($actor)->authorize('view', $subscriptionRequest);
 
-        return view('central.pages.admin.subscriptions.requests.show', ['subscriptionRequest' => $subscriptionRequest->load(['owner', 'subscription.plan', 'invoice.media', 'payment']),
-            'ownerMode' => true, 'plans' => $this->plans->available(), 'history' => Activity::forSubject($subscriptionRequest)->orderByDesc('id')->paginate(20)]);
+        return view('central.pages.admin.subscriptions.requests.show', ['subscriptionRequest' => $subscriptionRequest->load(['owner', 'subscription.plan', 'invoice.media', 'payment', 'decider']),
+            'currentSubscription' => $this->requests->currentSubscription($actor, $subscriptionRequest),
+            'ownerMode' => true, 'plans' => $this->plans->available(), 'history' => Activity::forSubject($subscriptionRequest)->with('causer')->orderByDesc('id')->paginate(20)]);
     }
 
     public function choice(SubscriptionRequestActionRequest $request, SubscriptionRequest $subscriptionRequest): RedirectResponse

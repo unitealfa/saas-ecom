@@ -16,6 +16,8 @@ use Illuminate\Validation\ValidationException;
 /** Projection de la demande dans la transaction du paiement existant. */
 class SubscriptionRequestPaymentState
 {
+    public function __construct(private readonly SubscriptionWorkflowNotifier $notifications) {}
+
     public const string SUBMITTED = 'subscription_request_payment_submitted';
 
     public const string ACCEPTED = 'subscription_request_accepted';
@@ -130,6 +132,9 @@ class SubscriptionRequestPaymentState
             ->withProperties(['request_uuid' => $request->uuid, 'version' => $request->reference_version,
                 'payment_uuid' => $payment->getAttribute('uuid'), 'amount' => $payment->getAttribute('amount'),
                 'currency' => $payment->getAttribute('currency'), 'reason' => $request->getAttribute('decision_reason')])->log($message);
+        if ($event !== self::SUBMITTED) {
+            $this->notifications->request($request, $event);
+        }
     }
 
     private function fail(string $message): never

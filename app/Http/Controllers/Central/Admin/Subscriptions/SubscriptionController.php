@@ -8,6 +8,7 @@ use App\Http\Requests\Central\Subscriptions\AssignSubscriptionRequest;
 use App\Http\Requests\Central\Subscriptions\ChangeSubscriptionRequest;
 use App\Http\Requests\Central\Subscriptions\CloseSubscriptionRequest;
 use App\Http\Requests\Central\Subscriptions\DeactivateSubscriptionRequest;
+use App\Http\Requests\Central\Subscriptions\SearchSubscriptionOwnersRequest;
 use App\Http\Requests\Central\Subscriptions\SearchSubscriptionsRequest;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Subscriptions\Subscription;
@@ -54,11 +55,13 @@ class SubscriptionController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(SearchSubscriptionOwnersRequest $request): View
     {
-        Gate::forUser($this->centralActor())->authorize('assign', Subscription::class);
+        $selected = $request->old('owner_uuid', $request->validated('owner'));
 
         return view('central.pages.admin.subscriptions.create', [
+            'selectedUuid' => is_string($selected) && Str::isUuid($selected) ? strtolower($selected) : null,
+            'search' => $request->validated('search') ?? '',
             'plans' => Plan::active()->where('code', '!=', 'free')->orderBy('name')->orderByDesc('version')->get(),
             'operationKey' => (string) Str::uuid(),
         ]);

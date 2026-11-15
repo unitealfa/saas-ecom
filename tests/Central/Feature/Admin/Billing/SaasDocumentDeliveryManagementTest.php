@@ -49,8 +49,8 @@ it('does not grant delivery access to an ordinary merchant', function (): void {
     $f = manualPaymentFixture();
     $delivery = SaasDocumentDelivery::sole();
     $this->actingAs($f['owner'], 'central')
-        ->get(route('central.deliveries.index'))->assertForbidden();
-    $this->get(route('central.deliveries.show', $delivery))->assertForbidden();
+        ->get('/admin/billing/deliveries')->assertNotFound();
+    $this->get('/admin/billing/deliveries/'.$delivery->uuid)->assertNotFound();
     $this->post(route('central.deliveries.send'), ['document_uuid' => $f['invoice']->uuid])->assertForbidden();
     $this->post(route('central.deliveries.retry', $delivery), ['expected_state' => $delivery->managementState()])->assertForbidden();
     Queue::assertNotPushed(SendSaasDocumentJob::class);
@@ -298,8 +298,8 @@ it('keeps the three delivery permissions independent', function (): void {
 
     $this->actingAs($reader, 'central');
 
-    $this->get(route('central.deliveries.index'))->assertOk();
-    $this->get(route('central.deliveries.show', $delivery))->assertOk();
+    $this->get('/admin/billing/deliveries')->assertNotFound();
+    $this->get('/admin/billing/deliveries/'.$delivery->uuid)->assertNotFound();
 
     $this->post(route('central.deliveries.send'), [
         'document_uuid' => $f['invoice']->uuid,

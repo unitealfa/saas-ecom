@@ -9,9 +9,12 @@ use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Enums\MediaVisibilityEnum;
 use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Media\Media;
+use App\Models\Central\Subscriptions\SubscriptionRequest;
 use App\Models\Central\Users\User;
 use App\Services\Central\Media\CentralMediaService;
 use App\Services\Central\Media\PrivateMediaAccessService;
+use App\Services\Central\Subscriptions\SubscriptionRequestPaymentState;
+use App\Services\Central\Subscriptions\SubscriptionWorkflowNotifier;
 use Closure;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -37,7 +40,7 @@ class PaymentDocumentService
 
     private const int MAX_PIXELS = 12000000;
 
-    public function __construct(private readonly PrivateMediaAccessService $files) {}
+    public function __construct(private readonly PrivateMediaAccessService $files, private readonly SubscriptionWorkflowNotifier $notifications) {}
 
     /** @return array{original: string, mime: string, pdf: string} */
     public function prepareExternalProof(UploadedFile $file): array
@@ -179,7 +182,10 @@ class PaymentDocumentService
             }
             $bytes = $this->render(view('central.documents.payment-receipt', ['payment' => $payment->load('invoice'), 'confirmed' => true])->render());
 
-            return $this->store($actor, $payment, self::RECEIPT, $bytes, 'application/pdf', 'pdf');
+            $receipt = $this->store($actor, $payment, self::RECEIPT, $bytes, 'application/pdf', 'pdf');
+            $this->notifications->receipt($payment);
+
+            return $receipt;
         } finally {
             DB::selectOne('SELECT RELEASE_LOCK(?) AS released', [$lock]);
         }
@@ -209,6 +215,12 @@ class PaymentDocumentService
                 return;
             }
             $current->forceFill(['proof_media_id' => $proof->id, 'source_proof_media_id' => $source?->id])->save();
+            if ($current->getAttribute('transfer_method') !== TransferMethodEnum::CASH_IN_PERSON) {
+                $request = SubscriptionRequest::where('current_payment_id', $current->getKey())->first();
+                if ($request !== null) {
+                    $this->notifications->request($request, SubscriptionRequestPaymentState::SUBMITTED);
+                }
+            }
         }, 3);
         $payment->refresh();
     }

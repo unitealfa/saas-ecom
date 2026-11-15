@@ -25,6 +25,7 @@ use App\Services\Central\Media\PrivateMediaAccessService;
 use App\Services\Central\Plans\PublicPlanCatalog;
 use App\Services\Central\Subscriptions\SubscriptionRequestPaymentState;
 use App\Services\Central\Subscriptions\SubscriptionRequestService;
+use App\Services\Central\Subscriptions\SubscriptionWorkflowNotifier;
 use Database\Factories\Central\MediaFactory;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
@@ -338,7 +339,7 @@ test('T46 T47 T48 no commercial refund endpoint or action is available', functio
 test('T43 a receipt failure after confirmation never retries the financial acceptance', function (): void {
     $f = requestFixture();
     $request = app(SubscriptionRequestService::class)->create($f['owner'], subscriptionRequestInput($f));
-    $documents = Mockery::mock(PaymentDocumentService::class, [app(PrivateMediaAccessService::class)])->makePartial();
+    $documents = Mockery::mock(PaymentDocumentService::class, [app(PrivateMediaAccessService::class), app(SubscriptionWorkflowNotifier::class)])->makePartial();
     $documents->shouldReceive('generatePaymentReceipt')->once()->andThrow(ValidationException::withMessages(['proof' => 'Stockage fictivement indisponible']));
     $this->app->instance(PaymentDocumentService::class, $documents);
     $request = app(SubscriptionRequestService::class)->accept($f['actor'], $request, $request->managementState(), [

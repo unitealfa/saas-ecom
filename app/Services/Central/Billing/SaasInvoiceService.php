@@ -4,6 +4,7 @@ namespace App\Services\Central\Billing;
 
 use App\Enums\Central\Billing\DocumentStatusEnum;
 use App\Enums\Central\Billing\DocumentTypeEnum;
+use App\Enums\Central\Billing\InvoiceListFilterEnum;
 use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Enums\VerificationStatusEnum;
@@ -36,7 +37,7 @@ class SaasInvoiceService
     private const array CUSTOMER_FIELDS = ['uuid', 'first_name', 'last_name', 'email', 'legal_form',
         'activity_nature', 'nif', 'nis', 'registration_number', 'artisan_card_number', 'legal_address'];
 
-    public function __construct(private readonly AuthorizationMutation $mutations, private readonly InvoiceCalculator $calculator) {}
+    public function __construct(private readonly AuthorizationMutation $mutations, private readonly InvoiceCalculator $calculator, private readonly InvoicePaymentService $payments) {}
 
     /** @param array<string, mixed> $filters
      * @return LengthAwarePaginator<int, SaasInvoice>
@@ -47,7 +48,8 @@ class SaasInvoiceService
         Gate::forUser($actor)->authorize($own ? 'viewOwn' : 'viewAny', SaasInvoice::class);
         $search = trim($filters['search'] ?? '');
 
-        return SaasInvoice::with('owner')
+        return SaasInvoice::with(['owner', 'subscription.plan'])
+            ->when(isset($filters['filter']), fn (Builder $query) => $this->payments->filter($query, InvoiceListFilterEnum::from($filters['filter'])))
             ->when($own, fn (Builder $query) => $query->where('user_id', $actor->id))
             ->when(! $own && isset($filters['owner']), fn (Builder $query) => $query->whereRelation('owner', 'uuid', $filters['owner']))
             ->when($search !== '', fn (Builder $query) => $query->where('number', 'like', '%'.addcslashes($search, '\\%_').'%'))

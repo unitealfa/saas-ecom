@@ -9,6 +9,7 @@ use App\Enums\Central\Billing\TransferStatusEnum;
 use App\Enums\Central\Billing\TriggerEventEnum;
 use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Enums\Central\Subscriptions\PaymentChoiceEnum;
+use App\Enums\Central\Subscriptions\RequestFilterEnum;
 use App\Enums\Central\Subscriptions\RequestStatusEnum;
 use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Models\Central\Billing\BillingRule;
@@ -52,6 +53,7 @@ class SubscriptionRequestService
         private readonly SaasInvoiceIssuanceService $issuance,
         private readonly SaasPaymentService $payments,
         private readonly InvoicePaymentService $balances,
+        private readonly SubscriptionWorkflowNotifier $notifications,
     ) {}
 
     /** @param array<string, mixed> $filters
@@ -65,11 +67,28 @@ class SubscriptionRequestService
 
         return SubscriptionRequest::with(['owner', 'subscription.plan', 'invoice', 'payment'])
             ->when($own, fn (Builder $query) => $query->where('user_id', $actor->id))
-            ->when(isset($filters['status']), fn (Builder $query) => $query->where('status', $filters['status']))
+            ->when(isset($filters['filter']), fn (Builder $query) => $query->whereIn('status', RequestFilterEnum::from($filters['filter'])->statuses()))
+            ->when(isset($filters['status']), function (Builder $query) use ($filters): void {
+                $status = RequestStatusEnum::from((int) $filters['status']);
+                $query->whereIn('status', $status === RequestStatusEnum::AWAITING_PAYMENT
+                    ? [RequestStatusEnum::INVOICE_PENDING, RequestStatusEnum::AWAITING_PAYMENT] : [$status]);
+            })
             ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query->where('uuid', $search)
                 ->orWhereRelation('invoice', 'number', 'like', '%'.addcslashes($search, '\\%_').'%')
-                ->orWhereRelation('owner', 'email', 'like', '%'.addcslashes($search, '\\%_').'%')))
+                ->orWhereHas('owner', fn (Builder $owner) => $owner->where('email', 'like', '%'.addcslashes($search, '\\%_').'%')
+                    ->orWhereRaw("CONCAT_WS(' ', first_name, last_name) LIKE ?", ['%'.addcslashes($search, '\\%_').'%']))))
             ->orderByDesc('id')->paginate(self::PER_PAGE)->withQueryString();
+    }
+
+    public function currentSubscription(User $actor, SubscriptionRequest $request): ?Subscription
+    {
+        Gate::forUser($actor)->authorize('view', $request);
+
+        return Subscription::where('user_id', $request->user_id)->whereIn('status', [StatusEnum::ACTIVE, StatusEnum::TRIAL])
+            ->where('period_starts_at', '<=', now())
+            ->where(fn (Builder $query) => $query->whereNull('period_ends_at')->orWhere('period_ends_at', '>', now()))
+            ->where(fn (Builder $query) => $query->whereNull('ended_at')->orWhere('ended_at', '>', now()))
+            ->with('plan')->orderByDesc('id')->first();
     }
 
     /** @return array<string, mixed> */
@@ -447,6 +466,7 @@ class SubscriptionRequestService
             ->withProperties(['request_uuid' => $request->uuid, 'version' => $request->reference_version,
                 'subscription_uuid' => $request->subscription?->uuid, 'invoice_uuid' => $request->invoice?->uuid,
                 'payment_choice' => $request->payment_choice->value, 'reason' => $request->getAttribute('decision_reason')])->log($message);
+        $this->notifications->request($request, $event);
     }
 
     private function fail(string $message): never
