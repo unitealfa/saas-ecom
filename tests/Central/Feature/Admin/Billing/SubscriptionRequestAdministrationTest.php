@@ -29,7 +29,6 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
@@ -58,7 +57,7 @@ test('request lists preserve refused decisions and notify the owner with the req
     $input = administrationRequestInput($f);
     $request = $service->create($f['owner'], $input);
     $service->create($f['owner'], $input);
-    Notification::assertSentToTimes($f['owner'], SubscriptionWorkflowNotification::class, 2);
+    Notification::assertSentToTimes($f['owner'], SubscriptionWorkflowNotification::class, 1);
     Notification::assertSentTo($f['actor'], SubscriptionWorkflowNotification::class, fn ($notice) => $notice->administrative);
     $this->actingAs($f['actor'], 'central')->get(route('central.subscription-requests.index', ['filter' => 'ongoing']))
         ->assertOk()->assertSee($request->uuid)->assertSee($request->subscription->plan->name);
@@ -70,7 +69,7 @@ test('request lists preserve refused decisions and notify the owner with the req
     expect($request->status)->toBe(RequestStatusEnum::REJECTED)
         ->and($request->decided_by_id)->toBe($f['actor']->id)
         ->and($request->decided_at)->not->toBeNull()
-        ->and($request->subscription->status)->toBe(StatusEnum::SCHEDULED);
+        ->and($request->subscription->status)->toBe(StatusEnum::CANCELLED);
     Notification::assertSentTo($f['owner'], SubscriptionWorkflowNotification::class,
         fn ($notice) => $notice->event === SubscriptionRequestPaymentState::REJECTED && str_contains($notice->toMail($f['owner'])->introLines[0], 'Justificatif illisible'));
     foreach (['all', 'rejected'] as $filter) {
@@ -112,12 +111,9 @@ test('new bank proofs notify both parties and cancelled requests remain availabl
     Queue::fake();
     $f = administrationRequestFixture();
     $service = app(SubscriptionRequestService::class);
-    $request = $service->create($f['owner'], administrationRequestInput($f, PaymentChoiceEnum::EXTERNAL));
-    $proof = UploadedFile::fake()->createWithContent('bank-proof.pdf', Storage::disk('local')->get($request->invoice->media->storage_key));
-    $request = $service->submitProof($f['owner'], $request, $request->managementState(), [
-        'method' => TransferMethodEnum::BANK_TRANSFER->value, 'amount' => '3000.00', 'currency' => 'DZD',
-        'occurred_at' => now()->toDateTimeString(), 'operation_id' => (string) Str::uuid(), 'reference' => 'BANK-TEST',
-    ], $proof);
+    $payment = ['method' => TransferMethodEnum::BANK_TRANSFER->value, 'amount' => '3000.00',
+        'occurred_at' => now()->toDateTimeString(), 'reference' => 'BANK-TEST'];
+    $request = $service->create($f['owner'], [...administrationRequestInput($f, PaymentChoiceEnum::EXTERNAL), 'payment' => $payment], UploadedFile::fake()->image('bank-proof.png'));
     expect($request->status)->toBe(RequestStatusEnum::REVIEW);
     foreach ([$f['owner'], $f['actor']] as $recipient) {
         Notification::assertSentTo($recipient, SubscriptionWorkflowNotification::class, fn ($notice) => $notice->event === SubscriptionRequestPaymentState::SUBMITTED);
@@ -223,4 +219,20 @@ test('a paid scheduled period notifies its actual activation only once', functio
     $owner = App\Models\Central\Users\User::findOrFail($f['owner']->id);
     expect(Notification::sent($owner, SubscriptionWorkflowNotification::class,
         fn ($notice) => $notice->event === SubscriptionWorkflowNotifier::ACTIVATED)->count())->toBe(1);
+});
+
+
+test('an initial bank proof and its replay notify each party once per actual transition', function (): void {
+    Notification::fake();
+    $f = administrationRequestFixture();
+    $input = [...administrationRequestInput($f, PaymentChoiceEnum::EXTERNAL),
+        'payment' => ['method' => TransferMethodEnum::BANK_TRANSFER->value, 'amount' => '3000.00',
+            'occurred_at' => now()->toDateTimeString(), 'reference' => 'TEST-INITIAL']];
+    $proof = UploadedFile::fake()->image('initial.png');
+    $service = app(SubscriptionRequestService::class);
+    $request = $service->create($f['owner'], $input, $proof);
+    $replay = $service->create($f['owner'], $input, $proof);
+    expect($replay->id)->toBe($request->id);
+    Notification::assertSentToTimes($f['owner'], SubscriptionWorkflowNotification::class, 2);
+    Notification::assertSentToTimes($f['actor'], SubscriptionWorkflowNotification::class, 2);
 });

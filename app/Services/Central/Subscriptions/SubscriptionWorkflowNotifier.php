@@ -25,8 +25,9 @@ class SubscriptionWorkflowNotifier
     {
         $message = match ($event) {
             SubscriptionRequestService::CREATED => 'Votre demande d’abonnement a été reçue.',
-            SubscriptionRequestService::INVOICE_READY => 'Votre facture est disponible dans votre espace, avant paiement.',
+            SubscriptionRequestService::INVOICE_READY => 'Votre facture définitive est disponible après confirmation du paiement.',
             SubscriptionRequestPaymentState::SUBMITTED => 'Votre justificatif bancaire a été reçu. Votre paiement est en vérification.',
+            SubscriptionRequestPaymentState::CONFIRMED => 'Votre paiement intégral a été reçu et confirmé. La facture et le reçu doivent être finalisés avant l’activation des droits.',
             SubscriptionRequestPaymentState::ACCEPTED => 'Votre paiement intégral est confirmé et votre demande est acceptée. Abonnement : '.$request->subscription->status->label().'.',
             SubscriptionRequestPaymentState::REJECTED => 'Votre demande a été refusée. Motif : '.$request->getAttribute('decision_reason'),
             default => null,
@@ -60,7 +61,7 @@ class SubscriptionWorkflowNotifier
     public function receipt(SaasPayment $payment): void
     {
         $this->owner($payment->getAttribute('user_id'), self::RECEIPT_READY,
-            'Votre reçu est disponible après confirmation du paiement intégral.', route('owner.payments.show', $payment));
+            'Votre reçu est disponible après confirmation du paiement intégral.', route('owner.invoices.show', $payment->invoice).'#payment-'.$payment->getAttribute('uuid'));
     }
 
     public function activated(Subscription $subscription): void

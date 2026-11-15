@@ -6,21 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Billing\ReportOwnPaymentCorrectionRequest;
 use App\Models\Central\Billing\SaasPayment;
 use App\Services\Central\Billing\OwnerPaymentCorrectionService;
-use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 
 final class OwnerPaymentCorrectionController extends Controller
 {
-    public function create(SaasPayment $payment): View
+    public function create(SaasPayment $payment): RedirectResponse
     {
-        $actor = $this->centralActor();
-        Gate::forUser($actor)->authorize('viewOwn', SaasPayment::class);
-        Gate::forUser($actor)->authorize('view', $payment);
+        Gate::forUser($this->centralActor())->authorize('viewOwn', SaasPayment::class);
+        Gate::forUser($this->centralActor())->authorize('view', $payment);
 
-        return view('central.pages.owner.billing.corrections.create', [
-            'payment' => $payment->load('invoice'),
-        ]);
+        return to_route('owner.invoices.show', $payment->invoice)->withFragment('payment-'.$payment->uuid);
     }
 
     public function store(
@@ -35,7 +31,7 @@ final class OwnerPaymentCorrectionController extends Controller
             trim($request->validated('reason')),
         );
 
-        return to_route('owner.billing.index')->with(
+        return to_route('owner.invoices.show', $payment->invoice)->withFragment('payment-'.$payment->uuid)->with(
             'status',
             'Signalement conservé dans l’historique. L’administration peut examiner la demande ; seule l’émission d’un avoir corrige la facture. Aucun paiement n’a été modifié.',
         );

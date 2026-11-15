@@ -7,6 +7,7 @@ use App\Models\Central\Billing\SaasCreditNote;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Media\Media;
+use App\Models\Central\Subscriptions\SubscriptionRequest;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
 use App\Services\Central\Billing\PaymentDocumentService;
@@ -34,6 +35,12 @@ class MediaPolicy
 
     public function download(User $actor, Media $media): bool
     {
+        if ($media->model_type === 'subscription_request' && in_array($media->collection_name, [PaymentDocumentService::PROOF, PaymentDocumentService::SOURCE], true)) {
+            $request = SubscriptionRequest::find($media->model_id);
+
+            return ! tenancy()->initialized && ! $media->trashed() && $media->visibility === MediaVisibilityEnum::PRIVATE
+                && $request !== null && Gate::forUser($actor)->allows('viewInitialProof', $request);
+        }
         if (in_array($media->collection_name, [PaymentDocumentService::PROOF,
             PaymentDocumentService::SOURCE, PaymentDocumentService::RECEIPT], true)) {
             $payment = $media->model_type === 'saas_payment' ? SaasPayment::find($media->model_id) : null;

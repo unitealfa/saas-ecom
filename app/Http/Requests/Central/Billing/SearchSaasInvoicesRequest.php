@@ -17,7 +17,7 @@ class SearchSaasInvoicesRequest extends FormRequest
         $actor = $this->user('central');
 
         return $actor instanceof User && Gate::forUser($actor)->allows(
-            $this->routeIs('owner.invoices.*', '*.owner.invoices.*') ? 'viewOwn' : 'viewAny', SaasInvoice::class,
+            $this->routeIs('owner.invoices.*', '*.owner.invoices.*') ? 'viewOwn' : 'viewBillingDossiers', SaasInvoice::class,
         );
     }
 

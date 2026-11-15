@@ -20,13 +20,17 @@ class SubscriptionPolicy
             && $actor->legal_verified_at !== null;
     }
 
-    public function purchaseFor(User $actor, User $owner): bool
+    public function purchaseFor(User $actor, User $owner, ?Subscription $source = null): bool
     {
         if ($owner->status !== StatusEnum::ACTIVE || $this->access->isStaff($owner) || tenancy()->initialized) {
             return false;
         }
 
-        return $actor->id === $owner->id ? $this->purchase($actor) : $this->assign($actor);
+        if ($actor->id === $owner->id) {
+            return $this->purchase($actor);
+        }
+
+        return $source === null ? $this->assign($actor) : ($source->user_id === $owner->id && $this->change($actor, $source));
     }
 
     public function viewAny(User $actor): bool

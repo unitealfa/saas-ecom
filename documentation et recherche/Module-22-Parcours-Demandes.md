@@ -74,3 +74,24 @@ Code : Controllers et Requests Central/Subscriptions, SubscriptionRequestService
 - PHPStan ciblé sur les services, notifications, Controllers, Requests, Policies, modèles et enums modifiés : zéro erreur. Pint, diff et routes contrôlés ; graphe actualisé. Les erreurs initiales (mauvais constructeur du double de reçu, ancien statut HTTP des pages d'envoi et alias de modèle dans les assertions de notification) ont été corrigées puis les scénarios rejoués.
 - Pas de validation navigateur interactive, SMTP distant, remise réelle ni impression papier. Aucun worker réel redémarré et aucune migration ou donnée réelle modifiée.
 - Nettoyage final des anciens écrans : GET supprimés (404), recherche et Request inutilisées retirées, fragment d'envoi déplacé vers billing/document-delivery et liens supprimés. Trois tests ciblés rejoués : réussis, 27 assertions ; PHPStan ciblé et Pint passent. La suppression physique du dossier désormais vide billing/deliveries a été bloquée par la protection automatique ; aucun fichier d'écran n'y subsiste.
+
+
+## Décision courante — demande.txt, 15 novembre 2026
+
+Cette décision remplace les mentions antérieures de facture définitive avant paiement. La demande conserve une préparation interne DRAFT, sans numéro ni PDF. Le versement externe exige sa preuve dès la création ; les données déclarées sont chiffrées dans submitted_payment et les fichiers privés restent dans media, y compris si la configuration fiscale bloque la préparation.
+
+La réception intégrale des fonds est une étape durable et idempotente : le paiement VERIFIED ne doit pas être effacé si la génération documentaire échoue. L’émission produit ensuite le PDF définitif, puis le reçu ; acceptation de la demande, activation des droits et audit sont finalisés atomiquement. Les reprises ne collectent pas un second paiement. Le contrôle automatique des périodes programmées exige une demande acceptée ; un reçu manquant ne doit pas ouvrir les droits.
+
+L’attribution administrative exige attribution (ou changement sur l’abonnement ciblé) et validation d’encaissement. Espèces : constat réel ; versement externe : preuve et compte/référence réellement contrôlés. Remplacement immédiat ou différé au tarif intégral, sans prorata ni remboursement automatique. Les droits précédents restent en place avant finalisation ; une relation centrale de remplacement conserve l’abonnement d’origine et son propriétaire.
+
+Un refus sans fonds signalés ni facture émise annule uniquement la réservation et son échéance. La demande, le motif, la preuve et les événements restent consultables ; une nouvelle demande devient possible. Les anciennes factures émises et les anomalies financières exigent toujours leur traitement documentaire ou administratif explicite.
+
+Interfaces : Factures regroupe échéances, paiements, preuves, rapprochement, reçus et signalements. Le commerçant utilise le tableau existant owner/billing/overview. Les anciennes pages de règles versionnées, compteurs et facture manuelle sont supprimées (404). Les anciennes lectures de paiements restent des redirections autorisées vers leurs dossiers, sans écran autonome. Les envois restent dans le document. Le formulaire de paramètres utilise les droits existants update + activate ; il conserve les versions et validations internes, sans les exposer comme étapes manuelles. La première configuration est explicite, jamais peuplée par un seeder financier.
+
+Notifications : canal database Laravel central en plus du mail, liste privée et indicateur non lu, marquage individuel idempotent. Les droits du destinataire sont revérifiés ; aucun accès aux notifications d’un autre compte, même avec le rôle root.
+
+Trois migrations additives sont préparées : notifications natives, submitted_payment chiffré et choix de transition/référence de remplacement. Elles ne sont pas appliquées à la base réelle. Le catalogue ne recrée plus les trois anciens droits de création/versionnement des règles et lecture des compteurs ; les anciennes lignes et attributions réelles ne sont pas supprimées automatiquement.
+
+Les références actives du modèle Examples/Test, de SchemaBlueprint, des diagnostics locaux et des API de plans ont été conservées. Le seul index généré graphify-out/cache/stat-index.json est retiré du suivi Git, sans supprimer le fichier local.
+
+Validation en cours : contrôles ciblés et suites MySQL locales temporaires autorisés ; aucune écriture sur les bases réelles, aucun SMTP réel, aucune dépendance installée. Les résultats des sections précédentes concernent l’ancienne version et ne constituent pas la validation de cette refonte.

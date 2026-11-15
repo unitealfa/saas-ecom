@@ -13,7 +13,8 @@ class SearchSubscriptionOwnersRequest extends FormRequest
     {
         $actor = $this->user('central');
 
-        return $actor instanceof User && Gate::forUser($actor)->allows('assign', Subscription::class);
+        return $actor instanceof User && Gate::forUser($actor)->allows('assign', Subscription::class)
+            && Gate::forUser($actor)->allows('saas.payments.validate');
     }
 
     /** @return array<string, list<string>> */

@@ -34,7 +34,13 @@ class SubscriptionWorkflowNotification extends Notification implements ShouldBeE
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return ['database', 'mail'];
+    }
+
+    /** @return array{event: string, message: string, url: string} */
+    public function toDatabase(object $notifiable): array
+    {
+        return ['event' => $this->event, 'message' => $this->message, 'url' => $this->url];
     }
 
     public function shouldSend(object $notifiable, string $channel): bool

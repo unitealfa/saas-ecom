@@ -16,6 +16,7 @@ use App\Models\Central\Domains\Domain;
 use App\Models\Central\Features\Feature;
 use App\Models\Central\Geography\GeographicArea;
 use App\Models\Central\Media\Media;
+use App\Models\Central\Notifications\DatabaseNotification;
 use App\Models\Central\Permissions\Permission;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Plans\PlanFeature;
@@ -48,6 +49,7 @@ use App\Policies\Central\DomainPolicy;
 use App\Policies\Central\FeaturePolicy;
 use App\Policies\Central\GeographicAreaPolicy;
 use App\Policies\Central\MediaPolicy;
+use App\Policies\Central\NotificationPolicy;
 use App\Policies\Central\PermissionPolicy;
 use App\Policies\Central\PickupPointPolicy;
 use App\Policies\Central\PlanPolicy;
@@ -84,6 +86,7 @@ class AppServiceProvider extends ServiceProvider
 {
     /** @var array<class-string, class-string> Modèle => policy. */
     private const array POLICIES = [
+        DatabaseNotification::class => NotificationPolicy::class,
         Activity::class => ActivityPolicy::class,
         SaasCreditNote::class => SaasCreditNotePolicy::class,
         SaasDocumentDelivery::class => SaasDocumentDeliveryPolicy::class,

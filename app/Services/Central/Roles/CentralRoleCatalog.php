@@ -62,12 +62,9 @@ class CentralRoleCatalog
     ];
 
     public const array BILLING_PERMISSIONS = [
-        'saas.billing-rules.view' => 'Consulter les règles de facturation',
-        'saas.billing-rules.create' => 'Créer une règle de facturation',
-        'saas.billing-rules.update' => 'Modifier une règle encore modifiable',
-        'saas.billing-rules.activate' => 'Activer ou désactiver une règle',
-        'saas.billing-rules.versions.create' => 'Créer une nouvelle version de règle',
-        'saas.billing-sequences.view' => 'Consulter les compteurs et numérotations',
+        'saas.billing-rules.view' => 'Consulter les paramètres de facturation',
+        'saas.billing-rules.update' => 'Modifier les paramètres de facturation',
+        'saas.billing-rules.activate' => 'Valider les paramètres de facturation',
     ];
 
     public const array SUBSCRIPTION_PERMISSIONS = [
@@ -227,8 +224,7 @@ class CentralRoleCatalog
         'Journal d’activité' => ['saas.activity.view', 'saas.activity.export'],
         'Échéances de paiement' => ['saas.subscriptions.installments.view', 'saas.subscriptions.installments.create'],
         'Factures SaaS' => ['saas.invoices.view', 'saas.invoices.create', 'saas.invoices.issue'],
-        'Règles de facturation' => ['saas.billing-rules.view', 'saas.billing-rules.create', 'saas.billing-rules.update', 'saas.billing-rules.activate', 'saas.billing-rules.versions.create'],
-        'Compteurs de facturation' => ['saas.billing-sequences.view'],
+        'Paramètres de facturation' => ['saas.billing-rules.view', 'saas.billing-rules.update', 'saas.billing-rules.activate'],
         'Fichiers centraux' => ['saas.media.view', 'saas.media.upload', 'saas.media.download', 'saas.media.archive'],
         'Bureaux de retrait' => ['saas.pickup-points.view', 'saas.pickup-points.create', 'saas.pickup-points.update', 'saas.pickup-points.import', 'saas.pickup-points.activate', 'saas.pickup-points.archive'],
         'Correspondances géographiques des transporteurs' => ['saas.carrier-mappings.view', 'saas.carrier-mappings.create', 'saas.carrier-mappings.update', 'saas.carrier-mappings.archive'],

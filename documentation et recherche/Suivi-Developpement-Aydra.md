@@ -2420,3 +2420,8 @@ Vérifications : 5 tests ciblés réussis, 27 assertions, sur MySQL local tempor
 | T-015 | À faire (proposé, non validé) | Contacts, couleurs, thème, image de marque `media`, cache public | Validation image, accès fichiers, cache/commit/rollback, parcours humain vérifiés |
 
 Ce lot n'a ni exécuté migrations ni seeders en BDD réelle. PHP `-l` seulement dans l'environnement de préparation ; tests Pest/MySQL et navigateur non exécutés. T-001 et T-010 restent des dépendances à terminer. Aucun statut « fait » ni coche n'est revendiqué.
+
+
+### Reprise — demande.txt — 15 novembre 2026
+
+Refonte en cours : préparation DRAFT avant paiement, PDF définitif et reçu après confirmation, puis acceptation/droits ; preuve bancaire initiale privée, modes immédiat/différé, réservation refusée libérée, notifications natives en base et par mail. Interfaces de facturation regroupées ; règles et compteurs conservés en interne, anciennes pages retirées. Voir le complément courant du rapport Module-22-Parcours-Demandes.md. Trois migrations additives préparées, aucune appliquée à la base réelle. Tests locaux isolés autorisés. La première suite a atteint 128 Mo pendant les PDF ; relance avec memory_limit=1G limitée au processus de test. Résultats finaux encore à compléter ; ne pas annoncer cette refonte validée à partir des anciennes passes.

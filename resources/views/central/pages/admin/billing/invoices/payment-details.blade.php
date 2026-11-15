@@ -1,11 +1,6 @@
-@php
-    $oldText = static fn (string $key, mixed $default = null): string => is_scalar($value = old($key, $default)) ? (string) $value : '';
-@endphp
-<x-layouts::app title="Paiement SaaS">
-    <section class="mx-auto flex w-full max-w-4xl flex-col gap-6">
-        <flux:heading size="xl" level="1">Paiement — {{ $payment->invoice->number }}</flux:heading>
-        @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
-        @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
+@php($oldText = static fn (string $key, mixed $default = null): string => is_scalar($value = old($key, $default)) ? (string) $value : '')
+<section id="payment-{{ $payment->uuid }}" class="flex flex-col gap-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+    <flux:heading>Paiement {{ $payment->uuid }}</flux:heading>
         <dl class="grid gap-4 sm:grid-cols-2">
             <div><dt>État</dt><dd>{{ $payment->statusLabel() }}</dd></div>
             <div><dt>Commerçant</dt><dd>{{ $payment->owner?->name }}</dd></div>
@@ -36,7 +31,11 @@
                     <flux:button type="submit">Reprendre le dépôt sans nouvelle déclaration</flux:button>
                 </form>
             @endcan
-            <flux:button :href="route('owner.billing.corrections.create', $payment)">Signaler une erreur sur ce paiement</flux:button>
+            <form method="POST" action="{{ route('owner.billing.corrections.store', $payment) }}" class="flex flex-col gap-3">
+                @csrf<input type="hidden" name="request_id" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
+                <flux:textarea name="reason" label="Signaler une erreur sur ce paiement (10 à 2 000 caractères)" minlength="10" maxlength="2000" required />
+                <flux:button type="submit">Envoyer le signalement</flux:button>
+            </form>
             <flux:text>Ce signalement n'altère pas le paiement confirmé : l'administration doit examiner la demande.</flux:text>
         @endif
 
@@ -96,10 +95,7 @@
                         <flux:callout>Motif communiqué par le commerçant : {{ $event->properties['reason'] ?? 'Motif non renseigné' }}</flux:callout>
                     @endif
                 @endforeach
-                {{ $history->links() }}
             @endif
         @endunless
-        <flux:button :href="route($ownerMode ? 'owner.invoices.show' : 'central.invoices.show', $payment->invoice)">Consulter la facture</flux:button>
-        <flux:button :href="route($ownerMode ? 'owner.payments.index' : 'central.payments.index')">Retour aux paiements</flux:button>
-    </section>
-</x-layouts::app>
+
+</section>

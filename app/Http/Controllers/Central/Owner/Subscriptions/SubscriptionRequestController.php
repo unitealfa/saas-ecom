@@ -8,11 +8,13 @@ use App\Http\Requests\Central\Subscriptions\SearchSubscriptionRequestsRequest;
 use App\Http\Requests\Central\Subscriptions\SubscriptionRequestActionRequest;
 use App\Models\Central\Audit\Activity;
 use App\Models\Central\Subscriptions\SubscriptionRequest;
+use App\Services\Central\Billing\PaymentDocumentService;
 use App\Services\Central\Plans\PublicPlanCatalog;
 use App\Services\Central\Subscriptions\SubscriptionRequestService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SubscriptionRequestController extends Controller
 {
@@ -48,24 +50,8 @@ class SubscriptionRequestController extends Controller
         return to_route('owner.subscription-requests.show', $subscriptionRequest)->with('status', 'Justificatif transmis. La réception réelle des fonds doit encore être confirmée.');
     }
 
-    public function prepareInvoice(SubscriptionRequestActionRequest $request, SubscriptionRequest $subscriptionRequest): RedirectResponse
+    public function initialProof(SubscriptionRequest $subscriptionRequest, PaymentDocumentService $documents): StreamedResponse
     {
-        $current = $this->requests->prepareInvoice($this->centralActor(), $subscriptionRequest, $request->validated('expected_state'));
-
-        return to_route('owner.subscription-requests.show', $current)->with('status', $current->getAttribute('invoice_error') ?? 'Facture disponible, sans confirmation de paiement.');
-    }
-
-    public function revise(SubscriptionRequestActionRequest $request, SubscriptionRequest $subscriptionRequest): RedirectResponse
-    {
-        $current = $this->requests->revise($this->centralActor(), $subscriptionRequest, $request->validated('expected_state'), $request->safe()->except('expected_state'));
-
-        return to_route('owner.subscription-requests.show', $current)->with('status', $current->getAttribute('invoice_error') ?? 'Demande corrigée et facture disponible. Aucun droit payant activé.');
-    }
-
-    public function cancel(SubscriptionRequestActionRequest $request, SubscriptionRequest $subscriptionRequest): RedirectResponse
-    {
-        $this->requests->cancel($this->centralActor(), $subscriptionRequest, $request->validated('expected_state'));
-
-        return to_route('owner.subscription-requests.show', $subscriptionRequest)->with('status', 'Demande annulée. Les documents et décisions restent conservés.');
+        return $documents->downloadRequestProof($this->centralActor(), $subscriptionRequest);
     }
 }

@@ -15,7 +15,8 @@ class ChangeSubscriptionRequest extends FormRequest
         $subscription = $this->route('subscription');
         $actor = $this->user('central');
 
-        return $actor instanceof User && $subscription instanceof Subscription && Gate::forUser($actor)->allows('change', $subscription);
+        return $actor instanceof User && $subscription instanceof Subscription && Gate::forUser($actor)->allows('change', $subscription)
+            && Gate::forUser($actor)->allows('saas.payments.validate');
     }
 
     protected function prepareForValidation(): void

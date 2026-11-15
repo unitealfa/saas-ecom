@@ -13,10 +13,13 @@
             @csrf
             @if ($credit) @method('PUT') @else<input type="hidden" name="operation_id" value="{{ $operation }}">@endif
             <input type="hidden" name="expected_state" value="{{ ($credit ?? $invoice)->managementState() }}">
-            <flux:select name="billing_rule_uuid" label="Règle d’avoir validée et active" required>
-                <option value="">Choisir une règle</option>
-                @foreach ($rules as $rule)<option value="{{ $rule->uuid }}" @selected($oldText('billing_rule_uuid', $credit?->billingRule->uuid) === $rule->uuid)>{{ $rule->code }} — version {{ $rule->version }}</option>@endforeach
-            </flux:select>
+            @php($applicableRule = $credit?->billingRule ?? ($rules->count() === 1 ? $rules->sole() : null))
+            @if ($applicableRule)
+                <input type="hidden" name="billing_rule_uuid" value="{{ $applicableRule->uuid }}">
+            @else
+                <flux:callout>Une seule configuration d’avoir validée et applicable doit être définie avant l’enregistrement.</flux:callout>
+            @endif
+
             <flux:textarea name="reason" label="Motif de l’avoir" required maxlength="2000">{{ $oldText('reason', $credit?->getAttribute('reason')) }}</flux:textarea>
             @foreach ($available as $id => $item)
                 @php($existing = $credit?->lines->firstWhere('original_invoice_line_id', $id))

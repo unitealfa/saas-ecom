@@ -17,18 +17,15 @@
                 @foreach ($plan['features'] as $feature)<flux:text>{{ $feature['name'] }} : {{ $feature['value'] }}</flux:text>@endforeach
                 @if ($plan['code'] === 'free')<flux:text>Offre gratuite : aucun paiement à effectuer.</flux:text>
                 @else
-                    <form method="POST" action="{{ route('owner.subscriptions.store') }}" class="mt-4 flex flex-col gap-3" x-data="{ period: @js($oldText('plan_uuid') === $plan['uuid'] ? $oldText('period', '1') : '1') }">
+                    <form method="POST" enctype="multipart/form-data" action="{{ route('owner.subscriptions.store') }}" class="mt-4 flex flex-col gap-3" x-data="{ period: @js($oldText('plan_uuid') === $plan['uuid'] ? $oldText('period', '1') : '1') }">
                         @csrf<input type="hidden" name="plan_uuid" value="{{ $plan['uuid'] }}">
                         <input type="hidden" name="operation_id" value="{{ $oldText('plan_uuid') === $plan['uuid'] ? $oldText('operation_id', (string) \Illuminate\Support\Str::uuid()) : (string) \Illuminate\Support\Str::uuid() }}">
                         <input type="hidden" name="expected_amount" value="{{ $plan['monthly_price'] }}" x-bind:value="period === '1' ? '{{ $plan['monthly_price'] }}' : '{{ $plan['annual_price'] }}'">
                         <flux:select name="period" label="Période à régler en une fois" x-model="period">
                             <option value="1">Un mois — {{ $plan['monthly_price'] }} DZD</option><option value="2">Un an — {{ $plan['annual_price'] }} DZD</option>
                         </flux:select>
-                        <flux:select name="payment_choice" label="Comment souhaitez-vous payer ?" required>
-                            <option value="1">Espèces au bureau Aydra</option>
-                            <option value="2">Versement externe avec justificatif</option>
-                        </flux:select>
-                        <flux:button type="submit" :disabled="$pending">Créer ma demande et obtenir ma facture</flux:button>
+                        @include('central.pages.owner.billing.subscriptions.payment-fields')
+                        <flux:button type="submit" :disabled="$pending">Créer ma demande</flux:button>
                     </form>
                 @endif
             </article>@endforeach

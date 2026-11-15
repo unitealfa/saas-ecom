@@ -27,6 +27,6 @@ class PurchaseSubscriptionRequest extends FormRequest
      */
     public function rules(): array
     {
-        return SubscriptionRequestService::rules();
+        return [...SubscriptionRequestService::rules(), ...SubscriptionRequestService::initialPaymentRules()];
     }
 }

@@ -13,6 +13,7 @@ use App\Services\Central\Subscriptions\SubscriptionRequestService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SubscriptionRequestController extends Controller
 {
@@ -55,11 +56,9 @@ class SubscriptionRequestController extends Controller
         return $this->redirectWithStatus($current, 'Demande refusée. Le motif et les pièces précédentes sont conservés.');
     }
 
-    public function prepareInvoice(SubscriptionRequestActionRequest $request, SubscriptionRequest $subscriptionRequest): RedirectResponse
+    public function initialProof(SubscriptionRequest $subscriptionRequest, PaymentDocumentService $documents): StreamedResponse
     {
-        $current = $this->requests->prepareInvoice($this->centralActor(), $subscriptionRequest, $request->validated('expected_state'));
-
-        return $this->redirectWithStatus($current, $current->getAttribute('invoice_error') ?? 'Facture disponible, sans confirmation de paiement.');
+        return $documents->downloadRequestProof($this->centralActor(), $subscriptionRequest);
     }
 
     private function redirectWithStatus(SubscriptionRequest $request, string $message): RedirectResponse

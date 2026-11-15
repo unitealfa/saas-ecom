@@ -8,9 +8,11 @@ use App\Enums\Central\Billing\InvoiceListFilterEnum;
 use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Enums\VerificationStatusEnum;
+use App\Models\Central\Audit\Activity;
 use App\Models\Central\Billing\BillingRule;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Billing\SaasInvoiceLine;
+use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Subscriptions\SubscriptionInstallment;
 use App\Models\Central\Subscriptions\SubscriptionRequest;
@@ -45,7 +47,7 @@ class SaasInvoiceService
     public function search(User $actor, array $filters, bool $own = false): LengthAwarePaginator
     {
         abort_if(tenancy()->initialized, 403);
-        Gate::forUser($actor)->authorize($own ? 'viewOwn' : 'viewAny', SaasInvoice::class);
+        Gate::forUser($actor)->authorize($own ? 'viewOwn' : 'viewBillingDossiers', SaasInvoice::class);
         $search = trim($filters['search'] ?? '');
 
         return SaasInvoice::with(['owner', 'subscription.plan'])
@@ -57,6 +59,20 @@ class SaasInvoiceService
             ->when(isset($filters['period_start']), fn (Builder $query) => $query->where('period_ends_at', '>', CarbonImmutable::parse($filters['period_start'])))
             ->when(isset($filters['period_end']), fn (Builder $query) => $query->where('period_starts_at', '<', CarbonImmutable::parse($filters['period_end'])))
             ->orderByDesc('id')->paginate(self::PER_PAGE)->withQueryString();
+    }
+
+    /** @return array<string, mixed> */
+    public function paymentDetails(User $actor, SaasInvoice $invoice, bool $own = false): array
+    {
+        Gate::forUser($actor)->authorize($own ? 'viewOwnInvoice' : 'viewBillingDossier', $invoice);
+        $canRead = Gate::forUser($actor)->allows($own ? 'viewOwn' : 'viewAny', SaasPayment::class);
+        $payments = $invoice->payments()->when(! $canRead, fn (Builder $query) => $query->whereRaw('1 = 0'))
+            ->with(['owner', 'creator', 'validator', 'invoice.subscription'])->orderByDesc('id')
+            ->paginate(10, ['*'], 'payment_page')->withQueryString();
+        $history = $own ? collect() : Activity::where('subject_type', (new SaasPayment)->getMorphClass())
+            ->whereIn('subject_id', $payments->getCollection()->modelKeys())->orderByDesc('id')->limit(200)->get()->groupBy('subject_id');
+
+        return ['invoicePayments' => $payments, 'paymentHistories' => $history];
     }
 
     public function prepareInstallment(User $actor, Subscription $subscription, SubscriptionInstallment $installment, string $ruleUuid, string $expected): SaasInvoice

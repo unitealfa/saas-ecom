@@ -36,12 +36,11 @@
                 <flux:button :href="\Illuminate\Support\Facades\URL::temporarySignedRoute($prefix.'.invoices.download', now()->addMinutes(10), ['invoice' => $item->invoice, 'inline' => 1])" target="_blank">Ouvrir le PDF de facture pour télécharger ou imprimer</flux:button>
             @endcan
         @else
-            <flux:callout>{{ $item->getAttribute('invoice_error') ?? 'La facture est en préparation. Aucun paiement ne doit être confirmé à ce stade.' }}</flux:callout>
-            @can('prepareInvoice', $item)
-                <form method="POST" action="{{ route($prefix.'.subscription-requests.invoice', $item) }}">@csrf
-                    <input type="hidden" name="expected_state" value="{{ $item->managementState() }}">
-                    <flux:button type="submit">Reprendre la préparation de la facture</flux:button>
-                </form>
+            <flux:callout>{{ $item->getAttribute('invoice_error') ?? 'Préparation interne sans numéro ni PDF définitif. La facture et le reçu suivront la confirmation du paiement intégral.' }}</flux:callout>
+        @endif
+        @if ($item->getAttribute('submitted_payment') !== null)
+            @can('viewInitialProof', $item)
+            <flux:button :href="\Illuminate\Support\Facades\URL::temporarySignedRoute($prefix.'.subscription-requests.initial-proof', now()->addMinutes(10), ['subscriptionRequest' => $item])">Consulter le justificatif initial</flux:button>
             @endcan
         @endif
         @if ($item->payment)
@@ -50,7 +49,7 @@
                 <flux:callout>Une réception de fonds est signalée. La demande ne peut pas être corrigée ou annulée commercialement ; l’administration doit terminer le contrôle ou le rapprochement.</flux:callout>
             @endif
             @can('view', $item->payment)
-                <flux:button :href="route($prefix.'.payments.show', $item->payment)">Consulter le paiement et son justificatif</flux:button>
+                <flux:button :href="route($prefix.'.invoices.show', $item->payment->invoice).'#payment-'.$item->payment->uuid">Consulter le paiement et son justificatif</flux:button>
                 @if ($item->payment->getAttribute('proof_media_id'))
                     <flux:button :href="\Illuminate\Support\Facades\URL::temporarySignedRoute($prefix.'.payments.proof', now()->addMinutes(10), ['payment' => $item->payment])">Télécharger le justificatif</flux:button>
                 @endif
@@ -74,6 +73,9 @@
                         <input type="hidden" name="expected_amount" x-bind:value="plans.find(p => p.uuid === plan)?.[period === '1' ? 'monthly_price' : 'annual_price'] ?? ''">
                     </div>
                     <input type="hidden" name="payment_choice" value="{{ $item->payment_choice->value }}">
+                    <flux:select name="transition_mode" label="Début de la nouvelle période">
+                        @foreach (\App\Enums\Central\Subscriptions\TransitionModeEnum::cases() as $mode)<option value="{{ $mode->value }}" @selected($item->subscription->transition_mode === $mode)>{{ $mode->label() }}</option>@endforeach
+                    </flux:select>
                     <flux:button type="submit">Modifier l’offre ou la période</flux:button>
                 </form>
                 <form method="POST" action="{{ route('owner.subscription-requests.cancel', $item) }}">@csrf
@@ -87,8 +89,8 @@
                     </flux:select>
                     <flux:button type="submit">Enregistrer mon choix</flux:button>
                 </form>
-                @if ($cash)<flux:callout>Présentez votre facture au bureau Aydra. Seul l’administrateur peut constater les espèces réellement reçues. Aucun droit ne sera activé avant ce contrôle. {{ config('central.billing.cash_instructions') }}</flux:callout>
-                @elseif ($issued)
+                @if ($cash)<flux:callout>Présentez votre référence de demande au bureau Aydra. Seul l’administrateur peut constater les espèces réellement reçues. Aucun droit ne sera activé avant ce contrôle. {{ config('central.billing.cash_instructions') }}</flux:callout>
+                @elseif ($item->invoice !== null && $item->subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::SCHEDULED)
                     <flux:callout>{{ config('central.billing.payment_instructions') ?: 'Demandez les coordonnées officielles de versement à l’administration avant tout envoi d’argent.' }}</flux:callout>
                     <form method="POST" enctype="multipart/form-data" action="{{ route('owner.subscription-requests.proof', $item) }}" class="flex flex-col gap-3">@csrf
                         <input type="hidden" name="expected_state" value="{{ $item->managementState() }}"><input type="hidden" name="currency" value="DZD">
@@ -105,9 +107,9 @@
                 @endif
             @endcan
         @elseif (! $ownerMode && ! $item->status->isFinal())
-            @if ($issued && ($item->payment === null || $item->payment->getAttribute('transfer_status') !== \App\Enums\Central\Billing\TransferStatusEnum::UNCERTAIN))
+            @if (($item->invoice !== null || $item->getAttribute('submitted_payment') !== null) && ($item->payment === null || $item->payment->getAttribute('transfer_status') !== \App\Enums\Central\Billing\TransferStatusEnum::UNCERTAIN))
                 @can('accept', $item)
-                    @if ($cash || $item->payment)
+                    @if ($cash || $item->payment || $item->getAttribute('submitted_payment') !== null)
                         <form method="POST" action="{{ route('central.subscription-requests.accept', $item) }}" class="flex flex-col gap-3">@csrf
                             <input type="hidden" name="expected_state" value="{{ $item->managementState() }}">
                             <input type="hidden" name="expected_payment_state" value="{{ $item->payment?->managementState() }}">

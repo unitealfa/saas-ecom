@@ -3,6 +3,7 @@
 namespace App\Policies\Central;
 
 use App\Enums\Central\Subscriptions\RequestStatusEnum;
+use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Subscriptions\SubscriptionRequest;
 use App\Models\Central\Users\User;
@@ -23,9 +24,9 @@ class SubscriptionRequestPolicy
         return ! tenancy()->initialized && Gate::forUser($actor)->allows('purchase', Subscription::class);
     }
 
-    public function createFor(User $actor, User $owner): bool
+    public function createFor(User $actor, User $owner, ?Subscription $source = null): bool
     {
-        return ! tenancy()->initialized && Gate::forUser($actor)->allows('purchaseFor', [Subscription::class, $owner]);
+        return ! tenancy()->initialized && Gate::forUser($actor)->allows('purchaseFor', [Subscription::class, $owner, $source]);
     }
 
     public function view(User $actor, SubscriptionRequest $request): bool
@@ -33,10 +34,23 @@ class SubscriptionRequestPolicy
         return $this->viewAny($actor) || $this->owns($actor, $request);
     }
 
+    public function viewInitialProof(User $actor, SubscriptionRequest $request): bool
+    {
+        return $this->owns($actor, $request)
+            || (! tenancy()->initialized && $this->access->allows($actor, 'saas.payments.view'));
+    }
+
     public function update(User $actor, SubscriptionRequest $request): bool
     {
         return $this->owns($actor, $request) && $this->create($actor) && ! $request->status->isFinal()
+            && $request->subscription?->status === StatusEnum::SCHEDULED
             && $request->payment?->hasReportedFunds() !== true;
+    }
+
+    public function supplyInitialProof(User $actor, SubscriptionRequest $request): bool
+    {
+        return ! $request->status->isFinal() && ($this->update($actor, $request)
+            || $this->accept($actor, $request));
     }
 
     public function cancel(User $actor, SubscriptionRequest $request): bool
@@ -47,12 +61,14 @@ class SubscriptionRequestPolicy
     public function prepareInvoice(User $actor, SubscriptionRequest $request): bool
     {
         return ! $request->status->isFinal() && ($this->update($actor, $request)
+            || (! tenancy()->initialized && $this->access->allows($actor, 'saas.payments.validate'))
             || (! tenancy()->initialized && $this->access->allows($actor, 'saas.invoices.create') && $this->access->allows($actor, 'saas.invoices.issue')));
     }
 
     public function accept(User $actor, SubscriptionRequest $request): bool
     {
         return ! tenancy()->initialized && $actor->id !== $request->user_id && ! $request->status->isFinal()
+            && $request->subscription?->status === StatusEnum::SCHEDULED
             && $this->access->allows($actor, 'saas.payments.validate');
     }
 

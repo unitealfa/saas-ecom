@@ -136,7 +136,7 @@ test('credit HTTP workflow supports preparation issuance private download and th
     $credit = SaasCreditNote::sole();
     $this->get(route('central.credit-notes.show', $credit))->assertOk()->assertSee('Valider et réserver le numéro');
     $this->actingAs($f['owner'], 'central')->get(route('owner.credit-notes.show', $credit))->assertForbidden();
-    $this->get(route('owner.credit-notes.index'))->assertOk()->assertDontSee('Brouillon');
+    $this->get(route('owner.billing.index'))->assertOk()->assertDontSee('Brouillon');
     $this->actingAs($f['actor'], 'central')->post(route('central.credit-notes.prepare', $credit), ['expected_state' => $credit->managementState()])->assertSessionHasNoErrors();
     $credit->refresh();
     $this->actingAs($f['owner'], 'central')
@@ -174,7 +174,7 @@ test('a full payment after an issued credit settles the corrected debt without e
     $f = creditNoteFixture();
     $credit = app(SaasCreditNoteService::class)->createCreditNoteDraft($f['actor'], $f['invoice'], creditNoteInput($f));
     app(SaasInvoiceIssuanceService::class)->issue($f['actor'], $credit, $credit->managementState());
-    $this->actingAs($f['owner'], 'central')->get(route('owner.payments.create', $f['invoice']))->assertOk()->assertSee('2500.00');
+    $this->actingAs($f['owner'], 'central')->get(route('owner.invoices.show', $f['invoice']))->assertOk()->assertSee('2500.00');
     $payment = app(SaasPaymentService::class)->recordCashPayment($f['actor'], $f['invoice'], [...manualExternalPayload('2500.00'), 'received' => true]);
     expect($payment->getAttribute('amount'))->toBe('2500.00')
         ->and($payment->getAttribute('transfer_status'))->toBe(TransferStatusEnum::VERIFIED)

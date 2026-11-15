@@ -69,12 +69,12 @@ class SubscriptionController extends Controller
 
     public function store(AssignSubscriptionRequest $request): RedirectResponse
     {
-        $subscription = $this->assignments->assign($this->centralActor(), $request->validated());
+        $subscription = $this->assignments->assign($this->centralActor(), $request->validated(), $request->file('proof'));
         $redirect = Gate::forUser($this->centralActor())->allows('view', $subscription)
             ? to_route('central.subscriptions.show', $subscription)
             : to_route('dashboard');
 
-        return $redirect->with('status', 'Abonnement réservé en attente du paiement intégral. Les droits actuels sont conservés.');
+        return $redirect->with('status', 'Paiement confirmé ; facture et reçu disponibles. Abonnement actif ou programmé selon la date choisie.');
     }
 
     public function close(CloseSubscriptionRequest $request, Subscription $subscription): RedirectResponse
@@ -94,6 +94,7 @@ class SubscriptionController extends Controller
     public function changeForm(Subscription $subscription): View
     {
         Gate::forUser($this->centralActor())->authorize('change', $subscription);
+        Gate::forUser($this->centralActor())->authorize('saas.payments.validate');
 
         return view('central.pages.admin.subscriptions.change', [
             'subscription' => $subscription,
@@ -104,9 +105,9 @@ class SubscriptionController extends Controller
 
     public function change(ChangeSubscriptionRequest $request, Subscription $subscription): RedirectResponse
     {
-        $this->transitions->change($this->centralActor(), $subscription, $request->validated());
+        $next = $this->transitions->change($this->centralActor(), $subscription, $request->validated(), $request->file('proof'));
 
-        return $this->redirectAfterTransition($subscription, 'Changement d’offre réservé à échéance, sous réserve du paiement intégral de la nouvelle période.');
+        return $this->redirectAfterTransition($next, 'Paiement confirmé ; changement appliqué ou programmé selon le mode choisi.');
     }
 
     private function redirectAfterTransition(Subscription $subscription, string $message): RedirectResponse

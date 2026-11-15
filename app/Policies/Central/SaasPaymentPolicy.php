@@ -2,8 +2,10 @@
 
 namespace App\Policies\Central;
 
+use App\Enums\Central\Billing\DocumentStatusEnum;
 use App\Enums\Central\Billing\TransferMethodEnum;
 use App\Enums\Central\Billing\TransferStatusEnum;
+use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
@@ -49,6 +51,8 @@ class SaasPaymentPolicy
     public function receipt(User $actor, SaasPayment $payment): bool
     {
         return $payment->getAttribute('transfer_status') === TransferStatusEnum::VERIFIED
+            && $payment->invoice?->status === DocumentStatusEnum::ISSUED
+            && $payment->invoice->installment->installment_status === InstallmentStatusEnum::PAID
             && $payment->getAttribute('reversal_of_id') === null && $this->view($actor, $payment);
     }
 

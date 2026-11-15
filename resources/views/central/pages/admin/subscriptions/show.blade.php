@@ -30,18 +30,11 @@
             @endforeach
         </dl>
         @if ($subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::SCHEDULED)
-            <flux:callout>Cette période est réservée. Préparez puis émettez sa facture depuis Échéances ; ses droits attendent la confirmation du paiement intégral et sa date de début.</flux:callout>
+            <flux:callout>Cette période est réservée. La facture définitive et le reçu sont produits après contrôle des fonds ; les droits attendent la finalisation et la date de début.</flux:callout>
         @endif
         <div class="flex flex-wrap gap-3">
-            @can('viewAny', \App\Models\Central\Subscriptions\SubscriptionInstallment::class)
-                <flux:button :href="route('central.subscriptions.installments.index', $subscription)">Échéances</flux:button>
-            @endcan
-            @if ($subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::ACTIVE)
-            @can('createInstallment', $subscription)
-                @can('create', \App\Models\Central\Billing\SaasInvoice::class)
-                    <flux:button :href="route('central.invoices.create', $subscription)">Préparer l’échéance et la facture</flux:button>
-                @endcan
-            @endcan
+            @if ($subscription->request)
+                @can('view', $subscription->request)<flux:button :href="route('central.subscription-requests.show', $subscription->request)">Demande et facturation</flux:button>@endcan
             @endif
             @can('history', $subscription)
                 <flux:button :href="route('central.subscriptions.history', $subscription)">Historique des abonnements</flux:button>
@@ -57,7 +50,9 @@
             @endif
             @if ($subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::ACTIVE && $subscription->period_ends_at?->isFuture() && $subscription->ended_at === null && $subscription->plan?->code !== 'free')
                 @can('change', $subscription)
+                    @can('saas.payments.validate')
                     <flux:button :href="route('central.subscriptions.change.form', $subscription)">Changer l’offre</flux:button>
+                    @endcan
                 @endcan
                 @can('close', $subscription)
                     <form method="POST" action="{{ route('central.subscriptions.close', $subscription) }}" x-data x-on:submit="if (! window.confirm('Mettre fin à cet abonnement à la fin de sa période ?')) $event.preventDefault()">

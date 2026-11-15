@@ -30,6 +30,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -170,8 +171,7 @@ test('payment state is derived without changing the issued invoice or PDF', func
 test('T19-01 invoice emission creates a real private PDF and atomic pending delivery', function (): void {
     $f = issuanceFixture();
     $invoice = issuanceDraft($f);
-    $this->actingAs($f['actor'], 'central')->post(route('central.invoices.issue', $invoice), ['expected_state' => $invoice->managementState()])
-        ->assertSessionHasNoErrors()->assertRedirect();
+    app(SaasInvoiceIssuanceService::class)->issue($f['actor'], $invoice, $invoice->managementState());
     $invoice->refresh();
     expect($invoice->status)->toBe(DocumentStatusEnum::ISSUED)->and($invoice->total_amount)->toBe('3000.00');
     expect(app(InvoicePaymentService::class)->states($f['owner'], collect([$invoice]))[$invoice->id])->toBe(PaymentStateEnum::DUE)
@@ -299,8 +299,8 @@ test('staff without invoice rights cannot prepare emit read or download and cons
     $actor = User::factory()->create();
     $actor->assignRole(Role::createWithPermissions('non-billing', ['saas.users.view' => 7]));
     $this->actingAs($actor, 'central')->get(route('central.invoices.show', $invoice))->assertForbidden();
-    $this->post(route('central.invoices.issue', $invoice), ['expected_state' => $invoice->managementState()])->assertForbidden();
-    $this->post(route('central.invoices.installment.store', ['subscription' => $f['subscription'], 'installment' => $f['installment']]), ['billing_rule_uuid' => $f['rule']->uuid])->assertForbidden();
+    expect(fn () => app(SaasInvoiceIssuanceService::class)->issue($actor, $invoice, $invoice->managementState()))->toThrow(AuthorizationException::class);
+    expect(fn () => app(SaasInvoiceService::class)->prepareInstallment($actor, $f['subscription'], $f['installment'], $f['rule']->uuid, $f['installment']->managementState()))->toThrow(AuthorizationException::class);
     $this->get(URL::temporarySignedRoute('central.invoices.download', now()->addMinutes(5), ['invoice' => $invoice]))->assertForbidden();
     expect(BillingSequence::count())->toBe(0);
 });
@@ -389,18 +389,17 @@ test('reserved invoice media cannot be changed or archived through SQL', functio
 
 test('invoice forms enforce server values while owner views and filters remain correctly scoped', function (): void {
     $f = issuanceFixture();
-    $route = route('central.invoices.installment.store', ['subscription' => $f['subscription'], 'installment' => $f['installment']]);
-    $this->actingAs($f['actor'], 'central')->post($route, ['billing_rule_uuid' => $f['rule']->uuid,
-        'expected_state' => $f['installment']->managementState(), 'total_amount' => '1.00'])->assertSessionHasErrors('total_amount');
-    $this->post($route, ['billing_rule_uuid' => $f['rule']->uuid, 'expected_state' => $f['installment']->managementState()])
-        ->assertSessionHasNoErrors()->assertRedirect();
-    $invoice = SaasInvoice::sole();
-    $this->get(route('central.invoices.show', $invoice))->assertOk()->assertSee('3000.00')->assertSee('Émettre la facture');
+    $this->actingAs($f['actor'], 'central')->post('/admin/subscriptions/'.$f['subscription']->uuid.'/installments/'.$f['installment']->uuid.'/invoice', [
+        'billing_rule_uuid' => $f['rule']->uuid, 'expected_state' => $f['installment']->managementState(), 'total_amount' => '1.00',
+    ])->assertNotFound();
+    expect(SaasInvoice::count())->toBe(0);
+    $invoice = issuanceDraft($f);
+    $this->get(route('central.invoices.show', $invoice))->assertOk()->assertSee('3000.00')->assertDontSee('Émettre la facture');
     $this->get(route('central.invoices.index', ['status' => DocumentStatusEnum::ISSUED->value]))->assertOk()->assertSee('Aucune facture préparée.');
-    $this->actingAs($f['owner'], 'central')->get(route('owner.invoices.index'))->assertOk()->assertSee('3000.00');
+    $this->actingAs($f['owner'], 'central')->get(route('owner.billing.index'))->assertOk()->assertSee('3000.00');
     $alias = Route::has('central.alias.0.owner.invoices.index')
         ? 'central.alias.0.owner.invoices.index' : 'central.alias.1.owner.invoices.index';
-    $this->get(route($alias))->assertOk()->assertSee('3000.00');
+    $this->get(route($alias))->assertRedirect(route('owner.billing.index'));
     $this->get(route('owner.invoices.show', $invoice))->assertOk()->assertDontSee('Émettre la facture');
     $this->get(route('central.invoices.show', $invoice))->assertForbidden();
     $this->actingAs(User::factory()->create(), 'central')->get(route('owner.invoices.show', $invoice))->assertForbidden();
@@ -499,3 +498,15 @@ test('browser emits a real isolated invoice and its owner can read and download 
         File::deleteDirectory($runtime);
     }
 })->skip(fn (): bool => getenv('AYDRA_MODULE19_BROWSER') !== '1', 'Requires an interactive browser pilot on isolated data.');
+
+test('payment readers use the integrated dossier without gaining fiscal invoice access', function (): void {
+    $f = issuanceFixture();
+    $invoice = issuanceDraft($f);
+    $actor = User::factory()->create();
+    $actor->assignRole(Role::createWithPermissions('payment-reader-only', ['saas.payments.view' => 7]));
+    expect(Gate::forUser($actor)->allows('view', $invoice))->toBeFalse();
+    $this->actingAs($actor, 'central')->get(route('central.invoices.show', $invoice))->assertOk()
+        ->assertDontSee($invoice->saas_identity_snapshot['nif'])->assertDontSee($invoice->customer_identity_snapshot['nif'])
+        ->assertDontSee('Télécharger le PDF privé');
+    $this->get(URL::temporarySignedRoute('central.invoices.download', now()->addMinutes(5), ['invoice' => $invoice]))->assertForbidden();
+});

@@ -10,10 +10,12 @@ use Database\Seeders\Central\AuthorizationSeeder;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
+require_once dirname(__DIR__, 4).'/Support/ManualBillingFixtures.php';
+
 test('assignment searches paginated merchants and submits the selected owner', function (): void {
     $this->seed(AuthorizationSeeder::class);
     $actor = User::factory()->create(['email' => 'staff-only@example.com']);
-    $actor->assignRole(Role::createWithPermissions('subscription-selector', ['saas.subscriptions.assign' => 7]));
+    $actor->assignRole(Role::createWithPermissions('subscription-selector', ['saas.subscriptions.assign' => 7, 'saas.payments.validate' => 7]));
     $owner = User::factory()->create(['first_name' => 'Karim', 'last_name' => 'Atman', 'email' => 'karim-selector@example.com']);
     User::factory()->count(11)->create();
     User::factory()->create(['first_name' => 'Karim', 'last_name' => 'Suspended', 'status' => StatusEnum::SUSPENDED]);
@@ -43,12 +45,15 @@ test('assignment searches paginated merchants and submits the selected owner', f
     $this->get(route('central.subscriptions.create', ['search' => '%']))
         ->assertOk()->assertSee('Aucun commerçant actif');
 
+    $f = manualPaymentFixture(issued: false);
+    $owner->forceFill($f['owner']->only(['legal_address', 'nif', 'legal_verification_status', 'legal_verified_at', 'legal_verified_by_id', 'legal_profile_version']))->save();
+    config(['central.billing.customers.'.$owner->uuid => [...config('central.billing.customers.'.$f['owner']->uuid), 'name' => $owner->name]]);
     $this->post(route('central.subscriptions.store'), [
         'owner_uuid' => $owner->uuid, 'plan_uuid' => $plan->uuid, 'period' => 1,
-        'operation_key' => (string) Str::uuid(), 'expected_amount' => '500.00',
+        'operation_key' => (string) Str::uuid(), 'expected_amount' => '500.00', 'received' => true, 'reference' => 'TEST-SELECTION', 'occurred_at' => now()->toDateTimeString(),
     ])->assertSessionHasNoErrors()->assertRedirect();
     expect(Subscription::where('user_id', $owner->id)->where('plan_id', $plan->id)->sole()->status)
-        ->toBe(SubscriptionStatus::SCHEDULED);
+        ->toBe(SubscriptionStatus::ACTIVE);
 });
 
 test('merchant lookup refuses unauthorized readers and invalid search parameters', function (): void {
@@ -57,7 +62,7 @@ test('merchant lookup refuses unauthorized readers and invalid search parameters
     $actor->assignRole(Role::createWithPermissions('subscription-reader-selector', ['saas.subscriptions.view' => 7]));
     $this->actingAs($actor, 'central')->get(route('central.subscriptions.create', ['search' => 'Karim']))->assertForbidden();
     Livewire::test('central::components.subscriptions.owner-selector')->assertForbidden();
-    $actor->givePermissionTo('saas.subscriptions.assign');
+    $actor->givePermissionTo(['saas.subscriptions.assign', 'saas.payments.validate']);
     $this->get(route('central.subscriptions.create', ['search' => ['invalid']]))->assertSessionHasErrors('search');
     $this->get(route('central.subscriptions.create', ['owner' => 'invalid']))->assertSessionHasErrors('owner');
     $selector = Livewire::test('central::components.subscriptions.owner-selector');

@@ -1,8 +1,8 @@
-<x-layouts::app title="Ma facturation SaaS">
+<x-layouts::app title="Factures SaaS">
     <section class="mx-auto flex w-full max-w-7xl flex-col gap-7">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-                <flux:heading size="xl" level="1">Ma facturation SaaS</flux:heading>
+                <flux:heading size="xl" level="1">Factures SaaS</flux:heading>
                 <flux:text>Mes échéances, factures, paiements, reçus et corrections documentaires.</flux:text>
             </div>
             <flux:button :href="route('owner.subscriptions.index')">Mes offres et abonnements</flux:button>
@@ -30,8 +30,8 @@
             </article>
             <article class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
                 <flux:text>Documents</flux:text>
-                <flux:button :href="route('owner.invoices.index')" size="sm">Toutes mes factures</flux:button>
-                <flux:button :href="route('owner.credit-notes.index')" size="sm">Tous mes avoirs</flux:button>
+                <flux:button :href="route('owner.subscription-requests.index')" size="sm">Mes demandes</flux:button>
+                <flux:button href="#owner-credits-heading" size="sm">Tous mes avoirs</flux:button>
             </article>
         </div>
 
@@ -127,14 +127,14 @@
                                 <td class="p-3">{{ $payment->getAttribute('transfer_method')->label() }}</td>
                                 <td class="p-3">{{ $payment->statusLabel() }}</td>
                                 <td class="p-3">
-                                    <a class="mr-3 underline" href="{{ route('owner.payments.show', $payment) }}">Détails</a>
+                                    <a class="mr-3 underline" href="{{ route('owner.invoices.show', $payment->invoice).'#payment-'.$payment->uuid }}">Détails</a>
                                     @can('receipt', $payment)
                                         <a class="mr-3 underline" href="{{ \Illuminate\Support\Facades\URL::temporarySignedRoute('owner.payments.receipt', now()->addMinutes(10), ['payment' => $payment]) }}">Reçu privé</a>
                                     @endcan
                                     @if ($payment->getAttribute('proof_media_id') !== null)
                                         <a class="mr-3 underline" href="{{ \Illuminate\Support\Facades\URL::temporarySignedRoute('owner.payments.proof', now()->addMinutes(10), ['payment' => $payment]) }}">Justificatif</a>
                                     @endif
-                                    <a class="underline" href="{{ route('owner.billing.corrections.create', $payment) }}">Signaler une erreur</a>
+                                    <a class="underline" href="{{ route('owner.invoices.show', $payment->invoice).'#payment-'.$payment->uuid }}">Signaler une erreur</a>
                                 </td>
                             </tr>
                         @empty

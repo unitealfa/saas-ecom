@@ -7,7 +7,6 @@ use App\Enums\Central\Billing\PolicyStatusEnum;
 use App\Enums\Central\Billing\TriggerEventEnum;
 use App\Models\Central\Audit\Activity;
 use App\Models\Central\Billing\BillingRule;
-use App\Models\Central\Billing\BillingSequence;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use Carbon\CarbonImmutable;
@@ -77,15 +76,6 @@ class BillingRuleService
             ->orderBy('code')->orderByDesc('version')->paginate(self::PER_PAGE)->withQueryString();
     }
 
-    /** @return LengthAwarePaginator<int, BillingSequence> */
-    public function sequences(User $actor): LengthAwarePaginator
-    {
-        $this->assertCentralContext();
-        Gate::forUser($actor)->authorize('viewAny', BillingSequence::class);
-
-        return BillingSequence::orderByDesc('fiscal_year')->orderBy('document_type')->paginate(self::PER_PAGE);
-    }
-
     /** @return LengthAwarePaginator<int, BillingRule> */
     public function versions(User $actor, BillingRule $rule): LengthAwarePaginator
     {
@@ -142,6 +132,96 @@ class BillingRuleService
                 }
                 $rule->save();
                 $this->audit($actor, $rule, self::EVENT_UPDATED, $before);
+            });
+    }
+
+    /** @return array<string, mixed> */
+    public static function parameterRules(bool $initial = false): array
+    {
+        return [
+            ...($initial ? ['document_type' => ['required', 'integer', Rule::enum(DocumentTypeEnum::class)],
+                'operation_uuid' => ['required', 'uuid:4']] : ['expected_state' => ['required', 'string', 'regex:'.BillingRule::STATE_PATTERN]]),
+            'payment_due_days' => ['required', 'integer', 'min:0'],
+            'validation_reference' => ['required', 'string', 'max:2000'],
+            ...array_fill_keys(['code', 'version', 'policy_status', 'effective_at', 'ends_at', 'trigger_event', 'parameters',
+                ...($initial ? ['expected_state'] : ['operation_uuid', 'document_type'])], ['missing']),
+        ];
+    }
+
+    /** @param array<string, mixed> $data */
+    public function configureInitial(User $actor, array $data): BillingRule
+    {
+        $this->assertCentralContext();
+        $values = Validator::make($data, self::parameterRules(initial: true))->validate();
+
+        return $this->mutations->run($actor, 'create', fn () => BillingRule::class, function () use ($actor, $values): BillingRule {
+            $invoice = (int) $values['document_type'] === DocumentTypeEnum::INVOICE->value;
+            $code = $invoice ? (config('central.billing.request_rule_code') ?: 'subscription.invoice') : 'invoice.correction';
+            $content = $this->content(['code' => $code,
+                'trigger_event' => $invoice ? TriggerEventEnum::INSTALLMENT_DUE : TriggerEventEnum::INVOICE_CORRECTION,
+                'parameters' => ['document_type' => (int) $values['document_type'], 'payment_due_days' => $values['payment_due_days']]]);
+            $operation = 'saas:rule:'.$actor->uuid.':'.strtolower($values['operation_uuid']);
+            $existing = BillingRule::where('code', $code)->orderBy('version')->lockForUpdate()->first();
+            if ($existing !== null && $existing->operation_key !== $operation) {
+                $this->fail('conflict', 'Ce type de document est déjà configuré. Modifiez ses paramètres existants.');
+            }
+            $rule = $this->insert($actor, $content, 1, $values['operation_uuid']);
+            if ($rule->policy_status !== PolicyStatusEnum::DRAFT) {
+                if ($rule->validation_reference !== $values['validation_reference']) {
+                    $this->fail('conflict', 'Cette opération est déjà validée avec une autre référence.');
+                }
+
+                return $rule;
+            }
+            $start = now()->toImmutable()->startOfSecond();
+            $this->assertNoOverlap($rule, $start, null);
+            $before = $this->snapshot($rule);
+            $rule->forceFill(['policy_status' => PolicyStatusEnum::VALIDATED,
+                'validated_by_id' => $actor->id, 'validated_at' => now(), 'validation_reference' => $values['validation_reference']])->save();
+            $this->audit($actor, $rule, self::EVENT_VALIDATED, $before);
+            $before = $this->snapshot($rule);
+            $rule->forceFill(['policy_status' => PolicyStatusEnum::ACTIVE, 'effective_at' => $start])->save();
+            $this->audit($actor, $rule, self::EVENT_ACTIVATED, $before);
+
+            return $rule->refresh();
+        });
+    }
+
+    /** @param array<string, mixed> $data */
+    public function configure(User $actor, BillingRule $rule, array $data): BillingRule
+    {
+        $this->assertCentralContext();
+        $values = Validator::make($data, self::parameterRules())->validate();
+
+        return $this->mutations->run($actor, 'configure', fn () => $this->lock($rule, $values['expected_state']),
+            function (BillingRule $current) use ($actor, $values): BillingRule {
+                $content = $this->content(['code' => $current->code, 'trigger_event' => $current->trigger_event,
+                    'parameters' => ['document_type' => $current->parameters['document_type'], 'payment_due_days' => $values['payment_due_days']]]);
+                $start = now()->toImmutable()->startOfSecond();
+                if ($current->policy_status === PolicyStatusEnum::ACTIVE) {
+                    if ($current->effective_at === null || $start->lessThanOrEqualTo($current->effective_at)) {
+                        $this->fail('conflict', 'Ce paramétrage vient d’être enregistré ou prend effet ultérieurement. Rechargez après sa prise d’effet.');
+                    }
+                    $before = $this->snapshot($current);
+                    $current->forceFill(['ends_at' => $start, 'policy_status' => PolicyStatusEnum::RETIRED])->save();
+                    $this->audit($actor, $current, self::EVENT_RETIRED, $before, $values['validation_reference']);
+                }
+                if ($current->policy_status !== PolicyStatusEnum::DRAFT || $current->isUsed()) {
+                    $version = (int) BillingRule::where('code', $current->code)->max('version') + 1;
+                    $current = $this->insert($actor, $content, $version, (string) Str::uuid());
+                } else {
+                    $current->forceFill($content)->save();
+                }
+                $this->assertNoOverlap($current, $start, null);
+                $before = $this->snapshot($current);
+                $current->forceFill(['policy_status' => PolicyStatusEnum::VALIDATED,
+                    'validated_by_id' => $actor->id, 'validated_at' => now(), 'validation_reference' => $values['validation_reference']])->save();
+                $this->audit($actor, $current, self::EVENT_VALIDATED, $before);
+                $before = $this->snapshot($current);
+                $current->forceFill(['policy_status' => PolicyStatusEnum::ACTIVE, 'effective_at' => $start, 'ends_at' => null])->save();
+                $this->audit($actor, $current, self::EVENT_ACTIVATED, $before);
+
+                return $current->refresh();
             });
     }
 

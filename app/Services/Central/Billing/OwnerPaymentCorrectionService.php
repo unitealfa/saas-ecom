@@ -5,6 +5,7 @@ namespace App\Services\Central\Billing;
 use App\Enums\Central\Billing\DocumentStatusEnum;
 use App\Models\Central\Audit\Activity;
 use App\Models\Central\Billing\SaasCreditNote;
+use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
@@ -30,6 +31,48 @@ final class OwnerPaymentCorrectionService
     public const string DECISION_CREDIT_NOTE = 'corrected_with_credit';
 
     public function __construct(private readonly CentralUserAccess $access) {}
+
+    /** @return array<string, mixed> */
+    public function reports(User $actor, ?SaasInvoice $invoice = null): array
+    {
+        abort_if(tenancy()->initialized, 403);
+        Gate::forUser($actor)->authorize('viewAny', SaasPayment::class);
+        $reports = Activity::query()
+            ->where('event', OwnerPaymentCorrectionService::EVENT)
+            ->where('subject_type', (new SaasPayment)->getMorphClass())
+            ->when($invoice !== null, fn ($query) => $query->whereIn('subject_id', $invoice->payments()->select('id')))
+            ->with('subject.invoice')
+            ->orderByDesc('id')
+            ->paginate(20, ['*'], 'report_page')
+            ->withQueryString();
+
+        $reportUuids = $reports->getCollection()->pluck('uuid');
+        $reportDecisions = Activity::query()
+            ->where('event', OwnerPaymentCorrectionService::REVIEWED_EVENT)
+            ->where('subject_type', (new SaasPayment)->getMorphClass())
+            ->whereIn('properties->report_uuid', $reportUuids)
+            ->orderByDesc('id')
+            ->get()
+            ->unique(fn (Activity $decision): string => (string) ($decision->properties['report_uuid'] ?? ''))
+            ->keyBy(fn (Activity $decision): string => (string) $decision->properties['report_uuid']);
+
+        $invoiceIds = $reports->getCollection()
+            ->map(fn (Activity $report): ?int => $report->subject instanceof SaasPayment
+                ? (int) $report->subject->getAttribute('document_id')
+                : null)
+            ->filter(fn (?int $invoiceId): bool => $invoiceId !== null && $invoiceId > 0)
+            ->unique();
+        $creditsByInvoiceId = SaasCreditNote::query()
+            ->whereIn('original_invoice_id', $invoiceIds)
+            ->where('status', DocumentStatusEnum::ISSUED)
+            ->orderByDesc('issued_at')
+            ->get()
+            ->groupBy('original_invoice_id');
+
+        return ['reports' => $reports, 'reportDecisions' => $reportDecisions,
+            'creditsByInvoiceId' => $creditsByInvoiceId,
+            'canReview' => $this->access->allows($actor, 'saas.payments.reconcile')];
+    }
 
     /** @return array<string, list<string>> */
     public static function rules(): array

@@ -6,6 +6,7 @@ use App\Enums\Central\Billing\DocumentStatusEnum;
 use App\Enums\Central\Billing\TransferMethodEnum;
 use App\Enums\Central\Billing\TransferStatusEnum;
 use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
+use App\Enums\Central\Subscriptions\RequestStatusEnum;
 use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Billing\SaasPayment;
@@ -48,7 +49,8 @@ class SaasPaymentService
 
     public function __construct(private readonly AuthorizationMutation $mutations,
         private readonly PaymentDocumentService $documents, private readonly PaidSubscriptionActivation $subscriptions,
-        private readonly InvoicePaymentService $balances, private readonly SubscriptionRequestPaymentState $requests) {}
+        private readonly InvoicePaymentService $balances, private readonly SubscriptionRequestPaymentState $requests,
+        private readonly SaasInvoiceIssuanceService $issuance) {}
 
     /** @param array<string, mixed> $filters
      * @return LengthAwarePaginator<int, SaasPayment>
@@ -141,7 +143,9 @@ class SaasPaymentService
                 'occurred_at' => $payment->getAttribute('occurred_at')->toDateTimeString()]);
         }
         if ($payment->getAttribute('transfer_status') === TransferStatusEnum::VERIFIED) {
-            $this->documents->generatePaymentReceipt($actor, $payment);
+            $this->finalizeRequestPayment($actor, $payment);
+
+            return $payment->refresh();
         }
 
         return $payment;
@@ -175,6 +179,12 @@ class SaasPaymentService
         });
         $this->documents->prepareInternalProof($actor, $current);
         if ($current->getAttribute('transfer_status') !== TransferStatusEnum::DECLARED) {
+            if ($current->getAttribute('transfer_status') === TransferStatusEnum::VERIFIED) {
+                $this->finalizeRequestPayment($actor, $current);
+
+                return $current->refresh();
+            }
+
             return $current;
         }
 
@@ -218,9 +228,9 @@ class SaasPaymentService
         return $this->mutations->run($actor, $cash ? 'recordCashPayment' : 'declarePayment', fn () => $this->lockInvoice($invoice),
             function (SaasInvoice $current) use ($actor, $data, $proof, $cash): SaasPayment {
                 $values = Validator::make($data, self::declarationRules($cash))->validate();
-                $this->requests->assertInvoice($current);
-                if ($current->status !== DocumentStatusEnum::ISSUED) {
-                    $this->fail('Seule une facture émise peut recevoir une déclaration de paiement.');
+                $request = $this->requests->assertInvoice($current);
+                if ($current->status !== DocumentStatusEnum::ISSUED && ($request === null || $current->status !== DocumentStatusEnum::DRAFT)) {
+                    $this->fail('Une obligation valide est nécessaire pour déclarer ce paiement.');
                 }
                 $amount = (string) BigDecimal::of($values['amount'])->toScale(2);
                 $method = $cash ? TransferMethodEnum::CASH_IN_PERSON : TransferMethodEnum::from((int) $values['method']);
@@ -245,7 +255,7 @@ class SaasPaymentService
                         return $previous;
                     }
                 }
-                $netDue = $this->balances->balance($actor, $current)['net_due'];
+                $netDue = $current->status === DocumentStatusEnum::ISSUED ? $this->balances->balance($actor, $current)['net_due'] : $current->total_amount;
                 $anomaly = $amount !== $netDue || $payments->contains(fn (SaasPayment $p): bool => $p->getAttribute('transfer_status') === TransferStatusEnum::VERIFIED);
                 $payment = new SaasPayment;
                 $uuid = (string) Str::uuid();
@@ -292,10 +302,10 @@ class SaasPaymentService
                     if (! hash_equals($current->managementState(), $values['expected_state'])) {
                         $this->fail('La déclaration a changé. Rechargez avant de prendre une décision.');
                     }
-                    $this->requests->assertCurrentPayment($current);
+                    $request = $this->requests->assertCurrentPayment($current);
                     $invoice = $current->invoice;
                     $due = $invoice->installment;
-                    if ($invoice->status !== DocumentStatusEnum::ISSUED
+                    if (($invoice->status !== DocumentStatusEnum::ISSUED && ($request === null || ! in_array($invoice->status, [DocumentStatusEnum::DRAFT, DocumentStatusEnum::PREPARING], true)))
                         || $current->getAttribute('currency') !== $invoice->currency) {
                         $this->fail('Cette obligation exige un seul paiement intégral non encore confirmé, dans la bonne devise.');
                     }
@@ -304,7 +314,7 @@ class SaasPaymentService
                         $this->fail('Les espèces utilisent leur référence interne et le registre central, sans référence bancaire.');
                     }
                     $this->documents->assertProof($current);
-                    $netDue = $this->balances->balance($actor, $invoice)['net_due'];
+                    $netDue = $invoice->status === DocumentStatusEnum::ISSUED ? $this->balances->balance($actor, $invoice)['net_due'] : $invoice->total_amount;
                     $received = ['occurred_at' => CarbonImmutable::parse($values['occurred_at']),
                         'transfer_reference' => $current->getAttribute('transfer_method') === TransferMethodEnum::CASH_IN_PERSON ? $current->getAttribute('transfer_reference') : $reference,
                         'financial_account_key' => $accountKey,
@@ -322,8 +332,11 @@ class SaasPaymentService
                     }
                     $current->forceFill([...$received, 'transfer_status' => TransferStatusEnum::VERIFIED, 'validated_by_id' => $actor->id,
                         'validated_at' => now(), 'transaction_fingerprint' => $fingerprint])->save();
-                    $this->subscriptions->activatePaidSubscription($actor, $invoice->subscription, $due);
-                    $this->requests->verified($actor, $current);
+                    if ($request === null) {
+                        $this->subscriptions->activatePaidSubscription($actor, $invoice->subscription, $due);
+                    } else {
+                        $this->requests->confirmed($actor, $current);
+                    }
                     $this->audit($actor, $current, self::VERIFIED, 'Réception intégrale des fonds confirmée ; période payée.');
 
                     return $current->refresh();
@@ -335,10 +348,43 @@ class SaasPaymentService
             $this->fail('Cette réception de fonds est déjà associée à un paiement vérifié. Aucun second règlement enregistré.');
         }
         if ($result->getAttribute('transfer_status') === TransferStatusEnum::VERIFIED) {
-            $this->documents->generatePaymentReceipt($actor, $result);
+            $this->finalizeRequestPayment($actor, $result);
+            $result->refresh();
         }
 
         return $result;
+    }
+
+    private function finalizeRequestPayment(User $actor, SaasPayment $payment): void
+    {
+        $invoice = $payment->invoice;
+        $request = $invoice->subscription->request;
+        if ($request === null || $request->status === RequestStatusEnum::ACCEPTED) {
+            $this->documents->generatePaymentReceipt($actor, $payment);
+
+            return;
+        }
+        $this->issuance->issueForRequest($actor, $invoice, $invoice->managementState());
+        $this->mutations->run($actor, 'verify', fn () => $this->lockPayment($payment), function (SaasPayment $current): void {
+            $this->requests->assertCurrentPayment($current);
+            if ($current->invoice->status !== DocumentStatusEnum::ISSUED || $current->getAttribute('transfer_status') !== TransferStatusEnum::VERIFIED) {
+                $this->fail('Un paiement confirmé et une facture émise sont nécessaires avant le reçu.');
+            }
+            $current->invoice->installment->forceFill(['installment_status' => InstallmentStatusEnum::PAID])->save();
+        });
+        $this->documents->generatePaymentReceipt($actor, $payment);
+        $this->mutations->run($actor, 'verify', fn () => $this->lockPayment($payment), function (SaasPayment $current) use ($actor): void {
+            $request = $current->invoice->subscription->request;
+            if ($request?->status === RequestStatusEnum::ACCEPTED) {
+                return;
+            }
+            $this->requests->assertCurrentPayment($current);
+            if ($current->invoice->status !== DocumentStatusEnum::ISSUED || $current->getAttribute('transfer_status') !== TransferStatusEnum::VERIFIED) {
+                $this->fail('La facture définitive doit être émise avant l’activation.');
+            }
+            $this->subscriptions->activatePaidSubscription($actor, $current->invoice->subscription, $current->invoice->installment);
+            $this->requests->verified($actor, $current);
+        });
     }
 
     public function rejectPayment(User $actor, SaasPayment $payment, string $expected, string $reason): SaasPayment

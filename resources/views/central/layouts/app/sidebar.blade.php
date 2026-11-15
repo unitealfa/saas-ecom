@@ -17,6 +17,12 @@
                         {{ __('Dashboard') }}
                     </flux:sidebar.item>
 
+                    @can('viewAny', \App\Models\Central\Notifications\DatabaseNotification::class)
+                        <flux:sidebar.item :href="route('notifications.index')" :current="request()->routeIs('notifications.*')" wire:navigate>
+                            Notifications ({{ auth('central')->user()->unreadNotifications()->count() }})
+                        </flux:sidebar.item>
+                    @endcan
+
                     @canany(['viewOperations', 'reconcileSubscriptions', 'reconcilePayments'], \App\Models\User::class)
                         <flux:sidebar.item icon="server" :href="route('central.operations.index')" :current="request()->routeIs('central.operations.*')" wire:navigate>Exploitation</flux:sidebar.item>
                     @endcanany
@@ -51,41 +57,27 @@
                     @can('viewAny', \App\Models\Central\Media\Media::class)
                         <flux:sidebar.item :href="route('central.media.index')" :current="request()->routeIs('central.media.*')" wire:navigate>{{ __('Fichiers centraux') }}</flux:sidebar.item>
                     @endcan
-                    @can('viewAny', \App\Models\Central\Billing\BillingRule::class)
-                        <flux:sidebar.item :href="route('central.billing-rules.index')" :current="request()->routeIs('central.billing-rules.*')" wire:navigate>Facturation — Configuration</flux:sidebar.item>
-                    @endcan
-                    @can('viewAny', \App\Models\Central\Billing\BillingSequence::class)
-                        <flux:sidebar.item :href="route('central.billing-sequences.index')" :current="request()->routeIs('central.billing-sequences.*')" wire:navigate>Compteurs de facturation</flux:sidebar.item>
-                    @endcan
+
+
                     @can('viewAny', \App\Models\Central\Billing\SaasCreditNote::class)
                         <flux:sidebar.item :href="route('central.credit-notes.index')" :current="request()->routeIs('central.credit-notes.*')" wire:navigate>Avoirs SaaS</flux:sidebar.item>
                     @endcan
-                    @can('viewAny', \App\Models\Central\Billing\SaasInvoice::class)
+                    @can('viewBillingDossiers', \App\Models\Central\Billing\SaasInvoice::class)
                         <flux:sidebar.item :href="route('central.invoices.index')" :current="request()->routeIs('central.invoices.*')" wire:navigate>Factures SaaS</flux:sidebar.item>
                     @endcan
-                    @can('viewAny', \App\Models\Central\Billing\SaasPayment::class)
-                        <flux:sidebar.item :href="route('central.payments.index')" :current="request()->routeIs('central.payments.index', 'central.payments.show')" wire:navigate>Paiements SaaS</flux:sidebar.item>
-                        <flux:sidebar.item :href="route('central.payments.corrections.index')" :current="request()->routeIs('central.payments.corrections.*')" wire:navigate>Signalements de paiements</flux:sidebar.item>
-                    @endcan
+
 
                     {{-- Nouveau tableau de bord commerçant : C-157/C-158/C-159/C-162. --}}
                     @can('viewOwn', \App\Models\Central\Billing\SaasInvoice::class)
                         <flux:sidebar.item icon="building-storefront" :href="route('dashboard').'#mes-boutiques'">Mes boutiques</flux:sidebar.item>
-                        <flux:sidebar.item :href="route('owner.billing.index')" :current="request()->routeIs('owner.billing.*')" wire:navigate>Ma facturation</flux:sidebar.item>
+                        <flux:sidebar.item :href="route('owner.billing.index')" :current="request()->routeIs('owner.billing.*')" wire:navigate>Factures</flux:sidebar.item>
                     @endcan
-                    @can('viewOwn', \App\Models\Central\Billing\SaasCreditNote::class)
-                        <flux:sidebar.item :href="route('owner.credit-notes.index')" :current="request()->routeIs('owner.credit-notes.*')" wire:navigate>Mes avoirs</flux:sidebar.item>
-                    @endcan
-                    @can('viewOwn', \App\Models\Central\Billing\SaasPayment::class)
-                        <flux:sidebar.item :href="route('owner.payments.index')" :current="request()->routeIs('owner.payments.*')" wire:navigate>Mes paiements</flux:sidebar.item>
-                    @endcan
+
+
                     @can('purchase', \App\Models\Central\Subscriptions\Subscription::class)
-                        <flux:sidebar.item :href="route('owner.subscription-requests.index')" :current="request()->routeIs('owner.subscription-requests.*')" wire:navigate>Mes demandes d’abonnement</flux:sidebar.item>
                         <flux:sidebar.item :href="route('owner.subscriptions.index')" :current="request()->routeIs('owner.subscriptions.*')" wire:navigate>Mon abonnement et les offres</flux:sidebar.item>
                     @endcan
-                    @can('viewOwn', \App\Models\Central\Billing\SaasInvoice::class)
-                        <flux:sidebar.item :href="route('owner.invoices.index')" :current="request()->routeIs('owner.invoices.*')" wire:navigate>Mes factures et avoirs</flux:sidebar.item>
-                    @endcan
+
 
                     @can('viewAny', \App\Models\Central\Shipping\PickupPoint::class)
                         <flux:sidebar.item :href="route('central.pickup-points.index')" :current="request()->routeIs('central.pickup-points.*')" wire:navigate>{{ __('Bureaux de retrait') }}</flux:sidebar.item>
