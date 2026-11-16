@@ -87,7 +87,7 @@ test('T21-03 and T21-04 external proof is private and requires actual full confi
     $payment = SaasPayment::sole();
     expect($payment->getAttribute('transfer_status'))->toBe(TransferStatusEnum::DECLARED)
         ->and($f['subscription']->refresh()->status)->toBe(StatusEnum::SCHEDULED);
-    $this->get(route('owner.payments.show', $payment))->assertOk()->assertSee('À vérifier')->assertDontSee('Confirmer la réception intégrale');
+    $this->get(route('owner.invoices.show', $payment->invoice))->assertOk()->assertSee('À vérifier')->assertDontSee('Confirmer la réception intégrale');
     $this->post(route('central.payments.verify', $payment), manualVerification($payment))->assertForbidden();
     $this->actingAs($f['actor'], 'central')->post(route('central.payments.verify', $payment), manualVerification($payment))
         ->assertSessionHasNoErrors()->assertRedirect();
@@ -131,7 +131,7 @@ test('T21-09 and T21-17 foreign owners cannot declare or download another owners
     $f = manualPaymentFixture();
     $payment = app(SaasPaymentService::class)->recordCashPayment($f['actor'], $f['invoice'], [...manualExternalPayload(), 'received' => true]);
     $this->actingAs(User::factory()->create(), 'central')->get(route('owner.payments.create', $f['invoice']))->assertForbidden();
-    $this->get(route('owner.payments.show', $payment))->assertForbidden();
+    $this->get(route('owner.invoices.show', $payment->invoice))->assertForbidden();
     $this->get(URL::temporarySignedRoute('owner.payments.receipt', now()->addMinutes(5), ['payment' => $payment]))->assertForbidden();
     $this->get(URL::temporarySignedRoute('owner.payments.proof', now()->addMinutes(5), ['payment' => $payment]))->assertForbidden();
 });
@@ -165,7 +165,7 @@ test('external rejection requires a reason and preserves evidence and administra
         ->assertSessionHasErrors('reason');
     $this->post(route('central.payments.reject', $payment), ['expected_state' => $payment->managementState(), 'reason' => 'Fonds non reçus'])
         ->assertSessionHasNoErrors();
-    $this->actingAs($f['owner'], 'central')->get(route('owner.payments.show', $payment))->assertOk()->assertSee('Fonds non reçus')->assertDontSee('Historique');
+    $this->actingAs($f['owner'], 'central')->get(route('owner.invoices.show', $payment->invoice))->assertOk()->assertSee('Fonds non reçus')->assertDontSee('Historique');
     expect($payment->refresh()->getAttribute('transfer_status'))->toBe(TransferStatusEnum::REJECTED)
         ->and(Activity::forSubject($payment)->where('event', SaasPaymentService::REJECTED)->count())->toBe(1);
 });
@@ -196,18 +196,17 @@ test('T21-18 a paid future period preserves current rights and activates only at
         ->and($payment->refresh()->getAttribute('transfer_status'))->toBe(TransferStatusEnum::VERIFIED);
 });
 
-test('new administrative paid assignments wait for payment without granting premium rights', function (): void {
-    $f = manualPaymentFixture();
-    $owner = User::factory()->create();
+test('new administrative paid assignments require received funds and produce the final documents', function (): void {
+    $f = manualPaymentFixture(issued: false);
+    $f['subscription']->forceFill(['status' => StatusEnum::CANCELLED])->save();
     $plan = Plan::factory()->create(['is_active' => true, 'monthly_price' => '3000.00']);
-
     $assigned = app(SubscriptionAssignmentService::class)->assign($f['actor'], [
-        'owner_uuid' => $owner->uuid, 'plan_uuid' => $plan->uuid, 'period' => 1, 'expected_amount' => '3000.00', 'operation_key' => (string) Str::uuid()]);
-
-    expect($assigned->status)->toBe(StatusEnum::SCHEDULED)
-        ->and(SubscriptionInstallment::where('subscription_id', $assigned->getKey())->sole()->installment_status)->toBe(InstallmentStatusEnum::PENDING);
-    $this->actingAs($f['actor'], 'central')->get(route('central.subscriptions.show', $assigned))->assertOk()
-        ->assertSee('ses droits attendent la confirmation du paiement intégral')->assertDontSee('Préparer l’échéance et la facture');
+        'owner_uuid' => $f['owner']->uuid, 'plan_uuid' => $plan->uuid, 'period' => 1, 'expected_amount' => '3000.00',
+        'operation_key' => (string) Str::uuid(), 'received' => true, 'reference' => 'TEST-ASSIGN', 'occurred_at' => now()->toDateTimeString(),
+    ]);
+    expect($assigned->status)->toBe(StatusEnum::ACTIVE)
+        ->and(SubscriptionInstallment::where('subscription_id', $assigned->getKey())->sole()->installment_status)->toBe(InstallmentStatusEnum::PAID);
+    $this->actingAs($f['actor'], 'central')->get(route('central.subscriptions.show', $assigned))->assertOk()->assertSee('Demande et facturation')->assertDontSee('Préparer l’échéance et la facture');
 });
 
 test('payment permission seeding preserves existing identities labels and assignments', function (): void {
@@ -232,10 +231,10 @@ test('malformed form values return validation errors without breaking the paymen
     $this->actingAs($f['actor'], 'central')->post(route('central.payments.cash.store', $f['invoice']), [
         'amount' => [], 'occurred_at' => [], 'operation_id' => [], 'currency' => 'DZD', 'received' => true,
     ])->assertSessionHasErrors(['amount', 'occurred_at', 'operation_id']);
-    $this->get(route('central.payments.cash.create', $f['invoice']))->assertOk();
+    $this->get(route('central.invoices.show', $f['invoice']))->assertOk();
     $this->post(route('central.payments.verify', $payment), [...manualVerification($payment), 'account' => [], 'reference' => []])
         ->assertSessionHasErrors(['account', 'reference']);
-    $this->get(route('central.payments.show', $payment))->assertOk();
+    $this->get(route('central.invoices.show', $payment->invoice))->assertOk();
     $this->actingAs($f['owner'], 'central')->post(route('owner.subscriptions.store'), [
         'plan_uuid' => $f['subscription']->plan->uuid, 'operation_id' => [], 'period' => [], 'expected_amount' => [],
     ])->assertSessionHasErrors(['operation_id', 'period', 'expected_amount']);
@@ -277,7 +276,7 @@ test('T21-10 all payment administrative endpoints reject staff without payment p
     $staff->assignRole(Role::createWithPermissions('payment-staff-'.Str::random(8), ['saas.users.view' => 7]));
     $this->actingAs($staff, 'central');
     $this->get(route('central.payments.index'))->assertForbidden();
-    $this->get(route('central.payments.show', $payment))->assertForbidden();
+    $this->get(route('central.invoices.show', $payment->invoice))->assertForbidden();
     $this->get(route('central.payments.cash.create', $f['invoice']))->assertForbidden();
     $this->post(route('central.payments.cash.store', $f['invoice']), [])->assertForbidden();
     foreach (['verify', 'reject', 'reconcile'] as $action) {

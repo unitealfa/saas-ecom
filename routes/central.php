@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Central\Auth\RegistrationStatusController;
 use App\Http\Controllers\Central\Dashboard\DashboardController;
+use App\Http\Controllers\Central\Notifications\NotificationController;
 use App\Http\Controllers\Central\Owner\Billing\CreditNoteController;
 use App\Http\Controllers\Central\Owner\Billing\InvoiceController;
 use App\Http\Controllers\Central\Owner\Billing\OwnerBillingOverviewController;
@@ -26,6 +27,10 @@ Route::get('inscription/statut', RegistrationStatusController::class)
 
 Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class])->group(function (): void {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::controller(NotificationController::class)->prefix('notifications')->name('notifications.')->group(function (): void {
+        Route::get('/', 'index')->name('index');
+        Route::patch('{notification}/read', 'read')->whereUuid('notification')->name('read');
+    });
 
     Route::name('owner.')->group(function (): void {
         // C-157/C-158/C-159/C-162: owner overview and append-only correction requests.
@@ -42,7 +47,7 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
         Route::controller(SubscriptionRequestController::class)->prefix('demandes-abonnement')->name('subscription-requests.')->whereUuid('subscriptionRequest')->group(function (): void {
             Route::get('/', 'index')->name('index');
             Route::get('{subscriptionRequest}', 'show')->name('show');
-            Route::post('{subscriptionRequest}/invoice', 'prepareInvoice')->name('invoice');
+            Route::get('{subscriptionRequest}/initial-proof', 'initialProof')->middleware('signed')->name('initial-proof');
             Route::patch('{subscriptionRequest}/choice', 'choice')->name('choice');
             Route::put('{subscriptionRequest}', 'revise')->name('revise');
             Route::post('{subscriptionRequest}/cancel', 'cancel')->name('cancel');

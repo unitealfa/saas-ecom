@@ -11,11 +11,13 @@ use App\Models\Central\Audit\Activity;
 use App\Models\Central\Billing\SaasCreditNote;
 use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Features\Feature;
+use App\Models\Central\Media\Media;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Plans\PlanFeature;
 use App\Models\Central\Roles\Role;
 use App\Models\Central\Subscriptions\SubscriptionRequest;
 use App\Models\User;
+use App\Notifications\Central\Subscriptions\SubscriptionWorkflowNotification;
 use App\Services\Central\Billing\BillingRuleService;
 use App\Services\Central\Billing\PaymentDocumentService;
 use App\Services\Central\Billing\SaasCreditNoteService;
@@ -23,15 +25,20 @@ use App\Services\Central\Billing\SaasInvoiceIssuanceService;
 use App\Services\Central\Billing\SaasPaymentService;
 use App\Services\Central\Media\PrivateMediaAccessService;
 use App\Services\Central\Plans\PublicPlanCatalog;
+use App\Services\Central\Subscriptions\DefaultSubscription;
 use App\Services\Central\Subscriptions\SubscriptionRequestPaymentState;
 use App\Services\Central\Subscriptions\SubscriptionRequestService;
+use App\Services\Central\Subscriptions\SubscriptionWorkflowNotifier;
 use Database\Factories\Central\MediaFactory;
+use Database\Seeders\Central\FreePlanSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -56,10 +63,30 @@ function subscriptionRequestInput(array $f): array
         'payment_choice' => PaymentChoiceEnum::CASH->value, 'operation_id' => (string) Str::uuid()];
 }
 
+function requestWithInitialProof(array $f): SubscriptionRequest
+{
+    $payment = manualExternalPayload();
+    unset($payment['operation_id'], $payment['currency']);
+
+    return app(SubscriptionRequestService::class)->create($f['owner'], [
+        ...subscriptionRequestInput($f), 'payment_choice' => PaymentChoiceEnum::EXTERNAL->value, 'payment' => $payment,
+    ], UploadedFile::fake()->image('initial-proof.png'));
+}
+
+function issueHistoricalRequest(array $f, SubscriptionRequest $request): SubscriptionRequest
+{
+    app(SaasInvoiceIssuanceService::class)->issue($f['actor'], $request->invoice, $request->invoice->managementState());
+
+    return $request->refresh();
+}
+
 test('invoice and receipt open as protected printable PDFs without changing normal downloads', function (): void {
     $f = requestFixture();
     $service = app(SubscriptionRequestService::class);
     $request = $service->create($f['owner'], subscriptionRequestInput($f));
+    $request = $service->accept($f['actor'], $request, $request->managementState(), [
+        'amount' => '3000.00', 'received' => true, 'operation_id' => (string) Str::uuid(), 'occurred_at' => now()->toDateTimeString(),
+    ]);
     $invoiceUrl = URL::temporarySignedRoute('owner.invoices.download', now()->addMinutes(5), ['invoice' => $request->invoice, 'inline' => 1]);
     $response = $this->actingAs($f['owner'], 'central')->get($invoiceUrl)->assertOk()
         ->assertHeader('content-type', 'application/pdf')->assertHeader('x-content-type-options', 'nosniff')
@@ -69,9 +96,6 @@ test('invoice and receipt open as protected printable PDFs without changing norm
     expect($this->get($download)->assertOk()->headers->get('content-disposition'))->toStartWith('attachment;');
     $this->get($download.'&inline=1')->assertForbidden();
 
-    $request = $service->accept($f['actor'], $request, $request->managementState(), [
-        'amount' => '3000.00', 'received' => true, 'operation_id' => (string) Str::uuid(), 'occurred_at' => now()->toDateTimeString(),
-    ]);
     foreach (['owner' => $f['owner'], 'central' => $f['actor']] as $prefix => $actor) {
         $url = URL::temporarySignedRoute($prefix.'.payments.receipt', now()->addMinutes(5), ['payment' => $request->payment, 'inline' => 1]);
         $response = $this->actingAs($actor, 'central')->get($url)->assertOk()->assertHeader('content-type', 'application/pdf');
@@ -81,7 +105,7 @@ test('invoice and receipt open as protected printable PDFs without changing norm
     expect($request->status)->toBe(RequestStatusEnum::ACCEPTED)->and(SaasPayment::count())->toBe(1);
 });
 
-test('T01 T02 a request has its real invoice before payment without activating paid rights', function (): void {
+test('T01 T02 a request has only an internal draft before confirmed payment', function (): void {
     $f = requestFixture();
     $request = app(SubscriptionRequestService::class)->create($f['owner'], subscriptionRequestInput($f));
     expect($request)->toBeInstanceOf(SubscriptionRequest::class)
@@ -89,9 +113,9 @@ test('T01 T02 a request has its real invoice before payment without activating p
         ->and($request->status)->toBe(RequestStatusEnum::AWAITING_PAYMENT)
         ->and($request->subscription->agreed_amount)->toBe('3000.00')
         ->and($request->subscription->status)->toBe(StatusEnum::SCHEDULED)
-        ->and($request->invoice->status)->toBe(DocumentStatusEnum::ISSUED)
+        ->and($request->invoice->status)->toBe(DocumentStatusEnum::DRAFT)
         ->and($request->invoice->total_amount)->toBe('3000.00')
-        ->and(Storage::disk('local')->get($request->invoice->media->storage_key))->toStartWith('%PDF-')
+        ->and($request->invoice->media)->toBeNull()->and($request->invoice->number)->toBeNull()
         ->and(SaasPayment::count())->toBe(0);
 });
 
@@ -116,7 +140,7 @@ test('the request invoice authorization never grants a customer administrative i
     $request = app(SubscriptionRequestService::class)->create($f['owner'], subscriptionRequestInput($f));
     expect(Gate::forUser($f['owner'])->allows('issue', $request->invoice))->toBeFalse()
         ->and(Gate::forUser($f['owner'])->allows('view', $request->invoice))->toBeFalse();
-    $this->actingAs($f['owner'], 'central')->post(route('central.invoices.issue', $request->invoice), ['expected_state' => $request->invoice->managementState()])->assertForbidden();
+    $this->actingAs($f['owner'], 'central')->post('/admin/billing/invoices/'.$request->invoice->uuid.'/issue', ['expected_state' => $request->invoice->managementState()])->assertNotFound();
     $this->get(route('owner.invoices.show', $request->invoice))->assertOk()->assertSee($request->invoice->number);
 });
 
@@ -136,14 +160,14 @@ test('T08 T10 cash acceptance confirms the full payment and request together wit
 test('T11 T23 an external refusal preserves the old proof and allows a new declaration', function (): void {
     $f = requestFixture();
     $service = app(SubscriptionRequestService::class);
-    $request = $service->create($f['owner'], [...subscriptionRequestInput($f), 'payment_choice' => PaymentChoiceEnum::EXTERNAL->value]);
+    $request = requestWithInitialProof($f);
     $proof = fn () => UploadedFile::fake()->image('preuve.png');
     $request = $service->submitProof($f['owner'], $request, $request->managementState(), manualExternalPayload(), $proof());
     $previous = $request->payment;
     expect($request->status)->toBe(RequestStatusEnum::REVIEW)->and($request->subscription->status)->toBe(StatusEnum::SCHEDULED);
     $request = $service->reject($f['actor'], $request, $request->managementState(), 'Justificatif non confirmé', $previous->managementState());
     expect($request->status)->toBe(RequestStatusEnum::REJECTED)->and($previous->refresh()->getAttribute('transfer_status'))->toBe(TransferStatusEnum::REJECTED);
-    $request = $service->submitProof($f['owner'], $request, $request->managementState(), manualExternalPayload(), $proof());
+    $request = requestWithInitialProof($f);
     expect($request->status)->toBe(RequestStatusEnum::REVIEW)->and($request->current_payment_id)->not->toBe($previous->getKey())
         ->and($previous->documents()->exists())->toBeTrue()->and($request->getAttribute('decision_reason'))->toBeNull();
     $request = $service->accept($f['actor'], $request, $request->managementState(), [
@@ -205,6 +229,7 @@ test('T18 T26 an issued invoice blocks price changes or cancellation until manua
     $f = requestFixture();
     $service = app(SubscriptionRequestService::class);
     $request = $service->create($f['owner'], subscriptionRequestInput($f));
+    $request = issueHistoricalRequest($f, $request);
     $other = Plan::factory()->create(['monthly_price' => '5000.00', 'is_active' => true]);
     expect(fn () => $service->revise($f['owner'], $request, $request->managementState(), [
         ...subscriptionRequestInput($f), 'plan_uuid' => $other->uuid, 'expected_amount' => '5000.00',
@@ -219,6 +244,7 @@ test('T18 T19 a manually issued full correction permits a new invoice without re
     $f = requestFixture();
     $service = app(SubscriptionRequestService::class);
     $request = $service->create($f['owner'], subscriptionRequestInput($f));
+    $request = issueHistoricalRequest($f, $request);
     $original = $request->invoice;
     $originalBytes = Storage::disk('local')->get($original->media->storage_key);
     $rules = app(BillingRuleService::class);
@@ -252,7 +278,7 @@ test('T18 T19 a manually issued full correction permits a new invoice without re
 test('T16 an invalid replacement proof does not discard the current valid declaration', function (): void {
     $f = requestFixture();
     $service = app(SubscriptionRequestService::class);
-    $request = $service->create($f['owner'], [...subscriptionRequestInput($f), 'payment_choice' => PaymentChoiceEnum::EXTERNAL->value]);
+    $request = requestWithInitialProof($f);
     $request = $service->submitProof($f['owner'], $request, $request->managementState(), manualExternalPayload(), UploadedFile::fake()->image('valide.png'));
     $paymentId = $request->current_payment_id;
     expect(fn () => $service->submitProof($f['owner'], $request, $request->managementState(), manualExternalPayload(),
@@ -264,6 +290,7 @@ test('T16 an invalid replacement proof does not discard the current valid declar
 test('T03 T05 private request invoice downloads reject foreign owners and unsigned URLs', function (): void {
     $f = requestFixture();
     $request = app(SubscriptionRequestService::class)->create($f['owner'], subscriptionRequestInput($f));
+    $request = issueHistoricalRequest($f, $request);
     $url = URL::temporarySignedRoute('owner.invoices.download', now()->addMinutes(5), ['invoice' => $request->invoice]);
     $this->actingAs($f['owner'], 'central')->get($url)->assertOk()
         ->assertStreamedContent(Storage::disk('local')->get($request->invoice->media->storage_key));
@@ -278,7 +305,7 @@ test('T37 administrative request actions require their server permissions', func
     $this->actingAs(User::factory()->create(), 'central');
     $this->get(route('central.subscription-requests.index'))->assertForbidden();
     $this->get(route('central.subscription-requests.show', $request))->assertForbidden();
-    foreach (['accept', 'reject', 'invoice'] as $action) {
+    foreach (['accept', 'reject'] as $action) {
         $this->post(route('central.subscription-requests.'.$action, $request), [])->assertForbidden();
     }
     expect($request->refresh()->status)->toBe(RequestStatusEnum::AWAITING_PAYMENT)->and(SaasPayment::count())->toBe(0);
@@ -298,12 +325,12 @@ test('T26 an unissued request can be cancelled without losing its reservation hi
 test('T15 a wrong declared amount without received funds remains correctable and its anomaly is retained', function (): void {
     $f = requestFixture();
     $service = app(SubscriptionRequestService::class);
-    $request = $service->create($f['owner'], [...subscriptionRequestInput($f), 'payment_choice' => PaymentChoiceEnum::EXTERNAL->value]);
+    $request = requestWithInitialProof($f);
     $request = $service->submitProof($f['owner'], $request, $request->managementState(), manualExternalPayload('2000.00'), UploadedFile::fake()->image('montant-incorrect.png'));
     $previous = $request->payment;
     expect($previous->getAttribute('transfer_status'))->toBe(TransferStatusEnum::UNCERTAIN)->and($previous->hasReportedFunds())->toBeFalse();
     $request = $service->reject($f['actor'], $request, $request->managementState(), 'Montant déclaré incorrect', $previous->managementState());
-    $request = $service->submitProof($f['owner'], $request, $request->managementState(), manualExternalPayload(), UploadedFile::fake()->image('montant-corrige.png'));
+    $request = requestWithInitialProof($f);
     expect($request->status)->toBe(RequestStatusEnum::REVIEW)->and($request->current_payment_id)->not->toBe($previous->getKey())
         ->and($previous->refresh()->getAttribute('transfer_status'))->toBe(TransferStatusEnum::UNCERTAIN)
         ->and($previous->documents()->exists())->toBeTrue()->and($request->subscription->status)->toBe(StatusEnum::SCHEDULED);
@@ -335,29 +362,36 @@ test('T46 T47 T48 no commercial refund endpoint or action is available', functio
     expect(SaasPayment::withoutGlobalScope('payment')->where('record_type', 2)->count())->toBe(0);
 });
 
-test('T43 a receipt failure after confirmation never retries the financial acceptance', function (): void {
-    $f = requestFixture();
-    $request = app(SubscriptionRequestService::class)->create($f['owner'], subscriptionRequestInput($f));
-    $documents = Mockery::mock(PaymentDocumentService::class, [app(PrivateMediaAccessService::class)])->makePartial();
-    $documents->shouldReceive('generatePaymentReceipt')->once()->andThrow(ValidationException::withMessages(['proof' => 'Stockage fictivement indisponible']));
-    $this->app->instance(PaymentDocumentService::class, $documents);
-    $request = app(SubscriptionRequestService::class)->accept($f['actor'], $request, $request->managementState(), [
-        'amount' => '3000.00', 'received' => true, 'operation_id' => (string) Str::uuid(), 'occurred_at' => now()->toDateTimeString(),
-    ]);
-    expect($request->status)->toBe(RequestStatusEnum::ACCEPTED)->and($request->payment->getAttribute('transfer_status'))->toBe(TransferStatusEnum::VERIFIED)
-        ->and($request->subscription->status)->toBe(StatusEnum::ACTIVE)
-        ->and($request->payment->documents()->where('collection_name', PaymentDocumentService::RECEIPT)->count())->toBe(0);
-    $this->app->forgetInstance(PaymentDocumentService::class);
-    $receipt = app(PaymentDocumentService::class)->generatePaymentReceipt($f['actor'], $request->payment);
-    expect(Storage::disk('local')->get($receipt->storage_key))->toStartWith('%PDF-')->and(SaasPayment::count())->toBe(1);
-    expect(fn () => DB::table('subscription_requests')->where('id', $request->id)->update(['payment_choice' => PaymentChoiceEnum::EXTERNAL->value]))
-        ->toThrow(QueryException::class);
-});
-
-test('T42 a SQL error accepting the request rolls back payment rights and decision together', function (): void {
+test('T43 receipt failure preserves confirmed funds and resumes documents before activating rights', function (): void {
     $f = requestFixture();
     $service = app(SubscriptionRequestService::class);
-    $request = $service->create($f['owner'], [...subscriptionRequestInput($f), 'payment_choice' => PaymentChoiceEnum::EXTERNAL->value]);
+    $request = $service->create($f['owner'], subscriptionRequestInput($f));
+    $documents = Mockery::mock(PaymentDocumentService::class, [app(PrivateMediaAccessService::class), app(SubscriptionWorkflowNotifier::class)])->makePartial();
+    $documents->shouldReceive('generatePaymentReceipt')->once()->andThrow(ValidationException::withMessages(['proof' => 'Stockage fictivement indisponible']));
+    $this->app->instance(PaymentDocumentService::class, $documents);
+    $this->app->forgetInstance(SaasPaymentService::class);
+    expect(fn () => app(SubscriptionRequestService::class)->accept($f['actor'], $request, $request->managementState(), [
+        'amount' => '3000.00', 'received' => true, 'operation_id' => (string) Str::uuid(), 'occurred_at' => now()->toDateTimeString(),
+    ]))->toThrow(ValidationException::class);
+    $request->refresh();
+    expect($request->status)->toBe(RequestStatusEnum::REVIEW)
+        ->and($request->payment->getAttribute('transfer_status'))->toBe(TransferStatusEnum::VERIFIED)
+        ->and($request->subscription->status)->toBe(StatusEnum::SCHEDULED)
+        ->and($request->payment->documents()->where('collection_name', PaymentDocumentService::RECEIPT)->count())->toBe(0);
+    $this->seed(FreePlanSeeder::class);
+    app(DefaultSubscription::class)->ensure($f['owner']);
+    expect($request->subscription->refresh()->status)->toBe(StatusEnum::SCHEDULED);
+    $this->app->forgetInstance(PaymentDocumentService::class);
+    app(SaasPaymentService::class)->resumeCashPayment($f['actor'], $request->payment, $request->payment->managementState());
+    expect($request->refresh()->status)->toBe(RequestStatusEnum::ACCEPTED)
+        ->and($request->subscription->status)->toBe(StatusEnum::ACTIVE)->and(SaasPayment::count())->toBe(1);
+    expect(fn () => DB::table('subscription_requests')->where('id', $request->id)->update(['payment_choice' => PaymentChoiceEnum::EXTERNAL->value]))->toThrow(QueryException::class);
+});
+
+test('T42 acceptance rollback preserves verified funds but never grants rights without the decision', function (): void {
+    $f = requestFixture();
+    $service = app(SubscriptionRequestService::class);
+    $request = requestWithInitialProof($f);
     $request = $service->submitProof($f['owner'], $request, $request->managementState(), manualExternalPayload(), UploadedFile::fake()->image('rollback.png'));
     $dispatcher = Activity::getEventDispatcher();
     $event = 'eloquent.created: '.Activity::class;
@@ -379,7 +413,7 @@ test('T42 a SQL error accepting the request rolls back payment rights and decisi
     }
     expect($request->refresh()->status)->toBe(RequestStatusEnum::REVIEW)
         ->and($request->subscription->status)->toBe(StatusEnum::SCHEDULED)
-        ->and($request->payment->getAttribute('transfer_status'))->toBe(TransferStatusEnum::DECLARED)
+        ->and($request->payment->getAttribute('transfer_status'))->toBe(TransferStatusEnum::VERIFIED)
         ->and(Activity::where('event', SubscriptionRequestPaymentState::ACCEPTED)->count())->toBe(0);
 });
 
@@ -422,12 +456,13 @@ test('T25 T35 two independent processes cannot accept an obsolete request or act
         'DB_HOST' => $connection['host'], 'DB_PORT' => (string) $connection['port'], 'DB_USERNAME' => $connection['username'],
         'DB_PASSWORD' => $connection['password'], 'CACHE_STORE' => 'array', 'APP_CONFIG_CACHE' => $runtime.'/config.php',
         'APP_ROUTES_CACHE' => $runtime.'/routes.php', 'REQUEST_RUNTIME' => $runtime, 'REQUEST_UUID' => $request->uuid,
-        'REQUEST_EXPECTED' => $request->managementState(), 'REQUEST_STORAGE' => Storage::disk('local')->path('')];
+        'REQUEST_EXPECTED' => $request->managementState(), 'REQUEST_BILLING' => json_encode(Arr::only(config('central.billing'), ['issuer', 'customers', 'tax_policy']), JSON_THROW_ON_ERROR), 'REQUEST_STORAGE' => Storage::disk('local')->path('')];
     $script = <<<'PHP'
     require 'vendor/autoload.php'; $app = require 'bootstrap/app.php'; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
     $c = config('database.connections.mysql');
     if (!in_array($c['host'], ['127.0.0.1','localhost','::1'], true) || !str_starts_with($c['database'], 'aydra_test_') || !empty($c['url'])) { throw new LogicException('Isolated local database required.'); }
     config(['filesystems.disks.local' => ['driver'=>'local','root'=>getenv('REQUEST_STORAGE'),'throw'=>true]]);
+    foreach (json_decode(getenv('REQUEST_BILLING'), true, flags: JSON_THROW_ON_ERROR) as $key => $value) { config(['central.billing.'.$key => $value]); }
     $actor = App\Models\User::where('uuid', getenv('REQUEST_ACTOR'))->firstOrFail();
     $request = App\Models\Central\Subscriptions\SubscriptionRequest::where('uuid', getenv('REQUEST_UUID'))->firstOrFail();
     $service = app(App\Services\Central\Subscriptions\SubscriptionRequestService::class);
@@ -534,3 +569,127 @@ test('a browser reads the invoice before payment and the receipt after request a
     }
 })->with(['cash' => [true], 'external' => [false]])
     ->skip(fn (): bool => getenv('AYDRA_MODULE22_BROWSER') !== '1', 'Requires the isolated interactive browser pilot.');
+
+test('demande requires an initial bank proof before creating any reservation', function (): void {
+    $f = requestFixture();
+    $before = SubscriptionRequest::count();
+    expect(fn () => app(SubscriptionRequestService::class)->create($f['owner'], [
+        ...subscriptionRequestInput($f), 'payment_choice' => PaymentChoiceEnum::EXTERNAL->value,
+    ]))->toThrow(ValidationException::class);
+    expect(SubscriptionRequest::count())->toBe($before)->and(SaasPayment::count())->toBe(0);
+});
+
+test('demande retains the initial proof even when fiscal preparation is blocked', function (): void {
+    $f = requestFixture();
+    config(['central.billing.issuer.nif' => null]);
+    $request = requestWithInitialProof($f);
+    expect($request->status)->toBe(RequestStatusEnum::REVIEW)->and($request->invoice)->toBeNull()
+        ->and($request->getAttribute('submitted_payment')['proof_uuid'])->not->toBeNull();
+    $url = URL::temporarySignedRoute('owner.subscription-requests.initial-proof', now()->addMinutes(5), ['subscriptionRequest' => $request]);
+    $this->actingAs($f['owner'], 'central')->get($url)->assertOk()->assertHeader('content-type', 'application/octet-stream');
+    $this->actingAs(User::factory()->create(), 'central')->get($url)->assertForbidden();
+});
+
+test('demande a refused unpaid reservation permits a new request and preserves its history', function (): void {
+    $f = requestFixture();
+    $service = app(SubscriptionRequestService::class);
+    $request = $service->create($f['owner'], subscriptionRequestInput($f));
+    $request = $service->reject($f['actor'], $request, $request->managementState(), 'Versement non retrouv?');
+    expect($request->subscription->status)->toBe(StatusEnum::CANCELLED);
+    $next = $service->create($f['owner'], subscriptionRequestInput($f));
+    expect($next->id)->not->toBe($request->id)->and($request->refresh()->getAttribute('decision_reason'))->toBe('Versement non retrouv?')
+        ->and($next->subscription->status)->toBe(StatusEnum::SCHEDULED);
+});
+
+test('demande replacement preserves old rights until funds documents and receipt are complete', function (int $mode): void {
+    $f = requestFixture();
+    $old = $f['subscription'];
+    $old->forceFill(['status' => StatusEnum::ACTIVE])->save();
+    $service = app(SubscriptionRequestService::class);
+    $request = $service->create($f['owner'], [...subscriptionRequestInput($f), 'transition_mode' => $mode]);
+    expect($old->refresh()->status)->toBe(StatusEnum::ACTIVE)->and($request->subscription->agreed_amount)->toBe('3000.00');
+    $request = $service->accept($f['actor'], $request, $request->managementState(), [
+        'amount' => '3000.00', 'received' => true, 'operation_id' => (string) Str::uuid(), 'occurred_at' => now()->toDateTimeString(),
+    ]);
+    expect($request->status)->toBe(RequestStatusEnum::ACCEPTED)
+        ->and($request->invoice->status)->toBe(DocumentStatusEnum::ISSUED)
+        ->and($request->payment->documents()->where('collection_name', PaymentDocumentService::RECEIPT)->exists())->toBeTrue();
+    expect($old->refresh()->status)->toBe($mode === 1 ? StatusEnum::CANCELLED : StatusEnum::ACTIVE)
+        ->and($request->subscription->status)->toBe($mode === 1 ? StatusEnum::ACTIVE : StatusEnum::SCHEDULED);
+})->with([1, 2]);
+
+test('demande notifications are central private and can be marked read idempotently', function (): void {
+    $f = requestFixture();
+    $owner = App\Models\Central\Users\User::findOrFail($f['owner']->id);
+    $notice = new SubscriptionWorkflowNotification('test_notice', 'Votre demande est reçue.', route('owner.billing.index'));
+    $owner->notifyNow($notice, ['database']);
+    $notification = $owner->notifications()->sole();
+    $this->actingAs($f['actor'], 'central')->patch(route('notifications.read', $notification))->assertForbidden();
+    $this->actingAs($owner, 'central')->get(route('notifications.index'))->assertOk()->assertSee('Votre demande est reçue.');
+    $this->patch(route('notifications.read', $notification))->assertRedirect(route('notifications.index'));
+    $readAt = $notification->refresh()->read_at;
+    $this->patch(route('notifications.read', $notification))->assertRedirect();
+    expect($notification->refresh()->read_at->equalTo($readAt))->toBeTrue()->and($owner->unreadNotifications()->count())->toBe(0);
+});
+
+test('initial bank proofs require financial reading rather than subscription reading alone', function (): void {
+    $f = requestFixture();
+    $request = requestWithInitialProof($f);
+    $reader = User::factory()->create();
+    $reader->assignRole(Role::createWithPermissions('subscription-reader-no-proofs', ['saas.subscriptions.view' => 7]));
+    $this->actingAs($reader, 'central')->get(route('central.subscription-requests.show', $request))->assertOk()->assertDontSee('Consulter le justificatif initial');
+    $this->get(URL::temporarySignedRoute('central.subscription-requests.initial-proof', now()->addMinutes(5), ['subscriptionRequest' => $request]))->assertForbidden();
+    $proof = Media::where('uuid', $request->getAttribute('submitted_payment')['proof_uuid'])->sole();
+    expect(Gate::forUser($reader)->allows('download', $proof))->toBeFalse();
+});
+
+test('administrators accept cash requests without entering financial fields', function (): void {
+    Notification::fake();
+    $f = requestFixture();
+    $request = app(SubscriptionRequestService::class)->create($f['owner'], subscriptionRequestInput($f));
+    $before = now()->startOfSecond();
+    $this->actingAs($f['actor'], 'central')->get(route('central.subscription-requests.show', $request))
+        ->assertOk()->assertSee('Accepter la demande')->assertSee('Refuser avec motif')
+        ->assertDontSee('name="amount"', false)->assertDontSee('name="occurred_at"', false)
+        ->assertDontSee('name="received"', false);
+    $this->post(route('central.subscription-requests.accept', $request), [
+        'expected_state' => $request->managementState(),
+        'amount' => '0.01', 'occurred_at' => '2099-01-01', 'received' => false,
+    ])->assertSessionHasNoErrors()->assertRedirect();
+    $request->refresh();
+    expect($request->status)->toBe(RequestStatusEnum::ACCEPTED)
+        ->and($request->payment->getAttribute('amount'))->toBe('3000.00')
+        ->and($request->payment->getAttribute('occurred_at')->greaterThanOrEqualTo($before))->toBeTrue();
+});
+
+test('an invoice warning must be acknowledged before an administrative acceptance', function (): void {
+    $f = requestFixture();
+    $request = app(SubscriptionRequestService::class)->create($f['owner'], subscriptionRequestInput($f));
+    $request->forceFill(['invoice_error' => 'Informations fiscales à vérifier',
+        'reference_version' => $request->reference_version + 1])->save();
+    $status = $request->status;
+    $payments = SaasPayment::count();
+    $this->actingAs($f['actor'], 'central')->get(route('central.subscription-requests.show', $request))
+        ->assertOk()->assertSee('name="acknowledged"', false);
+    $this->post(route('central.subscription-requests.accept', $request), ['expected_state' => $request->managementState()])
+        ->assertSessionHasErrors('acknowledged');
+    expect($request->refresh()->status)->toBe($status)->and(SaasPayment::count())->toBe($payments);
+});
+
+test('an initial external proof receives its submission date automatically and replay preserves it', function (): void {
+    $f = requestFixture();
+    $payment = manualExternalPayload();
+    unset($payment['operation_id'], $payment['currency'], $payment['occurred_at']);
+    $input = [...subscriptionRequestInput($f), 'payment_choice' => PaymentChoiceEnum::EXTERNAL->value, 'payment' => $payment];
+    $proof = UploadedFile::fake()->image('automatic-date.png');
+    $service = app(SubscriptionRequestService::class);
+    $request = $service->create($f['owner'], $input, $proof);
+    $occurredAt = $request->getAttribute('submitted_payment')['occurred_at'];
+    expect($occurredAt)->toBeString()->not->toBeEmpty()
+        ->and($request->payment->getAttribute('occurred_at')->toDateTimeString())->toBe($occurredAt);
+    $this->travel(1)->minutes();
+    $replay = $service->create($f['owner'], $input, $proof);
+    expect($replay->id)->toBe($request->id)
+        ->and($replay->getAttribute('submitted_payment')['occurred_at'])->toBe($occurredAt)
+        ->and(SubscriptionRequest::count())->toBe(1);
+});

@@ -121,8 +121,8 @@ test('T18-11 and T18-12 initialize independent invoice and credit series exactly
     $this->actingAs($actor, 'central');
     foreach (DocumentTypeEnum::cases() as $type) {
         $payload = ['document_type' => $type->value, 'fiscal_year' => 2030];
-        $this->post(route('central.billing-sequences.initialize'), $payload)->assertSessionHasNoErrors()->assertRedirect();
-        $this->post(route('central.billing-sequences.initialize'), $payload)->assertSessionHasNoErrors()->assertRedirect();
+        app(SaasNumberingService::class)->initialize($actor, $type, 2030);
+        app(SaasNumberingService::class)->initialize($actor, $type, 2030);
         $sequence = BillingSequence::where('document_type', $type)->sole();
         expect($sequence->next_number)->toBe(1);
         expect($sequence->getAttribute('sequence_slot'))->toBe(1);
@@ -131,35 +131,31 @@ test('T18-11 and T18-12 initialize independent invoice and credit series exactly
         }
         expect(Activity::forSubject($sequence)->where('event', 'saas_sequence_initialized')->count())->toBe(1);
     }
-    $this->get(route('central.billing-sequences.index'))->assertOk()->assertSee('FAC')->assertSee('AVOIR');
-    $this->get(route('central.billing-sequences.index'))->assertOk();
+    $this->get('/admin/billing/sequences')->assertNotFound();
     expect(BillingSequence::count())->toBe(2);
     expect(BillingSequence::pluck('next_number')->all())->toBe([1, 1]);
 });
 
-test('counter initialization requires the matching issue right and never a read right alone', function (string $permission, int $type, bool $allowed): void {
+test('automatic counter initialization requires the matching issue right', function (string $permission, int $type, bool $allowed): void {
     sequenceAdmin();
-    $this->actingAs(sequenceActor($permission), 'central');
-    $response = $this->post(route('central.billing-sequences.initialize'), ['document_type' => $type, 'fiscal_year' => 2031]);
+    $actor = sequenceActor($permission);
+    $operation = fn () => app(SaasNumberingService::class)->initialize($actor, DocumentTypeEnum::from($type), 2031);
     if ($allowed) {
-        $response->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
+        $operation();
     } else {
-        $response->assertForbidden();
+        expect($operation)->toThrow(AuthorizationException::class);
     }
     expect(BillingSequence::count())->toBe($allowed ? 1 : 0);
 })->with([
-    ['saas.billing-sequences.view', 1, false], ['saas.billing-rules.activate', 1, false],
+    ['saas.billing-rules.view', 1, false], ['saas.billing-rules.activate', 1, false],
     ['saas.invoices.issue', 1, true], ['saas.invoices.issue', 2, false],
     ['saas.credit-notes.issue', 2, true], ['saas.credit-notes.issue', 1, false],
 ]);
 
-test('a counter reader sees no initialization action and forged values are rejected', function (): void {
-    $actor = sequenceAdmin();
-    $this->actingAs(sequenceActor('saas.billing-sequences.view'), 'central')
-        ->get(route('central.billing-sequences.index'))->assertOk()->assertDontSee('Initialiser le compteur');
-    $this->actingAs($actor, 'central')->post(route('central.billing-sequences.initialize'), [
-        'document_type' => 1, 'fiscal_year' => 2031, 'next_number' => 800, 'prefix' => 'BAD',
-    ])->assertSessionHasErrors(['next_number', 'prefix']);
+test('removed counter pages and forged HTTP values never initialize a series', function (): void {
+    $this->actingAs(sequenceAdmin(), 'central');
+    $this->get('/admin/billing/sequences')->assertNotFound();
+    $this->post('/admin/billing/sequences', ['document_type' => 1, 'fiscal_year' => 2031, 'next_number' => 800, 'prefix' => 'BAD'])->assertNotFound();
     expect(BillingSequence::count())->toBe(0);
 });
 

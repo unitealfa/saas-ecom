@@ -4,6 +4,7 @@ namespace App\Services\Central\Subscriptions;
 
 use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Enums\Central\Subscriptions\StatusEnum;
+use App\Enums\Central\Subscriptions\TransitionModeEnum;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Subscriptions\SubscriptionInstallment;
 use App\Models\Central\Users\User;
@@ -31,7 +32,9 @@ class PaidSubscriptionActivation
             ->whereIn('status', [StatusEnum::ACTIVE, StatusEnum::TRIAL])->with('plan')->orderBy('id')->lockForUpdate()->get();
         foreach ($others as $current) {
             $end = $current->effectiveEndsAt();
-            if ($current->plan?->code !== 'free' && ($end === null || $end->isFuture())) {
+            $replacement = $subscription->transition_mode === TransitionModeEnum::IMMEDIATE
+                && $subscription->getAttribute('replaces_subscription_id') === $current->id;
+            if ($current->plan?->code !== 'free' && ($end === null || $end->isFuture()) && ! $replacement) {
                 throw ValidationException::withMessages(['payment' => 'Une autre période payante est encore active. Préservez ses droits et vérifiez les dates avant de confirmer.']);
             }
             $current->forceFill(['status' => $end !== null && $end->lessThanOrEqualTo(now()) ? StatusEnum::EXPIRED : StatusEnum::CANCELLED,

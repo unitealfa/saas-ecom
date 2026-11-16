@@ -10,6 +10,7 @@ use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Countries\Country;
 use App\Models\Central\Media\Media;
+use App\Models\Central\Notifications\DatabaseNotification;
 use App\Models\Central\Permissions\Permission;
 use App\Models\Central\Roles\Role;
 use App\Models\Central\Subscriptions\Subscription;
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -127,6 +129,12 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function getMorphClass(): string
     {
         return 'central_user';
+    }
+
+    /** @return MorphMany<DatabaseNotification, $this> */
+    public function notifications(): MorphMany
+    {
+        return $this->morphMany(DatabaseNotification::class, 'notifiable')->latest();
     }
 
     /** @param Builder<static> $query

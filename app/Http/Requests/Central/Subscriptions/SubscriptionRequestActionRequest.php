@@ -51,9 +51,10 @@ class SubscriptionRequestActionRequest extends FormRequest
             $rules['expected_payment_state'] = [$request instanceof SubscriptionRequest && $request->current_payment_id !== null ? 'required' : 'nullable', 'string', 'regex:'.SubscriptionRequest::STATE_PATTERN];
         } elseif ($action === 'accept') {
             $hasPayment = $request instanceof SubscriptionRequest && $request->current_payment_id !== null;
-            $cash = $request instanceof SubscriptionRequest && $request->payment_choice === PaymentChoiceEnum::CASH;
-            $rules = [...($cash && ! $hasPayment ? SaasPaymentService::declarationRules(true) : (! $cash ? SaasPaymentService::verificationRules() : ['received' => ['required', 'accepted']])), ...$rules];
             $rules['expected_payment_state'] = [$hasPayment ? 'required' : 'nullable', 'string', 'regex:'.SubscriptionRequest::STATE_PATTERN];
+            if ($request instanceof SubscriptionRequest && filled($request->getAttribute('invoice_error'))) {
+                $rules['acknowledged'] = ['required', 'accepted'];
+            }
         }
 
         return [...$rules, ...array_fill_keys(['user_id', 'current_subscription_id', 'current_invoice_id', 'current_payment_id',

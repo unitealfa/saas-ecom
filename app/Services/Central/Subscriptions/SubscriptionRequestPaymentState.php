@@ -2,23 +2,31 @@
 
 namespace App\Services\Central\Subscriptions;
 
+use App\Enums\Central\Billing\DocumentStatusEnum;
 use App\Enums\Central\Billing\TransferMethodEnum;
 use App\Enums\Central\Billing\TransferStatusEnum;
+use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Enums\Central\Subscriptions\PaymentChoiceEnum;
 use App\Enums\Central\Subscriptions\RequestStatusEnum;
+use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Subscriptions\SubscriptionRequest;
 use App\Models\Central\Users\User;
+use App\Services\Central\Billing\PaymentDocumentService;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 /** Projection de la demande dans la transaction du paiement existant. */
 class SubscriptionRequestPaymentState
 {
+    public function __construct(private readonly SubscriptionWorkflowNotifier $notifications) {}
+
     public const string SUBMITTED = 'subscription_request_payment_submitted';
 
     public const string ACCEPTED = 'subscription_request_accepted';
+
+    public const string CONFIRMED = 'subscription_request_payment_confirmed';
 
     public const string REJECTED = 'subscription_request_rejected';
 
@@ -103,13 +111,27 @@ class SubscriptionRequestPaymentState
         if ($request === null) {
             return;
         }
-        Gate::forUser($actor)->authorize('accept', $request);
-        if ($payment->getAttribute('transfer_status') !== TransferStatusEnum::VERIFIED) {
+        Gate::forUser($actor)->authorize('verify', $payment);
+        if ($payment->getAttribute('transfer_status') !== TransferStatusEnum::VERIFIED
+            || $payment->invoice->status !== DocumentStatusEnum::ISSUED
+            || $payment->invoice->installment->installment_status !== InstallmentStatusEnum::PAID
+            || ! in_array($payment->invoice->subscription->status, [StatusEnum::ACTIVE, StatusEnum::SCHEDULED], true)
+            || ! $payment->documents()->where('collection_name', PaymentDocumentService::RECEIPT)->exists()) {
             $this->fail('Une demande ne peut être acceptée sans encaissement intégral vérifié.');
         }
         $request->forceFill(['status' => RequestStatusEnum::ACCEPTED, 'decided_by_id' => $actor->id, 'decided_at' => now(),
             'decision_reason' => null, 'reference_version' => $request->reference_version + 1])->save();
+        $this->audit($actor, $request, $payment, SubscriptionRequestService::INVOICE_READY, 'Facture définitive émise après confirmation du paiement.');
         $this->audit($actor, $request, $payment, self::ACCEPTED, 'Paiement intégral confirmé, demande acceptée et droits appliqués dans la même transaction.');
+    }
+
+    public function confirmed(User $actor, SaasPayment $payment): void
+    {
+        $request = $this->assertCurrentPayment($payment);
+        if ($request === null || $payment->getAttribute('transfer_status') !== TransferStatusEnum::VERIFIED) {
+            return;
+        }
+        $this->audit($actor, $request, $payment, self::CONFIRMED, 'Réception intégrale confirmée ; documents puis acceptation à finaliser, sans activation prématurée.');
     }
 
     public function rejected(User $actor, SaasPayment $payment, string $reason): void
@@ -121,7 +143,25 @@ class SubscriptionRequestPaymentState
         Gate::forUser($actor)->authorize('reject', $request);
         $request->forceFill(['status' => RequestStatusEnum::REJECTED, 'decided_by_id' => $actor->id, 'decided_at' => now(),
             'decision_reason' => $reason, 'reference_version' => $request->reference_version + 1])->save();
+        $this->releaseRefusedReservation($request);
         $this->audit($actor, $request, $payment, self::REJECTED, 'Demande refusée avec motif, sans activation ni effacement d’encaissement.');
+    }
+
+    public function releaseRefusedReservation(SubscriptionRequest $request): void
+    {
+        if ($request->invoice?->status === DocumentStatusEnum::ISSUED || $request->payment?->hasReportedFunds()) {
+            return;
+        }
+        $subscription = $request->subscription()->lockForUpdate()->firstOrFail();
+        if ($subscription->status !== StatusEnum::SCHEDULED) {
+            return;
+        }
+        $subscription->forceFill(['status' => StatusEnum::CANCELLED, 'ended_at' => now()])->save();
+        foreach ($subscription->installments()->orderBy('id')->lockForUpdate()->get() as $due) {
+            if ($due->installment_status === InstallmentStatusEnum::PENDING) {
+                $due->forceFill(['installment_status' => InstallmentStatusEnum::CANCELLED])->save();
+            }
+        }
     }
 
     private function audit(User $actor, SubscriptionRequest $request, SaasPayment $payment, string $event, string $message): void
@@ -130,6 +170,9 @@ class SubscriptionRequestPaymentState
             ->withProperties(['request_uuid' => $request->uuid, 'version' => $request->reference_version,
                 'payment_uuid' => $payment->getAttribute('uuid'), 'amount' => $payment->getAttribute('amount'),
                 'currency' => $payment->getAttribute('currency'), 'reason' => $request->getAttribute('decision_reason')])->log($message);
+        if ($event !== self::SUBMITTED) {
+            $this->notifications->request($request, $event);
+        }
     }
 
     private function fail(string $message): never

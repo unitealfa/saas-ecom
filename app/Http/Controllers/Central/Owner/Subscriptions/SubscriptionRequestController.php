@@ -8,11 +8,13 @@ use App\Http\Requests\Central\Subscriptions\SearchSubscriptionRequestsRequest;
 use App\Http\Requests\Central\Subscriptions\SubscriptionRequestActionRequest;
 use App\Models\Central\Audit\Activity;
 use App\Models\Central\Subscriptions\SubscriptionRequest;
+use App\Services\Central\Billing\PaymentDocumentService;
 use App\Services\Central\Plans\PublicPlanCatalog;
 use App\Services\Central\Subscriptions\SubscriptionRequestService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SubscriptionRequestController extends Controller
 {
@@ -29,8 +31,9 @@ class SubscriptionRequestController extends Controller
         abort_unless($actor->id === $subscriptionRequest->user_id, 403);
         Gate::forUser($actor)->authorize('view', $subscriptionRequest);
 
-        return view('central.pages.admin.subscriptions.requests.show', ['subscriptionRequest' => $subscriptionRequest->load(['owner', 'subscription.plan', 'invoice.media', 'payment']),
-            'ownerMode' => true, 'plans' => $this->plans->available(), 'history' => Activity::forSubject($subscriptionRequest)->orderByDesc('id')->paginate(20)]);
+        return view('central.pages.admin.subscriptions.requests.show', ['subscriptionRequest' => $subscriptionRequest->load(['owner', 'subscription.plan', 'invoice.media', 'payment', 'decider']),
+            'currentSubscription' => $this->requests->currentSubscription($actor, $subscriptionRequest),
+            'ownerMode' => true, 'plans' => $this->plans->available(), 'history' => Activity::forSubject($subscriptionRequest)->with('causer')->orderByDesc('id')->paginate(20)]);
     }
 
     public function choice(SubscriptionRequestActionRequest $request, SubscriptionRequest $subscriptionRequest): RedirectResponse
@@ -47,24 +50,8 @@ class SubscriptionRequestController extends Controller
         return to_route('owner.subscription-requests.show', $subscriptionRequest)->with('status', 'Justificatif transmis. La réception réelle des fonds doit encore être confirmée.');
     }
 
-    public function prepareInvoice(SubscriptionRequestActionRequest $request, SubscriptionRequest $subscriptionRequest): RedirectResponse
+    public function initialProof(SubscriptionRequest $subscriptionRequest, PaymentDocumentService $documents): StreamedResponse
     {
-        $current = $this->requests->prepareInvoice($this->centralActor(), $subscriptionRequest, $request->validated('expected_state'));
-
-        return to_route('owner.subscription-requests.show', $current)->with('status', $current->getAttribute('invoice_error') ?? 'Facture disponible, sans confirmation de paiement.');
-    }
-
-    public function revise(SubscriptionRequestActionRequest $request, SubscriptionRequest $subscriptionRequest): RedirectResponse
-    {
-        $current = $this->requests->revise($this->centralActor(), $subscriptionRequest, $request->validated('expected_state'), $request->safe()->except('expected_state'));
-
-        return to_route('owner.subscription-requests.show', $current)->with('status', $current->getAttribute('invoice_error') ?? 'Demande corrigée et facture disponible. Aucun droit payant activé.');
-    }
-
-    public function cancel(SubscriptionRequestActionRequest $request, SubscriptionRequest $subscriptionRequest): RedirectResponse
-    {
-        $this->requests->cancel($this->centralActor(), $subscriptionRequest, $request->validated('expected_state'));
-
-        return to_route('owner.subscription-requests.show', $subscriptionRequest)->with('status', 'Demande annulée. Les documents et décisions restent conservés.');
+        return $documents->downloadRequestProof($this->centralActor(), $subscriptionRequest);
     }
 }

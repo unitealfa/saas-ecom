@@ -5,6 +5,7 @@ namespace App\Models\Central\Subscriptions;
 use App\Concerns\HasPublicUuid;
 use App\Enums\Central\Subscriptions\PeriodEnum;
 use App\Enums\Central\Subscriptions\StatusEnum;
+use App\Enums\Central\Subscriptions\TransitionModeEnum;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Users\User;
 use Carbon\CarbonImmutable;
@@ -21,6 +22,8 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
 /**
  * @property StatusEnum $status
  * @property PeriodEnum $period
+ * @property TransitionModeEnum $transition_mode
+ * @property int|null $replaces_subscription_id
  * @property string $agreed_amount
  * @property CarbonImmutable $period_starts_at
  * @property CarbonImmutable|null $period_ends_at
@@ -36,6 +39,8 @@ class Subscription extends Model
     /** @use HasFactory<SubscriptionFactory> */
     use CentralConnection, HasFactory, HasPublicUuid;
 
+    protected $attributes = ['transition_mode' => TransitionModeEnum::DEFERRED->value];
+
     // Table dédiée : tous les enregistrements sont des abonnements, sans record_type.
 
     protected function casts(): array
@@ -46,6 +51,8 @@ class Subscription extends Model
             'assigned_by_id' => 'integer',
             'subscription_request_id' => 'integer',
             'status' => StatusEnum::class,
+            'transition_mode' => TransitionModeEnum::class,
+            'replaces_subscription_id' => 'integer',
             'period' => PeriodEnum::class,
             'agreed_amount' => 'decimal:2',
             'auto_renew' => 'boolean',
@@ -91,7 +98,7 @@ class Subscription extends Model
     {
         return hash('sha256', json_encode($this->only([
             'uuid', 'user_id', 'plan_id', 'status', 'period', 'agreed_amount', 'started_at',
-            'period_starts_at', 'period_ends_at', 'trial_ends_at', 'ended_at', 'auto_renew',
+            'period_starts_at', 'period_ends_at', 'trial_ends_at', 'ended_at', 'auto_renew', 'transition_mode', 'replaces_subscription_id',
         ]), JSON_THROW_ON_ERROR));
     }
 

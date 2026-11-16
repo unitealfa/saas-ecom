@@ -7,15 +7,26 @@
 <x-layouts::app title="Demande d’abonnement">
     <section class="mx-auto flex w-full max-w-4xl flex-col gap-6">
         <flux:heading size="xl" level="1">Demande d’abonnement — {{ $item->subscription?->plan->name }}</flux:heading>
-        @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
+        @if (session('status'))
+            <flux:callout :variant="session('status_variant')" role="status" aria-live="polite">{{ session('status') }}</flux:callout>
+        @endif
         @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
         <dl class="grid gap-4 sm:grid-cols-2">
+            <div><dt>Référence de demande</dt><dd class="break-all">{{ $item->uuid }}</dd></div>
+            <div><dt>Date de soumission</dt><dd>{{ $item->submitted_at?->format('d/m/Y H:i') }}</dd></div>
             <div><dt>Commerçant</dt><dd>{{ $item->owner?->name }}</dd></div>
+            <div><dt>E-mail</dt><dd>{{ $item->owner?->email }}</dd></div>
             <div><dt>État</dt><dd>{{ $item->status->label() }}</dd></div>
+            <div><dt>Abonnement actuel</dt><dd>{{ $currentSubscription?->plan?->name ?? 'Aucun abonnement actif' }}</dd></div>
+            <div><dt>Nouvelle offre demandée</dt><dd>{{ $item->subscription?->plan?->name }}</dd></div>
+            <div><dt>Périodicité</dt><dd>{{ $item->subscription?->period?->label() }}</dd></div>
             <div><dt>Montant TTC</dt><dd>{{ $item->subscription?->agreed_amount }} DZD</dd></div>
             <div><dt>Moyen choisi</dt><dd>{{ $item->payment_choice->label() }}</dd></div>
             <div><dt>Période</dt><dd>{{ $item->subscription?->period_starts_at?->format('d/m/Y') }} — {{ $item->subscription?->period_ends_at?->format('d/m/Y') }}</dd></div>
-            <div><dt>Abonnement</dt><dd>{{ $item->subscription?->status->label() }}</dd></div>
+            <div><dt>Statut de l’abonnement demandé</dt><dd>{{ $item->subscription?->status->label() }}</dd></div>
+            @if ($item->decided_at)
+                <div><dt>Décision administrative</dt><dd>{{ $item->decider?->name }} — {{ $item->decided_at->format('d/m/Y H:i') }}</dd></div>
+            @endif
         </dl>
         @if ($item->getAttribute('decision_reason'))<flux:callout heading="Motif du refus">{{ $item->getAttribute('decision_reason') }}</flux:callout>@endif
         @if ($issued)
@@ -27,12 +38,11 @@
                 <flux:button :href="\Illuminate\Support\Facades\URL::temporarySignedRoute($prefix.'.invoices.download', now()->addMinutes(10), ['invoice' => $item->invoice, 'inline' => 1])" target="_blank">Ouvrir le PDF de facture pour télécharger ou imprimer</flux:button>
             @endcan
         @else
-            <flux:callout>{{ $item->getAttribute('invoice_error') ?? 'La facture est en préparation. Aucun paiement ne doit être confirmé à ce stade.' }}</flux:callout>
-            @can('prepareInvoice', $item)
-                <form method="POST" action="{{ route($prefix.'.subscription-requests.invoice', $item) }}">@csrf
-                    <input type="hidden" name="expected_state" value="{{ $item->managementState() }}">
-                    <flux:button type="submit">Reprendre la préparation de la facture</flux:button>
-                </form>
+            <flux:callout>{{ $item->getAttribute('invoice_error') ?? 'Préparation interne sans numéro ni PDF définitif. La facture et le reçu suivront la confirmation du paiement intégral.' }}</flux:callout>
+        @endif
+        @if ($item->getAttribute('submitted_payment') !== null)
+            @can('viewInitialProof', $item)
+            <flux:button :href="\Illuminate\Support\Facades\URL::temporarySignedRoute($prefix.'.subscription-requests.initial-proof', now()->addMinutes(10), ['subscriptionRequest' => $item])">Consulter le justificatif initial</flux:button>
             @endcan
         @endif
         @if ($item->payment)
@@ -41,7 +51,10 @@
                 <flux:callout>Une réception de fonds est signalée. La demande ne peut pas être corrigée ou annulée commercialement ; l’administration doit terminer le contrôle ou le rapprochement.</flux:callout>
             @endif
             @can('view', $item->payment)
-                <flux:button :href="route($prefix.'.payments.show', $item->payment)">Consulter le paiement et son justificatif</flux:button>
+                <flux:button :href="route($prefix.'.invoices.show', $item->payment->invoice).'#payment-'.$item->payment->uuid">Consulter le paiement et son justificatif</flux:button>
+                @if ($item->payment->getAttribute('proof_media_id'))
+                    <flux:button :href="\Illuminate\Support\Facades\URL::temporarySignedRoute($prefix.'.payments.proof', now()->addMinutes(10), ['payment' => $item->payment])">Télécharger le justificatif</flux:button>
+                @endif
             @endcan
             @can('receipt', $item->payment)
                 <flux:button :href="\Illuminate\Support\Facades\URL::temporarySignedRoute($prefix.'.payments.receipt', now()->addMinutes(10), ['payment' => $item->payment, 'inline' => 1])" target="_blank">Ouvrir le reçu pour télécharger ou imprimer</flux:button>
@@ -62,6 +75,9 @@
                         <input type="hidden" name="expected_amount" x-bind:value="plans.find(p => p.uuid === plan)?.[period === '1' ? 'monthly_price' : 'annual_price'] ?? ''">
                     </div>
                     <input type="hidden" name="payment_choice" value="{{ $item->payment_choice->value }}">
+                    <flux:select name="transition_mode" label="Début de la nouvelle période">
+                        @foreach (\App\Enums\Central\Subscriptions\TransitionModeEnum::cases() as $mode)<option value="{{ $mode->value }}" @selected($item->subscription->transition_mode === $mode)>{{ $mode->label() }}</option>@endforeach
+                    </flux:select>
                     <flux:button type="submit">Modifier l’offre ou la période</flux:button>
                 </form>
                 <form method="POST" action="{{ route('owner.subscription-requests.cancel', $item) }}">@csrf
@@ -75,8 +91,8 @@
                     </flux:select>
                     <flux:button type="submit">Enregistrer mon choix</flux:button>
                 </form>
-                @if ($cash)<flux:callout>Présentez votre facture au bureau Aydra. Seul l’administrateur peut constater les espèces réellement reçues. Aucun droit ne sera activé avant ce contrôle. {{ config('central.billing.cash_instructions') }}</flux:callout>
-                @elseif ($issued)
+                @if ($cash)<flux:callout>Présentez votre référence de demande au bureau Aydra. Seul l’administrateur peut constater les espèces réellement reçues. Aucun droit ne sera activé avant ce contrôle. {{ config('central.billing.cash_instructions') }}</flux:callout>
+                @elseif ($item->invoice !== null && $item->subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::SCHEDULED)
                     <flux:callout>{{ config('central.billing.payment_instructions') ?: 'Demandez les coordonnées officielles de versement à l’administration avant tout envoi d’argent.' }}</flux:callout>
                     <form method="POST" enctype="multipart/form-data" action="{{ route('owner.subscription-requests.proof', $item) }}" class="flex flex-col gap-3">@csrf
                         <input type="hidden" name="expected_state" value="{{ $item->managementState() }}"><input type="hidden" name="currency" value="DZD">
@@ -93,39 +109,43 @@
                 @endif
             @endcan
         @elseif (! $ownerMode && ! $item->status->isFinal())
-            @if ($issued && ($item->payment === null || $item->payment->getAttribute('transfer_status') !== \App\Enums\Central\Billing\TransferStatusEnum::UNCERTAIN))
+            @if ($item->payment === null || $item->payment->getAttribute('transfer_status') !== \App\Enums\Central\Billing\TransferStatusEnum::UNCERTAIN)
                 @can('accept', $item)
-                    @if ($cash || $item->payment)
+                    @if ($cash || $item->payment || $item->getAttribute('submitted_payment') !== null)
                         <form method="POST" action="{{ route('central.subscription-requests.accept', $item) }}" class="flex flex-col gap-3">@csrf
                             <input type="hidden" name="expected_state" value="{{ $item->managementState() }}">
                             <input type="hidden" name="expected_payment_state" value="{{ $item->payment?->managementState() }}">
-                            @if ($cash && ! $item->payment)
-                                <input type="hidden" name="operation_id" value="{{ (string) \Illuminate\Support\Str::uuid() }}"><input type="hidden" name="currency" value="DZD">
-                                <flux:input name="amount" label="Espèces réellement reçues (DZD)" required />
+                            <flux:text>En acceptant, vous confirmez avoir reçu et contrôlé le montant intégral de {{ $item->subscription->agreed_amount }} DZD. Le montant et la date de confirmation sont renseignés automatiquement.</flux:text>
+                            @if (filled($item->getAttribute('invoice_error')))
+                                <flux:checkbox name="acknowledged" value="1" label="J’ai lu et approuvé ce message." description="Cette confirmation ne remplace pas les vérifications fiscales et techniques nécessaires à la facture." required />
                             @endif
-                            @if (! $cash)
-                                <flux:input name="account" label="Compte destinataire réellement contrôlé" required maxlength="255" />
-                                <flux:input name="reference" label="Référence réelle contrôlée" required maxlength="255" />
-                            @endif
-                            @if (! $cash || ! $item->payment)<flux:input type="datetime-local" name="occurred_at" label="Date réelle de réception" required />@endif
-                            <flux:checkbox name="received" value="1" label="J’ai contrôlé la réception réelle du montant intégral et sa correspondance avec cette facture." required />
-                            <flux:button type="submit" variant="primary">Confirmer les fonds et accepter la demande</flux:button>
+                            <flux:button type="submit" variant="primary">Accepter la demande</flux:button>
                         </form>
+                    @else
+                        <flux:text>Le justificatif du versement doit être fourni avant de pouvoir accepter cette demande.</flux:text>
                     @endif
                 @endcan
             @endif
             @can('reject', $item)
-                <form method="POST" action="{{ route('central.subscription-requests.reject', $item) }}" class="flex flex-col gap-3">@csrf
-                    <input type="hidden" name="expected_state" value="{{ $item->managementState() }}"><input type="hidden" name="expected_payment_state" value="{{ $item->payment?->managementState() }}">
-                    <flux:textarea name="reason" label="Motif du refus, visible par le commerçant" required maxlength="2000" />
-                    <flux:button type="submit">Refuser avec motif</flux:button>
-                </form>
+                <flux:modal.trigger :name="'reject-subscription-request-'.$item->uuid">
+                    <flux:button variant="danger">Refuser</flux:button>
+                </flux:modal.trigger>
+                <flux:modal :name="'reject-subscription-request-'.$item->uuid" class="md:w-96">
+                    <form method="POST" action="{{ route('central.subscription-requests.reject', $item) }}" class="flex flex-col gap-4">
+                        @csrf
+                        <flux:heading size="lg">Refuser la demande</flux:heading>
+                        <input type="hidden" name="expected_state" value="{{ $item->managementState() }}">
+                        <input type="hidden" name="expected_payment_state" value="{{ $item->payment?->managementState() }}">
+                        <flux:textarea name="reason" label="Motif du refus, visible par le commerçant" required maxlength="2000">{{ is_string(old('reason')) ? old('reason') : '' }}</flux:textarea>
+                        <flux:button type="submit" variant="danger">Refuser avec motif</flux:button>
+                    </form>
+                </flux:modal>
             @endcan
         @endif
         @if ($history !== null)
             <flux:heading>Historique des décisions et corrections</flux:heading>
             @foreach ($history as $event)
-                <flux:text>{{ $event->created_at->format('d/m/Y H:i') }} — {{ $event->description }}</flux:text>
+                <flux:text>{{ $event->created_at->format('d/m/Y H:i') }} — {{ $event->causer?->name ?? 'Système' }} — {{ $event->description }}</flux:text>
                 @if (is_string($event->getProperty('reason')) && $event->getProperty('reason') !== '')<flux:text>Motif conservé : {{ $event->getProperty('reason') }}</flux:text>@endif
             @endforeach
             {{ $history->links() }}

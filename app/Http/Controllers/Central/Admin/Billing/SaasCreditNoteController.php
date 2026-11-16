@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Central\Admin\Billing;
 
+use App\Enums\Central\Billing\DocumentStatusEnum;
 use App\Enums\Central\Billing\PolicyStatusEnum;
 use App\Enums\Central\Billing\TriggerEventEnum;
 use App\Http\Controllers\Controller;
@@ -42,7 +43,7 @@ class SaasCreditNoteController extends Controller
     {
         $credit = $this->credits->createCreditNoteDraft($this->centralActor(), $invoice, $request->validated());
 
-        return $this->redirectWithStatus($credit, 'Brouillon créé. Les corrections sont réservées ; aucun avoir n’est encore émis.');
+        return $this->completeSave($credit);
     }
 
     public function edit(SaasCreditNote $credit): View
@@ -56,14 +57,14 @@ class SaasCreditNoteController extends Controller
     {
         $credit = $this->credits->updateDraft($this->centralActor(), $credit, $request->validated());
 
-        return $this->redirectWithStatus($credit, 'Brouillon modifié et réservations recalculées.');
+        return $this->completeSave($credit);
     }
 
     public function show(SaasCreditNote $credit): View
     {
         Gate::forUser($this->centralActor())->authorize('view', $credit);
 
-        return view('central.pages.admin.billing.credit-notes.show', ['credit' => $credit->load(['originalInvoice', 'lines', 'media']), 'ownerMode' => false,
+        return view('central.pages.admin.billing.credit-notes.show', ['credit' => $credit->load(['originalInvoice', 'lines', 'media', 'deliveries']), 'ownerMode' => false,
             'balance' => $this->balances->balance($this->centralActor(), $credit->originalInvoice),
             'available' => $this->credits->availableLines($this->centralActor(), $credit->originalInvoice),
             'history' => Activity::forSubject($credit)->latest('id')->paginate(20)]);
@@ -103,6 +104,20 @@ class SaasCreditNoteController extends Controller
             'available' => $this->credits->availableLines($this->centralActor(), $invoice, $credit),
             'rules' => BillingRule::where('trigger_event', TriggerEventEnum::INVOICE_CORRECTION)->where('policy_status', PolicyStatusEnum::ACTIVE)
                 ->orderBy('code')->get()->filter(fn (BillingRule $rule): bool => $rule->isActiveAt(now()))]);
+    }
+
+    private function completeSave(SaasCreditNote $credit): RedirectResponse
+    {
+        $actor = $this->centralActor();
+        if (in_array($credit->status, [DocumentStatusEnum::DRAFT, DocumentStatusEnum::PREPARING], true)
+            && Gate::forUser($actor)->allows('issue', $credit)) {
+            $this->issuance->issue($actor, $credit, $credit->managementState());
+            $credit->refresh();
+        }
+
+        return $this->redirectWithStatus($credit, $credit->status === DocumentStatusEnum::ISSUED
+            ? 'Avoir validé et émis. Le PDF est disponible et le solde a été recalculé, sans remboursement automatique.'
+            : 'Avoir enregistré. Son émission doit être validée par un administrateur autorisé.');
     }
 
     private function redirectWithStatus(SaasCreditNote $credit, string $message): RedirectResponse

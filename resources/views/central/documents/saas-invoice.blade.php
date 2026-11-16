@@ -8,7 +8,7 @@
 <p>Période : {{ $invoice->period_starts_at->format('d/m/Y') }} au {{ $invoice->period_ends_at->format('d/m/Y') }} (fin exclue)</p>
 <p>Exercice : {{ $invoice->getAttribute('fiscal_year') }} — Échéance : {{ $invoice->due_at->format('d/m/Y') }}</p>
 @foreach (['Émetteur' => $invoice->saas_identity_snapshot, 'Client' => $invoice->customer_identity_snapshot] as $label => $identity)
-    <div class="identity"><strong>{{ $label }} : {{ $identity['name'] }}</strong><br>{{ $identity['address'] }}<br>NIF : {{ $identity['nif'] }}</div>
+    <div class="identity"><strong>{{ $label }} : {{ $identity['name'] ?? '—' }}</strong><br>{{ $identity['address'] ?? '—' }}<br>NIF : {{ $identity['nif'] ?? '0' }}</div>
 @endforeach
 <table><thead><tr><th>Prestation</th><th>Qté</th><th>Prix HT</th><th>Remise HT</th><th>HT</th><th>Taxes</th><th>TTC</th></tr></thead><tbody>
 @foreach ($invoice->lines as $line)
@@ -19,10 +19,12 @@
 @foreach ($invoice->getAttribute('taxes') as $tax)
     <p>{{ $tax['code'] }} ({{ $tax['rate'] }} %) : {{ $tax['amount'] }} {{ $invoice->currency }}</p>
 @endforeach
-@if (empty($invoice->getAttribute('taxes')))<p>{{ $invoice->billing_rule_snapshot['fiscal_policy']['no_tax_reason'] }}</p>@endif
+@if (empty($invoice->getAttribute('taxes')) && filled($invoice->billing_rule_snapshot['fiscal_policy']['no_tax_reason'] ?? null))<p>{{ $invoice->billing_rule_snapshot['fiscal_policy']['no_tax_reason'] }}</p>@endif
 <p>Taxes : {{ $invoice->tax_amount }} {{ $invoice->currency }}</p>
 <p class="total"><strong>Total TTC : {{ $invoice->total_amount }} {{ $invoice->currency }}</strong></p>
 <p>Règle : {{ $invoice->billing_rule_snapshot['code'] }}, version {{ $invoice->billing_rule_snapshot['version'] }}.</p>
+@if (filled($invoice->billing_rule_snapshot['fiscal_policy']['validation_reference'] ?? null))
 <p>Référence fiscale : {{ $invoice->billing_rule_snapshot['fiscal_policy']['validation_reference'] }}.</p>
+@endif
 <p>Ce document ne constitue pas une confirmation de paiement.</p>
 </body></html>

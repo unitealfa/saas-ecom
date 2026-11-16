@@ -7,44 +7,38 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Billing\PaymentActionRequest;
 use App\Http\Requests\Central\Billing\SearchSaasPaymentsRequest;
 use App\Http\Requests\Central\Billing\StoreSaasPaymentRequest;
-use App\Models\Central\Audit\Activity;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Billing\SaasPayment;
-use App\Models\Central\Subscriptions\SubscriptionRequest;
-use App\Services\Central\Billing\InvoicePaymentService;
 use App\Services\Central\Billing\PaymentDocumentService;
 use App\Services\Central\Billing\SaasPaymentService;
-use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SaasPaymentController extends Controller
 {
-    public function __construct(private readonly SaasPaymentService $payments, private readonly PaymentDocumentService $documents, private readonly InvoicePaymentService $balances) {}
+    public function __construct(private readonly SaasPaymentService $payments, private readonly PaymentDocumentService $documents) {}
 
-    public function index(SearchSaasPaymentsRequest $request): View
+    public function index(SearchSaasPaymentsRequest $request): RedirectResponse
     {
-        return view('central.pages.admin.billing.payments.index', ['payments' => $this->payments->search($this->centralActor(), $request->validated()), 'ownerMode' => false]);
+        Gate::forUser($this->centralActor())->authorize('viewAny', SaasPayment::class);
+
+        return to_route('central.invoices.index');
     }
 
-    public function show(SaasPayment $payment): View
+    public function show(SaasPayment $payment): RedirectResponse
     {
         Gate::forUser($this->centralActor())->authorize('viewAny', SaasPayment::class);
         Gate::forUser($this->centralActor())->authorize('view', $payment);
 
-        return view('central.pages.admin.billing.payments.show', ['payment' => $payment->load(['invoice.subscription', 'owner', 'validator', 'creator']), 'ownerMode' => false,
-            'history' => Activity::forSubject($payment)->orderByDesc('id')->paginate(20)]);
+        return to_route('central.invoices.show', $payment->invoice)->withFragment('payment-'.$payment->uuid);
     }
 
-    public function createCash(SaasInvoice $invoice): View|RedirectResponse
+    public function createCash(SaasInvoice $invoice): RedirectResponse
     {
         Gate::forUser($this->centralActor())->authorize('recordCashPayment', $invoice);
-        if ($invoice->subscription->request !== null && Gate::forUser($this->centralActor())->allows('viewAny', SubscriptionRequest::class)) {
-            return to_route('central.subscription-requests.show', $invoice->subscription->request);
-        }
 
-        return view('central.pages.admin.billing.payments.create', ['invoice' => $invoice, 'cash' => true, 'balance' => $this->balances->balance($this->centralActor(), $invoice)]);
+        return to_route('central.invoices.show', $invoice);
     }
 
     public function cash(StoreSaasPaymentRequest $request, SaasInvoice $invoice): RedirectResponse
@@ -104,7 +98,7 @@ class SaasPaymentController extends Controller
     private function redirectWithStatus(SaasPayment $payment, string $message): RedirectResponse
     {
         $redirect = Gate::forUser($this->centralActor())->allows('viewAny', SaasPayment::class)
-            ? to_route('central.payments.show', $payment) : to_route('dashboard');
+            ? to_route('central.invoices.show', $payment->invoice)->withFragment('payment-'.$payment->uuid) : to_route('dashboard');
 
         return $redirect->with('status', $message);
     }

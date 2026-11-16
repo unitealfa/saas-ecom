@@ -1,13 +1,4 @@
-@php
-    $oldText = static fn (string $key, mixed $default = null): string => is_scalar($value = old($key, $default)) ? (string) $value : '';
-@endphp
-<x-layouts::app :title="$cash ? 'Enregistrer des espèces reçues' : 'Déposer un justificatif'">
-    <section class="mx-auto flex w-full max-w-3xl flex-col gap-6">
-        <flux:heading size="xl" level="1">{{ $cash ? 'Enregistrer des espèces reçues' : 'Déposer un justificatif externe' }}</flux:heading>
-        <flux:text>Facture {{ $invoice->number }} — montant initial : {{ $invoice->total_amount }} {{ $invoice->currency }}. Avoirs émis : {{ $balance['credits_total'] }}. Montant net intégral : {{ $balance['net_due'] }}.</flux:text>
-        <flux:text>Période : {{ $invoice->period_starts_at->format('d/m/Y') }} — {{ $invoice->period_ends_at->format('d/m/Y') }}.</flux:text>
-        <flux:callout>{{ config($cash ? 'central.billing.cash_instructions' : 'central.billing.payment_instructions') ?: 'Demandez à l’administration le lieu de remise des espèces ou les coordonnées de versement officielles avant tout paiement. Aucune coordonnée bancaire n’est inventée par Aydra.' }}</flux:callout>
-        @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
+@php($oldText = static fn (string $key, mixed $default = null): string => is_scalar($value = old($key, $default)) ? (string) $value : '')
         <form method="POST" enctype="multipart/form-data" class="flex flex-col gap-4" action="{{ route($cash ? 'central.payments.cash.store' : 'owner.payments.store', $invoice) }}">
             @csrf
             <input type="hidden" name="operation_id" value="{{ $oldText('operation_id', (string) \Illuminate\Support\Str::uuid()) }}">
@@ -30,6 +21,3 @@
             @endif
             <flux:button type="submit" variant="primary">{{ $cash ? 'Enregistrer l’encaissement reçu' : 'Déposer le justificatif' }}</flux:button>
         </form>
-        <flux:button :href="route($cash ? 'central.invoices.show' : 'owner.invoices.show', $invoice)">Retour à la facture</flux:button>
-    </section>
-</x-layouts::app>

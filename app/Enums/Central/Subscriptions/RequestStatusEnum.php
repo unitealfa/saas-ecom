@@ -14,11 +14,10 @@ enum RequestStatusEnum: int
     public function label(): string
     {
         return match ($this) {
-            self::INVOICE_PENDING => 'Facture à préparer',
-            self::AWAITING_PAYMENT => 'En attente de paiement',
-            self::REVIEW => 'À vérifier',
+            self::INVOICE_PENDING, self::AWAITING_PAYMENT => 'En attente de paiement',
+            self::REVIEW => 'En vérification',
             self::REJECTED => 'Refusée',
-            self::ACCEPTED => 'Acceptée — paiement confirmé',
+            self::ACCEPTED => 'Acceptée',
             self::CANCELLED => 'Annulée',
         };
     }

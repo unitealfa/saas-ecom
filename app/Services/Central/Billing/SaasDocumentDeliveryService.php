@@ -18,9 +18,7 @@ use App\Services\Central\Authorization\AuthorizationMutation;
 use App\Services\Central\Media\CentralMediaService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -38,21 +36,6 @@ class SaasDocumentDeliveryService
         private readonly AuthorizationMutation $mutations,
         private readonly SaasInvoicePdfService $pdf,
     ) {}
-
-    /** @param array<string, mixed> $filters
-     * @return LengthAwarePaginator<int, SaasDocumentDelivery>
-     */
-    public function search(User $actor, array $filters): LengthAwarePaginator
-    {
-        abort_if(tenancy()->initialized, 403);
-        Gate::forUser($actor)->authorize('viewAny', SaasDocumentDelivery::class);
-
-        return SaasDocumentDelivery::with(['document', 'owner', 'creator'])
-            ->when(isset($filters['status']), fn (Builder $query) => $query->where('delivery_status', $filters['status']))
-            ->when(! empty($filters['document_uuid']), fn (Builder $query) => $query->whereHas('document',
-                fn (Builder $document) => $document->where('uuid', $filters['document_uuid'])))
-            ->orderByDesc('id')->paginate(20)->withQueryString();
-    }
 
     /** Reprend l'intention créée lors de l'émission, jamais un second envoi implicite. */
 
@@ -138,24 +121,38 @@ class SaasDocumentDeliveryService
 
     public function retry(User $actor, SaasDocumentDelivery $delivery, string $expectedState): SaasDocumentDelivery
     {
+        return $this->queueAgain($actor, $delivery, $expectedState, false);
+    }
+
+    public function resend(User $actor, SaasDocumentDelivery $delivery, string $expectedState): SaasDocumentDelivery
+    {
+        return $this->queueAgain($actor, $delivery, $expectedState, true);
+    }
+
+    private function queueAgain(User $actor, SaasDocumentDelivery $delivery, string $expectedState, bool $resend): SaasDocumentDelivery
+    {
         abort_if(tenancy()->initialized, 403);
-        $delivery = $this->mutations->run($actor, 'retry',
+        $delivery = $this->mutations->run($actor, $resend ? 'resend' : 'retry',
             fn () => SaasDocumentDelivery::whereKey($delivery->id)->lockForUpdate()->firstOrFail(),
-            function (SaasDocumentDelivery $current) use ($actor, $expectedState): SaasDocumentDelivery {
+            function (SaasDocumentDelivery $current) use ($actor, $expectedState, $resend): SaasDocumentDelivery {
                 if (! hash_equals($current->managementState(), $expectedState)) {
                     $this->fail('L’état de cet envoi a changé. Rechargez la page.');
                 }
-                if (! in_array($current->delivery_status, [DeliveryStatusEnum::RETRYABLE, DeliveryStatusEnum::FAILED], true)
+                $allowed = $resend ? [DeliveryStatusEnum::SENT, DeliveryStatusEnum::DELIVERED] : [DeliveryStatusEnum::RETRYABLE, DeliveryStatusEnum::FAILED];
+                if (! in_array($current->delivery_status, $allowed, true)
                     || $current->attempts_count >= self::MAX_ATTEMPTS || $current->channel !== DeliveryChannelEnum::EMAIL) {
                     $this->fail('La relance n’est pas autorisée pour cet état. Un résultat incertain doit être vérifié manuellement.');
                 }
-                $this->assertRecipient($this->documentById($current));
+                if ($this->assertRecipient($this->documentById($current)) !== $current->encrypted_recipient) {
+                    $this->fail('Le destinataire historique a changé. Vérifiez le dossier avant tout renvoi.');
+                }
                 $current->forceFill([
                     'delivery_status' => DeliveryStatusEnum::PENDING,
                     'error_code' => null,
                     'next_attempt_at' => now()->addMinutes(10),
                 ])->save();
-                $this->audit($actor, $current, 'saas_delivery_retried', 'Relance demandée après échec identifié.');
+                $this->audit($actor, $current, $resend ? 'saas_delivery_resent' : 'saas_delivery_retried',
+                    $resend ? 'Renvoi explicitement demandé, tentatives précédentes conservées.' : 'Relance demandée après échec identifié.');
 
                 return $current;
             });

@@ -9,9 +9,12 @@ use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Enums\MediaVisibilityEnum;
 use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Media\Media;
+use App\Models\Central\Subscriptions\SubscriptionRequest;
 use App\Models\Central\Users\User;
 use App\Services\Central\Media\CentralMediaService;
 use App\Services\Central\Media\PrivateMediaAccessService;
+use App\Services\Central\Subscriptions\SubscriptionRequestPaymentState;
+use App\Services\Central\Subscriptions\SubscriptionWorkflowNotifier;
 use Closure;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -37,7 +40,7 @@ class PaymentDocumentService
 
     private const int MAX_PIXELS = 12000000;
 
-    public function __construct(private readonly PrivateMediaAccessService $files) {}
+    public function __construct(private readonly PrivateMediaAccessService $files, private readonly SubscriptionWorkflowNotifier $notifications) {}
 
     /** @return array{original: string, mime: string, pdf: string} */
     public function prepareExternalProof(UploadedFile $file): array
@@ -110,6 +113,54 @@ class PaymentDocumentService
         });
     }
 
+    public function retainRequestProof(User $actor, SubscriptionRequest $request, UploadedFile $file): Media
+    {
+        Gate::forUser($actor)->authorize('supplyInitialProof', $request);
+        $prepared = $this->prepareExternalProof($file);
+
+        return $this->withProofLock($request, function () use ($actor, $request, $prepared): Media {
+            Gate::forUser($actor)->authorize('supplyInitialProof', $request->refresh());
+            $existing = Media::where('model_type', $request->getMorphClass())->where('model_id', $request->id)->where('collection_name', self::PROOF)->first();
+            if ($existing !== null) {
+                $source = $prepared['mime'] === 'application/pdf' ? $existing : Media::where('model_type', $request->getMorphClass())
+                    ->where('model_id', $request->id)->where('collection_name', self::SOURCE)->first();
+                if ($source === null || ! hash_equals((string) $source->file_hash, hash('sha256', $prepared['original']))) {
+                    $this->fail('Cette demande conserve déjà une autre preuve initiale. Utilisez sa procédure de correction.');
+                }
+                $this->assertFile($existing);
+
+                return $existing;
+            }
+            if ($prepared['mime'] !== 'application/pdf') {
+                $this->store($actor, $request, self::SOURCE, $prepared['original'], $prepared['mime'], $prepared['mime'] === 'image/png' ? 'png' : 'jpg');
+            }
+
+            return $this->store($actor, $request, self::PROOF, $prepared['pdf'], 'application/pdf', 'pdf');
+        });
+    }
+
+    public function retainedProof(SubscriptionRequest $request): UploadedFile
+    {
+        $id = $request->getAttribute('submitted_payment')['proof_uuid'] ?? null;
+        $media = Media::where('model_type', $request->getMorphClass())->where('model_id', $request->id)->where('uuid', $id)->first();
+        if ($media === null || $media->collection_name !== self::PROOF) {
+            $this->fail('Le justificatif conservé est indisponible.');
+        }
+        $this->assertFile($media);
+
+        return new UploadedFile(Storage::disk($media->disk)->path($media->storage_key), $media->original_name, $media->mime_type, null, true);
+    }
+
+    public function downloadRequestProof(User $actor, SubscriptionRequest $request): StreamedResponse
+    {
+        Gate::forUser($actor)->authorize('viewInitialProof', $request);
+        $id = $request->getAttribute('submitted_payment')['proof_uuid'] ?? null;
+        $media = Media::where('model_type', $request->getMorphClass())->where('model_id', $request->id)->where('uuid', $id)->firstOrFail();
+        $this->assertFile($media);
+
+        return $this->files->download($actor, $media);
+    }
+
     private function createInternalProof(User $actor, SaasPayment $payment): void
     {
         $this->authorizeWriter($actor, $payment);
@@ -179,7 +230,10 @@ class PaymentDocumentService
             }
             $bytes = $this->render(view('central.documents.payment-receipt', ['payment' => $payment->load('invoice'), 'confirmed' => true])->render());
 
-            return $this->store($actor, $payment, self::RECEIPT, $bytes, 'application/pdf', 'pdf');
+            $receipt = $this->store($actor, $payment, self::RECEIPT, $bytes, 'application/pdf', 'pdf');
+            $this->notifications->receipt($payment);
+
+            return $receipt;
         } finally {
             DB::selectOne('SELECT RELEASE_LOCK(?) AS released', [$lock]);
         }
@@ -209,17 +263,26 @@ class PaymentDocumentService
                 return;
             }
             $current->forceFill(['proof_media_id' => $proof->id, 'source_proof_media_id' => $source?->id])->save();
+            if ($current->getAttribute('transfer_method') !== TransferMethodEnum::CASH_IN_PERSON) {
+                $request = SubscriptionRequest::where('current_payment_id', $current->getKey())->first();
+                $initial = $request?->getAttribute('submitted_payment');
+                $initialAlreadyNotified = is_array($initial) && Str::endsWith((string) $current->getAttribute('operation_key'), ':'.strtolower($initial['operation_id']));
+                if ($request !== null && ! $initialAlreadyNotified) {
+                    $this->notifications->request($request, SubscriptionRequestPaymentState::SUBMITTED);
+                }
+            }
         }, 3);
         $payment->refresh();
     }
 
-    private function store(User $actor, SaasPayment $payment, string $collection, string $bytes, string $mime, string $extension): Media
+    private function store(User $actor, SaasPayment|SubscriptionRequest $payment, string $collection, string $bytes, string $mime, string $extension): Media
     {
         $disk = Storage::disk(CentralMediaService::DISK);
-        $key = CentralMediaService::DIRECTORY.'/payments/'.$payment->getAttribute('uuid').'/'.$collection.'/'.hash('sha256', $bytes).'.'.$extension;
+        $directory = $payment instanceof SubscriptionRequest ? '/subscription-requests/' : '/payments/';
+        $key = CentralMediaService::DIRECTORY.$directory.$payment->getAttribute('uuid').'/'.$collection.'/'.hash('sha256', $bytes).'.'.$extension;
         $existing = Media::where('disk', CentralMediaService::DISK)->where('storage_key', $key)->first();
         if ($existing !== null) {
-            if ($existing->model_type !== 'saas_payment' || $existing->model_id !== $payment->getKey() || $existing->collection_name !== $collection) {
+            if ($existing->model_type !== $payment->getMorphClass() || $existing->model_id !== $payment->getKey() || $existing->collection_name !== $collection) {
                 $this->fail('Cette pièce privée appartient à une autre opération.');
             }
             $this->assertFile($existing);
@@ -245,7 +308,7 @@ class PaymentDocumentService
             }
         }
         $media = new Media;
-        $media->forceFill(['model_type' => 'saas_payment', 'model_id' => $payment->getKey(), 'created_by_id' => $actor->id,
+        $media->forceFill(['model_type' => $payment->getMorphClass(), 'model_id' => $payment->getKey(), 'created_by_id' => $actor->id,
             'collection_name' => $collection, 'disk' => CentralMediaService::DISK, 'storage_key' => $key,
             'original_name' => $collection.'.'.$extension, 'mime_type' => $mime, 'visibility' => MediaVisibilityEnum::PRIVATE,
             'size_bytes' => strlen($bytes), 'file_hash' => hash('sha256', $bytes), 'position' => 1, 'is_primary' => true])->save();
@@ -268,7 +331,8 @@ class PaymentDocumentService
     {
         $disk = Storage::disk(CentralMediaService::DISK);
         if ($media->disk !== CentralMediaService::DISK || $media->visibility !== MediaVisibilityEnum::PRIVATE
-            || ! str_starts_with($media->storage_key, CentralMediaService::DIRECTORY.'/payments/')
+            || (! str_starts_with($media->storage_key, CentralMediaService::DIRECTORY.'/payments/')
+                && ! str_starts_with($media->storage_key, CentralMediaService::DIRECTORY.'/subscription-requests/'))
             || str_contains($media->storage_key, '..') || ! $disk->exists($media->storage_key)
             || ! hash_equals((string) $media->file_hash, hash('sha256', $disk->get($media->storage_key)))) {
             $this->fail('L’intégrité du justificatif ou du reçu ne peut pas être confirmée.');
@@ -283,15 +347,21 @@ class PaymentDocumentService
         }
     }
 
-    private function withProofLock(SaasPayment $payment, Closure $write): void
+    /**
+     * @template T
+     *
+     * @param  Closure(): T  $write
+     * @return T
+     */
+    private function withProofLock(SaasPayment|SubscriptionRequest $payment, Closure $write): mixed
     {
         abort_if(tenancy()->initialized, 403);
-        $lock = 'proof:'.substr(hash('sha256', DB::connection()->getDatabaseName().':'.$payment->getKey()), 0, 50);
+        $lock = 'proof:'.substr(hash('sha256', DB::connection()->getDatabaseName().':'.$payment->getMorphClass().':'.$payment->getKey()), 0, 50);
         if ((int) DB::selectOne('SELECT GET_LOCK(?,10) AS acquired', [$lock])->acquired !== 1) {
             $this->fail('Le justificatif est déjà en préparation. Réessayez.');
         }
         try {
-            $write();
+            return $write();
         } finally {
             DB::selectOne('SELECT RELEASE_LOCK(?) AS released', [$lock]);
         }

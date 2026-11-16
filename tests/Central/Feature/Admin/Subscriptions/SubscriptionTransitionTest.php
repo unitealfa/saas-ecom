@@ -23,6 +23,8 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Stancl\Tenancy\Events\TenantCreated;
 
+require_once dirname(__DIR__, 4).'/Support/ManualBillingFixtures.php';
+
 function subscriptionTransitionActor(string $permission): User
 {
     test()->seed(AuthorizationSeeder::class);
@@ -97,12 +99,15 @@ test('a paid subscription is closed only at the end of its current period', func
 });
 
 test('plan changes are scheduled at the end of the paid period', function (): void {
+    $f = manualPaymentFixture(issued: false);
+    $subscription = $f['subscription'];
+    $subscription->forceFill(['status' => StatusEnum::ACTIVE])->save();
     $actor = subscriptionTransitionActor('saas.subscriptions.change');
-    $subscription = Subscription::factory()->create(['period_ends_at' => now()->addMonth()]);
+    $actor->givePermissionTo('saas.payments.validate');
     $plan = Plan::factory()->create(['is_active' => true, 'monthly_price' => '500.00']);
     $this->actingAs($actor, 'central')->post(route('central.subscriptions.change', $subscription), [
         'expected_state' => $subscription->transitionState(), 'plan_uuid' => $plan->uuid,
-        'period' => 1, 'expected_amount' => '500.00', 'operation_key' => (string) Str::uuid(),
+        'period' => 1, 'expected_amount' => '500.00', 'received' => true, 'reference' => 'TEST-CHANGE', 'occurred_at' => now()->toDateTimeString(), 'operation_key' => (string) Str::uuid(),
     ])->assertSessionHasNoErrors();
     $scheduled = Subscription::where('user_id', $subscription->user_id)->where('status', StatusEnum::SCHEDULED)->firstOrFail();
     expect($subscription->fresh()->status)->toBe(StatusEnum::ACTIVE)
@@ -111,28 +116,34 @@ test('plan changes are scheduled at the end of the paid period', function (): vo
 });
 
 test('repeating the same plan change does not create a second scheduled subscription', function (): void {
+    $f = manualPaymentFixture(issued: false);
+    $subscription = $f['subscription'];
+    $subscription->forceFill(['status' => StatusEnum::ACTIVE])->save();
     $actor = subscriptionTransitionActor('saas.subscriptions.change');
-    $subscription = Subscription::factory()->create(['period_ends_at' => now()->addMonth()]);
+    $actor->givePermissionTo('saas.payments.validate');
     $plan = Plan::factory()->create(['is_active' => true, 'monthly_price' => '500.00']);
     $input = ['expected_state' => $subscription->transitionState(), 'plan_uuid' => $plan->uuid,
-        'period' => 1, 'expected_amount' => '500.00', 'operation_key' => (string) Str::uuid()];
+        'period' => 1, 'expected_amount' => '500.00', 'received' => true, 'reference' => 'TEST-CHANGE', 'occurred_at' => now()->toDateTimeString(), 'operation_key' => (string) Str::uuid()];
     $this->actingAs($actor, 'central')->post(route('central.subscriptions.change', $subscription), $input)->assertSessionHasNoErrors();
     $this->post(route('central.subscriptions.change', $subscription), $input)->assertSessionHasNoErrors();
     expect(Subscription::where('user_id', $subscription->user_id)->where('status', StatusEnum::SCHEDULED)->count())->toBe(1);
 });
 
 test('a second plan change is refused while another one is scheduled', function (): void {
+    $f = manualPaymentFixture(issued: false);
+    $subscription = $f['subscription'];
+    $subscription->forceFill(['status' => StatusEnum::ACTIVE])->save();
     $actor = subscriptionTransitionActor('saas.subscriptions.change');
-    $subscription = Subscription::factory()->create(['period_ends_at' => now()->addMonth()]);
+    $actor->givePermissionTo('saas.payments.validate');
     $plan = Plan::factory()->create(['is_active' => true, 'monthly_price' => '500.00']);
     $this->actingAs($actor, 'central')->post(route('central.subscriptions.change', $subscription), [
         'expected_state' => $subscription->transitionState(), 'plan_uuid' => $plan->uuid,
-        'period' => 1, 'expected_amount' => '500.00', 'operation_key' => (string) Str::uuid(),
+        'period' => 1, 'expected_amount' => '500.00', 'received' => true, 'reference' => 'TEST-CHANGE', 'occurred_at' => now()->toDateTimeString(), 'operation_key' => (string) Str::uuid(),
     ])->assertSessionHasNoErrors();
     $this->post(route('central.subscriptions.change', $subscription), [
         'expected_state' => $subscription->fresh()->transitionState(), 'plan_uuid' => $plan->uuid,
-        'period' => 1, 'expected_amount' => '500.00', 'operation_key' => (string) Str::uuid(),
-    ])->assertSessionHasErrors('subscription');
+        'period' => 1, 'expected_amount' => '500.00', 'received' => true, 'reference' => 'TEST-CHANGE', 'occurred_at' => now()->toDateTimeString(), 'operation_key' => (string) Str::uuid(),
+    ])->assertSessionHasErrors('plan_uuid');
     expect(Subscription::where('user_id', $subscription->user_id)->where('status', StatusEnum::SCHEDULED)->count())->toBe(1);
 });
 

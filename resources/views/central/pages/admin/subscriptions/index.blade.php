@@ -1,10 +1,16 @@
 <x-layouts::app :title="__('Abonnements')">
     <section class="flex flex-col gap-6">
         <flux:heading size="xl" level="1">Abonnements</flux:heading>
+        @isset($requests)
+            @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
+            @include('central.pages.admin.subscriptions.requests.list', ['ownerMode' => false])
+        @else
         <flux:text>Recherchez les abonnements par propriétaire, offre ou identifiant.</flux:text>
         @if (session('status'))<flux:text role="status">{{ session('status') }}</flux:text>@endif
         @can('assign', \App\Models\Central\Subscriptions\Subscription::class)
+            @can('saas.payments.validate')
             <div><flux:button :href="route('central.subscriptions.create')" variant="primary">Attribuer un abonnement</flux:button></div>
+            @endcan
         @endcan
         @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
         <form method="GET" action="{{ route('central.subscriptions.index') }}" class="flex flex-wrap items-end gap-3">
@@ -41,5 +47,6 @@
             </table>
         </div>
         {{ $subscriptions->links() }}
+        @endisset
     </section>
 </x-layouts::app>

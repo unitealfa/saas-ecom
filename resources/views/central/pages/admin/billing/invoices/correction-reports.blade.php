@@ -1,17 +1,5 @@
-<x-layouts::app title="Signalements de paiements SaaS">
-    <section class="mx-auto flex w-full max-w-6xl flex-col gap-5">
-        <flux:heading size="xl" level="1">Signalements de paiements SaaS</flux:heading>
-        @if (session('status'))
-            <flux:callout>{{ session('status') }}</flux:callout>
-        @endif
-        @foreach ($errors->all() as $error)
-            <flux:text role="alert">{{ $error }}</flux:text>
-        @endforeach
-        <flux:callout>
-            Liste des demandes soumises par les commerçants. Un signalement n'est ni un remboursement,
-            ni un avoir, ni une validation. Examinez le paiement et son historique avant toute décision.
-            Une décision de correction exige un avoir déjà émis pour cette facture.
-        </flux:callout>
+<section id="corrections" class="flex flex-col gap-4">
+<flux:heading>Signalements à examiner</flux:heading>
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm">
                 <thead><tr><th class="p-3">Date</th><th class="p-3">Paiement</th><th class="p-3">Motif</th><th class="p-3">Décision</th><th class="p-3">Action</th></tr></thead>
@@ -47,7 +35,7 @@
                             </td>
                             <td class="p-3">
                                 @if ($report->subject instanceof \App\Models\Central\Billing\SaasPayment)
-                                    <a class="underline" href="{{ route('central.payments.show', $report->subject) }}">Examiner le paiement</a>
+                                    <a class="underline" href="{{ route('central.invoices.show', $report->subject->invoice).'#payment-'.$report->subject->uuid }}">Examiner le paiement</a>
                                     @if ($decision === null && $canReview)
                                         <div class="mt-3 flex flex-col gap-3">
                                             <form method="POST" action="{{ route('central.payments.corrections.review', $report) }}">
@@ -84,6 +72,5 @@
             </table>
         </div>
         {{ $reports->links() }}
-        <flux:button :href="route('central.payments.index')">Tous les paiements</flux:button>
-    </section>
-</x-layouts::app>
+
+</section>

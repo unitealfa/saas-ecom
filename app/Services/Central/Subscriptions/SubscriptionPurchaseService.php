@@ -5,6 +5,7 @@ namespace App\Services\Central\Subscriptions;
 use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Enums\Central\Subscriptions\PeriodEnum;
 use App\Enums\Central\Subscriptions\StatusEnum;
+use App\Enums\Central\Subscriptions\TransitionModeEnum;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Subscriptions\SubscriptionInstallment;
@@ -33,6 +34,9 @@ class SubscriptionPurchaseService
     {
         return ['plan_uuid' => ['required', 'uuid:4'], 'operation_id' => ['required', 'uuid:4'],
             'period' => ['required', 'integer', Rule::enum(PeriodEnum::class)],
+            'transition_mode' => ['sometimes', 'integer', Rule::enum(TransitionModeEnum::class)],
+            'source_uuid' => ['sometimes', 'uuid:4'],
+            'expected_source_state' => ['required_with:source_uuid', 'string', 'size:64'],
             'expected_amount' => ['required', 'string', 'regex:/^\d{1,12}\.\d{2}$/D'],
             ...array_fill_keys(['user_id', 'owner_uuid', 'status', 'agreed_amount', 'started_at', 'period_starts_at', 'period_ends_at', 'auto_renew', 'assigned_by_id', 'tenant_id'], ['missing'])];
     }
@@ -51,14 +55,27 @@ class SubscriptionPurchaseService
         try {
             return $this->mutations->transaction(function () use ($actor, $owner, $data): Subscription {
                 $owner = User::whereKey($owner->id)->lockForUpdate()->firstOrFail();
-                Gate::forUser($actor)->authorize('purchaseFor', [Subscription::class, $owner]);
                 $values = Validator::make($data, self::rules())->validate();
+                $source = null;
+                if (isset($values['source_uuid'])) {
+                    $source = Subscription::where('user_id', $owner->id)->where('uuid', $values['source_uuid'])->lockForUpdate()->firstOrFail();
+                    Gate::forUser($actor)->authorize('change', $source);
+                    if (! hash_equals($source->transitionState(), $values['expected_source_state'])) {
+                        throw ValidationException::withMessages(['expected_state' => 'L’abonnement a changé. Rechargez la page.']);
+                    }
+                    if ($source->status !== StatusEnum::ACTIVE || $source->period_starts_at->isFuture()
+                        || $source->plan->code === 'free' || $source->effectiveEndsAt()?->isFuture() !== true) {
+                        $this->fail('Seul un abonnement payant en cours peut être remplacé.');
+                    }
+                }
+                Gate::forUser($actor)->authorize('purchaseFor', [Subscription::class, $owner, $source]);
                 $administrative = $actor->id !== $owner->id;
                 $key = $administrative ? 'assign:'.strtolower($values['operation_id']) : 'purchase:'.$owner->uuid.':'.strtolower($values['operation_id']);
                 $existing = Subscription::where('operation_key', $key)->lockForUpdate()->first();
                 if ($existing !== null) {
                     if ($existing->user_id !== $owner->id || $existing->plan->uuid !== strtolower($values['plan_uuid']) || $existing->period->value !== (int) $values['period']
-                        || $existing->agreed_amount !== $values['expected_amount']) {
+                        || $existing->agreed_amount !== $values['expected_amount']
+                        || $existing->transition_mode->value !== (int) ($values['transition_mode'] ?? TransitionModeEnum::DEFERRED->value)) {
                         $this->fail('Cette demande a déjà été utilisée avec une autre offre ou un autre prix.');
                     }
 
@@ -87,6 +104,8 @@ class SubscriptionPurchaseService
                     $this->fail('Le prix a changé ou n’est pas payable pour cette période. Rechargez l’offre.');
                 }
                 $start = now()->toImmutable()->startOfSecond();
+                $mode = TransitionModeEnum::from((int) ($values['transition_mode'] ?? TransitionModeEnum::DEFERRED->value));
+                $replaces = null;
                 foreach ($subscriptions as $current) {
                     if ($current->plan->code === 'free') {
                         continue;
@@ -97,15 +116,22 @@ class SubscriptionPurchaseService
                     }
                     if ($end->greaterThan($start)) {
                         if ($administrative) {
-                            throw ValidationException::withMessages(['owner_uuid' => 'Ce commerçant possède déjà un abonnement payant en cours. Utilisez le changement d’offre à échéance.']);
+                            Gate::forUser($actor)->authorize('change', $current);
                         }
-                        $start = $end;
+                        if ($replaces !== null) {
+                            $this->fail('Plusieurs périodes payantes se chevauchent. Un examen administratif est nécessaire.');
+                        }
+                        $replaces = $current->id;
+                        if ($mode === TransitionModeEnum::DEFERRED) {
+                            $start = $end;
+                        }
                     }
                 }
                 $end = $period === PeriodEnum::MONTHLY ? $start->addMonthNoOverflow() : $start->addYearNoOverflow();
                 $subscription = new Subscription;
                 $subscription->forceFill(['user_id' => $owner->id, 'plan_id' => $plan->getKey(), 'operation_key' => $key,
                     'status' => StatusEnum::SCHEDULED, 'period' => $period, 'agreed_amount' => $amount,
+                    'transition_mode' => $mode, 'replaces_subscription_id' => $replaces,
                     'assigned_by_id' => $administrative ? $actor->id : null,
                     'started_at' => $start, 'period_starts_at' => $start, 'period_ends_at' => $end, 'auto_renew' => false])->save();
                 (new SubscriptionInstallment)->forceFill(['user_id' => $owner->id, 'subscription_id' => $subscription->getKey(),

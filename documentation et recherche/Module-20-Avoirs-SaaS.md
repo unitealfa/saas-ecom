@@ -185,3 +185,13 @@ Liste ci-dessous hors tests, fichiers d'instruction de mission et graphe génér
 - `resources/views/central/pages/admin/billing/payments/create.blade.php`
 - `routes/central.php`
 - `routes/central/admin/billing.php`
+
+
+### Avoirs simplifiés — décision du 16 novembre 2026
+
+Le formulaire de préparation/modification ne demande que montant TTC et motif par prestation. Quantité calculée sous verrou proportionnellement au solde monétaire et à la quantité encore disponibles, arrondie avec les deux décimales du schéma existant. Une dernière fraction est conservée pour solder la ligne ; si cette précision ne permet plus de fractionnement, demander une correction du solde en une fois plutôt que créer une quantité nulle ou dépasser les plafonds. Une correction intégrale reprend exactement la quantité restante. Le motif général absent est dérivé des motifs détaillés, qui restent conservés. Anciens champs facultatifs du contrat acceptés pour compatibilité ; leur quantité n’est jamais utilisée pour les écritures nouvelles. Contrôles TTC/HT/taxes/quantité, état attendu, transactions, idempotence et documents émis préservés ; aucun changement de schéma ou de données réelles. Explications, détails techniques et motif général retirés de la page. Tests adaptés et ajoutés, non exécutés conformément à la demande.
+
+
+### Validation et émission des avoirs en une action — 16 novembre 2026
+
+Le formulaire crée ou modifie le brouillon puis appelle immédiatement le service d’émission existant lorsque l’acteur possède saas.credit-notes.issue. Le bouton annonce Valider et émettre ; sans ce droit, il annonce Enregistrer le brouillon et ne réserve aucun numéro. L’étape manuelle de réservation du numéro est retirée de la fiche ; le service conserve sa réservation interne, les reprises et les anciens contrats. ISSUED est enregistré uniquement après PDF privé finalisé et audit atomique ; un échec conserve la préparation et son numéro sans succès fictif. L’avoir réel AVOIR-2026-000001 n’a pas été émis par cette intervention : son administrateur peut terminer l’émission depuis la fiche. Tests de création/émission/rejeu et séparation des droits ajoutés, non exécutés avant accord explicite.

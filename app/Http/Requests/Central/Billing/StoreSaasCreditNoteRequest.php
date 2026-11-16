@@ -31,12 +31,21 @@ class StoreSaasCreditNoteRequest extends FormRequest
         return SaasCreditNoteService::rules(! ($this->route('credit') instanceof SaasCreditNote));
     }
 
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return [
+            'billing_rule_uuid.required' => 'La configuration interne des avoirs est absente ou ambiguë. Elle doit être mise en place avant de préparer un avoir.',
+            'billing_rule_uuid.uuid' => 'La configuration interne des avoirs est invalide. Rechargez la page.',
+        ];
+    }
+
     protected function prepareForValidation(): void
     {
         $lines = $this->input('lines');
         if (is_array($lines)) {
             $this->merge(['lines' => array_filter($lines, fn ($line): bool => ! is_array($line)
-                || filled($line['quantity'] ?? null) || filled($line['total_amount'] ?? null))]);
+                || filled($line['quantity'] ?? null) || filled($line['total_amount'] ?? null) || filled($line['reason'] ?? null))]);
         }
     }
 }

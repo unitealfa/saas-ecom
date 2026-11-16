@@ -16,11 +16,6 @@ class SaasDocumentDeliveryPolicy
         return $this->has($actor, 'view');
     }
 
-    public function view(User $actor, SaasDocumentDelivery $delivery): bool
-    {
-        return $this->viewAny($actor);
-    }
-
     public function send(User $actor): bool
     {
         return $this->has($actor, 'send');
@@ -30,6 +25,13 @@ class SaasDocumentDeliveryPolicy
     {
         return $this->has($actor, 'retry')
             && in_array($delivery->delivery_status, [DeliveryStatusEnum::FAILED, DeliveryStatusEnum::RETRYABLE], true)
+            && $delivery->attempts_count < 3;
+    }
+
+    public function resend(User $actor, SaasDocumentDelivery $delivery): bool
+    {
+        return $this->send($actor)
+            && in_array($delivery->delivery_status, [DeliveryStatusEnum::SENT, DeliveryStatusEnum::DELIVERED], true)
             && $delivery->attempts_count < 3;
     }
 

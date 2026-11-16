@@ -11,6 +11,7 @@ use App\Services\Central\Billing\InvoicePaymentService;
 use App\Services\Central\Billing\SaasInvoiceIssuanceService;
 use App\Services\Central\Billing\SaasInvoiceService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -18,14 +19,11 @@ class InvoiceController extends Controller
 {
     public function __construct(private readonly SaasInvoiceService $invoices, private readonly InvoicePaymentService $payments) {}
 
-    public function index(SearchSaasInvoicesRequest $request): View
+    public function index(SearchSaasInvoicesRequest $request): RedirectResponse
     {
-        $invoices = $this->invoices->search($this->centralActor(), $request->validated(), own: true);
+        Gate::forUser($this->centralActor())->authorize('viewOwn', SaasInvoice::class);
 
-        return view('central.pages.admin.billing.invoices.index', [
-            'invoices' => $invoices, 'ownerMode' => true,
-            'paymentStates' => $this->payments->states($this->centralActor(), $invoices->getCollection()),
-        ]);
+        return to_route('owner.billing.index');
     }
 
     public function show(SaasInvoice $invoice): View
@@ -35,6 +33,7 @@ class InvoiceController extends Controller
         Gate::forUser($actor)->authorize('viewOwnInvoice', $invoice);
 
         return view('central.pages.admin.billing.invoices.show', [
+            ...$this->invoices->paymentDetails($actor, $invoice, own: true),
             'invoice' => $invoice->load(['installment', 'sequence', 'lines', 'media']), 'ownerMode' => true, 'history' => null,
             'paymentState' => $this->payments->states($actor, collect([$invoice]))[$invoice->id],
             'balance' => $this->payments->balance($actor, $invoice),
