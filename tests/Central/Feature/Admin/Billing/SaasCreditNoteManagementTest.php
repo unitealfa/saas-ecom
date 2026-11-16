@@ -89,7 +89,7 @@ test('T20-05 T20-06 T20-08 reserved corrections consume each original dimension'
     $service->createCreditNoteDraft($f['actor'], $f['invoice'], creditNoteInput($f, '1000.00', '0.50'));
     expect(fn () => $service->createCreditNoteDraft($f['actor'], $f['invoice'], creditNoteInput($f, $amount, $quantity)))->toThrow(ValidationException::class);
     expect(SaasCreditNote::count())->toBe(1);
-})->with([['0.60', '100.00'], ['0.10', '2500.00']]);
+})->with([['0.60', '2000.01'], ['0.10', '2500.00']]);
 
 test('T20-09 cancelling an unissued correction releases its reservation without deleting its history', function (): void {
     $f = creditNoteFixture();
@@ -193,7 +193,7 @@ test('T20-07 two compatible issued credits accumulate without modifying original
     $available = $service->availableLines($f['actor'], $f['invoice']);
     $line = array_values($available)[0];
     expect($line['issued']['total_amount'])->toBe('2500.00')->and($line['remaining']['total_amount'])->toBe('500.00')
-        ->and($line['remaining']['quantity'])->toBe('0.20')
+        ->and($line['remaining']['quantity'])->toBe('0.17')
         ->and($f['subscription']->refresh()->status)->toBe(StatusEnum::SCHEDULED);
 });
 
@@ -214,10 +214,10 @@ test('editing a draft recalculates its own reservation and rejects obsolete quan
     $credit = $service->createCreditNoteDraft($f['actor'], $f['invoice'], $input);
     unset($input['operation_id']);
     $input['expected_state'] = $credit->managementState();
-    $input['lines'][0]['quantity'] = '0.20';
+    $input['lines'][0]['total_amount'] = '600.00';
     $credit = $service->updateDraft($f['actor'], $credit, $input);
     expect($credit->lines()->sole()->quantity)->toBe('0.20');
-    expect(Activity::forSubject($credit)->where('event', SaasCreditNoteService::CREATED)->sole()->getProperty('lines')[0]['quantity'])->toBe('0.10')
+    expect(Activity::forSubject($credit)->where('event', SaasCreditNoteService::CREATED)->sole()->getProperty('lines')[0]['quantity'])->toBe('0.17')
         ->and(Activity::forSubject($credit)->where('event', SaasCreditNoteService::UPDATED)->sole()->getProperty('lines')[0]['quantity'])->toBe('0.20');
     expect(fn () => $service->updateDraft($f['actor'], $credit, $input))->toThrow(ValidationException::class);
     $before = $credit->lines()->sole()->getAttributes();
@@ -243,7 +243,7 @@ test('T20-11 original taxes are preserved and exact centimes are used for fracti
     expect($credit->net_amount)->toBe('100.00')->and($credit->tax_amount)->toBe('19.00')
         ->and($credit->getAttribute('taxes'))->toBe([['code' => 'TVA', 'rate' => '19', 'amount' => '19.00']]);
     $credit = app(SaasInvoiceIssuanceService::class)->issue($f['actor'], $credit, $credit->managementState());
-    expect($credit->total_amount)->toBe('119.00')->and($credit->lines()->sole()->quantity)->toBe('0.10');
+    expect($credit->total_amount)->toBe('119.00')->and($credit->lines()->sole()->quantity)->toBe('0.04');
 });
 
 test('a numbered correction stays frozen and cancelled numbers are never reused', function (): void {
@@ -611,3 +611,53 @@ test('browser creates prepares emits and privately reads a credit without rewrit
         File::deleteDirectory($runtime);
     }
 })->skip(fn (): bool => getenv('AYDRA_MODULE20_BROWSER') !== '1', 'Requires an interactive browser pilot on isolated data.');
+
+test('credit amounts determine quantities and line reasons supply the document reason', function (): void {
+    $f = creditNoteFixture();
+    $service = app(SaasCreditNoteService::class);
+    $input = creditNoteInput($f, '1500.00');
+    unset($input['reason'], $input['lines'][0]['quantity']);
+    $credit = $service->createCreditNoteDraft($f['actor'], $f['invoice'], $input);
+    expect($credit->lines()->sole()->quantity)->toBe('0.50')
+        ->and($credit->getAttribute('reason'))->toBe('Réduction de test');
+    $remaining = creditNoteInput($f, '1500.00', '99.00');
+    $next = $service->createCreditNoteDraft($f['actor'], $f['invoice']->refresh(), $remaining);
+    expect($next->lines()->sole()->quantity)->toBe('0.50');
+    expect(fn () => $service->createCreditNoteDraft($f['actor'], $f['invoice']->refresh(), creditNoteInput($f, '0.01')))
+        ->toThrow(ValidationException::class);
+});
+
+test('the simplified credit form only asks for an amount and reason per invoice line', function (): void {
+    $f = creditNoteFixture();
+    $this->actingAs($f['actor'], 'central')->get(route('central.credit-notes.create', $f['invoice']))
+        ->assertOk()->assertSee('Montant à retirer de la facture (DA)')->assertSee('Motif de la correction')
+        ->assertDontSee('name="reason"', false)->assertDontSee('[quantity]', false)
+        ->assertDontSee('Original :')->assertDontSee('Déjà corrigé :')->assertDontSee('Exemple :');
+});
+
+test('creating a credit with issuance permission emits its PDF in one action and replay is idempotent', function (): void {
+    $f = creditNoteFixture();
+    $input = creditNoteInput($f);
+    unset($input['reason'], $input['lines'][0]['quantity']);
+    $this->actingAs($f['actor'], 'central')->post(route('central.credit-notes.store', $f['invoice']), $input)
+        ->assertSessionHasNoErrors()->assertRedirect();
+    $credit = SaasCreditNote::sole();
+    $number = $credit->number;
+    $media = $credit->getAttribute('document_media_id');
+    expect($credit->status)->toBe(DocumentStatusEnum::ISSUED)->and($number)->not->toBeNull()->and($media)->not->toBeNull();
+    $this->post(route('central.credit-notes.store', $f['invoice']), $input)->assertSessionHasNoErrors()->assertRedirect();
+    expect(SaasCreditNote::count())->toBe(1)->and($credit->refresh()->number)->toBe($number)
+        ->and($credit->getAttribute('document_media_id'))->toBe($media)->and($credit->deliveries()->count())->toBe(1)
+        ->and(Activity::forSubject($credit)->where('event', SaasInvoiceIssuanceService::CREDIT_ISSUED)->count())->toBe(1);
+});
+
+test('creating a credit without issuance permission preserves the draft without a number or PDF', function (): void {
+    $f = creditNoteFixture();
+    $staff = User::factory()->create();
+    $staff->assignRole(Role::createWithPermissions('credit-draft-only', ['saas.credit-notes.create' => 7]));
+    $this->actingAs($staff, 'central')->post(route('central.credit-notes.store', $f['invoice']), creditNoteInput($f))
+        ->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
+    $credit = SaasCreditNote::sole();
+    expect($credit->status)->toBe(DocumentStatusEnum::DRAFT)->and($credit->number)->toBeNull()
+        ->and($credit->getAttribute('document_media_id'))->toBeNull()->and($credit->deliveries()->count())->toBe(0);
+});

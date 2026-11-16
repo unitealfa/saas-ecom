@@ -24,7 +24,7 @@ class SearchSaasInvoicesRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return ['search' => ['nullable', 'string', 'max:255'], 'owner' => ['nullable', 'uuid:4'],
+        return ['search' => ['nullable', 'string', 'max:255'], 'owner' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'integer', Rule::enum(DocumentStatusEnum::class)],
             'filter' => ['nullable', Rule::enum(InvoiceListFilterEnum::class)],
             'page' => ['sometimes', 'integer', 'min:1'],

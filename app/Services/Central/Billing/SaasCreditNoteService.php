@@ -15,6 +15,7 @@ use App\Models\Central\Subscriptions\SubscriptionInstallment;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
@@ -31,6 +32,8 @@ class SaasCreditNoteService
     public const string CANCELLED = 'saas_credit_note_cancelled';
 
     private const array DIMENSIONS = ['quantity', 'net_amount', 'tax_amount', 'total_amount'];
+
+    private const string QUANTITY_STEP = '0.01';
 
     public function __construct(private readonly AuthorizationMutation $mutations, private readonly InvoiceCalculator $calculator) {}
 
@@ -56,12 +59,12 @@ class SaasCreditNoteService
     {
         return ['expected_state' => ['required', 'string', 'regex:'.SaasCreditNote::STATE_PATTERN],
             'operation_id' => $creating ? ['required', 'uuid:4'] : ['missing'],
-            'billing_rule_uuid' => ['required', 'uuid:4'], 'reason' => ['required', 'string', 'max:2000'],
+            'billing_rule_uuid' => ['required', 'uuid:4'], 'reason' => ['sometimes', 'string', 'max:2000'],
             'lines' => ['required', 'array', 'min:1', 'max:100'],
             'lines.*' => ['array:original_line_uuid,quantity,total_amount,reason'],
             'lines.*.original_line_uuid' => ['required', 'uuid:4', 'distinct:ignore_case'],
-            'lines.*.quantity' => ['required', 'string', 'regex:/^\d{1,10}(?:\.\d{1,2})?$/D', 'gt:0'],
-            'lines.*.total_amount' => ['required', 'string', 'regex:/^\d{1,12}(?:\.\d{1,2})?$/D'],
+            'lines.*.quantity' => ['sometimes', 'string', 'regex:/^\d{1,10}(?:\.\d{1,2})?$/D', 'gt:0'],
+            'lines.*.total_amount' => ['required', 'string', 'regex:/^\d{1,12}(?:\.\d{1,2})?$/D', 'gt:0'],
             'lines.*.reason' => ['required', 'string', 'max:2000'],
             ...array_fill_keys(['user_id', 'original_invoice_id', 'subscription_id', 'installment_id', 'document_type', 'status', 'currency',
                 'net_amount', 'taxes', 'tax_amount', 'total_amount', 'number', 'sequence_id', 'document_media_id', 'operation_key', 'issued_at'], ['missing'])];
@@ -73,7 +76,7 @@ class SaasCreditNoteService
         abort_if(tenancy()->initialized, 403);
 
         return $this->mutations->run($actor, 'create', fn () => SaasCreditNote::class, function () use ($actor, $original, $data): SaasCreditNote {
-            $values = Validator::make($data, self::rules(true))->validate();
+            $values = $this->validated($data, true);
             $original = $this->lockOriginal($original);
             $key = 'saas:credit:'.$original->uuid.':'.strtolower($values['operation_id']);
             $payload = hash('sha256', json_encode(collect($values)->except(['expected_state', 'operation_id'])->all(), JSON_THROW_ON_ERROR));
@@ -109,7 +112,7 @@ class SaasCreditNoteService
         abort_if(tenancy()->initialized, 403);
 
         return $this->mutations->run($actor, 'update', fn () => $this->lockCredit($credit), function (SaasCreditNote $credit) use ($actor, $data): SaasCreditNote {
-            $values = Validator::make($data, self::rules(false))->validate();
+            $values = $this->validated($data, false);
             $this->assertState($credit, $values['expected_state']);
             if ($credit->status !== DocumentStatusEnum::DRAFT) {
                 $this->fail('Seul un brouillon non numéroté peut être modifié.');
@@ -183,7 +186,7 @@ class SaasCreditNoteService
             if ($origin === null) {
                 $this->fail('Une ligne ne provient pas de la facture originale.');
             }
-            $this->assertWithinLimits($origin, $line->getAttributes(), $credit->id);
+            $this->assertWithinLimits($line->getAttributes(), $this->calculateRemainingCorrection($origin, $credit->id));
             $computed = $this->correctionAmounts($origin, $line->total_amount);
             foreach (['net_amount', 'tax_amount', 'total_amount'] as $field) {
                 if ($computed[$field] !== $line->getAttribute($field)) {
@@ -206,6 +209,48 @@ class SaasCreditNoteService
         }
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function validated(array $data, bool $creating): array
+    {
+        $values = Validator::make($data, self::rules($creating))->validate();
+        if (blank($values['reason'] ?? null)) {
+            $values['reason'] = Str::limit(implode('; ', array_unique(array_column($values['lines'], 'reason'))), 2000, '');
+        }
+
+        return $values;
+    }
+
+    /** @param array<string, string> $remaining */
+    private function quantityForAmount(array $remaining, string $total): string
+    {
+        $amount = BigDecimal::of($total);
+        $balance = BigDecimal::of($remaining['total_amount']);
+        $quantity = BigDecimal::of($remaining['quantity']);
+        if ($balance->isLessThanOrEqualTo(0) || $quantity->isLessThanOrEqualTo(0) || $amount->isGreaterThan($balance)) {
+            $this->fail('Le montant dépasse le solde pouvant être corrigé sur cette ligne.');
+        }
+        if ($amount->isEqualTo($balance)) {
+            return (string) $quantity->toScale(2);
+        }
+        $calculated = $quantity->multipliedBy($amount)->dividedBy($balance, 2, RoundingMode::HalfUp);
+        if ($calculated->isZero()) {
+            $calculated = BigDecimal::of(self::QUANTITY_STEP);
+        }
+        // Conserver la dernière fraction pour une correction finale du solde.
+        $maximum = $quantity->minus(self::QUANTITY_STEP);
+        if ($calculated->isGreaterThan($maximum)) {
+            $calculated = $maximum;
+        }
+        if ($calculated->isLessThanOrEqualTo(0)) {
+            $this->fail('La précision disponible impose de corriger le solde restant de cette ligne en une seule fois.');
+        }
+
+        return (string) $calculated->toScale(2);
+    }
+
     /** @param array<array-key, array<string, mixed>> $inputs */
     private function reserveCorrection(SaasCreditNote $credit, SaasInvoice $original, array $inputs): void
     {
@@ -218,8 +263,9 @@ class SaasCreditNoteService
                 $this->fail('Sélectionnez uniquement les lignes de la facture originale.');
             }
             $amounts = $this->correctionAmounts($origin, $input['total_amount']);
-            $quantity = (string) BigDecimal::of($input['quantity'])->toScale(2);
-            $this->assertWithinLimits($origin, [...$amounts, 'quantity' => $quantity], $credit->id);
+            $limits = $this->calculateRemainingCorrection($origin, $credit->id);
+            $quantity = $this->quantityForAmount($limits['remaining'], $input['total_amount']);
+            $this->assertWithinLimits([...$amounts, 'quantity' => $quantity], $limits);
             (new SaasCreditNoteLine)->forceFill(['document_id' => $credit->id, 'user_id' => $original->user_id,
                 'document_type' => DocumentTypeEnum::CREDIT_NOTE, 'original_invoice_id' => $original->id, 'original_invoice_line_id' => $origin->id,
                 'line_number' => $index + 1, 'quantity' => $quantity, 'description' => $origin->description, 'reason' => trim($input['reason']),
@@ -287,9 +333,12 @@ class SaasCreditNoteService
     }
 
     /** @param array<string, mixed> $values */
-    private function assertWithinLimits(SaasInvoiceLine $original, array $values, int $exclude): void
+    /**
+     * @param  array<string, mixed>  $values
+     * @param  array{remaining: array<string, string>, remaining_taxes: array<string, string>}  $limits
+     */
+    private function assertWithinLimits(array $values, array $limits): void
     {
-        $limits = $this->calculateRemainingCorrection($original, $exclude);
         $available = $limits['remaining'];
         foreach (self::DIMENSIONS as $field) {
             $amount = BigDecimal::of($values[$field]);

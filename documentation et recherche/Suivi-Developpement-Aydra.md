@@ -2432,3 +2432,48 @@ Refonte en cours : préparation DRAFT avant paiement, PDF définitif et reçu ap
 Autorisation d’accepter contrôlée sous verrou avant l’activation ; la projection finale contrôle le paiement confirmé, la facture émise, l’échéance réglée et le reçu existant. La lecture du statut de paiement utilise le droit de consultation du dossier, sans étendre les droits sur les données fiscales ou les PDF. Le test de reprise initialise désormais son offre gratuite explicitement.
 
 Tests arrêtés à la demande de l’utilisateur : dernier résultat disponible, 269 réussis, 12 échecs, 7 erreurs et 7 ignorés sur 295 tests. Ces derniers raccordements ne sont pas retestés ; validation fonctionnelle non acquise. Aucune migration ni écriture appliquée à la base réelle.
+
+
+### Navigation administrative regroupée — 15 novembre 2026
+
+Sept entrées partagent une navigation par onglets : Personnel SaaS (personnel/rôles/permissions), Boutiques (boutiques/domaines/déploiements), Transporteurs (transporteurs/correspondances/bureaux), Géographie (pays/wilayas et communes), Plans et offres (offres/fonctionnalités), Facturation (factures/avoirs) et Abonnements (abonnements/demandes/quotas). Le composant central admin-navigation définit les liens une seule fois pour le menu et les onglets ; seule une rubrique autorisée est affichée et son entrée ouvre la première liste autorisée. URL, autorisations serveur, données et parcours commerçant conservés. Aucun changement de schéma. Compilation des quatre vues modifiées et contrôle du diff effectués ; tests fonctionnels et navigateur non exécutés à la demande de l’utilisateur.
+
+
+### Retrait des écrans de paramètres documentaires — 15 novembre 2026
+
+Décision actuelle : supprimer entièrement du site la configuration des types de document et la modification des paramètres de facturation. Formulaire, Controller, Form Request, boutons, lecture dédiée et routes billing-parameters retirés. Les règles financières internes, leurs permissions de service et les données historiques restent conservées pour les factures et avoirs ; aucune règle automatique ni écriture réelle ajoutée. Cette décision remplace les indications précédentes proposant un formulaire simplifié. Tests adaptés mais non exécutés, conformément à la demande.
+
+
+### Liste des factures — 15 novembre 2026
+
+Affichage réorganisé : filtres en grille, tableaux et pagination séparés pour factures et échéances. Filtre commerçant par nom complet ou e-mail, sans UUID saisi. Lien vers toutes les demandes et section des signalements retirés de la liste ; traitement conservé dans le détail de chaque facture. Requête globale des signalements supprimée de la liste. Compilation Blade et Pint contrôlés ; test de recherche/isolation ajouté sans exécution, selon la demande.
+
+
+### Décision simplifiée sur les demandes — 15 novembre 2026
+
+Le formulaire administratif propose Accepter et Refuser ; le refus ouvre une fenêtre avec motif obligatoire. Accepter confirme explicitement la réception intégrale : montant espèces issu de l’abonnement et date de confirmation générés côté serveur, sans saisie ni case supplémentaire. Les champs financiers envoyés en supplément au point d’entrée HTTP sont ignorés. Un versement externe exige toujours son justificatif et les véritables coordonnées de rapprochement déjà enregistrées : aucun compte bancaire ni référence ne sont inventés pour faciliter la validation. Droits, état attendu, contrôle des fonds, audits et reprises préservés. Test de non-manipulation ajouté mais non exécuté à la demande de l’utilisateur.
+
+
+### Informations fiscales facultatives — décision du 15 novembre 2026
+
+La décision explicite remplace l’ancien blocage sur des informations fiscales absentes : description et validation non renseignées restent null, NIF absent vaut "0", absence de taux signifie taxes calculées à 0. Les données disponibles du profil commerçant sont réutilisées. Aucun faux justificatif fiscal, date ou référence de validation ajouté. Les données fournies restent validées et les configurations contradictoires sont refusées. Préparation et émission emploient les mêmes conditions ; les PDF tolèrent les champs absents sans afficher de fausse référence fiscale. Approbation du compte, e-mail vérifié, règle applicable, période, montant intégral, idempotence, stockage privé, justificatif des versements externes et immutabilité des documents émis restent conservés. Aucun document réel ni configuration privée modifié. Tests adaptés/ajoutés mais non exécutés à la demande de l’utilisateur.
+
+
+### Avoirs simplifiés — décision du 16 novembre 2026
+
+Le formulaire de préparation/modification ne demande que montant TTC et motif par prestation. Quantité calculée sous verrou proportionnellement au solde monétaire et à la quantité encore disponibles, arrondie avec les deux décimales du schéma existant. Une dernière fraction est conservée pour solder la ligne ; si cette précision ne permet plus de fractionnement, demander une correction du solde en une fois plutôt que créer une quantité nulle ou dépasser les plafonds. Une correction intégrale reprend exactement la quantité restante. Le motif général absent est dérivé des motifs détaillés, qui restent conservés. Anciens champs facultatifs du contrat acceptés pour compatibilité ; leur quantité n’est jamais utilisée pour les écritures nouvelles. Contrôles TTC/HT/taxes/quantité, état attendu, transactions, idempotence et documents émis préservés ; aucun changement de schéma ou de données réelles. Explications, détails techniques et motif général retirés de la page. Tests adaptés et ajoutés, non exécutés conformément à la demande.
+
+
+### Activation réelle de la configuration des avoirs — 16 novembre 2026
+
+Sur autorisation explicite du propriétaire, une seule règle invoice.correction version 1 a été créée, validée et activée dans la base centrale aydra via BillingRuleService.configureInitial : document Avoir, délai nul, application immédiate. Trois événements audités. Les permissions saas.credit-notes.view/create/issue et celles de configuration étaient déjà présentes : aucun seeder ni changement d’attribution. Aucun avoir, facture, paiement, abonnement ou compteur créé ; aucun test lancé. Initialisation ponctuelle autorisée, pas de règle financière ajoutée aux seeders ni de page de configuration rétablie.
+
+
+### Validation et émission des avoirs en une action — 16 novembre 2026
+
+Le formulaire crée ou modifie le brouillon puis appelle immédiatement le service d’émission existant lorsque l’acteur possède saas.credit-notes.issue. Le bouton annonce Valider et émettre ; sans ce droit, il annonce Enregistrer le brouillon et ne réserve aucun numéro. L’étape manuelle de réservation du numéro est retirée de la fiche ; le service conserve sa réservation interne, les reprises et les anciens contrats. ISSUED est enregistré uniquement après PDF privé finalisé et audit atomique ; un échec conserve la préparation et son numéro sans succès fictif. L’avoir réel AVOIR-2026-000001 n’a pas été émis par cette intervention : son administrateur peut terminer l’émission depuis la fiche. Tests de création/émission/rejeu et séparation des droits ajoutés, non exécutés avant accord explicite.
+
+
+### Date automatique du justificatif initial — 16 novembre 2026
+
+Champ Date du versement retiré du formulaire initial partagé des offres. Sans date fournie par un ancien appelant, le service enregistre la date/heure serveur lors de la conservation du justificatif. Cette date reste stable lors du rejeu idempotent : elle est générée après le calcul de l’empreinte initiale et n’écrase pas une soumission existante. Justificatif, montant, réseau et autres contrôles préservés. Test de date automatique et rejeu ajouté, sans exécution avant accord.

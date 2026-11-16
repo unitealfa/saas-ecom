@@ -19,7 +19,6 @@
                 @endforeach
             </flux:select>
             <flux:input name="payment[amount]" label="Montant réellement versé (DZD)" :value="$paymentText('payment.amount')" required />
-            <flux:input name="payment[occurred_at]" type="datetime-local" label="Date du versement" :value="$paymentText('payment.occurred_at')" required />
             <flux:input name="payment[reference]" label="Référence du versement" :value="$paymentText('payment.reference')" maxlength="255" />
             <flux:input type="file" name="proof" label="Justificatif PDF/JPG/PNG (8 Mo maximum)" accept="application/pdf,image/jpeg,image/png" required />
         </fieldset>

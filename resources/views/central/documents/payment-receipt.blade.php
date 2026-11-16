@@ -2,8 +2,8 @@
 <html lang="fr"><head><meta charset="utf-8"><title>{{ $confirmed ? 'Reçu de paiement' : 'Constat interne d’encaissement' }}</title></head>
 <body style="font-family: DejaVu Sans, sans-serif; font-size: 12px">
     <h1>{{ $confirmed ? 'Reçu de paiement intégral' : 'Constat interne — contrôle du règlement à terminer' }}</h1>
-    <p>Émetteur : {{ $payment->invoice->saas_identity_snapshot['name'] }}</p>
-    <p>{{ $payment->invoice->saas_identity_snapshot['address'] }} — NIF : {{ $payment->invoice->saas_identity_snapshot['nif'] }}</p>
+    <p>Émetteur : {{ $payment->invoice->saas_identity_snapshot['name'] ?? '—' }}</p>
+    <p>{{ $payment->invoice->saas_identity_snapshot['address'] ?? '—' }} — NIF : {{ $payment->invoice->saas_identity_snapshot['nif'] ?? '0' }}</p>
     <p>Client : {{ $payment->invoice->customer_identity_snapshot['name'] }}</p>
     <p>Facture : {{ $payment->invoice->number }}</p>
     <p>Montant {{ $confirmed ? 'confirmé reçu' : 'déclaré reçu par l’administration' }} : {{ $payment->getAttribute('amount') }} {{ $payment->getAttribute('currency') }}</p>

@@ -7,7 +7,9 @@
 <x-layouts::app title="Demande d’abonnement">
     <section class="mx-auto flex w-full max-w-4xl flex-col gap-6">
         <flux:heading size="xl" level="1">Demande d’abonnement — {{ $item->subscription?->plan->name }}</flux:heading>
-        @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
+        @if (session('status'))
+            <flux:callout :variant="session('status_variant')" role="status" aria-live="polite">{{ session('status') }}</flux:callout>
+        @endif
         @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
         <dl class="grid gap-4 sm:grid-cols-2">
             <div><dt>Référence de demande</dt><dd class="break-all">{{ $item->uuid }}</dd></div>
@@ -107,33 +109,37 @@
                 @endif
             @endcan
         @elseif (! $ownerMode && ! $item->status->isFinal())
-            @if (($item->invoice !== null || $item->getAttribute('submitted_payment') !== null) && ($item->payment === null || $item->payment->getAttribute('transfer_status') !== \App\Enums\Central\Billing\TransferStatusEnum::UNCERTAIN))
+            @if ($item->payment === null || $item->payment->getAttribute('transfer_status') !== \App\Enums\Central\Billing\TransferStatusEnum::UNCERTAIN)
                 @can('accept', $item)
                     @if ($cash || $item->payment || $item->getAttribute('submitted_payment') !== null)
                         <form method="POST" action="{{ route('central.subscription-requests.accept', $item) }}" class="flex flex-col gap-3">@csrf
                             <input type="hidden" name="expected_state" value="{{ $item->managementState() }}">
                             <input type="hidden" name="expected_payment_state" value="{{ $item->payment?->managementState() }}">
-                            @if ($cash && ! $item->payment)
-                                <input type="hidden" name="operation_id" value="{{ (string) \Illuminate\Support\Str::uuid() }}"><input type="hidden" name="currency" value="DZD">
-                                <flux:input name="amount" label="Espèces réellement reçues (DZD)" required />
+                            <flux:text>En acceptant, vous confirmez avoir reçu et contrôlé le montant intégral de {{ $item->subscription->agreed_amount }} DZD. Le montant et la date de confirmation sont renseignés automatiquement.</flux:text>
+                            @if (filled($item->getAttribute('invoice_error')))
+                                <flux:checkbox name="acknowledged" value="1" label="J’ai lu et approuvé ce message." description="Cette confirmation ne remplace pas les vérifications fiscales et techniques nécessaires à la facture." required />
                             @endif
-                            @if (! $cash)
-                                <flux:input name="account" label="Compte destinataire réellement contrôlé" required maxlength="255" />
-                                <flux:input name="reference" label="Référence réelle contrôlée" required maxlength="255" />
-                            @endif
-                            @if (! $cash || ! $item->payment)<flux:input type="datetime-local" name="occurred_at" label="Date réelle de réception" required />@endif
-                            <flux:checkbox name="received" value="1" label="J’ai contrôlé la réception réelle du montant intégral et sa correspondance avec cette facture." required />
-                            <flux:button type="submit" variant="primary">Confirmer les fonds et accepter la demande</flux:button>
+                            <flux:button type="submit" variant="primary">Accepter la demande</flux:button>
                         </form>
+                    @else
+                        <flux:text>Le justificatif du versement doit être fourni avant de pouvoir accepter cette demande.</flux:text>
                     @endif
                 @endcan
             @endif
             @can('reject', $item)
-                <form method="POST" action="{{ route('central.subscription-requests.reject', $item) }}" class="flex flex-col gap-3">@csrf
-                    <input type="hidden" name="expected_state" value="{{ $item->managementState() }}"><input type="hidden" name="expected_payment_state" value="{{ $item->payment?->managementState() }}">
-                    <flux:textarea name="reason" label="Motif du refus, visible par le commerçant" required maxlength="2000" />
-                    <flux:button type="submit">Refuser avec motif</flux:button>
-                </form>
+                <flux:modal.trigger :name="'reject-subscription-request-'.$item->uuid">
+                    <flux:button variant="danger">Refuser</flux:button>
+                </flux:modal.trigger>
+                <flux:modal :name="'reject-subscription-request-'.$item->uuid" class="md:w-96">
+                    <form method="POST" action="{{ route('central.subscription-requests.reject', $item) }}" class="flex flex-col gap-4">
+                        @csrf
+                        <flux:heading size="lg">Refuser la demande</flux:heading>
+                        <input type="hidden" name="expected_state" value="{{ $item->managementState() }}">
+                        <input type="hidden" name="expected_payment_state" value="{{ $item->payment?->managementState() }}">
+                        <flux:textarea name="reason" label="Motif du refus, visible par le commerçant" required maxlength="2000">{{ is_string(old('reason')) ? old('reason') : '' }}</flux:textarea>
+                        <flux:button type="submit" variant="danger">Refuser avec motif</flux:button>
+                    </form>
+                </flux:modal>
             @endcan
         @endif
         @if ($history !== null)

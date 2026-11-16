@@ -21,7 +21,7 @@ class SubscriptionRequestController extends Controller
 
     public function index(SearchSubscriptionRequestsRequest $request): View
     {
-        return view('central.pages.admin.subscriptions.requests.index', ['requests' => $this->requests->search($this->centralActor(), $request->validated()), 'ownerMode' => false]);
+        return view('central.pages.admin.subscriptions.index', ['requests' => $this->requests->search($this->centralActor(), $request->validated()), 'ownerMode' => false]);
     }
 
     public function show(SubscriptionRequest $subscriptionRequest): View
@@ -42,8 +42,8 @@ class SubscriptionRequestController extends Controller
         $message = 'Réception conservée comme anomalie ; demande non acceptée, sans droit supplémentaire.';
         if ($current->status === RequestStatusEnum::ACCEPTED) {
             $message = $current->payment->documents()->where('collection_name', PaymentDocumentService::RECEIPT)->exists()
-                ? 'Paiement intégral confirmé et demande acceptée. Le reçu est disponible.'
-                : 'Paiement intégral confirmé et demande acceptée. La génération du reçu doit être reprise depuis son lien, sans nouvel encaissement.';
+                ? 'Demande d’abonnement acceptée. Le paiement intégral est confirmé et le reçu est disponible.'
+                : 'Demande d’abonnement acceptée. Le paiement intégral est confirmé ; la génération du reçu doit être reprise sans nouvel encaissement.';
         }
 
         return $this->redirectWithStatus($current, $message);
@@ -53,7 +53,7 @@ class SubscriptionRequestController extends Controller
     {
         $current = $this->requests->reject($this->centralActor(), $subscriptionRequest, $request->validated('expected_state'), $request->validated('reason'), $request->validated('expected_payment_state'));
 
-        return $this->redirectWithStatus($current, 'Demande refusée. Le motif et les pièces précédentes sont conservés.');
+        return $this->redirectWithStatus($current, 'Demande d’abonnement refusée. Le motif est enregistré et visible par le commerçant. Les pièces précédentes sont conservées.');
     }
 
     public function initialProof(SubscriptionRequest $subscriptionRequest, PaymentDocumentService $documents): StreamedResponse
@@ -66,6 +66,7 @@ class SubscriptionRequestController extends Controller
         $redirect = Gate::forUser($this->centralActor())->allows('viewAny', SubscriptionRequest::class)
             ? to_route('central.subscription-requests.show', $request) : to_route('dashboard');
 
-        return $redirect->with('status', $message);
+        return $redirect->with('status', $message)
+            ->with('status_variant', in_array($request->status, [RequestStatusEnum::ACCEPTED, RequestStatusEnum::REJECTED], true) ? 'success' : 'warning');
     }
 }

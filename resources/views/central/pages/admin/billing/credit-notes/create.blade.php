@@ -6,8 +6,7 @@
 <x-layouts::app :title="$credit ? 'Modifier le brouillon d’avoir' : 'Préparer un avoir'">
     <section class="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <flux:heading size="xl" level="1">{{ $credit ? 'Modifier le brouillon d’avoir' : 'Préparer un avoir' }}</flux:heading>
-        <flux:text>Facture {{ $invoice->number }} — {{ $invoice->total_amount }} {{ $invoice->currency }}. L’original reste conservé.</flux:text>
-        <flux:text>Renseignez la quantité et le TTC uniquement pour les lignes à corriger. Les taxes sont calculées depuis la ventilation originale. Chaque plafond est contrôlé séparément.</flux:text>
+        <flux:text>Facture {{ $invoice->number }} — {{ $invoice->total_amount }} {{ $invoice->currency }}.</flux:text>
         @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
         <form method="POST" action="{{ $credit ? route('central.credit-notes.update', $credit) : route('central.credit-notes.store', $invoice) }}" class="flex flex-col gap-5">
             @csrf
@@ -17,27 +16,23 @@
             @if ($applicableRule)
                 <input type="hidden" name="billing_rule_uuid" value="{{ $applicableRule->uuid }}">
             @else
-                <flux:callout>Une seule configuration d’avoir validée et applicable doit être définie avant l’enregistrement.</flux:callout>
+                <flux:callout variant="warning">La configuration interne des avoirs est absente ou ambiguë. Aucun avoir ne peut être préparé pour le moment.</flux:callout>
             @endif
 
-            <flux:textarea name="reason" label="Motif de l’avoir" required maxlength="2000">{{ $oldText('reason', $credit?->getAttribute('reason')) }}</flux:textarea>
             @foreach ($available as $id => $item)
                 @php($existing = $credit?->lines->firstWhere('original_invoice_line_id', $id))
                 <fieldset class="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
                     <legend class="font-medium">{{ $item['line']->description }}</legend>
-                    <flux:text>Original : {{ $item['line']->quantity }} unité(s), HT {{ $item['line']->net_amount }}, taxes {{ $item['line']->tax_amount }}, TTC {{ $item['line']->total_amount }} {{ $invoice->currency }}.</flux:text>
-                    <flux:text>Déjà corrigé : {{ $item['issued']['quantity'] }} unité(s), HT {{ $item['issued']['net_amount'] }}, taxes {{ $item['issued']['tax_amount'] }}, TTC {{ $item['issued']['total_amount'] }}.</flux:text>
-                    <flux:text>Autres réservations : {{ $item['reserved']['quantity'] }} unité(s), HT {{ $item['reserved']['net_amount'] }}, taxes {{ $item['reserved']['tax_amount'] }}, TTC {{ $item['reserved']['total_amount'] }}.</flux:text>
-                    <flux:text>Disponible : {{ $item['remaining']['quantity'] }} unité(s), HT {{ $item['remaining']['net_amount'] }}, taxes {{ $item['remaining']['tax_amount'] }}, TTC {{ $item['remaining']['total_amount'] }}.</flux:text>
                     <input type="hidden" name="lines[{{ $id }}][original_line_uuid]" value="{{ $item['line']->getAttribute('uuid') }}">
-                    <div class="grid gap-3 sm:grid-cols-2">
-                        <flux:input name="lines[{{ $id }}][quantity]" label="Quantité à corriger" inputmode="decimal" :value="$oldText('lines.'.$id.'.quantity', $existing?->quantity)" placeholder="Ex. : 0.10" />
-                        <flux:input name="lines[{{ $id }}][total_amount]" label="Correction TTC (DZD)" inputmode="decimal" :value="$oldText('lines.'.$id.'.total_amount', $existing?->total_amount)" placeholder="Ex. : 500.00" />
-                    </div>
-                    <flux:input name="lines[{{ $id }}][reason]" label="Motif de cette ligne" :value="$oldText('lines.'.$id.'.reason', $existing?->getAttribute('reason'))" maxlength="2000" />
+                    <flux:input name="lines[{{ $id }}][total_amount]" label="Montant à retirer de la facture (DA)" inputmode="decimal" :value="$oldText('lines.'.$id.'.total_amount', $existing?->total_amount)" />
+                    <flux:input name="lines[{{ $id }}][reason]" label="Motif de la correction" :value="$oldText('lines.'.$id.'.reason', $existing?->getAttribute('reason'))" maxlength="2000" />
                 </fieldset>
             @endforeach
-            <flux:button type="submit" variant="primary">{{ $credit ? 'Enregistrer les corrections' : 'Créer le brouillon et réserver les montants' }}</flux:button>
+            @can('saas.credit-notes.issue')
+                <flux:button type="submit" variant="primary" :disabled="! $applicableRule">Valider et émettre l’avoir</flux:button>
+            @else
+                <flux:button type="submit" variant="primary" :disabled="! $applicableRule">Enregistrer le brouillon</flux:button>
+            @endcan
         </form>
     </section>
 </x-layouts::app>

@@ -3,12 +3,10 @@
 namespace App\Http\Controllers\Central\Admin\Billing;
 
 use App\Enums\Central\Billing\DocumentStatusEnum;
-use App\Enums\Central\Billing\PolicyStatusEnum;
 use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Billing\SearchSaasInvoicesRequest;
 use App\Models\Central\Audit\Activity;
-use App\Models\Central\Billing\BillingRule;
 use App\Models\Central\Billing\SaasCreditNote;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Billing\SaasPayment;
@@ -32,8 +30,6 @@ class SaasInvoiceController extends Controller
 
         return view('central.pages.admin.billing.invoices.index', [
             'pendingInstallments' => Gate::forUser($this->centralActor())->allows('viewAny', SubscriptionInstallment::class) ? SubscriptionInstallment::where('installment_status', InstallmentStatusEnum::PENDING)->with(['subscription.plan', 'subscription.request', 'invoices'])->orderByDesc('id')->paginate(10, ['*'], 'due_page') : null,
-            'correctionReports' => Gate::forUser($this->centralActor())->allows('viewAny', SaasPayment::class) ? $this->corrections->reports($this->centralActor()) : null,
-            'billingParameters' => Gate::forUser($this->centralActor())->any(['viewAny', 'create'], BillingRule::class) ? BillingRule::whereIn('policy_status', [PolicyStatusEnum::ACTIVE, PolicyStatusEnum::DRAFT])->orderBy('code')->orderByRaw('policy_status = ? DESC', [PolicyStatusEnum::ACTIVE->value])->orderByDesc('version')->get()->unique('code') : collect(),
             'invoices' => $invoices, 'ownerMode' => false,
             'paymentStates' => $this->payments->states($this->centralActor(), $invoices->getCollection()),
         ]);

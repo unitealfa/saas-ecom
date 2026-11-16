@@ -49,11 +49,15 @@ class SaasInvoiceService
         abort_if(tenancy()->initialized, 403);
         Gate::forUser($actor)->authorize($own ? 'viewOwn' : 'viewBillingDossiers', SaasInvoice::class);
         $search = trim($filters['search'] ?? '');
+        $owner = trim($filters['owner'] ?? '');
+        $ownerPattern = '%'.addcslashes($owner, '\\%_').'%';
 
         return SaasInvoice::with(['owner', 'subscription.plan'])
             ->when(isset($filters['filter']), fn (Builder $query) => $this->payments->filter($query, InvoiceListFilterEnum::from($filters['filter'])))
             ->when($own, fn (Builder $query) => $query->where('user_id', $actor->id))
-            ->when(! $own && isset($filters['owner']), fn (Builder $query) => $query->whereRelation('owner', 'uuid', $filters['owner']))
+            ->when(! $own && $owner !== '', fn (Builder $query) => $query->whereHas('owner', fn (Builder $person) => $person
+                ->where('email', 'like', $ownerPattern)
+                ->orWhereRaw("CONCAT_WS(' ', first_name, last_name) LIKE ?", [$ownerPattern])))
             ->when($search !== '', fn (Builder $query) => $query->where('number', 'like', '%'.addcslashes($search, '\\%_').'%'))
             ->when(isset($filters['status']), fn (Builder $query) => $query->where('status', $filters['status']))
             ->when(isset($filters['period_start']), fn (Builder $query) => $query->where('period_ends_at', '>', CarbonImmutable::parse($filters['period_start'])))
@@ -154,26 +158,33 @@ class SaasInvoiceService
     /** @return array{0: array<string, mixed>, 1: array<string, mixed>, 2: array<string, mixed>} */
     private function fiscalData(User $owner): array
     {
-        $issuer = config('central.billing.issuer', []);
-        $policy = config('central.billing.tax_policy', []);
-        $customer = config('central.billing.customers', [])[$owner->uuid] ?? [];
-        $customer['email'] = $owner->email;
-        $proof = ['name' => ['required', 'string', 'max:255'], 'address' => ['required', 'string', 'max:2000'],
-            'nif' => ['required', 'string', 'max:255'], 'validation_reference' => ['required', 'string', 'max:255'],
-            'validated_at' => ['required', 'date', 'before_or_equal:now']];
-        Validator::make($issuer, $proof, ['required' => 'Le champ :attribute de l’émetteur fiscal est obligatoire.'])->validate();
-        Validator::make($customer, [...$proof, 'email' => ['required', 'email']], ['required' => 'Le champ :attribute du client doit être renseigné et validé.'])->validate();
-        if ($customer['name'] !== trim($owner->first_name.' '.$owner->last_name)
-            || $customer['address'] !== $owner->legal_address || $customer['nif'] !== $owner->getAttribute('nif')) {
-            $this->fail('customer', 'Les informations fiscales du client ont changé depuis leur validation. Faites valider leur nouvelle version pour la facturation, sans nouvelle approbation du compte.');
+        $defaults = array_fill_keys(['name', 'address', 'nif', 'validation_reference', 'validated_at'], null);
+        $issuer = array_replace($defaults, config('central.billing.issuer', []));
+        $issuer = array_map(fn (mixed $value): mixed => $value === '' ? null : $value, $issuer);
+        $issuer['nif'] = filled($issuer['nif']) ? $issuer['nif'] : '0';
+        $profile = ['name' => trim($owner->first_name.' '.$owner->last_name), 'address' => filled($owner->legal_address) ? $owner->legal_address : null,
+            'nif' => filled($owner->getAttribute('nif')) ? $owner->getAttribute('nif') : '0'];
+        $configured = config('central.billing.customers', [])[$owner->uuid] ?? [];
+        foreach ($profile as $field => $value) {
+            if (filled($configured[$field] ?? null) && $configured[$field] !== $value) {
+                $this->fail('customer', 'Les informations fiscales configurées ne correspondent plus au profil du commerçant.');
+            }
         }
+        $customer = array_replace($defaults, $configured, $profile, ['email' => $owner->email]);
+        $policy = array_replace(['validation_reference' => null, 'validated_at' => null, 'no_tax_reason' => null, 'rates' => []],
+            config('central.billing.tax_policy', []));
+        $policy['rates'] ??= [];
+        $proof = ['name' => ['nullable', 'string', 'max:255'], 'address' => ['nullable', 'string', 'max:2000'],
+            'nif' => ['nullable', 'string', 'max:255'], 'validation_reference' => ['nullable', 'string', 'max:255'],
+            'validated_at' => ['nullable', 'date', 'before_or_equal:now']];
+        Validator::make($issuer, $proof)->validate();
+        Validator::make($customer, [...$proof, 'email' => ['required', 'email']])->validate();
         if ($owner->legal_verification_status !== VerificationStatusEnum::VERIFIED || ! $owner->hasVerifiedEmail()) {
-            $this->fail('customer', 'L’identité et l’adresse e-mail du client doivent être vérifiées avant facturation.');
+            $this->fail('customer', 'Le compte commerçant et son adresse e-mail doivent être vérifiés avant facturation.');
         }
-        Validator::make($policy, ['validation_reference' => ['required', 'string', 'max:255'],
-            'validated_at' => ['required', 'date', 'before_or_equal:now'], 'rates' => ['present', 'array'],
-            'no_tax_reason' => empty($policy['rates']) ? ['required', 'string', 'max:2000'] : ['nullable', 'string', 'max:2000']],
-            ['required' => 'La politique fiscale doit renseigner :attribute avec une validation réelle.'])->validate();
+        Validator::make($policy, ['validation_reference' => ['nullable', 'string', 'max:255'],
+            'validated_at' => ['nullable', 'date', 'before_or_equal:now'], 'rates' => ['present', 'array'],
+            'no_tax_reason' => ['nullable', 'string', 'max:2000']])->validate();
 
         return [$issuer, $customer, $policy];
     }

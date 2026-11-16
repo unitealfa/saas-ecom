@@ -20,11 +20,8 @@
                 <flux:text>Réservé : {{ $item['reserved']['quantity'] }} unité(s), HT {{ $item['reserved']['net_amount'] }}, taxes {{ $item['reserved']['tax_amount'] }}, TTC {{ $item['reserved']['total_amount'] }}. Disponible : {{ $item['remaining']['quantity'] }} unité(s), HT {{ $item['remaining']['net_amount'] }}, taxes {{ $item['remaining']['tax_amount'] }}, TTC {{ $item['remaining']['total_amount'] }}.</flux:text>
             @endforeach
             @can('update', $credit)<flux:button :href="route('central.credit-notes.edit', $credit)">Modifier le brouillon</flux:button>@endcan
-            @if ($credit->status === \App\Enums\Central\Billing\DocumentStatusEnum::DRAFT)
-                @can('reserveNumber', $credit)<form method="POST" action="{{ route('central.credit-notes.prepare', $credit) }}">@csrf<input type="hidden" name="expected_state" value="{{ $expectedState }}"><flux:button type="submit">Valider et réserver le numéro</flux:button></form>@endcan
-            @endif
             @if (in_array($credit->status, [\App\Enums\Central\Billing\DocumentStatusEnum::DRAFT, \App\Enums\Central\Billing\DocumentStatusEnum::PREPARING], true))
-                @can('issue', $credit)<form method="POST" action="{{ route('central.credit-notes.issue', $credit) }}">@csrf<input type="hidden" name="expected_state" value="{{ $expectedState }}"><flux:button type="submit" variant="primary">Émettre l’avoir avec son PDF</flux:button></form>@endcan
+                @can('issue', $credit)<form method="POST" action="{{ route('central.credit-notes.issue', $credit) }}">@csrf<input type="hidden" name="expected_state" value="{{ $expectedState }}"><flux:button type="submit" variant="primary">Valider et émettre l’avoir</flux:button></form>@endcan
                 @can('cancel', $credit)<form method="POST" action="{{ route('central.credit-notes.cancel', $credit) }}" class="flex flex-col gap-3">@csrf<input type="hidden" name="expected_state" value="{{ $expectedState }}"><flux:textarea name="reason" label="Motif de l’annulation" required maxlength="2000" /><flux:button type="submit">Annuler le brouillon</flux:button></form>@endcan
             @endif
             @if ($history !== null)<flux:heading>Historique</flux:heading>@foreach ($history as $event)<flux:text>{{ $event->created_at->format('d/m/Y H:i') }} — {{ $event->description }}</flux:text>@endforeach{{ $history->links() }}@endif

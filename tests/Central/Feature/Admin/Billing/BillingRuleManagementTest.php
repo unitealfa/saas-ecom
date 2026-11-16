@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\MassAssignmentException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\Process\Process;
@@ -74,8 +75,8 @@ test('billing seeding is additive and does not create financial settings or chan
 test('all billing parameter endpoints reject staff without their permission', function (): void {
     $rule = billingDraft();
     $this->actingAs(billingStaff('saas.users.view'), 'central');
-    $this->get(route('central.billing-parameters.edit', $rule))->assertForbidden();
-    $this->put(route('central.billing-parameters.update', $rule), [])->assertForbidden();
+    $this->get(('/admin/billing/parameters/'.$rule->uuid))->assertNotFound();
+    $this->put(('/admin/billing/parameters/'.$rule->uuid), [])->assertNotFound();
     foreach (['/admin/billing/rules', '/admin/billing/rules/create', '/admin/billing/sequences'] as $url) {
         $this->get($url)->assertNotFound();
     }
@@ -87,20 +88,15 @@ test('billing configuration separates reading editing and validation permissions
     $actor = billingStaff($permission);
     expect(Gate::forUser($actor)->allows('viewAny', BillingRule::class))->toBe($permission === 'saas.billing-rules.view')
         ->and(Gate::forUser($actor)->allows('configure', $rule))->toBeFalse();
-    $this->actingAs($actor, 'central')->put(route('central.billing-parameters.update', $rule), [])->assertForbidden();
-    $response = $this->get(route('central.billing-parameters.edit', $rule));
-    if ($permission === 'saas.billing-rules.view') {
-        $response->assertOk()->assertDontSee('Valider et enregistrer les paramètres');
-    } else {
-        $response->assertForbidden();
-    }
+    $this->actingAs($actor, 'central')->put(('/admin/billing/parameters/'.$rule->uuid), [])->assertNotFound();
+    $response = $this->get(('/admin/billing/parameters/'.$rule->uuid));
+    $response->assertNotFound();
 })->with(['saas.billing-rules.view', 'saas.billing-rules.update', 'saas.billing-rules.activate']);
 
-test('the simple parameter form replaces the old version and counter interfaces', function (): void {
+test('billing configuration and counter interfaces are removed', function (): void {
     $rule = billingDraft();
-    $this->get(route('central.billing-parameters.edit', $rule))->assertOk()->assertSee('Délai de paiement en jours')
-        ->assertDontSee('Nouvelle version')->assertDontSee('Initialiser le compteur');
-    $this->get(route('central.billing-parameters.edit', $rule->id))->assertNotFound();
+    $this->get('/admin/billing/parameters/'.$rule->uuid)->assertNotFound();
+    $this->get(('/admin/billing/parameters/'.$rule->id))->assertNotFound();
     $this->get('/admin/billing/rules')->assertNotFound();
     $this->get('/admin/billing/sequences')->assertNotFound();
 });
@@ -124,7 +120,8 @@ test('parameter input rejects injected financial identity state and technical fi
     $rule = billingDraft();
     $payload = ['expected_state' => $rule->managementState(), 'payment_due_days' => 15, 'validation_reference' => 'TEST-CONFIG'];
     foreach (['code', 'policy_status', 'version', 'parameters', 'trigger_event', 'effective_at'] as $field) {
-        $this->put(route('central.billing-parameters.update', $rule), [...$payload, $field => 'forged'])->assertSessionHasErrors($field);
+        $validation = Validator::make([...$payload, $field => 'forged'], BillingRuleService::parameterRules());
+        expect($validation->fails())->toBeTrue()->and($validation->errors()->has($field))->toBeTrue();
     }
     expect(BillingRule::count())->toBe(1)->and($rule->refresh()->policy_status)->toBe(PolicyStatusEnum::DRAFT);
 });
@@ -156,8 +153,8 @@ test('the payment delay accepts zero but rejects negative days and an unsupporte
 test('saving parameters requires validation and freezes their contents even for root', function (): void {
     $rule = billingDraft();
     $payload = ['expected_state' => $rule->managementState(), 'payment_due_days' => 30];
-    $this->put(route('central.billing-parameters.update', $rule), $payload)->assertSessionHasErrors('validation_reference');
-    $this->put(route('central.billing-parameters.update', $rule), [...$payload, 'validation_reference' => 'FACT-001'])->assertSessionHasNoErrors()->assertRedirect();
+    expect(fn () => $this->service->configure($this->admin, $rule, $payload))->toThrow(ValidationException::class);
+    $this->service->configure($this->admin, $rule, [...$payload, 'validation_reference' => 'FACT-001']);
     expect($rule->refresh()->policy_status)->toBe(PolicyStatusEnum::ACTIVE)
         ->and($rule->getAttribute('validated_by_id'))->toBe($this->admin->id)->and($rule->validated_at)->not->toBeNull();
     expect(fn () => $rule->forceFill(['parameters' => ['document_type' => 1, 'payment_due_days' => 90]])->save())->toThrow(LogicException::class);
@@ -205,13 +202,13 @@ test('withdrawal requires a reason and closes the interval without allowing reus
         ->toThrow(ValidationException::class);
 });
 
-test('a parameter writer without invoice reading returns to the dashboard after saving', function (): void {
+test('internal configuration does not require invoice reading', function (): void {
     $rule = billingDraft();
     $actor = billingStaff('saas.billing-rules.update');
     $actor->givePermissionTo('saas.billing-rules.activate');
-    $this->actingAs($actor, 'central')->put(route('central.billing-parameters.update', $rule), [
+    $this->service->configure($actor, $rule, [
         'expected_state' => $rule->managementState(), 'payment_due_days' => 15, 'validation_reference' => 'TEST-ONLY',
-    ])->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
+    ]);
     expect(BillingRule::count())->toBe(1);
 });
 
@@ -239,17 +236,17 @@ test('a draft already referenced by an invoice is immutable', function (): void 
     expect($rule->refresh()->parameters['payment_due_days'])->toBe(15);
 });
 
-test('malformed previous input never breaks the simple billing form', function (): void {
+test('old form input does not restore the removed billing page', function (): void {
     $rule = billingDraft();
     $this->withSession(['_old_input' => ['payment_due_days' => ['invalid'], 'validation_reference' => ['invalid']]]);
-    $this->get(route('central.billing-parameters.edit', $rule))->assertOk();
+    $this->get(('/admin/billing/parameters/'.$rule->uuid))->assertNotFound();
 });
 
 test('guests cannot read or write billing parameters', function (): void {
     $rule = billingDraft();
     auth('central')->logout();
-    $this->get(route('central.billing-parameters.edit', $rule))->assertRedirect(route('login'));
-    $this->put(route('central.billing-parameters.update', $rule), [])->assertRedirect(route('login'));
+    $this->get(('/admin/billing/parameters/'.$rule->uuid))->assertNotFound();
+    $this->put(('/admin/billing/parameters/'.$rule->uuid), [])->assertNotFound();
     expect($rule->refresh()->policy_status)->toBe(PolicyStatusEnum::DRAFT);
 });
 
@@ -282,7 +279,7 @@ test('sequences are isolated read only and cannot bind as billing rules', functi
         'prefix' => 'FAC', 'next_number' => 12, 'operation_key' => 'saas:sequence:invoice:2026'])->save();
     billingDraft();
     $this->get('/admin/billing/sequences')->assertNotFound();
-    $this->get(route('central.billing-parameters.edit', $sequence->uuid))->assertNotFound();
+    $this->get(('/admin/billing/parameters/'.$sequence->uuid))->assertNotFound();
     expect(BillingRule::count())->toBe(1);
     expect(BillingSequence::count())->toBe(1);
     expect($sequence->refresh()->next_number)->toBe(12);
@@ -366,9 +363,10 @@ test('concurrent activations of overlapping versions allow only one success', fu
 
 test('T18-02 malformed technical inputs never alter saved parameters', function (array $change, string $field): void {
     $rule = billingDraft();
-    $this->put(route('central.billing-parameters.update', $rule), [
+    $validation = Validator::make([
         'expected_state' => $rule->managementState(), 'payment_due_days' => 15, 'validation_reference' => 'TEST', ...$change,
-    ])->assertSessionHasErrors($field);
+    ], BillingRuleService::parameterRules());
+    expect($validation->fails())->toBeTrue()->and($validation->errors()->has($field))->toBeTrue();
     expect(BillingRule::count())->toBe(1)->and($rule->refresh()->policy_status)->toBe(PolicyStatusEnum::DRAFT);
 })->with([
     [['code' => null], 'code'], [['version' => null], 'version'], [['version' => 0], 'version'],
@@ -402,7 +400,7 @@ test('validation audit preserves the actor and native correlation while escaping
     $audit = Activity::forSubject($rule)->where('event', 'saas_billing_rule_validated')->sole();
     expect($audit->getAttribute('correlation_id'))->toBe($rule->correlation_id);
     expect($audit->getAttribute('causer_id'))->toBe($this->admin->id);
-    $this->get(route('central.billing-parameters.edit', $rule))->assertOk()->assertSee($reference)->assertDontSee($reference, false);
+    $this->get('/admin/billing/parameters/'.$rule->uuid)->assertNotFound();
     expect($rule->policy_status)->toBe(PolicyStatusEnum::VALIDATED);
 });
 
@@ -427,11 +425,11 @@ test('forged validation and retirement transitions never bypass the current rule
 });
 
 test('the first parameter configuration is explicit validated and idempotent without manual counters', function (): void {
-    $this->get(route('central.billing-parameters.edit'))->assertOk()->assertSee('Document à configurer');
+    $this->get('/admin/billing/parameters')->assertNotFound();
     $payload = ['document_type' => DocumentTypeEnum::INVOICE->value, 'payment_due_days' => 0,
         'operation_uuid' => (string) Str::uuid(), 'validation_reference' => 'TEST-INITIAL'];
-    $this->put(route('central.billing-parameters.update'), $payload)->assertSessionHasNoErrors()->assertRedirect();
-    $this->put(route('central.billing-parameters.update'), $payload)->assertSessionHasNoErrors()->assertRedirect();
+    $this->service->configureInitial($this->admin, $payload);
+    $this->service->configureInitial($this->admin, $payload);
     $rule = BillingRule::sole();
     expect($rule->policy_status)->toBe(PolicyStatusEnum::ACTIVE)->and($rule->validation_reference)->toBe('TEST-INITIAL')
         ->and($rule->parameters['payment_due_days'])->toBe(0)->and(BillingSequence::count())->toBe(0)
@@ -443,8 +441,8 @@ test('saving active parameters preserves historical contents and creates the nex
     validateBillingRuleForTest($this->admin, $rule);
     $this->service->activate($this->admin, $rule, $rule->managementState(), now()->subDay()->toDateTimeString(), null);
     $rule->refresh();
-    $this->put(route('central.billing-parameters.update', $rule), ['expected_state' => $rule->managementState(),
-        'payment_due_days' => 30, 'validation_reference' => 'TEST-NEXT'])->assertSessionHasNoErrors()->assertRedirect();
+    $this->service->configure($this->admin, $rule, ['expected_state' => $rule->managementState(),
+        'payment_due_days' => 30, 'validation_reference' => 'TEST-NEXT']);
     $next = BillingRule::where('version', 2)->sole();
     expect($rule->refresh()->parameters['payment_due_days'])->toBe(15)
         ->and($rule->policy_status)->toBe(PolicyStatusEnum::RETIRED)

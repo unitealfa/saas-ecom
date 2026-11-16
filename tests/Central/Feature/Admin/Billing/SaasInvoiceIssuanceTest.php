@@ -197,14 +197,14 @@ test('T19-02 an installment belonging to another subscription is refused without
     expect(SaasInvoice::count())->toBe(0)->and(BillingSequence::count())->toBe(0);
 });
 
-test('T19-03 missing fiscal proof or inactive rule blocks preparation', function (string $invalid): void {
+test('T19-03 malformed fiscal values stale identities or an inactive rule block preparation', function (string $invalid): void {
     $f = issuanceFixture();
     if ($invalid === 'rule') {
         $f['rule']->forceFill(['ends_at' => now()->subHour()])->save();
     } elseif ($invalid === 'issuer') {
-        config(['central.billing.issuer.nif' => null]);
+        config(['central.billing.issuer.nif' => ['invalid']]);
     } elseif ($invalid === 'policy') {
-        config(['central.billing.tax_policy.validation_reference' => null]);
+        config(['central.billing.tax_policy.validated_at' => 'not-a-date']);
     } else {
         $f['owner']->forceFill(['nif' => null])->save();
     }
@@ -509,4 +509,38 @@ test('payment readers use the integrated dossier without gaining fiscal invoice 
         ->assertDontSee($invoice->saas_identity_snapshot['nif'])->assertDontSee($invoice->customer_identity_snapshot['nif'])
         ->assertDontSee('Télécharger le PDF privé');
     $this->get(URL::temporarySignedRoute('central.invoices.download', now()->addMinutes(5), ['invoice' => $invoice]))->assertForbidden();
+});
+
+test('invoice merchant filtering accepts names and emails and preserves owner isolation', function (): void {
+    $f = issuanceFixture();
+    $invoice = issuanceDraft($f);
+    $this->actingAs($f['actor'], 'central');
+
+    foreach ([$f['owner']->name, $f['owner']->email] as $search) {
+        $this->get(route('central.invoices.index', ['owner' => $search]))
+            ->assertOk()
+            ->assertViewHas('invoices', fn ($invoices): bool => $invoices->getCollection()->modelKeys() === [$invoice->id])
+            ->assertDontSee('UUID du commerçant')->assertDontSee('Demandes, y compris celles sans facture définitive')
+            ->assertDontSee('Signalements ? examiner');
+    }
+    $this->get(route('central.invoices.index', ['owner' => 'no-match@example.invalid']))
+        ->assertOk()->assertViewHas('invoices', fn ($invoices): bool => $invoices->isEmpty());
+    $other = User::factory()->create();
+    expect(app(SaasInvoiceService::class)->search($other, ['owner' => $f['owner']->email], own: true)->total())->toBe(0);
+});
+
+test('missing fiscal details use nullable identities zero NIF and zero taxes without blocking issuance', function (): void {
+    $f = issuanceFixture();
+    config(['central.billing.issuer' => [], 'central.billing.customers' => [], 'central.billing.tax_policy' => []]);
+    $f['owner']->forceFill(['nif' => null, 'legal_address' => null])->save();
+    $invoice = issuanceDraft($f);
+    expect($invoice->saas_identity_snapshot['name'])->toBeNull()
+        ->and($invoice->saas_identity_snapshot['address'])->toBeNull()
+        ->and($invoice->saas_identity_snapshot['nif'])->toBe('0')
+        ->and($invoice->customer_identity_snapshot['nif'])->toBe('0')
+        ->and($invoice->customer_identity_snapshot['name'])->toBe($f['owner']->name)
+        ->and($invoice->billing_rule_snapshot['fiscal_policy']['validation_reference'])->toBeNull()
+        ->and($invoice->tax_amount)->toBe('0.00')->and($invoice->total_amount)->toBe('3000.00');
+    expect(app(SaasInvoiceIssuanceService::class)->issue($f['actor'], $invoice, $invoice->managementState())->status)
+        ->toBe(DocumentStatusEnum::ISSUED);
 });

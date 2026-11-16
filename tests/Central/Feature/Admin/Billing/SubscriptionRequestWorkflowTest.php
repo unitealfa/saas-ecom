@@ -38,6 +38,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -640,4 +641,55 @@ test('initial bank proofs require financial reading rather than subscription rea
     $this->get(URL::temporarySignedRoute('central.subscription-requests.initial-proof', now()->addMinutes(5), ['subscriptionRequest' => $request]))->assertForbidden();
     $proof = Media::where('uuid', $request->getAttribute('submitted_payment')['proof_uuid'])->sole();
     expect(Gate::forUser($reader)->allows('download', $proof))->toBeFalse();
+});
+
+test('administrators accept cash requests without entering financial fields', function (): void {
+    Notification::fake();
+    $f = requestFixture();
+    $request = app(SubscriptionRequestService::class)->create($f['owner'], subscriptionRequestInput($f));
+    $before = now()->startOfSecond();
+    $this->actingAs($f['actor'], 'central')->get(route('central.subscription-requests.show', $request))
+        ->assertOk()->assertSee('Accepter la demande')->assertSee('Refuser avec motif')
+        ->assertDontSee('name="amount"', false)->assertDontSee('name="occurred_at"', false)
+        ->assertDontSee('name="received"', false);
+    $this->post(route('central.subscription-requests.accept', $request), [
+        'expected_state' => $request->managementState(),
+        'amount' => '0.01', 'occurred_at' => '2099-01-01', 'received' => false,
+    ])->assertSessionHasNoErrors()->assertRedirect();
+    $request->refresh();
+    expect($request->status)->toBe(RequestStatusEnum::ACCEPTED)
+        ->and($request->payment->getAttribute('amount'))->toBe('3000.00')
+        ->and($request->payment->getAttribute('occurred_at')->greaterThanOrEqualTo($before))->toBeTrue();
+});
+
+test('an invoice warning must be acknowledged before an administrative acceptance', function (): void {
+    $f = requestFixture();
+    $request = app(SubscriptionRequestService::class)->create($f['owner'], subscriptionRequestInput($f));
+    $request->forceFill(['invoice_error' => 'Informations fiscales à vérifier',
+        'reference_version' => $request->reference_version + 1])->save();
+    $status = $request->status;
+    $payments = SaasPayment::count();
+    $this->actingAs($f['actor'], 'central')->get(route('central.subscription-requests.show', $request))
+        ->assertOk()->assertSee('name="acknowledged"', false);
+    $this->post(route('central.subscription-requests.accept', $request), ['expected_state' => $request->managementState()])
+        ->assertSessionHasErrors('acknowledged');
+    expect($request->refresh()->status)->toBe($status)->and(SaasPayment::count())->toBe($payments);
+});
+
+test('an initial external proof receives its submission date automatically and replay preserves it', function (): void {
+    $f = requestFixture();
+    $payment = manualExternalPayload();
+    unset($payment['operation_id'], $payment['currency'], $payment['occurred_at']);
+    $input = [...subscriptionRequestInput($f), 'payment_choice' => PaymentChoiceEnum::EXTERNAL->value, 'payment' => $payment];
+    $proof = UploadedFile::fake()->image('automatic-date.png');
+    $service = app(SubscriptionRequestService::class);
+    $request = $service->create($f['owner'], $input, $proof);
+    $occurredAt = $request->getAttribute('submitted_payment')['occurred_at'];
+    expect($occurredAt)->toBeString()->not->toBeEmpty()
+        ->and($request->payment->getAttribute('occurred_at')->toDateTimeString())->toBe($occurredAt);
+    $this->travel(1)->minutes();
+    $replay = $service->create($f['owner'], $input, $proof);
+    expect($replay->id)->toBe($request->id)
+        ->and($replay->getAttribute('submitted_payment')['occurred_at'])->toBe($occurredAt)
+        ->and(SubscriptionRequest::count())->toBe(1);
 });

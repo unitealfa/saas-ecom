@@ -102,3 +102,8 @@ Validation en cours : contrôles ciblés et suites MySQL locales temporaires aut
 Autorisation d’accepter contrôlée sous verrou avant l’activation ; la projection finale contrôle le paiement confirmé, la facture émise, l’échéance réglée et le reçu existant. La lecture du statut de paiement utilise le droit de consultation du dossier, sans étendre les droits sur les données fiscales ou les PDF. Le test de reprise initialise désormais son offre gratuite explicitement.
 
 Tests arrêtés à la demande de l’utilisateur : dernier résultat disponible, 269 réussis, 12 échecs, 7 erreurs et 7 ignorés sur 295 tests. Ces derniers raccordements ne sont pas retestés ; validation fonctionnelle non acquise. Aucune migration ni écriture appliquée à la base réelle.
+
+
+### Informations fiscales facultatives — décision du 15 novembre 2026
+
+La décision explicite remplace l’ancien blocage sur des informations fiscales absentes : description et validation non renseignées restent null, NIF absent vaut "0", absence de taux signifie taxes calculées à 0. Les données disponibles du profil commerçant sont réutilisées. Aucun faux justificatif fiscal, date ou référence de validation ajouté. Les données fournies restent validées et les configurations contradictoires sont refusées. Préparation et émission emploient les mêmes conditions ; les PDF tolèrent les champs absents sans afficher de fausse référence fiscale. Approbation du compte, e-mail vérifié, règle applicable, période, montant intégral, idempotence, stockage privé, justificatif des versements externes et immutabilité des documents émis restent conservés. Aucun document réel ni configuration privée modifié. Tests adaptés/ajoutés mais non exécutés à la demande de l’utilisateur.

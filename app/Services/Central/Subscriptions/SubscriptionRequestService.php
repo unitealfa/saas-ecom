@@ -31,6 +31,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -111,7 +112,7 @@ class SubscriptionRequestService
             'payment' => ['required_if:payment_choice,'.PaymentChoiceEnum::EXTERNAL->value, 'prohibited_unless:payment_choice,'.PaymentChoiceEnum::EXTERNAL->value, 'array:method,amount,occurred_at,reference'],
             'payment.method' => ['required_with:payment', 'integer', Rule::in([TransferMethodEnum::BANK_TRANSFER->value, TransferMethodEnum::CCP_TRANSFER->value, TransferMethodEnum::BARIDIMOB->value])],
             'payment.amount' => ['required_with:payment', 'string', 'regex:/^\d{1,6}(?:\.\d{1,2})?$/D', 'gt:0'],
-            'payment.occurred_at' => ['required_with:payment', 'date', 'before_or_equal:now'],
+            'payment.occurred_at' => ['sometimes', 'date', 'before_or_equal:now'],
             'payment.reference' => ['nullable', 'string', 'max:255']];
     }
 
@@ -163,7 +164,9 @@ class SubscriptionRequestService
             $media = $this->documents->retainRequestProof($actor, $request, $proof);
             $request = $this->mutations->run($actor, 'supplyInitialProof', fn () => $this->lock($request), function (SubscriptionRequest $current) use ($data, $media, $actor): SubscriptionRequest {
                 if ($current->getAttribute('submitted_payment') === null) {
-                    $current->forceFill(['submitted_payment' => [...$data['payment'], 'amount' => (string) BigDecimal::of($data['payment']['amount'])->toScale(2), 'currency' => $current->currency,
+                    $current->forceFill(['submitted_payment' => [...$data['payment'],
+                        'occurred_at' => $data['payment']['occurred_at'] ?? now()->toDateTimeString(),
+                        'amount' => (string) BigDecimal::of($data['payment']['amount'])->toScale(2), 'currency' => $current->currency,
                         'operation_id' => $data['operation_id'], 'proof_uuid' => $media->uuid],
                         'status' => RequestStatusEnum::REVIEW, 'reference_version' => $current->reference_version + 1])->save();
                     $this->audit($actor, $current, SubscriptionRequestPaymentState::SUBMITTED, 'Justificatif initial conservé ; versement à vérifier, sans activation.');
@@ -295,6 +298,15 @@ class SubscriptionRequestService
             $this->declareRetainedProof($actor, $current);
             $current->refresh();
             $data['expected_payment_state'] = $current->payment->managementState();
+        }
+        $data += ['received' => true, 'occurred_at' => now()->toDateTimeString(),
+            'amount' => $current->subscription->agreed_amount, 'operation_id' => (string) Str::uuid()];
+        if ($current->payment_choice === PaymentChoiceEnum::EXTERNAL) {
+            $details = $current->payment->getAttribute('encrypted_transfer_details') ?? [];
+            $data += ['account' => $details['account'] ?? null, 'reference' => $current->payment->getAttribute('transfer_reference')];
+            if (blank($data['account']) || blank($data['reference'])) {
+                $this->fail('Rapprochez d’abord le compte destinataire et la référence depuis le détail du paiement, puis acceptez la demande.');
+            }
         }
         try {
             if ($current->payment_choice === PaymentChoiceEnum::CASH) {

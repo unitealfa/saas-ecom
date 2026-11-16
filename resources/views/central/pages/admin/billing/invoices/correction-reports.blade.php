@@ -1,5 +1,5 @@
 <section id="corrections" class="flex flex-col gap-4">
-<flux:heading>Signalements ? examiner</flux:heading>
+<flux:heading>Signalements à examiner</flux:heading>
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm">
                 <thead><tr><th class="p-3">Date</th><th class="p-3">Paiement</th><th class="p-3">Motif</th><th class="p-3">Décision</th><th class="p-3">Action</th></tr></thead>

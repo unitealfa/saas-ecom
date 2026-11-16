@@ -191,13 +191,13 @@ class SaasInvoiceIssuanceService
 
     private function assertIssuable(SaasInvoice $invoice): void
     {
-        $identity = ['name' => ['required', 'string'], 'address' => ['required', 'string'], 'nif' => ['required', 'string'],
-            'validation_reference' => ['required', 'string'], 'validated_at' => ['required', 'date', 'before_or_equal:now']];
+        $identity = ['name' => ['nullable', 'string'], 'address' => ['nullable', 'string'], 'nif' => ['nullable', 'string'],
+            'validation_reference' => ['nullable', 'string'], 'validated_at' => ['nullable', 'date', 'before_or_equal:now']];
         Validator::make($invoice->saas_identity_snapshot, $identity)->validate();
         Validator::make($invoice->customer_identity_snapshot, [...$identity, 'email' => ['required', 'email']])->validate();
         $policy = $invoice->billing_rule_snapshot['fiscal_policy'] ?? [];
-        Validator::make($policy, ['validation_reference' => ['required', 'string'], 'validated_at' => ['required', 'date', 'before_or_equal:now'],
-            'rates' => ['present', 'array'], 'no_tax_reason' => empty($policy['rates']) ? ['required', 'string'] : ['nullable', 'string']])->validate();
+        Validator::make($policy, ['validation_reference' => ['nullable', 'string'], 'validated_at' => ['nullable', 'date', 'before_or_equal:now'],
+            'rates' => ['present', 'array'], 'no_tax_reason' => ['nullable', 'string']])->validate();
         if ($invoice->currency !== SaasInvoice::CURRENCY || $invoice->period_ends_at->lessThanOrEqualTo($invoice->period_starts_at)) {
             $this->fail('La devise ou la période de la facture est invalide.');
         }

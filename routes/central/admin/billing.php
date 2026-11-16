@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Central\Admin\Billing\BillingRuleController;
 use App\Http\Controllers\Central\Admin\Billing\OwnerPaymentCorrectionReviewController;
 use App\Http\Controllers\Central\Admin\Billing\SaasCreditNoteController;
 use App\Http\Controllers\Central\Admin\Billing\SaasInvoiceController;
@@ -46,9 +45,4 @@ Route::controller(SaasInvoiceController::class)->prefix('billing/invoices')->nam
     Route::get('/', 'index')->name('index');
     Route::get('{invoice}', 'show')->name('show');
     Route::get('{invoice}/pdf', 'download')->middleware('signed')->name('download');
-});
-
-Route::controller(BillingRuleController::class)->prefix('billing/parameters/{billingRule?}')->name('billing-parameters.')->whereUuid('billingRule')->group(function (): void {
-    Route::get('/', 'edit')->name('edit');
-    Route::put('/', 'update')->name('update');
 });
