@@ -17,12 +17,24 @@
                 <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
                     @forelse ($plans as $plan)
                         <tr>
-                            <td class="p-4">{{ $plan->name }}<div class="text-xs">{{ $plan->code }}</div></td>
+                            <td class="p-4">{{ $plan->name }}@if ($plan->is_default)<flux:badge>Par défaut — attribution gratuite</flux:badge>@endif<div class="text-xs">{{ $plan->code }}</div></td>
                             <td class="p-4">{{ $plan->version }}</td>
                             <td class="p-4">{{ $plan->monthly_price }} DZD</td>
                             <td class="p-4">{{ $plan->annual_price }} DZD</td>
                             <td class="p-4">{{ $plan->trashed() ? 'Archivée' : ($plan->is_active ? 'Active' : 'Inactive') }}</td>
-                            <td class="p-4"><flux:button :href="route('central.plan-pages.show', $plan)">Détails</flux:button></td>
+                            <td class="p-4">
+                                <flux:button :href="route('central.plan-pages.show', $plan)">Détails</flux:button>
+                                @can('setDefault', $plan)
+                                    @if (! $plan->is_default)
+                                        <form method="POST" action="{{ route('central.plan-pages.default', $plan) }}" class="mt-3 flex flex-col gap-2">
+                                            @csrf @method('PATCH')
+                                            <input type="hidden" name="expected_state" value="{{ $plan->compositionState($plan->features) }}">
+                                            <flux:checkbox name="confirmed" value="1" label="Attribuer cette offre gratuitement par défaut" required />
+                                            <flux:button type="submit">Définir comme plan par défaut</flux:button>
+                                        </form>
+                                    @endif
+                                @endcan
+                            </td>
                         </tr>
                     @empty
                         <tr><td colspan="6" class="p-4">Aucun plan trouvé.</td></tr>

@@ -1,3 +1,5 @@
+> Complément du 16 novembre 2026 : `plans.is_default` est nullable, unique et limité à 1 lorsqu’il est défini. Le plan choisi est attribué automatiquement gratuitement (`agreed_amount=0.00`) à défaut de droits payants valides, sans changer les prix historiques. `subscriptions.effective_starts_at` et `effective_ends_at` définissent ensemble une période d’accès anticipée complète ; les dates de facturation et les documents émis restent inchangés. Migration additive `2026_11_16_171548_add_default_plan_and_effective_subscription_periods.php`, non appliquée par cette intervention.
+
 # Diagramme complet de la BDD centrale
 
 **Architecture centrale revue :** abonnements dans `subscriptions`, échéances dans `subscription_installments`, demandes dans `subscription_requests`. Le référentiel et l'historique des factures restent conservés.

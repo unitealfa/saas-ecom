@@ -24,5 +24,6 @@ Route::controller(PlanPageController::class)->prefix('offres')->name('plan-pages
     Route::put('{plan}/features', 'updateFeatures')->name('features.update');
     Route::post('{plan}/versions', 'storeVersion')->name('versions.store');
     Route::patch('{plan}/activation', 'activate')->name('activate');
+    Route::patch('{plan}/default', 'setDefault')->whereUuid('plan')->name('default');
     Route::delete('{plan}', 'archive')->name('archive');
 });

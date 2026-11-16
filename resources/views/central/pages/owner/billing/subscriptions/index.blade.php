@@ -9,13 +9,13 @@
         @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
         <flux:text>Une période se paie intégralement. Les droits actuels sont conservés jusqu’à leur fin ; une nouvelle période n’est activée qu’après réception et vérification du paiement.</flux:text>
         @php($pending = $subscriptions->contains(fn ($subscription) => $subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::SCHEDULED && ($subscription->period_ends_at === null || $subscription->period_ends_at->isFuture())))
-        @if ($pending)<flux:callout>Une période est déjà prévue ou en attente. Consultez-la ci-dessous avant de choisir une autre offre.</flux:callout>@endif
+        @if ($pending)<flux:callout>Une période est déjà prévue ou en attente. Vous pouvez modifier ou annuler une demande non payée ci-dessous, puis choisir une autre offre.</flux:callout>@endif
         <div class="grid gap-4 md:grid-cols-2">
             @foreach ($plans as $plan)<article class="rounded-lg border border-zinc-200 p-5 dark:border-zinc-700">
                 <flux:heading>{{ $plan['name'] }}</flux:heading><flux:text>{{ $plan['description'] }}</flux:text>
-                <flux:text>{{ $plan['monthly_price'] }} DZD/mois — {{ $plan['annual_price'] }} DZD/an</flux:text>
+                @if ($plan['is_default'])<flux:text>Plan par défaut — attribution automatique gratuite.</flux:text>@else<flux:text>{{ $plan['monthly_price'] }} DZD/mois — {{ $plan['annual_price'] }} DZD/an</flux:text>@endif
                 @foreach ($plan['features'] as $feature)<flux:text>{{ $feature['name'] }} : {{ $feature['value'] }}</flux:text>@endforeach
-                @if ($plan['code'] === 'free')<flux:text>Offre gratuite : aucun paiement à effectuer.</flux:text>
+                @if ($plan['code'] === 'free' || $plan['is_default'])<flux:text>Offre gratuite : aucun paiement à effectuer.</flux:text>
                 @else
                     <form method="POST" enctype="multipart/form-data" action="{{ route('owner.subscriptions.store') }}" class="mt-4 flex flex-col gap-3" x-data="{ period: @js($oldText('plan_uuid') === $plan['uuid'] ? $oldText('period', '1') : '1') }">
                         @csrf<input type="hidden" name="plan_uuid" value="{{ $plan['uuid'] }}">
@@ -32,7 +32,27 @@
         </div>
         <flux:heading>Mes périodes</flux:heading>
         @forelse ($subscriptions as $subscription)
-            <flux:button :href="route('owner.subscriptions.show', $subscription)">{{ $subscription->plan->name }} — {{ $subscription->status->label() }} — {{ $subscription->period_starts_at->format('d/m/Y') }}</flux:button>
+            <article class="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+                <flux:button :href="route('owner.subscriptions.show', $subscription)">{{ $subscription->plan->name }} — {{ $subscription->status->label() }} — {{ $subscription->effectiveStartsAt()->format('d/m/Y') }}</flux:button>
+                @can('startNow', $subscription)
+                    <flux:button :href="route('owner.subscriptions.show', $subscription).'#demarrer'">Appliquer ce plan maintenant</flux:button>
+                @endcan
+                @if ($subscription->request?->current_subscription_id === $subscription->id)
+                    <div class="flex flex-wrap gap-2">
+                        <flux:button :href="route('owner.subscription-requests.show', $subscription->request)">Consulter la demande</flux:button>
+                        @can('update', $subscription->request)
+                            <flux:button :href="route('owner.subscription-requests.show', $subscription->request).'#modifier'">Modifier l’offre ou la période</flux:button>
+                        @endcan
+                        @can('cancel', $subscription->request)
+                            <form method="POST" action="{{ route('owner.subscription-requests.cancel', $subscription->request) }}">
+                                @csrf
+                                <input type="hidden" name="expected_state" value="{{ $subscription->request->managementState() }}">
+                                <flux:button type="submit" variant="danger">Annuler la demande non payée</flux:button>
+                            </form>
+                        @endcan
+                    </div>
+                @endif
+            </article>
         @empty<flux:text>Aucune période enregistrée.</flux:text>@endforelse
     </section>
 </x-layouts::app>

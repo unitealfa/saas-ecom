@@ -39,6 +39,7 @@ class Plan extends Model
     protected function casts(): array
     {
         return [
+            'is_default' => 'boolean',
             'version' => 'integer',
             'monthly_price' => 'decimal:2',
             'annual_price' => 'decimal:2',
@@ -68,7 +69,7 @@ class Plan extends Model
         ])->values()->all();
 
         return hash('sha256', json_encode([
-            $this->only(['uuid', 'code', 'version', 'name', 'description', 'monthly_price', 'annual_price', 'is_active', 'deleted_at']),
+            $this->only(['uuid', 'code', 'version', 'name', 'description', 'monthly_price', 'annual_price', 'is_active', 'is_default', 'deleted_at']),
             $composition,
         ], JSON_THROW_ON_ERROR));
     }

@@ -14,10 +14,10 @@ use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use App\Services\Central\Authorization\CentralUserAccess;
 use App\Services\Central\Tenants\TenantStatusService;
-use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 class QuotaService
 {
@@ -33,7 +33,7 @@ class QuotaService
     {
         Gate::forUser($actor)->authorize('viewQuota', $owner);
         $subscription = $this->current($owner);
-        $expired = $subscription === null || $subscription->period_starts_at->isFuture()
+        $expired = $subscription === null || $subscription->effectiveStartsAt()->isFuture()
             || ($subscription->effectiveEndsAt() !== null && ! $subscription->effectiveEndsAt()->isFuture());
         $grant = $expired ? null : PlanFeature::query()->where('plan_id', $subscription->plan_id)
             ->whereHas('feature', fn ($query) => $query->where('code', Feature::SHOPS_CODE))->first();

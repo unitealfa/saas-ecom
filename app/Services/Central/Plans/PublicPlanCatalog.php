@@ -21,6 +21,7 @@ class PublicPlanCatalog
         'description',
         'monthly_price',
         'annual_price',
+        'is_default',
     ];
 
     /** @return list<array<string, mixed>> */
@@ -70,7 +71,7 @@ class PublicPlanCatalog
     /** Le nom de la base isole les caches des environnements. */
     private function prefix(): string
     {
-        return 'public-plans:v2:'.hash(
+        return 'public-plans:v3:'.hash(
             'sha256',
             (new Plan)->getConnection()->getDatabaseName()
         );
@@ -124,7 +125,7 @@ class PublicPlanCatalog
         }
 
         return $feature->limit === null
-            ? 'Non précisé'
+            ? 'Sans limite'
             : (string) $feature->limit;
     }
 }
