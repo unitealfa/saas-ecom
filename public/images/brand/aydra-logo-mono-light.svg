@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 570 176" role="img" aria-labelledby="aydra-logo-mono-light-title">
+    <title id="aydra-logo-mono-light-title">Aydra — logo monochrome</title>
+    
+    <path fill="#151e63" d="       M114 41       C126 34 136 40 143 53       L194 139       C202 154 194 164 177 164       H57L87 121Z" />
+    <path fill="#151e63" d="       M76 85 106 53       C119 40 133 33 141 42       L169 90       C166 107 158 118 146 125       L114 94       C99 80 88 79 76 85Z" />
+    <path fill="#151e63" d="       M5 140 65 35       C75 17 87 10 102 10       C119 10 132 19 141 36       L145 45       C132 28 117 40 102 56       L35 152       C24 169 1 163 1 151       C1 147 2 144 5 140Z" />
+    <path fill="#151e63" d="       M57 164 82 126 96 102       C101 94 108 95 115 103       L146 125Z" />
+    
+      <g transform="translate(10 0)" fill="none" stroke="#151e63" stroke-width="18" stroke-linecap="butt" stroke-linejoin="round">
+      <path d="m210 137 35-86q5-12 10 0l35 86" stroke-linecap="round" />
+      <path d="m296 69 28 55m28-55-44 94" />
+      <circle cx="389" cy="104" r="29" />
+      <path d="M418 40v97" />
+      <path d="M447 137V98q0-29 28-29" />
+      <circle cx="513" cy="104" r="29" />
+      <path d="M542 104v33" />
+    </g>
+  </svg>

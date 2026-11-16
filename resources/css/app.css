@@ -36,6 +36,218 @@
     }
 }
 
+/* L'identité Aydra est limitée aux comptes du personnel central. */
+body.aydra-admin {
+    --color-accent: #3459da;
+    --color-accent-content: #2748bd;
+    --color-accent-foreground: #fff;
+    --aydra-surface: #fff;
+    --aydra-border: #e2e8f3;
+    --aydra-heading: #151e63;
+    --aydra-muted: #5f6d84;
+    background: #f4f7fc;
+}
+
+html.dark body.aydra-admin {
+    --color-accent: #7eafff;
+    --color-accent-content: #a8c9ff;
+    --color-accent-foreground: #101a3b;
+    --aydra-surface: #151f3a;
+    --aydra-border: #2b3b5c;
+    --aydra-heading: #f4f8ff;
+    --aydra-muted: #a7b5cf;
+    background: #0b1429;
+}
+
+body.aydra-admin .aydra-admin-sidebar {
+    background: var(--aydra-surface);
+    border-color: var(--aydra-border);
+    scrollbar-width: none;
+}
+
+body.aydra-admin .aydra-admin-sidebar::-webkit-scrollbar {
+    display: none;
+}
+
+body.aydra-admin [data-flux-main-inset] {
+    background: #f4f7fc;
+    border-color: var(--aydra-border);
+}
+
+html.dark body.aydra-admin [data-flux-main-inset] {
+    background: #0b1429;
+}
+
+body.aydra-admin .aydra-admin-brand {
+    display: inline-flex;
+    align-items: center;
+    min-height: 3rem;
+    padding-inline: .5rem;
+}
+
+body.aydra-admin .aydra-admin-sidebar [data-flux-sidebar-group] > div:first-child {
+    color: #63738d;
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .01em;
+    text-transform: none;
+}
+
+body.aydra-admin .aydra-admin-sidebar [data-flux-sidebar-item][data-current] {
+    background: #eaf1ff;
+    border-color: transparent;
+    color: #2748bd;
+    box-shadow: inset 3px 0 #3459da;
+}
+
+body.aydra-admin .aydra-admin-sidebar [data-flux-sidebar-item]:focus-visible,
+body.aydra-admin .aydra-admin-brand:focus-visible {
+    outline: 2px solid #3459da;
+    outline-offset: 2px;
+}
+
+html.dark body.aydra-admin .aydra-admin-sidebar [data-flux-sidebar-group] > div:first-child {
+    color: #a7b5cf;
+}
+
+html.dark body.aydra-admin .aydra-admin-sidebar [data-flux-sidebar-item][data-current] {
+    background: #263c62;
+    color: #c5dcff;
+    box-shadow: inset 3px 0 #7eafff;
+}
+
+/* Une seule surface réunit les indicateurs qui décrivent la plateforme. */
+body.aydra-admin .aydra-overview,
+body.aydra-admin .aydra-financial {
+    background: var(--aydra-surface);
+    border: 1px solid var(--aydra-border);
+    border-radius: 1rem;
+}
+
+body.aydra-admin .aydra-dashboard-date {
+    color: var(--aydra-muted);
+    font-size: .75rem;
+}
+
+body.aydra-admin .aydra-overview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--aydra-border);
+}
+
+body.aydra-admin .aydra-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+body.aydra-admin .aydra-overview-column {
+    min-width: 0;
+    padding: 1.5rem;
+}
+
+body.aydra-admin .aydra-overview-column + .aydra-overview-column {
+    border-left: 1px solid var(--aydra-border);
+}
+
+body.aydra-admin .aydra-status-list {
+    border-top: 1px solid var(--aydra-border);
+}
+
+body.aydra-admin .aydra-chart {
+    position: relative;
+    width: 10rem;
+    margin-inline: auto;
+}
+
+body.aydra-admin .aydra-chart-ring {
+    display: block;
+    width: 100%;
+    transform: rotate(-90deg);
+}
+
+body.aydra-admin .aydra-chart-track {
+    fill: none;
+    stroke: var(--aydra-border);
+    stroke-width: 10;
+}
+
+body.aydra-admin .aydra-chart-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--aydra-heading);
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+}
+
+body.aydra-admin .aydra-chart-center small {
+    color: var(--aydra-muted);
+    font-size: .75rem;
+    font-weight: 400;
+}
+
+body.aydra-admin .aydra-chart-key {
+    flex: none;
+    width: .625rem;
+    height: .625rem;
+    border-radius: 50%;
+}
+
+body.aydra-admin .aydra-overview-note {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--aydra-border);
+    color: var(--aydra-muted);
+    font-size: .75rem;
+}
+
+body.aydra-admin .aydra-financial {
+    border-left: 4px solid #3459da;
+}
+
+html.dark body.aydra-admin .aydra-financial {
+    border-left-color: #7eafff;
+}
+
+@media (max-width: 1100px) {
+    body.aydra-admin .aydra-overview-grid { grid-template-columns: 1fr; }
+    body.aydra-admin .aydra-overview-column + .aydra-overview-column {
+        border-left: 0;
+        border-top: 1px solid var(--aydra-border);
+    }
+}
+
+@media (max-width: 480px) {
+    body.aydra-admin .aydra-overview-header,
+    body.aydra-admin .aydra-overview-column { padding: 1.25rem; }
+}
+
+body.aydra-admin .aydra-heading { color: var(--aydra-heading); }
+body.aydra-admin .aydra-muted { color: var(--aydra-muted); }
+
+body.aydra-admin .aydra-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: .85rem;
+    background: #eaf1ff;
+    color: #3459da;
+}
+
+html.dark body.aydra-admin .aydra-icon {
+    background: #23385c;
+    color: #a8c9ff;
+}
+
 @layer base {
 
     *,
