@@ -35,6 +35,26 @@ beforeEach(function (): void {
     $this->withoutVite();
 });
 
+test('central staff see the branded navigation with only authorized sections', function (): void {
+    $staff = adminDashboardActor(['saas.users.view']);
+
+    $this->actingAs($staff, 'central')->get(route('dashboard'))->assertOk()
+        ->assertSee('Comptes et accès')->assertSee('Utilisateurs')
+        ->assertSee('data-flux-main-inset', false)
+        ->assertSee('/images/brand/aydra-logo-light.svg', false)
+        ->assertSee('/images/brand/aydra-logo-dark.svg', false)
+        ->assertDontSee('Facturation SaaS')->assertDontSee(route('central.invoices.index'));
+});
+
+test('the redesigned dashboard keeps general and financial data separated', function (): void {
+    $general = adminDashboardActor(['saas.dashboard.view']);
+    $this->actingAs($general, 'central')->get(route('central.admin-dashboard.index'))->assertOk()
+        ->assertSee('Vue d’ensemble')->assertSee('Comptes commerçants')->assertDontSee('Paiements vérifiés');
+    $financial = adminDashboardActor(['saas.dashboard.financial.view']);
+    $this->actingAs($financial, 'central')->get(route('central.admin-dashboard.index'))->assertOk()
+        ->assertSee('Paiements vérifiés')->assertDontSee('Comptes commerçants');
+});
+
 test('staff with either dashboard permission land directly on the administrative page after login', function (string $permission): void {
     $actor = adminDashboardActor([$permission]);
 
@@ -122,6 +142,7 @@ test('general counts exclude staff and installments while preserving shop status
         'period_ends_at' => $subscription->period_ends_at])->save();
 
     $this->actingAs($viewer, 'central')->get(route('central.admin-dashboard.index'))->assertOk()
+        ->assertSee('stroke-dasharray="50 50"', false)
         ->assertViewHas('overview', fn (array $data): bool => array_sum($data['merchants']) === 2
             && ($data['merchants'][UserStatus::PENDING->value] ?? 0) === 1
             && ($data['shops'][TenantStatus::ACTIVE->value] ?? 0) === 1

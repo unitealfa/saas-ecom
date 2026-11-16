@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
+use Livewire\Livewire;
 use Stancl\Tenancy\Events\TenantCreated;
 
 beforeEach(function (): void {
@@ -45,6 +46,31 @@ test('user management actions have a global scope without target lists', functio
         ->assertSee($first->email)->assertSee($other->email);
     $this->get(route('central.users.show', $first))->assertOk();
     $this->get(route('central.users.show', $other))->assertOk();
+});
+
+test('user sorting orders the filtered results and toggles direction', function (): void {
+    User::factory()->create(['first_name' => 'Zelda', 'last_name' => 'Sorting', 'email' => 'z-sort@example.test']);
+    User::factory()->create(['first_name' => 'Alice', 'last_name' => 'Sorting', 'email' => 'a-sort@example.test']);
+
+    $this->actingAs($this->admin, 'central');
+    Livewire::test('central::pages.admin.users.index')
+        ->set('search', 'Sorting')
+        ->call('sort', 'name')->assertSeeInOrder(['Alice Sorting', 'Zelda Sorting'])
+        ->call('sort', 'name')->assertSeeInOrder(['Zelda Sorting', 'Alice Sorting'])
+        ->call('sort', 'email')->assertSeeInOrder(['a-sort@example.test', 'z-sort@example.test']);
+});
+
+test('sorting applies before pagination and returns to the first page', function (): void {
+    for ($i = 20; $i >= 0; $i--) {
+        User::factory()->create(['first_name' => sprintf('Test%02d', $i), 'last_name' => 'Pagination']);
+    }
+
+    $this->actingAs($this->admin, 'central');
+    Livewire::test('central::pages.admin.users.index')
+        ->set('search', 'Pagination')->call('sort', 'name')
+        ->assertSee('Test00 Pagination')->assertDontSee('Test20 Pagination')
+        ->call('gotoPage', 2)->assertSee('Test20 Pagination')->assertDontSee('Test00 Pagination')
+        ->call('sort', 'name')->assertSee('Test20 Pagination')->assertDontSee('Test00 Pagination');
 });
 test('suspension invalidates sessions and reactivation requires its own permission', function (): void {
     $moderator = User::factory()->create();
