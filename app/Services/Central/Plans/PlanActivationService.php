@@ -16,7 +16,7 @@ class PlanActivationService
         'deleted_at', 'features',
     ];
 
-    public function __construct(private readonly AuthorizationMutation $mutations) {}
+    public function __construct(private readonly AuthorizationMutation $mutations, private readonly FreePlanCatalog $defaults) {}
 
     /** @return array<string, array<int, string>> */
     public static function rules(): array
@@ -55,6 +55,35 @@ class PlanActivationService
 
                 $this->change($actor, $plan, $active, null);
             });
+    }
+
+    public function setDefault(User $actor, Plan $plan, string $expected): void
+    {
+        $this->mutations->run($actor, 'setDefault', function () use ($plan): Plan {
+            // Le choix par défaut est unique pour tout le catalogue.
+            Plan::withTrashed()->orderBy('id')->lockForUpdate()->get();
+
+            return Plan::whereKey($plan->id)->firstOrFail();
+        }, function (Plan $target) use ($actor, $expected): void {
+            $features = $target->features()->orderBy('feature_id')->lockForUpdate()->get();
+            if (! hash_equals($target->compositionState($features), $expected)) {
+                throw ValidationException::withMessages(['expected_state' => 'Le plan a changé. Rechargez la liste.']);
+            }
+            if ($target->is_default) {
+                return;
+            }
+            $previous = Plan::where('is_default', true)->first();
+            $previous?->forceFill(['is_default' => null])->save();
+            $target->forceFill(['is_default' => true])->save();
+            try {
+                $this->defaults->current();
+            } catch (\LogicException) {
+                throw ValidationException::withMessages(['plan' => 'Le plan par défaut doit être actif et inclure un quota de boutiques valide.']);
+            }
+            activity()->causedBy($actor)->performedOn($target)->event('plan_default_selected')
+                ->withProperties(['previous_plan_uuid' => $previous?->uuid, 'plan_uuid' => $target->uuid])
+                ->log('Plan de secours choisi : attribution automatique gratuite, sans modification des prix historiques.');
+        });
     }
 
     private function change(User $actor, Plan $plan, bool $active, ?string $replacementUuid): void

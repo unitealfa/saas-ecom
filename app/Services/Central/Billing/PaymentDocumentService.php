@@ -151,14 +151,23 @@ class PaymentDocumentService
         return new UploadedFile(Storage::disk($media->disk)->path($media->storage_key), $media->original_name, $media->mime_type, null, true);
     }
 
-    public function downloadRequestProof(User $actor, SubscriptionRequest $request): StreamedResponse
+    public function downloadRequestProof(User $actor, SubscriptionRequest $request, bool $inline = false): StreamedResponse
     {
         Gate::forUser($actor)->authorize('viewInitialProof', $request);
         $id = $request->getAttribute('submitted_payment')['proof_uuid'] ?? null;
         $media = Media::where('model_type', $request->getMorphClass())->where('model_id', $request->id)->where('uuid', $id)->firstOrFail();
+        if ($media->collection_name !== self::PROOF || $media->mime_type !== 'application/pdf') {
+            $this->fail('Le justificatif initial est indisponible ou son format est invalide.');
+        }
         $this->assertFile($media);
 
-        return $this->files->download($actor, $media);
+        $response = $this->files->download($actor, $media);
+        if ($inline) {
+            $response->headers->set('Content-Type', 'application/pdf');
+            $response->headers->set('Content-Disposition', $response->headers->makeDisposition('inline', 'justificatif-'.$request->uuid.'.pdf'));
+        }
+
+        return $response;
     }
 
     private function createInternalProof(User $actor, SaasPayment $payment): void

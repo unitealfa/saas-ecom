@@ -6,6 +6,7 @@ use App\Models\Central\Plans\Plan;
 use App\Models\Central\Users\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 
@@ -21,7 +22,7 @@ class PlanCatalogService
         $search = trim((string) $search);
         $pattern = '%'.addcslashes($search, '\\%_').'%';
 
-        return Plan::withTrashed()
+        return Plan::withTrashed()->with('features')
             ->when($search !== '', fn (Builder $query) => $query->where(
                 fn (Builder $query) => $query->where('code', 'like', $pattern)->orWhere('name', 'like', $pattern),
             ))
@@ -34,7 +35,7 @@ class PlanCatalogService
     {
         Gate::forUser($actor)->authorize('view', $plan);
 
-        return $plan->load(['features.feature' => fn (BelongsTo $relation) => $relation->withTrashed()]);
+        return $plan->load(['features.feature' => fn (BelongsTo $relation) => $relation->getQuery()->withoutGlobalScope(SoftDeletingScope::class)]);
     }
 
     public function latestVersion(User $actor, Plan $plan): int

@@ -52,7 +52,7 @@ class DefaultSubscription
             $current = $this->currentOf($owner);
 
             if ($current !== null) {
-                if ($current->period_starts_at->isFuture()) {
+                if ($current->effectiveStartsAt()->isFuture()) {
                     throw new LogicException(
                         'An active subscription cannot start in the future.'
                     );
@@ -61,10 +61,10 @@ class DefaultSubscription
                 $end = $current->effectiveEndsAt();
 
                 if ($end === null || $end->isFuture()) {
-                    $paidNext = $current->plan->code === 'free' && $this->paidDocuments()->where('user_id', $owner->id)
+                    $paidNext = $current->isFree() && $this->paidDocuments()->where('user_id', $owner->id)
                         ->whereHas('subscription', fn (Builder $query) => $query->where('status', StatusEnum::SCHEDULED)
                             ->where('period_starts_at', '<=', now())->where('period_ends_at', '>', now()))->exists();
-                    if (! $paidNext) {
+                    if (! $current->isFree() || (! $paidNext && $current->plan_id === $this->catalog->current()->id)) {
                         return $current;
                     }
                     $current->forceFill(['status' => StatusEnum::CANCELLED, 'ended_at' => now()])->save();
@@ -171,7 +171,7 @@ class DefaultSubscription
                 .($previous->uuid ?? self::INITIAL),
             'status' => StatusEnum::ACTIVE,
             'period' => PeriodEnum::MONTHLY,
-            'agreed_amount' => $plan->monthly_price,
+            'agreed_amount' => '0.00',
             'started_at' => now(),
             'period_starts_at' => now(),
             'period_ends_at' => null,

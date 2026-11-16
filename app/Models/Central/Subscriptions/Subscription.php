@@ -27,6 +27,8 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
  * @property string $agreed_amount
  * @property CarbonImmutable $period_starts_at
  * @property CarbonImmutable|null $period_ends_at
+ * @property CarbonImmutable|null $effective_starts_at
+ * @property CarbonImmutable|null $effective_ends_at
  * @property CarbonImmutable|null $trial_ends_at
  */
 #[Fillable([
@@ -59,6 +61,8 @@ class Subscription extends Model
             'started_at' => 'immutable_datetime',
             'period_starts_at' => 'immutable_datetime',
             'period_ends_at' => 'immutable_datetime',
+            'effective_starts_at' => 'immutable_datetime',
+            'effective_ends_at' => 'immutable_datetime',
             'trial_ends_at' => 'immutable_datetime',
             'ended_at' => 'immutable_datetime',
         ];
@@ -99,11 +103,26 @@ class Subscription extends Model
         return hash('sha256', json_encode($this->only([
             'uuid', 'user_id', 'plan_id', 'status', 'period', 'agreed_amount', 'started_at',
             'period_starts_at', 'period_ends_at', 'trial_ends_at', 'ended_at', 'auto_renew', 'transition_mode', 'replaces_subscription_id',
+            'effective_starts_at', 'effective_ends_at',
         ]), JSON_THROW_ON_ERROR));
+    }
+
+    public function isFree(): bool
+    {
+        return $this->agreed_amount === '0.00';
+    }
+
+    public function effectiveStartsAt(): CarbonImmutable
+    {
+        return $this->effective_starts_at ?? $this->period_starts_at;
     }
 
     public function effectiveEndsAt(): ?CarbonImmutable
     {
+        if ($this->effective_ends_at !== null) {
+            return $this->effective_ends_at;
+        }
+
         if ($this->status !== StatusEnum::TRIAL || $this->trial_ends_at === null) {
             return $this->period_ends_at;
         }
@@ -114,12 +133,23 @@ class Subscription extends Model
     }
 
     /** @param Builder<static> $query */
+    public function scopeCurrentlyEffective(Builder $query): void
+    {
+        $query->whereRaw('COALESCE(effective_starts_at, period_starts_at) <= ?', [now()])
+            ->where(fn (Builder $query) => $query->whereRaw('COALESCE(effective_ends_at, period_ends_at) IS NULL')
+                ->orWhereRaw('COALESCE(effective_ends_at, period_ends_at) > ?', [now()]))
+            ->where(fn (Builder $query) => $query->whereNull('ended_at')->orWhere('ended_at', '>', now()))
+            ->where(fn (Builder $query) => $query->where('status', '!=', StatusEnum::TRIAL)
+                ->orWhereNull('trial_ends_at')->orWhere('trial_ends_at', '>', now()));
+    }
+
+    /** @param Builder<static> $query */
     public function scopeDueForResolution(Builder $query): void
     {
         $query->where(function (Builder $query): void {
             $query->where(function (Builder $query): void {
                 $query->whereIn('status', [StatusEnum::ACTIVE, StatusEnum::TRIAL])
-                    ->where('period_ends_at', '<=', now());
+                    ->whereRaw('COALESCE(effective_ends_at, period_ends_at) <= ?', [now()]);
             })->orWhere(function (Builder $query): void {
                 $query->where('status', StatusEnum::TRIAL)->where('trial_ends_at', '<=', now());
             })->orWhere(function (Builder $query): void {

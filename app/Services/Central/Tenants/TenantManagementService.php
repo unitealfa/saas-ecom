@@ -86,8 +86,7 @@ class TenantManagementService
 
         return Subscription::whereIn('user_id', $tenants->pluck('user_id')->unique())
             ->whereIn('status', [SubscriptionStatus::ACTIVE, SubscriptionStatus::TRIAL])
-            ->where('period_starts_at', '<=', now())
-            ->where(fn ($query) => $query->whereNull('period_ends_at')->orWhere('period_ends_at', '>', now()))
+            ->currentlyEffective()
             ->with('plan')->orderByDesc('id')->get()->unique('user_id')->keyBy('user_id');
     }
 

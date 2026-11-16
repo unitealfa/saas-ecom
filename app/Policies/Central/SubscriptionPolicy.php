@@ -2,6 +2,8 @@
 
 namespace App\Policies\Central;
 
+use App\Enums\Central\Subscriptions\RequestStatusEnum;
+use App\Enums\Central\Subscriptions\StatusEnum as SubscriptionStatus;
 use App\Enums\Central\Users\StatusEnum;
 use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Subscriptions\Subscription;
@@ -18,6 +20,13 @@ class SubscriptionPolicy
             && $actor->status === StatusEnum::ACTIVE && $actor->hasVerifiedEmail()
             && $actor->legal_verification_status === VerificationStatusEnum::VERIFIED
             && $actor->legal_verified_at !== null;
+    }
+
+    public function startNow(User $actor, Subscription $subscription): bool
+    {
+        return $this->purchase($actor) && $subscription->user_id === $actor->id
+            && $subscription->status === SubscriptionStatus::SCHEDULED
+            && $subscription->request?->status === RequestStatusEnum::ACCEPTED;
     }
 
     public function purchaseFor(User $actor, User $owner, ?Subscription $source = null): bool

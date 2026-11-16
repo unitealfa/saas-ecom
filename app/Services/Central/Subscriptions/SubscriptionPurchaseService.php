@@ -63,8 +63,8 @@ class SubscriptionPurchaseService
                     if (! hash_equals($source->transitionState(), $values['expected_source_state'])) {
                         throw ValidationException::withMessages(['expected_state' => 'L’abonnement a changé. Rechargez la page.']);
                     }
-                    if ($source->status !== StatusEnum::ACTIVE || $source->period_starts_at->isFuture()
-                        || $source->plan->code === 'free' || $source->effectiveEndsAt()?->isFuture() !== true) {
+                    if ($source->status !== StatusEnum::ACTIVE || $source->effectiveStartsAt()->isFuture()
+                        || $source->isFree() || $source->effectiveEndsAt()?->isFuture() !== true) {
                         $this->fail('Seul un abonnement payant en cours peut être remplacé.');
                     }
                 }
@@ -94,7 +94,7 @@ class SubscriptionPurchaseService
                     $this->fail('Une période est déjà prévue ou en attente de paiement. Consultez cet abonnement avant d’en choisir un autre.');
                 }
                 $plan = Plan::where('uuid', strtolower($values['plan_uuid']))->active()->lockForUpdate()->first();
-                if ($plan === null || $plan->code === 'free') {
+                if ($plan === null || $plan->code === 'free' || $plan->is_default) {
                     $this->fail('Choisissez une offre payante actuellement disponible. L’offre gratuite ne nécessite aucun paiement.');
                 }
                 $period = PeriodEnum::from((int) $values['period']);
@@ -107,7 +107,7 @@ class SubscriptionPurchaseService
                 $mode = TransitionModeEnum::from((int) ($values['transition_mode'] ?? TransitionModeEnum::DEFERRED->value));
                 $replaces = null;
                 foreach ($subscriptions as $current) {
-                    if ($current->plan->code === 'free') {
+                    if ($current->isFree()) {
                         continue;
                     }
                     $end = $current->effectiveEndsAt();

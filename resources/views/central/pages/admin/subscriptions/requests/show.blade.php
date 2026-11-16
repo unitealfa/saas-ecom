@@ -23,11 +23,19 @@
             <div><dt>Montant TTC</dt><dd>{{ $item->subscription?->agreed_amount }} DZD</dd></div>
             <div><dt>Moyen choisi</dt><dd>{{ $item->payment_choice->label() }}</dd></div>
             <div><dt>Période</dt><dd>{{ $item->subscription?->period_starts_at?->format('d/m/Y') }} — {{ $item->subscription?->period_ends_at?->format('d/m/Y') }}</dd></div>
+            @if ($item->subscription?->effective_starts_at)
+                <div><dt>Période d’accès après démarrage anticipé</dt><dd>{{ $item->subscription->effectiveStartsAt()->format('d/m/Y') }} — {{ $item->subscription->effectiveEndsAt()?->format('d/m/Y') }}</dd></div>
+            @endif
             <div><dt>Statut de l’abonnement demandé</dt><dd>{{ $item->subscription?->status->label() }}</dd></div>
             @if ($item->decided_at)
                 <div><dt>Décision administrative</dt><dd>{{ $item->decider?->name }} — {{ $item->decided_at->format('d/m/Y H:i') }}</dd></div>
             @endif
         </dl>
+        @if ($ownerMode && $item->subscription)
+            @can('startNow', $item->subscription)
+                <flux:button :href="route('owner.subscriptions.show', $item->subscription).'#demarrer'">Appliquer ce plan maintenant</flux:button>
+            @endcan
+        @endif
         @if ($item->getAttribute('decision_reason'))<flux:callout heading="Motif du refus">{{ $item->getAttribute('decision_reason') }}</flux:callout>@endif
         @if ($issued)
             <flux:text>Facture {{ $item->invoice->number }}. Elle constate le montant dû ; elle ne prouve pas un paiement.</flux:text>
@@ -42,7 +50,15 @@
         @endif
         @if ($item->getAttribute('submitted_payment') !== null)
             @can('viewInitialProof', $item)
-            <flux:button :href="\Illuminate\Support\Facades\URL::temporarySignedRoute($prefix.'.subscription-requests.initial-proof', now()->addMinutes(10), ['subscriptionRequest' => $item])">Consulter le justificatif initial</flux:button>
+                @php($proofPreview = \Illuminate\Support\Facades\URL::temporarySignedRoute($prefix.'.subscription-requests.initial-proof', now()->addMinutes(10), ['subscriptionRequest' => $item, 'inline' => 1]))
+                <section class="flex flex-col gap-3" aria-label="Justificatif initial">
+                    <flux:heading>Justificatif initial</flux:heading>
+                    <iframe src="{{ $proofPreview }}" title="Consulter le justificatif initial" class="h-[36rem] w-full rounded-lg border border-zinc-200 dark:border-zinc-700"></iframe>
+                    <div class="flex flex-wrap gap-2">
+                        <flux:button :href="$proofPreview" target="_blank" rel="noopener">Ouvrir le justificatif</flux:button>
+                        <flux:button :href="\Illuminate\Support\Facades\URL::temporarySignedRoute($prefix.'.subscription-requests.initial-proof', now()->addMinutes(10), ['subscriptionRequest' => $item])">Télécharger le justificatif initial</flux:button>
+                    </div>
+                </section>
             @endcan
         @endif
         @if ($item->payment)
@@ -62,23 +78,41 @@
         @endif
         @if ($ownerMode && ! $item->status->isFinal())
             @can('update', $item)
-                <flux:callout>Pour changer l’offre ou la période après émission, demandez d’abord à l’administration une correction documentaire manuelle complète. La facture initiale reste conservée ; aucun avoir automatique.</flux:callout>
+                <flux:heading id="modifier">Modifier ou annuler ma demande</flux:heading>
+                @if ($issued)
+                    <flux:callout>Avant de modifier ou annuler cette demande, l’administration doit corriger la facture émise. Les documents restent conservés.</flux:callout>
+                @endif
                 <form method="POST" action="{{ route('owner.subscription-requests.revise', $item) }}" class="flex flex-col gap-3">@csrf @method('PUT')
                     <input type="hidden" name="expected_state" value="{{ $item->managementState() }}">
                     <input type="hidden" name="operation_id" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
-                    @php($paidPlans = array_values(array_filter($plans, fn ($plan) => $plan['code'] !== 'free')))
-                    <div x-data="{ plans: @js($paidPlans), plan: @js($item->subscription->plan->uuid), period: @js((string) $item->subscription->period->value) }" class="flex flex-col gap-3">
+                    @php($paidPlans = array_values(array_filter($plans, fn ($plan) => $plan['code'] !== 'free' && ! $plan['is_default'])))
+                    <div x-data="{ plans: @js($paidPlans), plan: @js($item->subscription->plan->uuid), period: @js((string) $item->subscription->period->value), mode: @js((string) $item->subscription->transition_mode->value) }" class="flex flex-col gap-3">
                         <flux:select name="plan_uuid" label="Nouvelle offre" x-model="plan" required>
                             @foreach ($paidPlans as $plan)<option value="{{ $plan['uuid'] }}">{{ $plan['name'] }} — {{ $plan['monthly_price'] }} DZD/mois, {{ $plan['annual_price'] }} DZD/an</option>@endforeach
                         </flux:select>
                         <flux:select name="period" label="Période" x-model="period" required><option value="1">Mensuelle</option><option value="2">Annuelle</option></flux:select>
                         <input type="hidden" name="expected_amount" x-bind:value="plans.find(p => p.uuid === plan)?.[period === '1' ? 'monthly_price' : 'annual_price'] ?? ''">
-                    </div>
                     <input type="hidden" name="payment_choice" value="{{ $item->payment_choice->value }}">
-                    <flux:select name="transition_mode" label="Début de la nouvelle période">
+                    <flux:select name="transition_mode" label="Début de la nouvelle période" x-model="mode">
                         @foreach (\App\Enums\Central\Subscriptions\TransitionModeEnum::cases() as $mode)<option value="{{ $mode->value }}" @selected($item->subscription->transition_mode === $mode)>{{ $mode->label() }}</option>@endforeach
                     </flux:select>
+                    @if ($currentSubscription && ! $currentSubscription->isFree() && $currentSubscription->status === \App\Enums\Central\Subscriptions\StatusEnum::ACTIVE)
+                        <input type="hidden" name="source_uuid" value="{{ $currentSubscription->uuid }}">
+                        <input type="hidden" name="expected_source_state" value="{{ $currentSubscription->transitionState() }}">
+                    @endif
+                    <div x-show="mode === '1'" x-cloak class="flex flex-col gap-3">
+                        @include('central.pages.owner.billing.subscriptions.current-plan-warning')
+                        <flux:heading>Nouveau plan : <span x-text="plans.find(p => p.uuid === plan)?.name"></span></flux:heading>
+                        <ul class="list-inside list-disc text-sm">
+                            <template x-for="feature in (plans.find(p => p.uuid === plan)?.features ?? [])" :key="feature.name">
+                                <li><span x-text="feature.name"></span> : <span x-text="feature.value"></span></li>
+                            </template>
+                        </ul>
+                        <flux:text>Les nouveaux droits commenceront après confirmation du paiement intégral, pour une période complète. Aucun prorata ni remboursement automatique.</flux:text>
+                        <label class="flex items-start gap-2"><input type="checkbox" name="confirm_replacement" value="1" x-bind:required="mode === '1'" x-bind:disabled="mode !== '1'">Je confirme l’arrêt des droits actuels lors de l’activation de la nouvelle période.</label>
+                    </div>
                     <flux:button type="submit">Modifier l’offre ou la période</flux:button>
+                    </div>
                 </form>
                 <form method="POST" action="{{ route('owner.subscription-requests.cancel', $item) }}">@csrf
                     <input type="hidden" name="expected_state" value="{{ $item->managementState() }}">

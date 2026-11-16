@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Central\Subscriptions;
 
 use App\Enums\Central\Subscriptions\PaymentChoiceEnum;
+use App\Enums\Central\Subscriptions\TransitionModeEnum;
 use App\Models\Central\Subscriptions\SubscriptionRequest;
 use App\Models\Central\Users\User;
 use App\Services\Central\Billing\PaymentDocumentService;
@@ -41,6 +42,9 @@ class SubscriptionRequestActionRequest extends FormRequest
         $rules = ['expected_state' => ['required', 'string', 'regex:'.SubscriptionRequest::STATE_PATTERN]];
         if ($action === 'revise') {
             $rules = [...SubscriptionRequestService::rules(), ...$rules];
+            if ($this->integer('transition_mode') === TransitionModeEnum::IMMEDIATE->value) {
+                $rules['confirm_replacement'] = ['required', 'accepted'];
+            }
         } elseif ($action === 'choice') {
             $rules['payment_choice'] = ['required', 'integer', Rule::enum(PaymentChoiceEnum::class)];
         } elseif ($action === 'proof') {
