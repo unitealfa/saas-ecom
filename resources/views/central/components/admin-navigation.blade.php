@@ -1,6 +1,15 @@
 @props(['sidebar' => false])
 
 @php
+    $icons = [
+        'Personnel SaaS' => 'user-group',
+        'Boutiques' => 'building-storefront',
+        'Transporteurs' => 'truck',
+        'Géographie' => 'globe-alt',
+        'Plans et offres' => 'rectangle-stack',
+        'Facturation' => 'document-text',
+        'Abonnements' => 'credit-card',
+    ];
     $groups = [
         'Personnel SaaS' => [
             ['label' => 'Personnel', 'route' => 'central.staff.index', 'model' => \App\Models\User::class, 'ability' => 'viewAnyStaff', 'matches' => ['central.staff.*']],
@@ -47,7 +56,7 @@
     @endphp
     @continue($visible->isEmpty())
     @if ($sidebar)
-        <flux:sidebar.item :href="route($visible->first()['route'])" :current="$current" wire:navigate>{{ $label }}</flux:sidebar.item>
+        <flux:sidebar.item :icon="$icons[$label]" :href="route($visible->first()['route'])" :current="$current" wire:navigate>{{ $label }}</flux:sidebar.item>
     @elseif ($current)
         <nav aria-label="{{ $label }}" class="mb-6 flex flex-wrap gap-2">
             @foreach ($visible as $item)

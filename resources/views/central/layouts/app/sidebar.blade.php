@@ -19,17 +19,14 @@
                 <flux:sidebar.collapse class="lg:hidden" />
             </flux:sidebar.header>
 
-            @if ($isStaff)
-                @include('central.partials.admin-navigation')
-            @else
             <flux:sidebar.nav>
-                <flux:sidebar.group :heading="__('Platform')" class="grid">
+                <flux:sidebar.group :heading="$isStaff ? 'Administration' : __('Mon espace')" class="grid">
                     <flux:sidebar.item icon="home" :href="route($dashboardRoute)" :current="request()->routeIs($dashboardRoute === 'dashboard' ? 'dashboard' : 'central.admin-dashboard.*')" wire:navigate>
-                        {{ __('Dashboard') }}
+                        Tableau de bord
                     </flux:sidebar.item>
 
                     @can('viewAny', \App\Models\Central\Notifications\DatabaseNotification::class)
-                        <flux:sidebar.item :href="route('notifications.index')" :current="request()->routeIs('notifications.*')" wire:navigate>
+                        <flux:sidebar.item icon="bell" :href="route('notifications.index')" :current="request()->routeIs('notifications.*')" wire:navigate>
                             Notifications ({{ auth('central')->user()->unreadNotifications()->count() }})
                         </flux:sidebar.item>
                     @endcan
@@ -39,31 +36,30 @@
                     @endcanany
 
                     @can('viewAny', \App\Models\User::class)
-                        <flux:sidebar.item :href="route('central.users.index')" :current="request()->routeIs('central.users.*')" wire:navigate>{{ __('Utilisateurs') }}</flux:sidebar.item>
+                        <flux:sidebar.item icon="users" :href="route('central.users.index')" :current="request()->routeIs('central.users.*')" wire:navigate>{{ __('Utilisateurs') }}</flux:sidebar.item>
                     @endcan
 
                     <x-central::components.admin-navigation sidebar />
                     @can('viewAny', \App\Models\Central\Audit\Activity::class)
-                        <flux:sidebar.item :href="route('central.activity.index')" :current="request()->routeIs('central.activity.*')" wire:navigate>Journal d’activité</flux:sidebar.item>
+                        <flux:sidebar.item icon="clipboard-document-list" :href="route('central.activity.index')" :current="request()->routeIs('central.activity.*')" wire:navigate>Journal d’activité</flux:sidebar.item>
                     @endcan
 
                     @can('viewAny', \App\Models\Central\Media\Media::class)
-                        <flux:sidebar.item :href="route('central.media.index')" :current="request()->routeIs('central.media.*')" wire:navigate>{{ __('Fichiers centraux') }}</flux:sidebar.item>
+                        <flux:sidebar.item icon="folder" :href="route('central.media.index')" :current="request()->routeIs('central.media.*')" wire:navigate>{{ __('Fichiers centraux') }}</flux:sidebar.item>
                     @endcan
 
                     {{-- Nouveau tableau de bord commerçant : C-157/C-158/C-159/C-162. --}}
                     @can('viewOwn', \App\Models\Central\Billing\SaasInvoice::class)
                         <flux:sidebar.item icon="building-storefront" :href="route('dashboard').'#mes-boutiques'">Mes boutiques</flux:sidebar.item>
-                        <flux:sidebar.item :href="route('owner.billing.index')" :current="request()->routeIs('owner.billing.*')" wire:navigate>Factures</flux:sidebar.item>
+                        <flux:sidebar.item icon="document-text" :href="route('owner.billing.index')" :current="request()->routeIs('owner.billing.*')" wire:navigate>Factures</flux:sidebar.item>
                     @endcan
 
                     @can('purchase', \App\Models\Central\Subscriptions\Subscription::class)
-                        <flux:sidebar.item :href="route('owner.subscriptions.index')" :current="request()->routeIs('owner.subscriptions.*')" wire:navigate>Mon abonnement et les offres</flux:sidebar.item>
+                        <flux:sidebar.item icon="credit-card" :href="route('owner.subscriptions.index')" :current="request()->routeIs('owner.subscriptions.*')" wire:navigate>Mon abonnement et les offres</flux:sidebar.item>
                     @endcan
 
                 </flux:sidebar.group>
             </flux:sidebar.nav>
-            @endif
 
             <flux:spacer />
             <x-central::components.desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />

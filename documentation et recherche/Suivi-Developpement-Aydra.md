@@ -2483,3 +2483,8 @@ Le formulaire crée ou modifie le brouillon puis appelle immédiatement le servi
 ### Date automatique du justificatif initial — 16 novembre 2026
 
 Champ Date du versement retiré du formulaire initial partagé des offres. Sans date fournie par un ancien appelant, le service enregistre la date/heure serveur lors de la conservation du justificatif. Cette date reste stable lors du rejeu idempotent : elle est générée après le calcul de l’empreinte initiale et n’écrase pas une soumission existante. Justificatif, montant, réseau et autres contrôles préservés. Test de date automatique et rejeu ajouté, sans exécution avant accord.
+
+
+### Réconciliation de la navigation après fusion — 16 novembre 2026
+
+Correction depuis origin/dev (8336226) sur fix/navigation-integration. Navigation fonctionnelle de fix-invoice conservée : sept regroupements, onglets internes, notifications et contrôles de permission existants. Habillage de code-mimou-3h conservé : logos, couleurs, panneau principal et dashboard ; tri des utilisateurs inchangé. Le partial central/partials/admin-navigation, doublon réintroduisant des routes supprimées, est retiré. Le composant central/components/admin-navigation reste la seule définition des regroupements, utilisée par la sidebar et le layout principal. Tests de navigation adaptés et ajoutés, non exécutés avant accord explicite. Aucune écriture en base ni publication.

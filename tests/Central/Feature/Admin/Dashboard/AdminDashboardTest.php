@@ -2,24 +2,24 @@
 
 require_once dirname(__DIR__, 4).'/Support/ManualBillingFixtures.php';
 
-use App\Models\Central\Roles\Role;
-use App\Models\Central\Billing\SaasInvoice;
-use App\Models\Central\Billing\SaasPayment;
-use App\Models\Central\Media\Media;
-use App\Models\Central\Subscriptions\Subscription;
-use App\Models\Central\Subscriptions\SubscriptionInstallment;
-use App\Models\Central\Tenants\Tenant;
 use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Enums\Central\Tenants\StatusEnum as TenantStatus;
 use App\Enums\Central\Users\StatusEnum as UserStatus;
+use App\Models\Central\Billing\SaasInvoice;
+use App\Models\Central\Billing\SaasPayment;
+use App\Models\Central\Media\Media;
+use App\Models\Central\Roles\Role;
+use App\Models\Central\Subscriptions\Subscription;
+use App\Models\Central\Subscriptions\SubscriptionInstallment;
+use App\Models\Central\Tenants\Tenant;
 use App\Models\User;
-use App\Services\Central\Billing\SaasPaymentService;
 use App\Services\Central\Billing\SaasInvoicePdfService;
+use App\Services\Central\Billing\SaasPaymentService;
 use Database\Seeders\Central\AuthorizationSeeder;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Stancl\Tenancy\Events\TenantCreated;
 
 function adminDashboardActor(array $permissions): User
@@ -39,11 +39,35 @@ test('central staff see the branded navigation with only authorized sections', f
     $staff = adminDashboardActor(['saas.users.view']);
 
     $this->actingAs($staff, 'central')->get(route('dashboard'))->assertOk()
-        ->assertSee('Comptes et accès')->assertSee('Utilisateurs')
+        ->assertSee('Administration')->assertSee('Utilisateurs')
         ->assertSee('data-flux-main-inset', false)
         ->assertSee('/images/brand/aydra-logo-light.svg', false)
         ->assertSee('/images/brand/aydra-logo-dark.svg', false)
         ->assertDontSee('Facturation SaaS')->assertDontSee(route('central.invoices.index'));
+});
+
+test('root navigation preserves grouped pages and notifications without obsolete routes', function (): void {
+    $root = adminDashboardActor(['saas.dashboard.view']);
+    $root->assignRole(Role::findByName('root', 'central'));
+
+    $this->actingAs($root, 'central')->get(route('central.admin-dashboard.index'))
+        ->assertOk()->assertSee('Notifications')
+        ->assertSee('Personnel SaaS')->assertSee('Boutiques')->assertSee('Transporteurs')
+        ->assertSee('Géographie')->assertSee('Plans et offres')->assertSee('Facturation')->assertSee('Abonnements')
+        ->assertDontSee('Compteurs de facturation')->assertDontSee('Demandes d’abonnement')
+        ->assertDontSee('Signalements de paiements');
+
+    $this->get(route('central.subscriptions.index'))->assertOk()
+        ->assertSee('aria-label="Abonnements"', false)
+        ->assertSee('href="'.route('central.subscription-requests.index').'"', false);
+});
+
+test('payment readers can access the billing group without invoice viewing permission', function (): void {
+    $actor = adminDashboardActor(['saas.payments.view']);
+
+    $this->actingAs($actor, 'central')->get(route('dashboard'))->assertOk()
+        ->assertSee('href="'.route('central.invoices.index').'"', false)
+        ->assertDontSee('Personnel SaaS');
 });
 
 test('the redesigned dashboard keeps general and financial data separated', function (): void {
@@ -116,7 +140,9 @@ test('the general and financial dashboard permissions protect their own indicato
     $other = adminDashboardActor(['saas.users.view']);
 
     $queries = [];
-    DB::listen(function ($query) use (&$queries): void { $queries[] = $query->sql; });
+    DB::listen(function ($query) use (&$queries): void {
+        $queries[] = $query->sql;
+    });
     $this->actingAs($general, 'central')->get(route('central.admin-dashboard.index'))->assertOk()
         ->assertSee('Comptes commerçants')->assertDontSee('Paiements vérifiés');
     expect(collect($queries)->contains(fn (string $sql): bool => str_contains($sql, 'saas_transfers')))->toBeFalse();
@@ -223,7 +249,9 @@ test('financial dashboard aggregates verified payments without model hydration',
     ]);
     $viewer = adminDashboardActor(['saas.dashboard.financial.view']);
     $retrieved = 0;
-    SaasPayment::retrieved(function () use (&$retrieved): void { $retrieved++; });
+    SaasPayment::retrieved(function () use (&$retrieved): void {
+        $retrieved++;
+    });
 
     $this->actingAs($viewer, 'central')->get(route('central.admin-dashboard.index'))->assertOk()
         ->assertSee('3000.00')->assertSee('DZD');
