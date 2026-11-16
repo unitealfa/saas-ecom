@@ -9,46 +9,43 @@ use App\Http\Requests\Central\Billing\SearchSaasPaymentsRequest;
 use App\Http\Requests\Central\Billing\StoreSaasPaymentRequest;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Billing\SaasPayment;
-use App\Services\Central\Billing\InvoicePaymentService;
 use App\Services\Central\Billing\PaymentDocumentService;
 use App\Services\Central\Billing\SaasPaymentService;
-use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PaymentController extends Controller
 {
-    public function __construct(private readonly SaasPaymentService $payments, private readonly PaymentDocumentService $documents, private readonly InvoicePaymentService $balances) {}
+    public function __construct(private readonly SaasPaymentService $payments, private readonly PaymentDocumentService $documents) {}
 
-    public function index(SearchSaasPaymentsRequest $request): View
+    public function index(SearchSaasPaymentsRequest $request): RedirectResponse
     {
-        return view('central.pages.admin.billing.payments.index', ['payments' => $this->payments->search($this->centralActor(), $request->validated(), own: true), 'ownerMode' => true]);
+        Gate::forUser($this->centralActor())->authorize('viewOwn', SaasPayment::class);
+
+        return to_route('owner.billing.index');
     }
 
-    public function show(SaasPayment $payment): View
+    public function show(SaasPayment $payment): RedirectResponse
     {
         Gate::forUser($this->centralActor())->authorize('viewOwn', SaasPayment::class);
         Gate::forUser($this->centralActor())->authorize('view', $payment);
 
-        return view('central.pages.admin.billing.payments.show', ['payment' => $payment->load(['invoice.subscription', 'owner']), 'ownerMode' => true, 'history' => null]);
+        return to_route('owner.invoices.show', $payment->invoice)->withFragment('payment-'.$payment->uuid);
     }
 
-    public function create(SaasInvoice $invoice): View|RedirectResponse
+    public function create(SaasInvoice $invoice): RedirectResponse
     {
         Gate::forUser($this->centralActor())->authorize('declarePayment', $invoice);
-        if ($invoice->subscription->request !== null) {
-            return to_route('owner.subscription-requests.show', $invoice->subscription->request);
-        }
 
-        return view('central.pages.admin.billing.payments.create', ['invoice' => $invoice, 'cash' => false, 'balance' => $this->balances->balance($this->centralActor(), $invoice)]);
+        return to_route('owner.invoices.show', $invoice);
     }
 
     public function store(StoreSaasPaymentRequest $request, SaasInvoice $invoice): RedirectResponse
     {
         $payment = $this->payments->declareExternalPayment($this->centralActor(), $invoice, $request->safe()->except('proof'), $request->file('proof'));
 
-        return to_route('owner.payments.show', $payment)->with('status', match ($payment->getAttribute('transfer_status')) {
+        return to_route('owner.invoices.show', $payment->invoice)->withFragment('payment-'.$payment->uuid)->with('status', match ($payment->getAttribute('transfer_status')) {
             TransferStatusEnum::VERIFIED => 'Ce paiement est déjà confirmé. Son reçu est disponible.',
             TransferStatusEnum::UNCERTAIN => 'Déclaration conservée pour examen administratif. Aucun droit supplémentaire accordé.',
             TransferStatusEnum::REJECTED => 'Cette déclaration a déjà été refusée. Consultez son motif.',
@@ -67,7 +64,7 @@ class PaymentController extends Controller
     {
         $payment = $this->payments->resumeExternalProof($this->centralActor(), $payment, $request->validated('expected_state'), $request->file('proof'));
 
-        return to_route('owner.payments.show', $payment)->with('status', 'Justificatif complété sur la même déclaration. La réception des fonds doit encore être vérifiée.');
+        return to_route('owner.invoices.show', $payment->invoice)->withFragment('payment-'.$payment->uuid)->with('status', 'Justificatif complété sur la même déclaration. La réception des fonds doit encore être vérifiée.');
     }
 
     public function receipt(SaasPayment $payment): StreamedResponse

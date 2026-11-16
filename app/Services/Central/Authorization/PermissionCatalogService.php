@@ -21,6 +21,7 @@ class PermissionCatalogService
         $search = trim((string) $search);
 
         return Permission::forCentralGuard()
+            ->whereIn('name', array_keys(CentralRoleCatalog::PERMISSIONS))
             ->when($search !== '', fn (Builder $query) => $this->matching($query, $search))
             ->orderBy('name')
             ->orderBy('id')

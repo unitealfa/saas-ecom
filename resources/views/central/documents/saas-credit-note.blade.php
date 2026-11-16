@@ -7,7 +7,7 @@
 <p>Motif : {{ $invoice->getAttribute('reason') }}</p>
 <p>Période : {{ $invoice->period_starts_at->format('d/m/Y') }} — {{ $invoice->period_ends_at->format('d/m/Y') }} (fin exclue).</p>
 @foreach (['Émetteur' => $invoice->saas_identity_snapshot, 'Client' => $invoice->customer_identity_snapshot] as $label => $identity)
-<p><strong>{{ $label }} : {{ $identity['name'] }}</strong><br>{{ $identity['address'] }}<br>NIF : {{ $identity['nif'] }}</p>
+<p><strong>{{ $label }} : {{ $identity['name'] ?? '—' }}</strong><br>{{ $identity['address'] ?? '—' }}<br>NIF : {{ $identity['nif'] ?? '0' }}</p>
 @endforeach
 <table><thead><tr><th>Prestation corrigée</th><th>Quantité</th><th>Motif</th><th>HT</th><th>Taxes</th><th>TTC</th></tr></thead><tbody>
 @foreach ($invoice->lines as $line)
@@ -18,6 +18,8 @@
 @foreach ($invoice->getAttribute('taxes') as $tax)<p>{{ $tax['code'] }} — {{ $tax['rate'] }} % : {{ $tax['amount'] }} {{ $invoice->currency }}</p>@endforeach
 <p><strong>Correction totale TTC : {{ $invoice->total_amount }} {{ $invoice->currency }}</strong></p>
 <p>Règle : {{ $invoice->billing_rule_snapshot['code'] }} — version {{ $invoice->billing_rule_snapshot['version'] }}.</p>
+@if (filled($invoice->billing_rule_snapshot['fiscal_policy']['validation_reference'] ?? null))
 <p>Politique fiscale historique : {{ $invoice->billing_rule_snapshot['fiscal_policy']['validation_reference'] }}.</p>
+@endif
 <p>Cet avoir corrige le montant dû. Il ne constitue ni un remboursement effectué ni une modification de la facture originale.</p>
 </body></html>

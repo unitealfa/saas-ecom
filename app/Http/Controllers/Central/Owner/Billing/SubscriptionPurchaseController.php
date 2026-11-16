@@ -26,9 +26,9 @@ class SubscriptionPurchaseController extends Controller
 
     public function store(PurchaseSubscriptionRequest $request): RedirectResponse
     {
-        $subscriptionRequest = $this->requests->create($this->centralActor(), $request->validated());
+        $subscriptionRequest = $this->requests->create($this->centralActor(), $request->validated(), $request->file('proof'));
 
-        return to_route('owner.subscription-requests.show', $subscriptionRequest)->with('status', $subscriptionRequest->getAttribute('invoice_error') ?? 'Demande créée. Sa facture est disponible avant paiement ; aucun droit payant n’est encore activé.');
+        return to_route('owner.subscription-requests.show', $subscriptionRequest)->with('status', $subscriptionRequest->getAttribute('invoice_error') ?? 'Demande enregistrée. La facture définitive et le reçu seront disponibles après confirmation du paiement intégral.');
     }
 
     public function show(Subscription $subscription): View

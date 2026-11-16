@@ -3,6 +3,8 @@
 namespace App\Policies\Central;
 
 use App\Enums\Central\Billing\DocumentStatusEnum;
+use App\Enums\Central\Billing\TransferStatusEnum;
+use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
@@ -16,7 +18,8 @@ class SaasInvoicePolicy
 
         return $request !== null && $request->current_invoice_id === $invoice->id
             && $request->current_subscription_id === $invoice->subscription_id
-            && Gate::forUser($actor)->allows('prepareInvoice', $request);
+            && $request->payment?->getAttribute('transfer_status') === TransferStatusEnum::VERIFIED
+            && Gate::forUser($actor)->allows('verify', $request->payment);
     }
 
     public function reserveForRequest(User $actor, SaasInvoice $invoice): bool
@@ -33,6 +36,7 @@ class SaasInvoicePolicy
     public function viewFinancialBalance(User $actor, SaasInvoice $invoice): bool
     {
         return ! tenancy()->initialized && ($this->owns($actor, $invoice) || $this->viewAny($actor)
+            || $this->access->allows($actor, 'saas.payments.view')
             || $this->access->allows($actor, 'saas.payments.validate')
             || $this->access->allows($actor, 'saas.credit-notes.view')
             || $this->access->allows($actor, 'saas.credit-notes.create')
@@ -46,14 +50,27 @@ class SaasInvoicePolicy
         return $this->has($actor, 'view');
     }
 
+    public function viewBillingDossiers(User $actor): bool
+    {
+        return $this->viewAny($actor) || (! tenancy()->initialized && $this->access->allows($actor, 'saas.payments.view'));
+    }
+
+    public function viewBillingDossier(User $actor, SaasInvoice $invoice): bool
+    {
+        return $this->viewBillingDossiers($actor);
+    }
+
     public function declarePayment(User $actor, SaasInvoice $invoice): bool
     {
-        return $this->owns($actor, $invoice) && $actor->hasVerifiedEmail() && $invoice->status === DocumentStatusEnum::ISSUED;
+        $request = $invoice->subscription->request;
+
+        return $this->payable($invoice) && (($this->owns($actor, $invoice) && $actor->hasVerifiedEmail())
+            || ($request !== null && ! tenancy()->initialized && $actor->id !== $invoice->user_id && $this->access->allows($actor, 'saas.payments.validate')));
     }
 
     public function recordCashPayment(User $actor, SaasInvoice $invoice): bool
     {
-        return ! tenancy()->initialized && $actor->id !== $invoice->user_id && $invoice->status === DocumentStatusEnum::ISSUED
+        return ! tenancy()->initialized && $actor->id !== $invoice->user_id && $this->payable($invoice)
             && $this->access->allows($actor, 'saas.payments.validate');
     }
 
@@ -92,6 +109,16 @@ class SaasInvoicePolicy
     private function owns(User $actor, SaasInvoice $invoice): bool
     {
         return $this->viewOwn($actor) && $actor->id === $invoice->user_id;
+    }
+
+    private function payable(SaasInvoice $invoice): bool
+    {
+        $request = $invoice->subscription->request;
+
+        return $invoice->status === DocumentStatusEnum::ISSUED
+            || ($invoice->status === DocumentStatusEnum::DRAFT && $request !== null && ! $request->status->isFinal()
+                && $invoice->subscription->status === StatusEnum::SCHEDULED
+                && $request->current_invoice_id === $invoice->id && $request->current_subscription_id === $invoice->subscription_id);
     }
 
     public function create(User $actor): bool

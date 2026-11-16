@@ -3,37 +3,20 @@
 namespace App\Http\Controllers\Central\Admin\Billing;
 
 use App\Enums\Central\Billing\DeliveryStatusEnum;
+use App\Enums\Central\Billing\DocumentTypeEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Billing\RetrySaasDocumentRequest;
-use App\Http\Requests\Central\Billing\SearchSaasDeliveriesRequest;
 use App\Http\Requests\Central\Billing\SendSaasDocumentRequest;
-use App\Models\Central\Audit\Activity;
+use App\Models\Central\Billing\SaasCreditNote;
 use App\Models\Central\Billing\SaasDocumentDelivery;
+use App\Models\Central\Billing\SaasInvoice;
 use App\Services\Central\Billing\SaasDocumentDeliveryService;
-use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 
 class SaasDocumentDeliveryController extends Controller
 {
     public function __construct(private readonly SaasDocumentDeliveryService $deliveries) {}
-
-    public function index(SearchSaasDeliveriesRequest $request): View
-    {
-        return view('central.pages.admin.billing.deliveries.index', [
-            'deliveries' => $this->deliveries->search($this->centralActor(), $request->validated()),
-        ]);
-    }
-
-    public function show(SaasDocumentDelivery $delivery): View
-    {
-        Gate::forUser($this->centralActor())->authorize('view', $delivery);
-
-        return view('central.pages.admin.billing.deliveries.show', [
-            'delivery' => $delivery->load(['document', 'owner', 'creator']),
-            'history' => Activity::forSubject($delivery)->latest('id')->paginate(20),
-        ]);
-    }
 
     public function send(SendSaasDocumentRequest $request): RedirectResponse
     {
@@ -55,10 +38,24 @@ class SaasDocumentDeliveryController extends Controller
         return $this->redirect($delivery, 'Relance enregistrée. Elle ne prouve pas encore l’envoi.');
     }
 
+    public function resend(RetrySaasDocumentRequest $request, SaasDocumentDelivery $delivery): RedirectResponse
+    {
+        $delivery = $this->deliveries->resend($this->centralActor(), $delivery, $request->validated('expected_state'));
+
+        return $this->redirect($delivery, 'Renvoi demandé. Les tentatives précédentes sont conservées ; consultez le résultat du worker.');
+    }
+
     private function redirect(SaasDocumentDelivery $delivery, string $message): RedirectResponse
     {
-        return (Gate::forUser($this->centralActor())->allows('view', $delivery)
-            ? to_route('central.deliveries.show', $delivery)
-            : to_route('dashboard'))->with('status', $message);
+        return $this->documentRedirect($delivery)->with('status', $message);
+    }
+
+    private function documentRedirect(SaasDocumentDelivery $delivery): RedirectResponse
+    {
+        $credit = $delivery->document_type === DocumentTypeEnum::CREDIT_NOTE;
+        $document = $credit ? SaasCreditNote::findOrFail($delivery->document_id) : SaasInvoice::findOrFail($delivery->document_id);
+
+        return Gate::forUser($this->centralActor())->allows('view', $document)
+            ? to_route($credit ? 'central.credit-notes.show' : 'central.invoices.show', $document) : to_route('dashboard');
     }
 }

@@ -23,7 +23,7 @@ class BillingRulePolicy
 
     public function create(User $actor): bool
     {
-        return $this->has($actor, 'create');
+        return $this->has($actor, 'update') && $this->has($actor, 'activate');
     }
 
     public function update(User $actor, BillingRule $rule): bool
@@ -44,7 +44,13 @@ class BillingRulePolicy
 
     public function createVersion(User $actor, BillingRule $rule): bool
     {
-        return $this->has($actor, 'versions.create');
+        return $this->create($actor);
+    }
+
+    public function configure(User $actor, BillingRule $rule): bool
+    {
+        return $this->has($actor, 'update') && $this->has($actor, 'activate')
+            && in_array($rule->policy_status, [PolicyStatusEnum::DRAFT, PolicyStatusEnum::VALIDATED, PolicyStatusEnum::ACTIVE], true);
     }
 
     private function has(User $actor, string $action): bool

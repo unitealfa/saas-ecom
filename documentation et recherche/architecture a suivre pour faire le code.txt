@@ -2787,3 +2787,62 @@ Fichiers, commandes et matrice de contrôle : `documentation et recherche/Module
 ## Complement au paragraphe 38 — generation externe des modules Tenant (13 novembre 2026)
 
 Regle : les permissions administratives SaaS (guard central, CentralRoleCatalog) et les permissions locales shop.* (guard tenant, seeder local) sont deux perimetres distincts. Declencheur : tout prompt ou ajout touchant une administration boutique. Verifier le provisionnement et les bootstrappers existants avant d'ajouter un catalogue ou une configuration parallele ; ne pas attribuer implicitement des droits aux proprietaires encore invites. Limites : ne pas convertir un composant deja correct en defaut pour appliquer un motif central. Les controleurs verifient l'acteur reel ; les mutations relisent son identite et son etat sous verrou. Les callbacks de cache capturent le store et les cles du contexte avant commit ; les lecteurs publics reutilisent leurs listes au lieu de faire une requete par ligne. Pour les prompts externes futurs, reprendre la checklist du rapport Module-T012-T015-Profil-Boutique.md avant les chemins proposes.
+
+## Complément au paragraphe 56 — demandes et documents SaaS, 15 novembre 2026
+
+Conserver séparément les états de demande, paiement, abonnement et document. Les demandes traitées restent consultables ; un refus exige motif, auteur et date, sans suppression des preuves ou décisions antérieures. RequestFilterEnum regroupe les états affichés ; une préparation de facture ne devient ni un refus de facture ni une confirmation de paiement. InvoiceListFilterEnum filtre avant pagination sans charger tout le catalogue ; une correction intégrale par avoir ne constitue pas un paiement.
+
+Les envois se gèrent uniquement dans le détail du document, sous les permissions existantes. Les anciens écrans indépendants, routes GET, noms et liens associés sont supprimés ; leurs URL répondent 404. Conserver uniquement les POST réellement utilisés depuis les factures et avoirs et le fragment partagé billing/document-delivery. Un renvoi explicite est distinct de la reprise après échec, exige son état attendu et conserve toutes les tentatives et les limites existantes ; ne jamais relancer aveuglément un résultat SMTP incertain. Documents émis, PDF privés et liens propriétaires historiques restent protégés.
+
+SubscriptionWorkflowNotifier réutilise les notifications Laravel et le worker database/saas-documents : programmation après commit, payload de queue chiffré, destinataire actif et vérifié, droits administratifs relus à l'envoi. N'annoncer une preuve ou un reçu qu'après stockage réussi. Une notification ne confirme ni paiement, remise, lecture ni activation ; elle décrit une transition déjà enregistrée. Sa panne ne doit pas annuler un encaissement validé. Rapport et limites : Module-22-Parcours-Demandes.md, complément du 15 novembre 2026.
+
+
+## Décision courante — demande.txt, 15 novembre 2026
+
+Cette décision remplace les mentions antérieures de facture définitive avant paiement. La demande conserve une préparation interne DRAFT, sans numéro ni PDF. Le versement externe exige sa preuve dès la création ; les données déclarées sont chiffrées dans submitted_payment et les fichiers privés restent dans media, y compris si la configuration fiscale bloque la préparation.
+
+La réception intégrale des fonds est une étape durable et idempotente : le paiement VERIFIED ne doit pas être effacé si la génération documentaire échoue. L’émission produit ensuite le PDF définitif, puis le reçu ; acceptation de la demande, activation des droits et audit sont finalisés atomiquement. Les reprises ne collectent pas un second paiement. Le contrôle automatique des périodes programmées exige une demande acceptée ; un reçu manquant ne doit pas ouvrir les droits.
+
+L’attribution administrative exige attribution (ou changement sur l’abonnement ciblé) et validation d’encaissement. Espèces : constat réel ; versement externe : preuve et compte/référence réellement contrôlés. Remplacement immédiat ou différé au tarif intégral, sans prorata ni remboursement automatique. Les droits précédents restent en place avant finalisation ; une relation centrale de remplacement conserve l’abonnement d’origine et son propriétaire.
+
+Un refus sans fonds signalés ni facture émise annule uniquement la réservation et son échéance. La demande, le motif, la preuve et les événements restent consultables ; une nouvelle demande devient possible. Les anciennes factures émises et les anomalies financières exigent toujours leur traitement documentaire ou administratif explicite.
+
+Interfaces : Factures regroupe échéances, paiements, preuves, rapprochement, reçus et signalements. Le commerçant utilise le tableau existant owner/billing/overview. Les anciennes pages de règles versionnées, compteurs et facture manuelle sont supprimées (404). Les anciennes lectures de paiements restent des redirections autorisées vers leurs dossiers, sans écran autonome. Les envois restent dans le document. Le formulaire de paramètres utilise les droits existants update + activate ; il conserve les versions et validations internes, sans les exposer comme étapes manuelles. La première configuration est explicite, jamais peuplée par un seeder financier.
+
+Notifications : canal database Laravel central en plus du mail, liste privée et indicateur non lu, marquage individuel idempotent. Les droits du destinataire sont revérifiés ; aucun accès aux notifications d’un autre compte, même avec le rôle root.
+
+Trois migrations additives sont préparées : notifications natives, submitted_payment chiffré et choix de transition/référence de remplacement. Elles ne sont pas appliquées à la base réelle. Le catalogue ne recrée plus les trois anciens droits de création/versionnement des règles et lecture des compteurs ; les anciennes lignes et attributions réelles ne sont pas supprimées automatiquement.
+
+Les références actives du modèle Examples/Test, de SchemaBlueprint, des diagnostics locaux et des API de plans ont été conservées. Le seul index généré graphify-out/cache/stat-index.json est retiré du suivi Git, sans supprimer le fichier local.
+
+Validation en cours : contrôles ciblés et suites MySQL locales temporaires autorisés ; aucune écriture sur les bases réelles, aucun SMTP réel, aucune dépendance installée. Les résultats des sections précédentes concernent l’ancienne version et ne constituent pas la validation de cette refonte.
+
+
+### Navigation administrative regroupée — 15 novembre 2026
+
+Sept entrées partagent une navigation par onglets : Personnel SaaS (personnel/rôles/permissions), Boutiques (boutiques/domaines/déploiements), Transporteurs (transporteurs/correspondances/bureaux), Géographie (pays/wilayas et communes), Plans et offres (offres/fonctionnalités), Facturation (factures/avoirs) et Abonnements (abonnements/demandes/quotas). Le composant central admin-navigation définit les liens une seule fois pour le menu et les onglets ; seule une rubrique autorisée est affichée et son entrée ouvre la première liste autorisée. URL, autorisations serveur, données et parcours commerçant conservés. Aucun changement de schéma. Compilation des quatre vues modifiées et contrôle du diff effectués ; tests fonctionnels et navigateur non exécutés à la demande de l’utilisateur.
+
+
+### Retrait des écrans de paramètres documentaires — 15 novembre 2026
+
+Décision actuelle : supprimer entièrement du site la configuration des types de document et la modification des paramètres de facturation. Formulaire, Controller, Form Request, boutons, lecture dédiée et routes billing-parameters retirés. Les règles financières internes, leurs permissions de service et les données historiques restent conservées pour les factures et avoirs ; aucune règle automatique ni écriture réelle ajoutée. Cette décision remplace les indications précédentes proposant un formulaire simplifié. Tests adaptés mais non exécutés, conformément à la demande.
+
+
+### Décision simplifiée sur les demandes — 15 novembre 2026
+
+Le formulaire administratif propose Accepter et Refuser ; le refus ouvre une fenêtre avec motif obligatoire. Accepter confirme explicitement la réception intégrale : montant espèces issu de l’abonnement et date de confirmation générés côté serveur, sans saisie ni case supplémentaire. Les champs financiers envoyés en supplément au point d’entrée HTTP sont ignorés. Un versement externe exige toujours son justificatif et les véritables coordonnées de rapprochement déjà enregistrées : aucun compte bancaire ni référence ne sont inventés pour faciliter la validation. Droits, état attendu, contrôle des fonds, audits et reprises préservés. Test de non-manipulation ajouté mais non exécuté à la demande de l’utilisateur.
+
+
+### Informations fiscales facultatives — décision du 15 novembre 2026
+
+La décision explicite remplace l’ancien blocage sur des informations fiscales absentes : description et validation non renseignées restent null, NIF absent vaut "0", absence de taux signifie taxes calculées à 0. Les données disponibles du profil commerçant sont réutilisées. Aucun faux justificatif fiscal, date ou référence de validation ajouté. Les données fournies restent validées et les configurations contradictoires sont refusées. Préparation et émission emploient les mêmes conditions ; les PDF tolèrent les champs absents sans afficher de fausse référence fiscale. Approbation du compte, e-mail vérifié, règle applicable, période, montant intégral, idempotence, stockage privé, justificatif des versements externes et immutabilité des documents émis restent conservés. Aucun document réel ni configuration privée modifié. Tests adaptés/ajoutés mais non exécutés à la demande de l’utilisateur.
+
+
+### Avoirs simplifiés — décision du 16 novembre 2026
+
+Le formulaire de préparation/modification ne demande que montant TTC et motif par prestation. Quantité calculée sous verrou proportionnellement au solde monétaire et à la quantité encore disponibles, arrondie avec les deux décimales du schéma existant. Une dernière fraction est conservée pour solder la ligne ; si cette précision ne permet plus de fractionnement, demander une correction du solde en une fois plutôt que créer une quantité nulle ou dépasser les plafonds. Une correction intégrale reprend exactement la quantité restante. Le motif général absent est dérivé des motifs détaillés, qui restent conservés. Anciens champs facultatifs du contrat acceptés pour compatibilité ; leur quantité n’est jamais utilisée pour les écritures nouvelles. Contrôles TTC/HT/taxes/quantité, état attendu, transactions, idempotence et documents émis préservés ; aucun changement de schéma ou de données réelles. Explications, détails techniques et motif général retirés de la page. Tests adaptés et ajoutés, non exécutés conformément à la demande.
+
+
+### Validation et émission des avoirs en une action — 16 novembre 2026
+
+Le formulaire crée ou modifie le brouillon puis appelle immédiatement le service d’émission existant lorsque l’acteur possède saas.credit-notes.issue. Le bouton annonce Valider et émettre ; sans ce droit, il annonce Enregistrer le brouillon et ne réserve aucun numéro. L’étape manuelle de réservation du numéro est retirée de la fiche ; le service conserve sa réservation interne, les reprises et les anciens contrats. ISSUED est enregistré uniquement après PDF privé finalisé et audit atomique ; un échec conserve la préparation et son numéro sans succès fictif. L’avoir réel AVOIR-2026-000001 n’a pas été émis par cette intervention : son administrateur peut terminer l’émission depuis la fiche. Tests de création/émission/rejeu et séparation des droits ajoutés, non exécutés avant accord explicite.

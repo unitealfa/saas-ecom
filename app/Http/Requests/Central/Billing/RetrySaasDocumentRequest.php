@@ -15,7 +15,7 @@ class RetrySaasDocumentRequest extends FormRequest
         $delivery = $this->route('delivery');
 
         return $actor instanceof User && $delivery instanceof SaasDocumentDelivery
-            && Gate::forUser($actor)->allows('retry', $delivery);
+            && Gate::forUser($actor)->allows($this->route()?->getActionMethod() === 'resend' ? 'resend' : 'retry', $delivery);
     }
 
     /** @return array<string, mixed> */

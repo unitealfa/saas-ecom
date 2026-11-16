@@ -1,0 +1,253 @@
+1. Premier constat : les anciennes fonctionnalités sont toujours présentes
+La branche fix-invoice n'a pas entièrement supprimé les anciennes interfaces. Le problème ne vient pas uniquement du cache du navigateur : plusieurs entrées du menu, routes et pages existent toujours dans le code GitHub.
+Fonctionnalité que tu voulais retirer	État constaté
+Facturation — Configuration	Toujours dans le menu et les routes
+Compteurs et numérotations	Toujours dans le menu et les routes
+Paiements SaaS	Toujours dans le menu
+Signalements de paiements	Toujours dans le menu
+Mes paiements, côté commerçant	Toujours dans le menu
+Mes avoirs, côté commerçant	Toujours dans le menu
+Mes demandes d'abonnement	Toujours dans le menu
+
+Fichier responsable du menu
+resources/views/central/layouts/app/sidebar.blade.php
+
+Les lignes à traiter sont :
+- 54–56 : Facturation — Configuration.
+- 57–59 : Compteurs de facturation.
+- 66–69 : Paiements SaaS et Signalements de paiements.
+- 72–88 : rubriques de facturation du commerçant à regrouper.
+Ces éléments sont confirmés directement dans le fichier de la branche analysée.
+Les anciennes URL sont encore actives dans le code
+Le fichier routes/central/admin/billing.php, lignes 60 à 76, déclare toujours :
+URL	Fonctionnalité
+/admin/billing/rules	Liste des règles
+/admin/billing/rules/create	Création d'une règle
+/admin/billing/rules/{uuid}/versions/create	Nouvelle version
+/admin/billing/rules/{uuid}/edit	Modification
+/admin/billing/sequences	Compteurs et numérotations
+
+Les routes de création, activation, validation et retrait des règles existent également.
+
+Conclusion confirmée : retirer seulement les boutons du menu ne suffit pas. Pour supprimer réellement ces anciennes pages, il faut nettoyer leurs routes, leurs vues, les actions associées et les liens qui y conduisent, tout en conservant les mécanismes internes indispensables.
+2. Problèmes supplémentaires confirmés
+A. Le parcours « facture après paiement » n'est pas implémenté
+Dans app/Services/Central/Subscriptions/SubscriptionRequestService.php :
+- Lignes 136–143 : la création d'une demande peut déclencher immédiatement la préparation d'une facture.
+- Lignes 146–180 : prepareInvoice() prépare puis émet la facture avant que le paiement soit confirmé.
+- Lignes 203–220 : le justificatif bancaire est déposé à partir d'une facture déjà émise.
+- Lignes 225–252 : l'acceptation exige également une facture émise.
+Cela contredit ton nouveau processus : demande → paiement → vérification → facture définitive → reçu → activation.
+
+Il faudra modifier les services associés, notamment SaasInvoiceService, SaasInvoiceIssuanceService, SaasPaymentService et les formulaires de demandes. Supprimer uniquement le bouton « Préparer la facture » casserait le parcours actuel.
+B. Plusieurs anciennes actions restent dans les pages
+Fichier	Lignes	Élément à corriger
+admin/billing/index.blade.php	9, 12, 23, 42	Créer une règle, compteurs, recherche par version, nouvelle version
+admin/billing/form.blade.php	5–14, 35–37	Formulaire de nouvelle version et retour à la configuration
+admin/billing/show.blade.php	25–85	Validation, activation, retrait et historique des versions
+admin/billing/sequences.blade.php	1–36	Page des compteurs et formulaire d'initialisation
+admin/billing/invoices/create.blade.php	13–22	Sélection manuelle de la règle et préparation anticipée
+admin/billing/invoices/installments.blade.php	13–24	Bouton pour préparer la facture avant paiement
+admin/billing/invoices/show.blade.php	53–61	Liens vers les anciens écrans de paiements
+admin/billing/invoices/show.blade.php	76–105	Émission manuelle et réservation de numéro
+owner/billing/subscriptions/index.blade.php	20–32	Demande créée avec promesse d'obtenir immédiatement une facture
+admin/subscriptions/change.blade.php	4–25	Changement différé seulement, sans option immédiate
+
+Les chemins ci-dessus sont relatifs à resources/views/central/pages/, sauf le fichier du menu indiqué précédemment.
+C. Notifications : seulement des e-mails, pas de centre de notifications dans l'application
+Le nouveau fichier SubscriptionWorkflowNotification.php contient, à la ligne 37 :
+return ['mail'];
+
+
+Le service SubscriptionWorkflowNotifier.php envoie effectivement ces notifications par e-mail.
+
+Cela signifie que le système actuel prévoit des messages par e-mail, mais pas encore la liste des notifications directement dans Aydra avec indicateur non lu, comme demandé.
+
+Il faut conserver l'envoi d'e-mails et ajouter le canal de notifications en base avec une interface de consultation.
+3. Le nettoyage doit aussi toucher les tests et les permissions
+La seconde vérification révèle pourquoi certaines anciennes pages peuvent revenir après une modification : les tests actuels considèrent encore ces pages comme des fonctionnalités attendues.
+Fichier	Références confirmées	Action
+BillingRuleManagementTest.php	Lignes 73–116 : routes des règles, compteurs et nouvelle version	Réécrire les tests d'interface pour la nouvelle configuration
+BillingSequenceManagementTest.php	Lignes 119–162 : initialisation manuelle et page des compteurs	Remplacer ces tests UI par des tests de numérotation automatique
+SubscriptionRequestWorkflowTest.php	Lignes 85–95 : facture explicitement créée avant paiement	Adapter les scénarios au nouveau cycle
+SaasBillingScenarioTest.php	Plusieurs scénarios utilisent l'ancienne préparation manuelle	Conserver les tests d'intégrité, adapter les parcours
+OwnerBillingOverviewTest.php	Tests des anciennes pages et du signalement indépendant	Adapter les liens et tester le regroupement
+SaasDocumentDeliveryManagementTest.php	Teste déjà l'absence de page dédiée /admin/billing/deliveries	Conserver : ce nettoyage est bien engagé
+
+Permissions encore liées aux anciennes pages
+app/Services/Central/Roles/CentralRoleCatalog.php :
+- Lignes 64–70 : permissions de création et versionnement des règles, consultation des compteurs.
+- Lignes 229–231 : groupes de permissions « Règles de facturation » et « Compteurs de facturation ».
+database/seeders/Central/BillingPermissionSeeder.php utilise ce catalogue pour créer les permissions.
+
+Il faudra donc adapter catalogue, rôles, seeders et tests, puis traiter les anciennes permissions en base sans supprimer celles encore nécessaires à la facturation automatique.
+
+Un simple retrait du menu laisserait ces autorisations et leurs anciennes routes en place.
+4. Audit fonctionnel : ce qui est déjà correct et ce qui reste à corriger
+Il faut distinguer les fonctionnalités réellement inutiles des fonctionnalités que tu souhaites simplement intégrer à une autre page.
+Fonctionnalité	État dans fix-invoice	Décision
+Liste des demandes avec filtres En cours, Acceptées, Refusées, Annulées	Implémentée	Conserver
+Refus avec commentaire obligatoire	Implémenté côté serveur	Conserver
+Historique des décisions et motifs de refus	Implémenté	Conserver
+Téléchargement privé des factures et reçus	Implémenté	Conserver
+Envoi de factures par e-mail depuis leur détail	Implémenté	Conserver
+Suppression de la page autonome des envois	Effectuée	Ne pas refaire
+Regroupement complet des paiements dans les factures	Incomplet	Modifier
+Justificatif bancaire obligatoire dès la demande initiale	Non implémenté	Corriger
+Facture définitive après confirmation du paiement	Non implémenté	Refactoriser
+Attribution administrative avec paiement directement confirmé	Incomplet	Modifier
+Remplacement immédiat ou différé d'un abonnement	Différé uniquement	Ajouter le choix
+Notifications consultables dans Aydra	E-mails uniquement	Compléter
+
+Anomalie supplémentaire : une demande refusée peut bloquer une nouvelle souscription
+J'ai vérifié trois éléments qui interagissent mal :
+- SubscriptionRequestService::reject() conserve la demande refusée.
+- SubscriptionRequestAdministrationTest.php, ligne 73, confirme qu'après un refus, l'abonnement associé peut rester SCHEDULED.
+- SubscriptionPurchaseService.php, lignes 67–77, bloque une nouvelle réservation lorsqu'un abonnement SCHEDULED existe déjà.
+En parallèle, owner/billing/subscriptions/index.blade.php, lignes 11–12 et 31, désactive le bouton de nouvelle demande lorsqu'une période programmée existe.
+
+Conséquence : un commerçant ayant une demande refusée peut se retrouver bloqué pour choisir une nouvelle offre. Il peut reprendre certaines étapes de sa demande existante, mais changer d'offre peut aussi exiger une correction documentaire de la facture déjà émise.
+
+À corriger pendant la refonte : distinguer clairement une réservation payable, une demande refusée à corriger et une période payée programmée. Un refus ne doit pas immobiliser inutilement le commerçant.
+
+5. Nettoyage précis par couche technique
+A. Vues Blade à supprimer ou remplacer
+Fichier relatif à resources/views/central/pages/	Décision
+admin/billing/index.blade.php	Supprimer l'ancienne liste de règles après remplacement
+admin/billing/show.blade.php	Supprimer l'ancienne gestion des versions après remplacement
+admin/billing/sequences.blade.php	Supprimer entièrement la page
+admin/billing/form.blade.php	Remplacer par un formulaire simple « Modifier les paramètres »
+admin/billing/invoices/create.blade.php	Supprimer le parcours de facture manuelle anticipée après adaptation des services
+admin/billing/invoices/installments.blade.php	Intégrer les échéances dans la facturation principale
+admin/billing/payments/index.blade.php	Intégrer la liste des paiements à Factures
+admin/billing/payments/show.blade.php	Intégrer la consultation et les actions au détail du dossier
+admin/billing/payments/create.blade.php	Remplacer par les formulaires du nouveau parcours
+admin/billing/payments/corrections.blade.php	Intégrer les corrections au dossier concerné
+owner/billing/corrections/create.blade.php	Intégrer le signalement d'erreur, si conservé, dans le détail du paiement
+
+Attention : les cinq dernières vues ne sont pas du code mort actuellement. Elles sont appelées par des routes et contrôleurs existants. Elles deviennent supprimables après le déplacement de leurs fonctionnalités.
+B. Vues à conserver et simplifier
+Fichier	Travail
+admin/billing/invoices/index.blade.php	Ajouter les échéances et paiements à traiter
+admin/billing/invoices/show.blade.php	Centraliser justificatif, validation, facture, reçu et envoi
+admin/billing/credit-notes/index.blade.php	Garder la liste des avoirs
+admin/billing/credit-notes/show.blade.php	Garder consultation, correction, PDF et e-mail
+admin/billing/credit-notes/create.blade.php	Masquer le choix technique des versions de règles
+admin/billing/document-delivery.blade.php	Conserver : composant réutilisable déjà conforme
+admin/subscriptions/requests/index.blade.php	Conserver les filtres et améliorer la présentation
+admin/subscriptions/requests/show.blade.php	Garder acceptation/refus, adapter paiement puis facture
+admin/subscriptions/create.blade.php	Ajouter encaissement, justificatif et mode de transition
+admin/subscriptions/change.blade.php	Ajouter remplacement immédiat/différé
+admin/subscriptions/show.blade.php	Retirer les instructions de facture anticipée
+owner/billing/overview.blade.php	Utiliser comme page centrale « Factures »
+owner/billing/subscriptions/index.blade.php	Ajouter le justificatif bancaire lors de la demande
+owner/billing/subscriptions/show.blade.php	Retirer les messages de facture avant paiement
+
+L'ancienne page owner/billing/overview.blade.php constitue une bonne base : elle regroupe déjà plusieurs informations. Inutile de la reconstruire entièrement.
+C. Contrôleurs à nettoyer
+BillingRuleController.php
+
+Une fois le nouveau paramétrage interne prêt, retirer ou remplacer ses actions d'interface devenues obsolètes : index, sequences, create, createVersion, store, storeVersion, show, activate, validateRule, retire et initializeSequence.
+
+Conserver une action de modification simple si les paramètres doivent rester administrables.
+
+SaasInvoiceController.php
+
+Conserver index, show, download.
+
+Réexaminer create, store, prepareInstallment, reserve, issue et installments pour supprimer les étapes manuelles devenues inutiles après automatisation. Leur logique de préparation et d'émission doit rester disponible dans les services.
+
+SaasPaymentController.php
+
+Conserver les opérations métier verify, reject, reconcile, resumeCash, proof, receipt, mais les appeler depuis les nouvelles interfaces.
+
+Les actions index, show, createCash peuvent disparaître ou être redirigées après regroupement.
+
+OwnerPaymentCorrectionReviewController.php
+
+Déplacer la consultation et la décision administrative dans le détail du paiement. Le contrôleur autonome pourra ensuite être retiré, sans supprimer OwnerPaymentCorrectionService ni les activités historiques.
+
+Owner/Billing/PaymentController.php
+
+Regrouper l'index et les formulaires dans « Factures ». Garder impérativement les contrôles d'accès aux justificatifs et reçus.
+D. Services : ne pas tout supprimer
+Service	Décision
+BillingRuleService	Simplifier l'API administrative ; conserver les contrôles de validité et d'historique nécessaires
+SaasNumberingService	Conserver impérativement la numérotation automatique
+SaasInvoiceService	Refactoriser le moment de création de facture
+SaasInvoiceIssuanceService	Conserver émission, PDF et intégrité
+SaasPaymentService	Adapter la déclaration et la vérification sans facture préalable
+InvoicePaymentService	Conserver les calculs d'intégrité, réduire leur exposition à l'interface
+PaymentDocumentService	Conserver preuves privées et reçus
+SaasCreditNoteService	Conserver
+SaasDocumentDeliveryService	Conserver
+OwnerBillingOverviewService	Adapter au nouvel affichage
+SubscriptionRequestService	Refactorisation importante
+SubscriptionTransitionService	Ajouter la transition immédiate
+PaidSubscriptionActivation	Gérer correctement les deux transitions
+
+Ne pas supprimer les mécanismes de rapprochement, contrepassation ou remboursement historique simplement parce que tu n'acceptes plus ces opérations dans le nouveau parcours. Certains calculs servent à préserver l'exactitude des anciennes données.
+
+6. Code hors facturation : nettoyage supplémentaire
+J'ai également identifié des candidats, mais ils n'ont pas tous le même niveau de certitude.
+Fichier ou fonction	Constat	Décision
+graphify-out/cache/stat-index.json	Fichier d'index généré et suivi par Git, alors que .gitignore contient déjà /graphify-out	Candidat fort pour retrait du suivi Git
+app/Models/Examples/Test.php	Modèle générique de 13 lignes, sans fonction métier apparente dans le fichier	Candidat ; confirmer l'absence de références
+tests/Central/Unit/ExampleTest.php	Test trivial true === true	Supprimable si aucun besoin pédagogique
+tests/Central/Feature/ExampleTest.php	Vérifie réellement la redirection d'accueil	Conserver
+routes/central/diagnostics.php	Expose une route de diagnostic local /_dev/database	Optionnel ; supprimer seulement si l'outil de diagnostic n'est plus utilisé
+app/Http/Middleware/EnsureLocalDiagnostics.php	Restreint le diagnostic à l'environnement local/testing avec debug et loopback	Conserver tant que le diagnostic existe
+app/Services/SchemaBlueprint.php	Utilisé dans AppServiceProvider.php, ligne 119	Conserver
+
+Autre surface à étudier : Plans et offres
+routes/central/admin/plans.php déclare deux groupes :
+- Lignes 7–16 : API JSON /admin/plans, utilisant PlanController.
+- Lignes 18–28 : interface Blade /admin/offres, utilisant PlanPageController.
+Les deux proposent création, modification, versionnement, activation et archivage.
+
+Ce n'est pas nécessairement un doublon inutile : une API JSON et une interface HTML peuvent légitimement coexister. Il faut vérifier leurs consommateurs avant d'en supprimer une.
+
+Par ailleurs, resources/views/central/pages/admin/plans/show.blade.php affiche toujours « Créer une nouvelle version », mais il s'agit ici des versions des plans commerciaux, pas des règles de facturation. Ce versionnement protège notamment les offres déjà associées aux abonnements.
+
+Je ne recommande donc pas de le supprimer automatiquement dans cette refonte.
+
+7. Ordre précis de suppression pour éviter les régressions
+1. Refactoriser le parcours métier
+   
+   Permettre l'enregistrement et la vérification des paiements sans exiger une facture définitive préalable. Ajouter les deux modes de transition d'abonnement.
+2. Consolider les nouvelles pages
+   
+   Factures et échéances administrateur, Avoirs, demandes d'abonnement, Factures commerçant et Mon abonnement.
+3. Déplacer toutes les actions utiles
+   
+   Validation, refus motivé, justificatifs, reçus, PDF, envoi e-mail, correction et historique. Vérifier les permissions.
+4. Retirer les anciennes routes et pages
+   
+   Supprimer les routes de configuration versionnée et des compteurs, ainsi que les anciennes pages autonomes remplacées.
+5. Nettoyer les contrôleurs, Requests, permissions et tests
+   
+   Ne supprimer que les méthodes et classes sans appelant après la migration. Adapter les seeders sans dupliquer les permissions.
+6. Vérifier les dépendances et l'application
+   
+   Rechercher les anciens noms de routes, tester les parcours et vider les caches Laravel. Contrôler également les URLs directes.
+
+Contrôles à effectuer dans le projet local après les modifications
+Depuis C:\Users\habou\Herd\aydra :
+php artisan optimize:clear
+
+php artisan route:list --path=admin/billing
+php artisan route:list --path=admin/subscriptions
+php artisan route:list --path=facturation
+php artisan route:list --path=paiements
+
+php artisan test tests/Central/Feature/Admin/Billing
+php artisan test tests/Central/Feature/Admin/Subscriptions
+php artisan test tests/Central/Feature/Owner
+
+
+Vérifier ensuite en étant connecté avec les rôles concernés :
+- /admin/billing/rules : ancienne interface supprimée ou correctement redirigée.
+- /admin/billing/sequences : ancienne interface supprimée.
+- /admin/billing/invoices : nouvelle interface complète.
+- /admin/billing/credit-notes : avoirs accessibles.
+- /admin/subscriptions/requests : demandes et filtres fonctionnels.

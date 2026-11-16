@@ -5,12 +5,15 @@ namespace App\Services\Central\Subscriptions;
 use App\Enums\Central\Billing\DocumentStatusEnum;
 use App\Enums\Central\Billing\DocumentTypeEnum;
 use App\Enums\Central\Billing\PolicyStatusEnum;
+use App\Enums\Central\Billing\TransferMethodEnum;
 use App\Enums\Central\Billing\TransferStatusEnum;
 use App\Enums\Central\Billing\TriggerEventEnum;
 use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Enums\Central\Subscriptions\PaymentChoiceEnum;
+use App\Enums\Central\Subscriptions\RequestFilterEnum;
 use App\Enums\Central\Subscriptions\RequestStatusEnum;
 use App\Enums\Central\Subscriptions\StatusEnum;
+use App\Enums\Central\Subscriptions\TransitionModeEnum;
 use App\Models\Central\Billing\BillingRule;
 use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Subscriptions\Subscription;
@@ -20,14 +23,15 @@ use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use App\Services\Central\Billing\InvoicePaymentService;
 use App\Services\Central\Billing\PaymentDocumentService;
-use App\Services\Central\Billing\SaasInvoiceIssuanceService;
 use App\Services\Central\Billing\SaasInvoiceService;
 use App\Services\Central\Billing\SaasPaymentService;
+use Brick\Math\BigDecimal;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -39,6 +43,8 @@ class SubscriptionRequestService
 
     public const string INVOICE_READY = 'subscription_request_invoice_ready';
 
+    public const string DRAFT_READY = 'subscription_request_draft_ready';
+
     public const string INVOICE_BLOCKED = 'subscription_request_invoice_blocked';
 
     public const string UPDATED = 'subscription_request_updated';
@@ -49,9 +55,11 @@ class SubscriptionRequestService
         private readonly AuthorizationMutation $mutations,
         private readonly SubscriptionPurchaseService $purchases,
         private readonly SaasInvoiceService $invoices,
-        private readonly SaasInvoiceIssuanceService $issuance,
         private readonly SaasPaymentService $payments,
         private readonly InvoicePaymentService $balances,
+        private readonly SubscriptionWorkflowNotifier $notifications,
+        private readonly PaymentDocumentService $documents,
+        private readonly SubscriptionRequestPaymentState $paymentState,
     ) {}
 
     /** @param array<string, mixed> $filters
@@ -65,11 +73,28 @@ class SubscriptionRequestService
 
         return SubscriptionRequest::with(['owner', 'subscription.plan', 'invoice', 'payment'])
             ->when($own, fn (Builder $query) => $query->where('user_id', $actor->id))
-            ->when(isset($filters['status']), fn (Builder $query) => $query->where('status', $filters['status']))
+            ->when(isset($filters['filter']), fn (Builder $query) => $query->whereIn('status', RequestFilterEnum::from($filters['filter'])->statuses()))
+            ->when(isset($filters['status']), function (Builder $query) use ($filters): void {
+                $status = RequestStatusEnum::from((int) $filters['status']);
+                $query->whereIn('status', $status === RequestStatusEnum::AWAITING_PAYMENT
+                    ? [RequestStatusEnum::INVOICE_PENDING, RequestStatusEnum::AWAITING_PAYMENT] : [$status]);
+            })
             ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query->where('uuid', $search)
                 ->orWhereRelation('invoice', 'number', 'like', '%'.addcslashes($search, '\\%_').'%')
-                ->orWhereRelation('owner', 'email', 'like', '%'.addcslashes($search, '\\%_').'%')))
+                ->orWhereHas('owner', fn (Builder $owner) => $owner->where('email', 'like', '%'.addcslashes($search, '\\%_').'%')
+                    ->orWhereRaw("CONCAT_WS(' ', first_name, last_name) LIKE ?", ['%'.addcslashes($search, '\\%_').'%']))))
             ->orderByDesc('id')->paginate(self::PER_PAGE)->withQueryString();
+    }
+
+    public function currentSubscription(User $actor, SubscriptionRequest $request): ?Subscription
+    {
+        Gate::forUser($actor)->authorize('view', $request);
+
+        return Subscription::where('user_id', $request->user_id)->whereIn('status', [StatusEnum::ACTIVE, StatusEnum::TRIAL])
+            ->where('period_starts_at', '<=', now())
+            ->where(fn (Builder $query) => $query->whereNull('period_ends_at')->orWhere('period_ends_at', '>', now()))
+            ->where(fn (Builder $query) => $query->whereNull('ended_at')->orWhere('ended_at', '>', now()))
+            ->with('plan')->orderByDesc('id')->first();
     }
 
     /** @return array<string, mixed> */
@@ -77,25 +102,40 @@ class SubscriptionRequestService
     {
         return [...SubscriptionPurchaseService::rules(), 'payment_choice' => ['required', 'integer', Rule::enum(PaymentChoiceEnum::class)],
             ...array_fill_keys(['current_subscription_id', 'current_invoice_id', 'current_payment_id', 'reference_version',
-                'decided_by_id', 'decided_at', 'decision_reason', 'invoice_error', 'currency', 'amount'], ['missing'])];
+                'decided_by_id', 'decided_at', 'decision_reason', 'invoice_error', 'currency', 'amount', 'submitted_payment'], ['missing'])];
     }
 
-    /** @param array<string, mixed> $data */
-    public function create(User $owner, array $data): SubscriptionRequest
+    /** @return array<string, mixed> */
+    public static function initialPaymentRules(): array
     {
-        return $this->createFor($owner, $owner, $data);
+        return ['proof' => ['required_if:payment_choice,'.PaymentChoiceEnum::EXTERNAL->value, 'prohibited_unless:payment_choice,'.PaymentChoiceEnum::EXTERNAL->value, 'nullable', 'file', 'mimetypes:application/pdf,image/jpeg,image/png', 'max:'.PaymentDocumentService::MAX_KB],
+            'payment' => ['required_if:payment_choice,'.PaymentChoiceEnum::EXTERNAL->value, 'prohibited_unless:payment_choice,'.PaymentChoiceEnum::EXTERNAL->value, 'array:method,amount,occurred_at,reference'],
+            'payment.method' => ['required_with:payment', 'integer', Rule::in([TransferMethodEnum::BANK_TRANSFER->value, TransferMethodEnum::CCP_TRANSFER->value, TransferMethodEnum::BARIDIMOB->value])],
+            'payment.amount' => ['required_with:payment', 'string', 'regex:/^\d{1,6}(?:\.\d{1,2})?$/D', 'gt:0'],
+            'payment.occurred_at' => ['sometimes', 'date', 'before_or_equal:now'],
+            'payment.reference' => ['nullable', 'string', 'max:255']];
     }
 
     /** @param array<string, mixed> $data */
-    public function createFor(User $actor, User $owner, array $data): SubscriptionRequest
+    public function create(User $owner, array $data, ?UploadedFile $proof = null): SubscriptionRequest
+    {
+        return $this->createFor($owner, $owner, $data, $proof);
+    }
+
+    /** @param array<string, mixed> $data */
+    public function createFor(User $actor, User $owner, array $data, ?UploadedFile $proof = null): SubscriptionRequest
     {
         abort_if(tenancy()->initialized, 403);
-        $request = $this->mutations->run($actor, 'createFor', fn () => [SubscriptionRequest::class, $owner], function () use ($actor, $owner, $data): SubscriptionRequest {
+        Validator::make([...$data, 'proof' => $proof], self::initialPaymentRules())->validate();
+        $source = isset($data['source_uuid']) ? Subscription::where('uuid', $data['source_uuid'])->where('user_id', $owner->id)->firstOrFail() : null;
+        $request = $this->mutations->run($actor, 'createFor', fn () => [SubscriptionRequest::class, $owner, $source], function () use ($actor, $owner, $data, $proof): SubscriptionRequest {
             User::whereKey($owner->id)->lockForUpdate()->firstOrFail();
             $values = Validator::make($data, self::rules())->validate();
             $key = 'subscription-request:'.$owner->uuid.':'.strtolower($values['operation_id']);
             $payload = hash('sha256', json_encode([strtolower($values['plan_uuid']), (int) $values['period'],
-                $values['expected_amount'], (int) $values['payment_choice']], JSON_THROW_ON_ERROR));
+                $values['expected_amount'], (int) $values['payment_choice'], (int) ($values['transition_mode'] ?? TransitionModeEnum::DEFERRED->value),
+                $data['payment'] ?? null, $proof === null ? null : hash('sha256', $proof->getContent()),
+                $values['source_uuid'] ?? null, $values['expected_source_state'] ?? null, $data['confirmation'] ?? null], JSON_THROW_ON_ERROR));
             $existing = SubscriptionRequest::where('operation_key', $key)->lockForUpdate()->first();
             if ($existing !== null) {
                 if ($existing->getAttribute('initial_payload_hash') !== $payload) {
@@ -114,14 +154,42 @@ class SubscriptionRequestService
 
             return $request->refresh();
         });
-        if ($request->status->isFinal() || $request->current_invoice_id !== null && $request->invoice?->status === DocumentStatusEnum::ISSUED) {
+        if ($request->status->isFinal()) {
             return $request;
         }
-        if (Gate::forUser($actor)->denies('prepareInvoice', $request)) {
-            return $request;
+        if ($request->current_invoice_id === null && Gate::forUser($actor)->allows('prepareInvoice', $request)) {
+            $request = $this->prepareInvoice($actor, $request, $request->managementState());
+        }
+        if ($proof !== null && $request->getAttribute('submitted_payment') === null) {
+            $media = $this->documents->retainRequestProof($actor, $request, $proof);
+            $request = $this->mutations->run($actor, 'supplyInitialProof', fn () => $this->lock($request), function (SubscriptionRequest $current) use ($data, $media, $actor): SubscriptionRequest {
+                if ($current->getAttribute('submitted_payment') === null) {
+                    $current->forceFill(['submitted_payment' => [...$data['payment'],
+                        'occurred_at' => $data['payment']['occurred_at'] ?? now()->toDateTimeString(),
+                        'amount' => (string) BigDecimal::of($data['payment']['amount'])->toScale(2), 'currency' => $current->currency,
+                        'operation_id' => $data['operation_id'], 'proof_uuid' => $media->uuid],
+                        'status' => RequestStatusEnum::REVIEW, 'reference_version' => $current->reference_version + 1])->save();
+                    $this->audit($actor, $current, SubscriptionRequestPaymentState::SUBMITTED, 'Justificatif initial conservé ; versement à vérifier, sans activation.');
+                }
+
+                return $current->refresh();
+            });
+        }
+        if ($request->payment_choice === PaymentChoiceEnum::EXTERNAL && $request->invoice !== null && $request->current_payment_id === null) {
+            $this->declareRetainedProof($actor, $request);
         }
 
-        return $this->prepareInvoice($actor, $request, $request->managementState());
+        return $request->refresh();
+    }
+
+    private function declareRetainedProof(User $actor, SubscriptionRequest $request): void
+    {
+        $data = $request->getAttribute('submitted_payment');
+        if (! is_array($data)) {
+            $this->fail('Un justificatif bancaire est obligatoire avant la vérification.');
+        }
+        $this->payments->declareExternalPayment($actor, $request->invoice,
+            [...$data, 'expected_request_state' => $request->managementState()], $this->documents->retainedProof($request));
     }
 
     public function prepareInvoice(User $actor, SubscriptionRequest $request, string $expected): SubscriptionRequest
@@ -145,7 +213,6 @@ class SubscriptionRequestService
             if ($invoice === null) {
                 $this->fail('La facture de cette demande n’a pas été préparée.');
             }
-            $invoice = $this->issuance->issueForRequest($actor, $invoice, $invoice->managementState());
 
             return $this->mutations->run($actor, 'prepareInvoice', fn () => $this->lock($request), function (SubscriptionRequest $current) use ($actor, $invoice): SubscriptionRequest {
                 if ($current->current_invoice_id !== $invoice->id || $current->current_subscription_id !== $invoice->subscription_id) {
@@ -154,7 +221,7 @@ class SubscriptionRequestService
                 if ($current->status === RequestStatusEnum::INVOICE_PENDING) {
                     $current->forceFill(['status' => RequestStatusEnum::AWAITING_PAYMENT, 'invoice_error' => null,
                         'reference_version' => $current->reference_version + 1])->save();
-                    $this->audit($actor, $current, self::INVOICE_READY, 'Facture émise et disponible avant paiement. Aucun reçu ni droit payant créé.');
+                    $this->audit($actor, $current, self::DRAFT_READY, 'Préparation interne enregistrée, sans numéro ni PDF. La facture définitive attend la confirmation du paiement.');
                 }
 
                 return $current->refresh();
@@ -191,7 +258,7 @@ class SubscriptionRequestService
         $current = $this->mutations->run($owner, 'update', fn () => $this->lock($request), function (SubscriptionRequest $current) use ($expected): SubscriptionRequest {
             $this->assertState($current, $expected);
             if ($current->status->isFinal() || $current->payment_choice !== PaymentChoiceEnum::EXTERNAL
-                || $current->invoice?->status !== DocumentStatusEnum::ISSUED) {
+                || $current->invoice === null) {
                 $this->fail('Cette demande ne peut pas recevoir un justificatif externe.');
             }
 
@@ -209,10 +276,10 @@ class SubscriptionRequestService
         $current = $this->mutations->run($actor, 'accept', fn () => $this->lock($request), function (SubscriptionRequest $current) use ($actor, $expected, $data): SubscriptionRequest {
             abort_if($actor->id === $current->user_id, 403);
             $this->assertState($current, $expected);
-            if ($current->status->isFinal() || $current->invoice?->status !== DocumentStatusEnum::ISSUED) {
-                $this->fail('Une facture émise et une demande non terminée sont nécessaires.');
+            if ($current->status->isFinal()) {
+                $this->fail('Cette demande est déjà terminée.');
             }
-            if ($current->payment_choice === PaymentChoiceEnum::EXTERNAL && $current->payment === null) {
+            if ($current->payment_choice === PaymentChoiceEnum::EXTERNAL && $current->payment === null && $current->getAttribute('submitted_payment') === null) {
                 $this->fail('Le commerçant doit fournir son justificatif avant la confirmation du versement externe.');
             }
             if ($current->payment !== null && ! hash_equals($current->payment->managementState(), (string) ($data['expected_payment_state'] ?? ''))) {
@@ -221,6 +288,26 @@ class SubscriptionRequestService
 
             return $current;
         });
+        if ($current->invoice === null) {
+            $current = $this->prepareInvoice($actor, $current, $current->managementState());
+            if ($current->invoice === null) {
+                $this->fail('La configuration de facturation doit être complétée avant la confirmation des fonds.');
+            }
+        }
+        if ($current->payment_choice === PaymentChoiceEnum::EXTERNAL && $current->current_payment_id === null) {
+            $this->declareRetainedProof($actor, $current);
+            $current->refresh();
+            $data['expected_payment_state'] = $current->payment->managementState();
+        }
+        $data += ['received' => true, 'occurred_at' => now()->toDateTimeString(),
+            'amount' => $current->subscription->agreed_amount, 'operation_id' => (string) Str::uuid()];
+        if ($current->payment_choice === PaymentChoiceEnum::EXTERNAL) {
+            $details = $current->payment->getAttribute('encrypted_transfer_details') ?? [];
+            $data += ['account' => $details['account'] ?? null, 'reference' => $current->payment->getAttribute('transfer_reference')];
+            if (blank($data['account']) || blank($data['reference'])) {
+                $this->fail('Rapprochez d’abord le compte destinataire et la référence depuis le détail du paiement, puis acceptez la demande.');
+            }
+        }
         try {
             if ($current->payment_choice === PaymentChoiceEnum::CASH) {
                 if ($current->payment === null) {
@@ -267,6 +354,7 @@ class SubscriptionRequestService
             }
             $current->forceFill(['status' => RequestStatusEnum::REJECTED, 'decision_reason' => trim($reason),
                 'decided_by_id' => $actor->id, 'decided_at' => now(), 'reference_version' => $current->reference_version + 1])->save();
+            $this->paymentState->releaseRefusedReservation($current);
             $this->audit($actor, $current, SubscriptionRequestPaymentState::REJECTED, 'Demande refusée avec motif, sans encaissement ni activation.');
 
             return $current->refresh();
@@ -287,9 +375,9 @@ class SubscriptionRequestService
             }
             $previous = $current->payment_choice;
             $this->retireDeclaration($owner, $current);
-            $current->forceFill(['payment_choice' => $choice, 'status' => $current->invoice?->status === DocumentStatusEnum::ISSUED
+            $current->forceFill(['payment_choice' => $choice, 'status' => $current->invoice !== null
                 ? RequestStatusEnum::AWAITING_PAYMENT : RequestStatusEnum::INVOICE_PENDING,
-                'decision_reason' => null, 'decided_by_id' => null, 'decided_at' => null,
+                'decision_reason' => null, 'decided_by_id' => null, 'decided_at' => null, 'submitted_payment' => null,
                 'reference_version' => $current->reference_version + 1])->save();
             activity('central')->causedBy($owner)->performedOn($current)->event(self::UPDATED)
                 ->withProperties(['request_uuid' => $current->uuid, 'previous_payment_choice' => $previous->value,
@@ -311,7 +399,9 @@ class SubscriptionRequestService
                 $this->fail('Une demande terminée est immuable.');
             }
             $subscription = $current->subscription()->lockForUpdate()->firstOrFail();
-            if ($subscription->plan->uuid === strtolower($values['plan_uuid']) && $subscription->period->value === (int) $values['period']) {
+            $values['transition_mode'] ??= $subscription->transition_mode->value;
+            if ($subscription->plan->uuid === strtolower($values['plan_uuid']) && $subscription->period->value === (int) $values['period']
+                && $subscription->transition_mode->value === (int) $values['transition_mode']) {
                 if ($subscription->agreed_amount !== $values['expected_amount']) {
                     $this->fail('Le montant transmis ne correspond pas à cette période.');
                 }
@@ -332,6 +422,7 @@ class SubscriptionRequestService
             $replacement->forceFill(['subscription_request_id' => $current->id])->save();
             $current->forceFill(['current_subscription_id' => $replacement->id, 'current_invoice_id' => null, 'current_payment_id' => null,
                 'payment_choice' => (int) $values['payment_choice'], 'status' => RequestStatusEnum::INVOICE_PENDING,
+                'submitted_payment' => null,
                 'decision_reason' => null, 'decided_by_id' => null, 'decided_at' => null, 'invoice_error' => null,
                 'reference_version' => $current->reference_version + 1])->save();
             activity('central')->causedBy($owner)->performedOn($current)->event(self::UPDATED)
@@ -447,6 +538,7 @@ class SubscriptionRequestService
             ->withProperties(['request_uuid' => $request->uuid, 'version' => $request->reference_version,
                 'subscription_uuid' => $request->subscription?->uuid, 'invoice_uuid' => $request->invoice?->uuid,
                 'payment_choice' => $request->payment_choice->value, 'reason' => $request->getAttribute('decision_reason')])->log($message);
+        $this->notifications->request($request, $event);
     }
 
     private function fail(string $message): never

@@ -9,10 +9,10 @@
             @forelse ($installment->invoices as $invoice)
                 <flux:button :href="route('owner.invoices.show', $invoice)">Facture {{ $invoice->number ?? 'en préparation' }}</flux:button>
             @empty
-                <flux:callout>L’administration doit préparer et émettre votre facture avant le dépôt du justificatif. Aucun droit payant n’est encore accordé.</flux:callout>
+                <flux:callout>La préparation interne précède le paiement. La facture définitive et le reçu sont produits après confirmation intégrale des fonds, avant l’activation des droits.</flux:callout>
             @endforelse
         @empty<flux:text>Aucune échéance payante : l’offre gratuite n’exige pas de paiement.</flux:text>@endforelse
         <flux:button :href="route('owner.subscriptions.index')">Retour aux offres</flux:button>
-        <flux:button :href="route('owner.payments.index')">Mes paiements et reçus</flux:button>
+        <flux:button :href="route('owner.billing.index')">Factures, paiements et reçus</flux:button>
     </section>
 </x-layouts::app>

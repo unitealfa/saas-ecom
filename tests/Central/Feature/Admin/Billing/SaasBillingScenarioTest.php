@@ -24,8 +24,10 @@ use App\Services\Central\Plans\PlanCompositionService;
 use App\Services\Central\Plans\PlanCreationService;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Database\Seeders\Central\FreePlanSeeder;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\Process\Process;
 
 const INVOICE_TEST_PERMISSION_DAYS = 7;
@@ -45,8 +47,7 @@ function fullPeriodDueForTest(array $scenario, string $amount, InstallmentStatus
 test('MVP refuses a fractional or partly paid period without changing historical installments', function (string $amount, InstallmentStatusEnum $status): void {
     $s = invoiceScenario();
     $due = fullPeriodDueForTest($s, $amount, $status);
-    $this->actingAs($s['actor'], 'central')->post(route('central.invoices.store', $s['subscription']), $s['data'])
-        ->assertSessionHasErrors('installment');
+    expect(fn () => app(SaasInvoiceService::class)->prepareCurrentPeriodWithoutTax($s['actor'], $s['subscription'], $s['data']))->toThrow(ValidationException::class);
     expect(SubscriptionInstallment::count())->toBe(1)
         ->and($due->refresh()->installment_amount)->toBe($amount)
         ->and($due->installment_status)->toBe($status)
@@ -65,16 +66,14 @@ test('MVP refuses a historical split schedule without deleting its installments'
     $s = invoiceScenario();
     fullPeriodDueForTest($s, '1500.00');
     fullPeriodDueForTest($s, '1500.00');
-    $this->actingAs($s['actor'], 'central')->post(route('central.invoices.store', $s['subscription']), $s['data'])
-        ->assertSessionHasErrors('installment');
+    expect(fn () => app(SaasInvoiceService::class)->prepareCurrentPeriodWithoutTax($s['actor'], $s['subscription'], $s['data']))->toThrow(ValidationException::class);
     expect(SubscriptionInstallment::count())->toBe(2)->and(SaasInvoice::count())->toBe(0);
 });
 
 test('MVP does not prepare a new invoice from a retired rule even before its historical end', function (): void {
     $s = invoiceScenario();
     app(BillingRuleService::class)->retire($s['actor'], $s['rule'], $s['rule']->managementState(), 'Retrait', now()->addDay()->toDateTimeString());
-    $this->actingAs($s['actor'], 'central')->post(route('central.invoices.store', $s['subscription']), $s['data'])
-        ->assertSessionHasErrors('billing_rule_uuid');
+    expect(fn () => app(SaasInvoiceService::class)->prepareCurrentPeriodWithoutTax($s['actor'], $s['subscription'], $s['data']))->toThrow(ValidationException::class);
     expect(SaasInvoice::count())->toBe(0)->and(SubscriptionInstallment::count())->toBe(0);
 });
 
@@ -110,10 +109,7 @@ test('MVP refuses a historical fractional configuration without rewriting the ru
         'validation_reference' => 'Historique de test', 'validated_at' => now()->subDay(), 'effective_at' => now()->subDay(),
         'created_by_id' => $s['actor']->id, 'validated_by_id' => $s['actor']->id,
         'operation_key' => 'saas:rule:historical:'.Str::uuid(), 'correlation_id' => (string) Str::uuid()])->save();
-    $this->actingAs($s['actor'], 'central')->get(route('central.invoices.create', $s['subscription']))
-        ->assertOk()->assertDontSee('historical.partial');
-    $this->actingAs($s['actor'], 'central')->post(route('central.invoices.store', $s['subscription']), [...$s['data'], 'billing_rule_uuid' => $historical->uuid])
-        ->assertSessionHasErrors('parameters');
+    expect(fn () => app(SaasInvoiceService::class)->prepareCurrentPeriodWithoutTax($s['actor'], $s['subscription'], [...$s['data'], 'billing_rule_uuid' => $historical->uuid]))->toThrow(ValidationException::class);
     expect($historical->refresh()->parameters)->toBe($parameters)
         ->and(SaasInvoice::count())->toBe(0)->and(SubscriptionInstallment::count())->toBe(0);
 });
@@ -126,8 +122,7 @@ test('MVP refuses a first reservation for a fractional or duplicated obligation 
     } else {
         $invoice->installment->forceFill(['installment_amount' => '1500.00'])->save();
     }
-    $this->actingAs($s['actor'], 'central')->post(route('central.invoices.reserve', $invoice), ['expected_state' => $invoice->managementState()])
-        ->assertSessionHasErrors('installment');
+    expect(fn () => app(SaasNumberingService::class)->reserve($s['actor'], $invoice, $invoice->managementState()))->toThrow(ValidationException::class);
     expect($invoice->refresh()->status)->toBe(DocumentStatusEnum::DRAFT)->and(BillingSequence::count())->toBe(0);
 })->with([true, false]);
 
@@ -169,13 +164,13 @@ function invoiceScenario(): array
 test('Pro creates one 3000 DZD installment invoice and reserved number when operations are replayed', function (): void {
     $scenario = invoiceScenario();
     $this->actingAs($scenario['actor'], 'central');
-    $route = route('central.invoices.store', $scenario['subscription']);
-    $this->post($route, $scenario['data'])->assertSessionHasNoErrors()->assertRedirect();
-    $this->post($route, $scenario['data'])->assertSessionHasNoErrors()->assertRedirect();
+    $service = app(SaasInvoiceService::class);
+    $service->prepareCurrentPeriodWithoutTax($scenario['actor'], $scenario['subscription'], $scenario['data']);
+    $service->prepareCurrentPeriodWithoutTax($scenario['actor'], $scenario['subscription'], $scenario['data']);
     $invoice = SaasInvoice::sole();
     $expected = $invoice->managementState();
-    $this->post(route('central.invoices.reserve', $invoice), ['expected_state' => $expected])->assertSessionHasNoErrors()->assertRedirect();
-    $this->post(route('central.invoices.reserve', $invoice), ['expected_state' => $expected])->assertSessionHasNoErrors()->assertRedirect();
+    app(SaasNumberingService::class)->reserve($scenario['actor'], $invoice, $expected);
+    app(SaasNumberingService::class)->reserve($scenario['actor'], $invoice, $expected);
 
     expect($scenario['plan']->refresh()->monthly_price)->toBe('3000.00');
     expect($scenario['plan']->features()->sole()->limit)->toBe(2);
@@ -200,9 +195,9 @@ test('invoice and installment pages render the persisted rule and amounts', func
     $invoice = app(SaasInvoiceService::class)->prepareCurrentPeriodWithoutTax($s['actor'], $s['subscription'], $s['data']);
     $this->actingAs($s['actor'], 'central');
     $this->get(route('central.invoices.index'))->assertOk()->assertSee('3000.00');
-    $this->get(route('central.invoices.create', $s['subscription']))->assertOk()->assertSee('pro.monthly');
+    $this->get('/admin/subscriptions/'.$s['subscription']->uuid.'/invoice/create')->assertNotFound();
     $this->get(route('central.invoices.show', $invoice))->assertOk()->assertSee('version 1')->assertSee('Réserver le numéro');
-    $this->get(route('central.subscriptions.installments.index', $s['subscription']))->assertOk()->assertSee('3000.00');
+    $this->get('/admin/subscriptions/'.$s['subscription']->uuid.'/installments')->assertNotFound();
     $this->get(route('central.invoices.show', $invoice->id))->assertNotFound();
 });
 
@@ -214,22 +209,22 @@ test('all invoice and installment actions refuse staff lacking their rights', fu
     $this->actingAs($staff, 'central');
     $this->get(route('central.invoices.index'))->assertForbidden();
     $this->get(route('central.invoices.show', $invoice))->assertForbidden();
-    $this->get(route('central.invoices.create', $s['subscription']))->assertForbidden();
-    $this->get(route('central.subscriptions.installments.index', $s['subscription']))->assertForbidden();
-    $this->post(route('central.invoices.store', $s['subscription']), [])->assertForbidden();
-    $this->post(route('central.invoices.reserve', $invoice), [])->assertForbidden();
+    $this->get('/admin/subscriptions/'.$s['subscription']->uuid.'/invoice/create')->assertNotFound();
+    $this->get('/admin/subscriptions/'.$s['subscription']->uuid.'/installments')->assertNotFound();
+    $this->post('/admin/subscriptions/'.$s['subscription']->uuid.'/invoice', [])->assertNotFound();
+    $this->post('/admin/billing/invoices/'.$invoice->uuid.'/number', [])->assertNotFound();
     expect(BillingSequence::count())->toBe(0);
 });
 
 test('preparation refuses stale subscription forms injected amounts and an inapplicable rule without creating debt', function (): void {
     $s = invoiceScenario();
     $this->actingAs($s['actor'], 'central');
-    $route = route('central.invoices.store', $s['subscription']);
-    $this->post($route, [...$s['data'], 'amount' => 1])->assertSessionHasErrors('amount');
-    $this->post($route, [...$s['data'], 'expected_state' => str_repeat('a', 64)])->assertSessionHasErrors('conflict');
+    $service = app(SaasInvoiceService::class);
+    expect(fn () => $service->prepareCurrentPeriodWithoutTax($s['actor'], $s['subscription'], [...$s['data'], 'amount' => 1]))->toThrow(ValidationException::class);
+    expect(fn () => $service->prepareCurrentPeriodWithoutTax($s['actor'], $s['subscription'], [...$s['data'], 'expected_state' => str_repeat('a', 64)]))->toThrow(ValidationException::class);
     app(BillingRuleService::class)->retire($s['actor'], $s['rule'], $s['rule']->managementState(), 'Fin de la règle de test', now()->addMinute()->toDateTimeString());
     $this->travel(2)->minutes();
-    $this->post($route, $s['data'])->assertSessionHasErrors('billing_rule_uuid');
+    expect(fn () => $service->prepareCurrentPeriodWithoutTax($s['actor'], $s['subscription'], $s['data']))->toThrow(ValidationException::class);
     expect(SubscriptionInstallment::count())->toBe(0);
     expect(SaasInvoice::count())->toBe(0);
 });
@@ -238,8 +233,7 @@ test('combined preparation requires both installment creation and invoice creati
     $s = invoiceScenario();
     $staff = User::factory()->create();
     $staff->assignRole(Role::createWithPermissions('single-right', [$permission => INVOICE_TEST_PERMISSION_DAYS]));
-    $this->actingAs($staff, 'central')->get(route('central.invoices.create', $s['subscription']))->assertForbidden();
-    $this->post(route('central.invoices.store', $s['subscription']), $s['data'])->assertForbidden();
+    expect(fn () => app(SaasInvoiceService::class)->prepareCurrentPeriodWithoutTax($staff, $s['subscription'], $s['data']))->toThrow(AuthorizationException::class);
     expect(SubscriptionInstallment::count())->toBe(0);
     expect(SaasInvoice::count())->toBe(0);
 })->with(['saas.subscriptions.installments.create', 'saas.invoices.create']);
@@ -262,9 +256,7 @@ test('an invoice with inconsistent line totals cannot consume a number', functio
     $s = invoiceScenario();
     $invoice = app(SaasInvoiceService::class)->prepareCurrentPeriodWithoutTax($s['actor'], $s['subscription'], $s['data']);
     $invoice->lines()->sole()->forceFill(['net_amount' => '9000.00', 'total_amount' => '9000.00'])->save();
-    $this->actingAs($s['actor'], 'central')->post(route('central.invoices.reserve', $invoice), [
-        'expected_state' => $invoice->managementState(),
-    ])->assertSessionHasErrors('invoice');
+    expect(fn () => app(SaasNumberingService::class)->reserve($s['actor'], $invoice, $invoice->managementState()))->toThrow(ValidationException::class);
     expect(BillingSequence::count())->toBe(0);
 });
 

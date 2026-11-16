@@ -28,7 +28,7 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
  * @property PaymentChoiceEnum $payment_choice
  */
 #[Fillable([])]
-#[Hidden(['id', 'user_id', 'current_subscription_id', 'current_invoice_id', 'current_payment_id', 'decided_by_id'])]
+#[Hidden(['id', 'user_id', 'current_subscription_id', 'current_invoice_id', 'current_payment_id', 'decided_by_id', 'submitted_payment'])]
 class SubscriptionRequest extends Model
 {
     use CentralConnection, HasPublicUuid;
@@ -49,7 +49,7 @@ class SubscriptionRequest extends Model
 
     protected function casts(): array
     {
-        return ['status' => RequestStatusEnum::class, 'payment_choice' => PaymentChoiceEnum::class,
+        return ['submitted_payment' => 'encrypted:array', 'status' => RequestStatusEnum::class, 'payment_choice' => PaymentChoiceEnum::class,
             'user_id' => 'integer', 'current_subscription_id' => 'integer', 'current_invoice_id' => 'integer', 'current_payment_id' => 'integer',
             'reference_version' => 'integer', 'submitted_at' => 'immutable_datetime', 'decided_at' => 'immutable_datetime'];
     }
@@ -58,6 +58,12 @@ class SubscriptionRequest extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id')->withTrashed();
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function decider(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'decided_by_id')->withTrashed();
     }
 
     /** @return BelongsTo<Subscription, $this> */

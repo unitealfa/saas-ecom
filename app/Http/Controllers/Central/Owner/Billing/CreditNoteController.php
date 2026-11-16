@@ -9,17 +9,20 @@ use App\Services\Central\Billing\InvoicePaymentService;
 use App\Services\Central\Billing\SaasCreditNoteService;
 use App\Services\Central\Billing\SaasInvoiceIssuanceService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CreditNoteController extends Controller
 {
-    public function __construct(private readonly SaasCreditNoteService $credits, private readonly SaasInvoiceIssuanceService $issuance,
+    public function __construct(private readonly SaasInvoiceIssuanceService $issuance,
         private readonly InvoicePaymentService $balances) {}
 
-    public function index(SearchCreditNotesRequest $request): View
+    public function index(SearchCreditNotesRequest $request): RedirectResponse
     {
-        return view('central.pages.admin.billing.credit-notes.index', ['credits' => $this->credits->search($this->centralActor(), $request->validated(), own: true), 'ownerMode' => true]);
+        Gate::forUser($this->centralActor())->authorize('viewOwn', SaasCreditNote::class);
+
+        return to_route('owner.billing.index')->withFragment('owner-credits-heading');
     }
 
     public function show(SaasCreditNote $credit): View

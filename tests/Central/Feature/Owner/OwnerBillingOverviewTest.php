@@ -58,7 +58,7 @@ it('C-157 shows only the authenticated merchant due periods and invoices', funct
     $this->actingAs($f['owner'], 'central')
         ->get(route('owner.billing.index'))
         ->assertOk()
-        ->assertSee('Ma facturation SaaS')
+        ->assertSee('Factures')
         ->assertSee($f['invoice']->number)
         ->assertSee($f['due']->installment_number, false)
         ->assertSee('3000.00')
@@ -82,7 +82,7 @@ it('C-157 denies other merchants access to someone elses payment correction form
 
     $intruder = User::factory()->create();
     $this->actingAs($intruder, 'central')
-        ->get(route('owner.billing.corrections.create', $payment))->assertForbidden();
+        ->get(route('owner.invoices.show', $payment->invoice))->assertForbidden();
 
     $this->post(route('owner.billing.corrections.store', $payment), [
         'request_id' => (string) Str::uuid(),
@@ -135,13 +135,13 @@ it('C-159 creates one append-only correction request without modifying confirmed
     $data = ['request_id' => $id, 'reason' => 'Je souhaite signaler une erreur de référence sur mon règlement.'];
 
     $this->actingAs($f['owner'], 'central')
-        ->get(route('owner.billing.corrections.create', $payment))->assertOk()
+        ->get(route('owner.invoices.show', $payment->invoice))->assertOk()
         ->assertSee('Signaler une erreur');
 
     $this->post(route('owner.billing.corrections.store', $payment), $data)
-        ->assertRedirect(route('owner.billing.index'));
+        ->assertRedirect(route('owner.invoices.show', $payment->invoice).'#payment-'.$payment->uuid);
     $this->post(route('owner.billing.corrections.store', $payment), $data)
-        ->assertRedirect(route('owner.billing.index'));
+        ->assertRedirect(route('owner.invoices.show', $payment->invoice).'#payment-'.$payment->uuid);
 
     $reports = Activity::forSubject($payment)->where('event', OwnerPaymentCorrectionService::EVENT)->get();
     expect($reports)->toHaveCount(1)
@@ -221,15 +221,15 @@ it('C-159 puts the owners correction request in the authorized admin inbox and h
             'reason' => $reason,
         ])->assertSessionHasNoErrors();
 
-    $this->get(route('central.payments.corrections.index'))->assertForbidden();
+    $this->get(route('central.invoices.show', $f['invoice']))->assertForbidden();
 
     $this->actingAs($f['actor'], 'central')
-        ->get(route('central.payments.corrections.index'))
+        ->get(route('central.invoices.show', $f['invoice']))
         ->assertOk()
         ->assertSee($reason)
         ->assertSee($payment->uuid);
 
-    $this->get(route('central.payments.show', $payment))
+    $this->get(route('central.invoices.show', $payment->invoice))
         ->assertOk()
         ->assertSee($reason);
 });
@@ -247,19 +247,19 @@ it('C-159 records an examined decision in history without changing the payment',
         ->post(route('owner.billing.corrections.store', $payment), [
             'request_id' => (string) Str::uuid(),
             'reason' => $reason,
-        ])->assertRedirect(route('owner.billing.index'));
+        ])->assertRedirect(route('owner.invoices.show', $payment->invoice).'#payment-'.$payment->uuid);
     $report = Activity::forSubject($payment)->where('event', OwnerPaymentCorrectionService::EVENT)->sole();
 
     $this->get(route('owner.billing.index'))->assertOk()->assertSee('En attente');
     $this->actingAs($f['actor'], 'central')
-        ->get(route('central.payments.corrections.index'))
+        ->get(route('central.invoices.show', $f['invoice']))
         ->assertOk()
         ->assertSee($reason)
         ->assertSee('Examiné — aucune correction nécessaire');
     $this->post(route('central.payments.corrections.review', $report), [
         'decision' => OwnerPaymentCorrectionService::DECISION_EXAMINED,
         'note' => 'Examen effectué, aucune correction n’est nécessaire.',
-    ])->assertRedirect(route('central.payments.corrections.index'));
+    ])->assertRedirect(route('central.invoices.show', $f['invoice']).'#payment-'.$payment->uuid);
     $this->post(route('central.payments.corrections.review', $report), [
         'decision' => OwnerPaymentCorrectionService::DECISION_EXAMINED,
         'note' => 'Examen effectué, aucune correction n’est nécessaire.',
@@ -279,7 +279,7 @@ it('C-159 records an examined decision in history without changing the payment',
         ->and($payment->refresh()->getAttributes())->toBe($paymentBefore)
         ->and($f['invoice']->refresh()->getAttributes())->toBe($invoiceBefore);
 
-    $this->get(route('central.payments.corrections.index'))
+    $this->get(route('central.invoices.show', $f['invoice']))
         ->assertOk()
         ->assertSee('Examen effectué, aucune correction n’est nécessaire.')
         ->assertSee('Examiné — aucune correction nécessaire');
@@ -301,7 +301,7 @@ it('C-159 only records an issued credit note for the payment invoice and owner',
         ->post(route('owner.billing.corrections.store', $payment), [
             'request_id' => (string) Str::uuid(),
             'reason' => 'La référence de cette facture doit être corrigée.',
-        ])->assertRedirect(route('owner.billing.index'));
+        ])->assertRedirect(route('owner.invoices.show', $payment->invoice).'#payment-'.$payment->uuid);
     $report = Activity::forSubject($payment)->where('event', OwnerPaymentCorrectionService::EVENT)->sole();
 
     $foreign = manualPaymentFixture();
@@ -330,7 +330,7 @@ it('C-159 only records an issued credit note for the payment invoice and owner',
         'decision' => OwnerPaymentCorrectionService::DECISION_CREDIT_NOTE,
         'note' => 'Le montant est corrigé par l’avoir émis sur cette facture.',
         'credit_uuid' => $credit->uuid,
-    ])->assertRedirect(route('central.payments.corrections.index'));
+    ])->assertRedirect(route('central.invoices.show', $f['invoice']).'#payment-'.$payment->uuid);
 
     $review = Activity::forSubject($payment)->where('event', OwnerPaymentCorrectionService::REVIEWED_EVENT)->sole();
     expect($review->properties['decision'])->toBe(OwnerPaymentCorrectionService::DECISION_CREDIT_NOTE)
@@ -357,13 +357,13 @@ it('C-159 requires the existing reconcile permission to decide a correction repo
         ->post(route('owner.billing.corrections.store', $payment), [
             'request_id' => (string) Str::uuid(),
             'reason' => 'Cette référence doit être contrôlée par le personnel.',
-        ])->assertRedirect(route('owner.billing.index'));
+        ])->assertRedirect(route('owner.invoices.show', $payment->invoice).'#payment-'.$payment->uuid);
     $report = Activity::forSubject($payment)->where('event', OwnerPaymentCorrectionService::EVENT)->sole();
     $reader = User::factory()->create();
     $reader->assignRole(Role::createWithPermissions('payment-reader-'.Str::random(8), ['saas.payments.view' => 7]));
 
     $this->actingAs($reader, 'central')
-        ->get(route('central.payments.corrections.index'))
+        ->get(route('central.invoices.show', $f['invoice']))
         ->assertOk()
         ->assertSee('En attente')
         ->assertDontSee('Examiné — aucune correction nécessaire');

@@ -8,6 +8,7 @@ use App\Http\Requests\Central\Subscriptions\AssignSubscriptionRequest;
 use App\Http\Requests\Central\Subscriptions\ChangeSubscriptionRequest;
 use App\Http\Requests\Central\Subscriptions\CloseSubscriptionRequest;
 use App\Http\Requests\Central\Subscriptions\DeactivateSubscriptionRequest;
+use App\Http\Requests\Central\Subscriptions\SearchSubscriptionOwnersRequest;
 use App\Http\Requests\Central\Subscriptions\SearchSubscriptionsRequest;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Subscriptions\Subscription;
@@ -54,11 +55,13 @@ class SubscriptionController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(SearchSubscriptionOwnersRequest $request): View
     {
-        Gate::forUser($this->centralActor())->authorize('assign', Subscription::class);
+        $selected = $request->old('owner_uuid', $request->validated('owner'));
 
         return view('central.pages.admin.subscriptions.create', [
+            'selectedUuid' => is_string($selected) && Str::isUuid($selected) ? strtolower($selected) : null,
+            'search' => $request->validated('search') ?? '',
             'plans' => Plan::active()->where('code', '!=', 'free')->orderBy('name')->orderByDesc('version')->get(),
             'operationKey' => (string) Str::uuid(),
         ]);
@@ -66,12 +69,12 @@ class SubscriptionController extends Controller
 
     public function store(AssignSubscriptionRequest $request): RedirectResponse
     {
-        $subscription = $this->assignments->assign($this->centralActor(), $request->validated());
+        $subscription = $this->assignments->assign($this->centralActor(), $request->validated(), $request->file('proof'));
         $redirect = Gate::forUser($this->centralActor())->allows('view', $subscription)
             ? to_route('central.subscriptions.show', $subscription)
             : to_route('dashboard');
 
-        return $redirect->with('status', 'Abonnement réservé en attente du paiement intégral. Les droits actuels sont conservés.');
+        return $redirect->with('status', 'Paiement confirmé ; facture et reçu disponibles. Abonnement actif ou programmé selon la date choisie.');
     }
 
     public function close(CloseSubscriptionRequest $request, Subscription $subscription): RedirectResponse
@@ -91,6 +94,7 @@ class SubscriptionController extends Controller
     public function changeForm(Subscription $subscription): View
     {
         Gate::forUser($this->centralActor())->authorize('change', $subscription);
+        Gate::forUser($this->centralActor())->authorize('saas.payments.validate');
 
         return view('central.pages.admin.subscriptions.change', [
             'subscription' => $subscription,
@@ -101,9 +105,9 @@ class SubscriptionController extends Controller
 
     public function change(ChangeSubscriptionRequest $request, Subscription $subscription): RedirectResponse
     {
-        $this->transitions->change($this->centralActor(), $subscription, $request->validated());
+        $next = $this->transitions->change($this->centralActor(), $subscription, $request->validated(), $request->file('proof'));
 
-        return $this->redirectAfterTransition($subscription, 'Changement d’offre réservé à échéance, sous réserve du paiement intégral de la nouvelle période.');
+        return $this->redirectAfterTransition($next, 'Paiement confirmé ; changement appliqué ou programmé selon le mode choisi.');
     }
 
     private function redirectAfterTransition(Subscription $subscription, string $message): RedirectResponse

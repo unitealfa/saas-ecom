@@ -7,6 +7,7 @@ use App\Enums\Central\Billing\DocumentTypeEnum;
 use App\Enums\Central\Billing\TransferStatusEnum;
 use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
 use App\Enums\Central\Subscriptions\PeriodEnum;
+use App\Enums\Central\Subscriptions\RequestStatusEnum;
 use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Subscriptions\Subscription;
@@ -29,7 +30,8 @@ class DefaultSubscription
     private const int ATTEMPTS = 3;
 
     public function __construct(
-        private FreePlanCatalog $catalog
+        private FreePlanCatalog $catalog,
+        private readonly SubscriptionWorkflowNotifier $notifications,
     ) {}
 
     public function ensure(
@@ -107,6 +109,7 @@ class DefaultSubscription
                         'effective_at' => $next->period_starts_at->toISOString(),
                     ])
                     ->log('Abonnement programmé activé.');
+                $this->notifications->activated($next);
 
                 return $this->resolved($owner, $next, $assignedBy);
             }
@@ -130,6 +133,8 @@ class DefaultSubscription
     private function paidDocuments(): Builder
     {
         return SaasInvoice::where('status', DocumentStatusEnum::ISSUED)
+            ->whereHas('subscription', fn (Builder $query) => $query->whereNull('subscription_request_id')
+                ->orWhereHas('request', fn (Builder $request) => $request->where('status', RequestStatusEnum::ACCEPTED)))
             ->whereHas('payments', fn (Builder $query) => $query->where('transfer_status', TransferStatusEnum::VERIFIED), '=', 1)
             ->whereHas('installment', fn (Builder $query) => $query->where('installment_status', InstallmentStatusEnum::PAID))
             ->whereHas('payments', fn (Builder $query) => $query->where('transfer_status', TransferStatusEnum::VERIFIED)
