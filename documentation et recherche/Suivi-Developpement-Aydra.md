@@ -1,5 +1,11 @@
 # Suivi de développement et audit Aydra
 
+## 15 novembre 2026 — identité frontend du personnel central
+
+Premier lot validé : présentation Aydra sobre en modes clair et sombre, logo adapté, navigation du personnel regroupée et tableau de bord administratif redessiné avec les indicateurs existants. Les contrôles des liens et les droits généraux/financiers restent distincts ; le menu commerçant et le layout Tenant sont conservés. Les nouvelles couleurs sont limitées au layout du personnel central.
+
+Vérifications : 14 tests ciblés et 70 assertions réussis sur MySQL temporaire autorisé avec PHP 8.4.4 ; compilation frontend réussie avec avertissement sur la dépendance facultative fontaine. Contrastes des principales couleurs calculés à au moins 4,5:1. Les navigateurs automatisés iab et Chrome ne sont pas disponibles dans cette session : aucun contrôle visuel ou mobile réel n'est revendiqué. Aucun changement de données réelles ni du logo source fourni.
+
 ## 11 novembre 2026 — Module 26, réconciliations centrales
 
 Décisions utilisateur : appliquer les transitions d'abonnements échues et recalculer les boutiques ; détecter les anomalies financières sans confirmer ni modifier les paiements. Droits saas.operations.subscriptions.reconcile et saas.operations.payments.reconcile indépendants, ajoutés au catalogue et au seeder additif existant. Traitements bornés à 50 éléments avec continuation explicite ; abonnements verrouillés et audités par compte commerçant, échecs isolés. Contrôle financier limité aux paiements incertains, vérifications incohérentes et doublons vérifiés, avec bilan audité ; ce contrôle n'est pas exhaustif et ne prouve pas l'encaissement.

@@ -1,6 +1,5 @@
 <x-layouts::app.sidebar :title="$title ?? null">
-    <flux:main>
-        <x-central::components.admin-navigation />
+    <flux:main :inset="app(\App\Services\Central\Authorization\CentralUserAccess::class)->isStaff(auth('central')->user())">
         {{ $slot }}
     </flux:main>
 </x-layouts::app.sidebar>
