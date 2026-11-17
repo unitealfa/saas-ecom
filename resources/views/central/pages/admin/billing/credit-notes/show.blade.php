@@ -6,9 +6,14 @@
         <flux:text>État : {{ $credit->status->label() }}. Facture corrigée : {{ $credit->originalInvoice->number }}.</flux:text>
         <flux:text>Motif : {{ $credit->getAttribute('reason') }}</flux:text>
         <flux:text>Période : {{ $credit->period_starts_at->format('d/m/Y') }} — {{ $credit->period_ends_at->format('d/m/Y') }}.</flux:text>
-        <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr><th>Prestation</th><th>Quantité</th><th>HT</th><th>Taxes</th><th>TTC</th><th>Motif</th></tr></thead><tbody>
-        @foreach ($credit->lines as $line)<tr><td class="p-3">{{ $line->description }}</td><td>{{ $line->quantity }}</td><td>{{ $line->net_amount }}</td><td>{{ $line->tax_amount }}</td><td>{{ $line->total_amount }}</td><td>{{ $line->getAttribute('reason') }}</td></tr>@endforeach
-        </tbody></table></div>
+        <flux:table>
+            <flux:table.columns><flux:table.column>Prestation</flux:table.column><flux:table.column>Quantité</flux:table.column><flux:table.column>HT</flux:table.column><flux:table.column>Taxes</flux:table.column><flux:table.column>TTC</flux:table.column><flux:table.column>Motif</flux:table.column></flux:table.columns>
+            <flux:table.rows>
+                @foreach ($credit->lines as $line)
+                    <flux:table.row><flux:table.cell>{{ $line->description }}</flux:table.cell><flux:table.cell>{{ $line->quantity }}</flux:table.cell><flux:table.cell>{{ $line->net_amount }}</flux:table.cell><flux:table.cell>{{ $line->tax_amount }}</flux:table.cell><flux:table.cell>{{ $line->total_amount }}</flux:table.cell><flux:table.cell>{{ $line->getAttribute('reason') }}</flux:table.cell></flux:table.row>
+                @endforeach
+            </flux:table.rows>
+        </flux:table>
         <flux:heading>Total corrigé : {{ $credit->total_amount }} {{ $credit->currency }}</flux:heading>
         <flux:text>Dû net : {{ $balance['net_due'] }} — paiements nets : {{ $balance['payments'] }} — remboursements nets : {{ $balance['refunds'] }} — reste à payer : {{ $balance['remaining'] }} — surplus : {{ $balance['surplus'] }} {{ $credit->currency }}.</flux:text>
         <flux:callout>Un brouillon réserve son montant, mais seul un avoir émis réduit le dû. Aucun remboursement ni changement d’abonnement n’est déclenché automatiquement.</flux:callout>

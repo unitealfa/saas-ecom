@@ -180,6 +180,21 @@ test('staff listing separates merchants archived accounts and protected root wit
         ->assertDontSee('Priorités des boutiques de '.$staff->name);
 });
 
+test('staff listing sorts matching staff by name and email', function (): void {
+    $first = staffTestAccount();
+    $first->forceFill(['first_name' => 'Alice', 'last_name' => 'Sorting', 'email' => 'a-sort@example.test'])->save();
+    $last = staffTestAccount();
+    $last->forceFill(['first_name' => 'Zelda', 'last_name' => 'Sorting', 'email' => 'z-sort@example.test'])->save();
+    User::factory()->create(['first_name' => 'Merchant', 'last_name' => 'Sorting']);
+
+    Livewire::actingAs($this->admin, 'central')->test('central::pages.admin.staff.index')
+        ->set('search', 'Sorting')
+        ->call('sort', 'name')->assertSeeInOrder(['Alice Sorting', 'Zelda Sorting'])
+        ->call('sort', 'name')->assertSeeInOrder(['Zelda Sorting', 'Alice Sorting'])
+        ->call('sort', 'email')->assertSeeInOrder(['a-sort@example.test', 'z-sort@example.test'])
+        ->assertDontSee('Merchant Sorting');
+});
+
 test('staff pages refuse guests merchants and ordinary readers including direct URLs', function (): void {
     $staff = staffTestAccount();
     $this->get(route('central.staff.index'))->assertRedirect(route('login'));

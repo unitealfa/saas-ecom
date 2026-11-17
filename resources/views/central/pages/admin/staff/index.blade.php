@@ -18,6 +18,16 @@ new #[Layout('layouts::app'), Title('Personnel SaaS')] class extends Component
 
     public string $search = '';
     public string $status = '';
+    public string $sortBy = 'id';
+    public string $sortDirection = 'asc';
+
+    public function sort(string $column): void
+    {
+        abort_unless(in_array($column, ['name', 'email'], true), 422);
+        $this->sortDirection = $this->sortBy === $column && $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        $this->sortBy = $column;
+        $this->resetPage();
+    }
 
     public function mount(): void
     {
@@ -42,10 +52,12 @@ new #[Layout('layouts::app'), Title('Personnel SaaS')] class extends Component
         $this->validate([
             'search' => ['string', 'max:255'],
             'status' => ['nullable', Rule::in(array_column(StatusEnum::cases(), 'value'))],
+            'sortBy' => [Rule::in(['id', 'name', 'email'])],
+            'sortDirection' => [Rule::in(['asc', 'desc'])],
         ]);
 
         return app(StaffManagementService::class)->search(Auth::guard('central')->user(), $this->search,
-            $this->status === '' ? null : StatusEnum::from((int) $this->status));
+            $this->status === '' ? null : StatusEnum::from((int) $this->status), $this->sortBy, $this->sortDirection);
     }
 };
 ?>
@@ -65,24 +77,31 @@ new #[Layout('layouts::app'), Title('Personnel SaaS')] class extends Component
             <option value="{{ $state->value }}">{{ $state->label() }}</option>
         @endforeach
     </flux:select>
-    <div class="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
-        <table class="w-full text-left text-sm">
-            <thead><tr><th class="p-4">Nom</th><th class="p-4">E-mail</th><th class="p-4">Rôles</th><th class="p-4">État</th><th class="p-4">Actions</th></tr></thead>
-            <tbody>
+    <div class="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
+        <flux:table :paginate="$this->staff">
+            <flux:table.columns>
+                <flux:table.column sortable :sorted="$sortBy === 'name'" :direction="$sortDirection" :aria-sort="$sortBy === 'name' ? ($sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'" wire:click="sort('name')">Nom</flux:table.column>
+                <flux:table.column sortable :sorted="$sortBy === 'email'" :direction="$sortDirection" :aria-sort="$sortBy === 'email' ? ($sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'" wire:click="sort('email')">E-mail</flux:table.column>
+                <flux:table.column>Rôles</flux:table.column>
+                <flux:table.column>État</flux:table.column>
+                <flux:table.column>Actions</flux:table.column>
+            </flux:table.columns>
+            <flux:table.rows>
                 @forelse ($this->staff as $user)
-                    <tr wire:key="staff-{{ $user->uuid }}">
-                        <td class="p-4"><div class="flex items-center gap-2"><flux:avatar :src="$user->profile_photo_url" :name="$user->name" size="sm" />{{ $user->name }}</div></td><td class="p-4">{{ $user->email }}</td>
-                        <td class="p-4">{{ $user->roles->pluck('label')->join(', ') }}</td><td class="p-4">{{ $user->status->label() }}</td>
-                        <td class="p-4">
+                    <flux:table.row :key="$user->uuid">
+                        <flux:table.cell><div class="flex items-center gap-2"><flux:avatar :src="$user->profile_photo_url" :name="$user->name" size="sm" />{{ $user->name }}</div></flux:table.cell>
+                        <flux:table.cell>{{ $user->email }}</flux:table.cell>
+                        <flux:table.cell>{{ $user->roles->pluck('label')->join(', ') }}</flux:table.cell>
+                        <flux:table.cell>{{ $user->status->label() }}</flux:table.cell>
+                        <flux:table.cell>
                             <flux:button :href="route('central.staff.show', $user)">Informations</flux:button>
                             @include('central.pages.admin.staff.actions')
-                        </td>
-                    </tr>
+                        </flux:table.cell>
+                    </flux:table.row>
                 @empty
-                    <tr><td colspan="5" class="p-4">Aucun administrateur trouvé.</td></tr>
+                    <flux:table.row><flux:table.cell colspan="5">Aucun administrateur trouvé.</flux:table.cell></flux:table.row>
                 @endforelse
-            </tbody>
-        </table>
+            </flux:table.rows>
+        </flux:table>
     </div>
-    {{ $this->staff->links() }}
 </section>
