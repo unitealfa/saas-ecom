@@ -178,6 +178,8 @@ test('staff listing separates merchants archived accounts and protected root wit
         ->assertDontSeeText($staff->uuid)
         ->assertDontSee('href="'.route('central.users.tenants.create', $staff).'"', false)
         ->assertDontSee('Priorités des boutiques de '.$staff->name);
+    $this->get(route('central.staff.create'))->assertOk()->assertSee('Identité et coordonnées')->assertSee('Rôles du personnel');
+    $this->get(route('central.staff.edit', $staff))->assertOk()->assertSee('Identité et coordonnées')->assertSee('name="email"', false);
 });
 
 test('staff listing sorts matching staff by name and email', function (): void {
