@@ -69,6 +69,17 @@ body.aydra-admin .aydra-admin-sidebar::-webkit-scrollbar {
     display: none;
 }
 
+body.aydra-admin .aydra-context-header {
+    background: var(--aydra-surface);
+    border-bottom: 1px solid var(--aydra-border);
+}
+
+@media (min-width: 64rem) {
+    .aydra-context-header:not(:has(.aydra-context-nav)) {
+        display: none !important;
+    }
+}
+
 body.aydra-admin [data-flux-main-inset] {
     background: #f4f7fc;
     border-color: var(--aydra-border);
