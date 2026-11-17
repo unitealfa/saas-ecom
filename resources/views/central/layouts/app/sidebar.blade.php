@@ -66,7 +66,8 @@
         </flux:sidebar>
 
         <!-- Mobile User Menu -->
-        <flux:header class="lg:hidden">
+        <flux:header class="aydra-context-header block!">
+            <div class="flex min-h-14 w-full items-center lg:hidden">
             <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
             @if ($isStaff)
                 <a href="{{ route($dashboardRoute) }}" aria-label="Aydra — tableau de bord" wire:navigate>
@@ -99,6 +100,8 @@
                     </form>
                 </flux:menu>
             </flux:dropdown>
+            </div>
+            <x-central::components.admin-navigation />
         </flux:header>
 
         {{ $slot }}

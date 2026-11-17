@@ -126,7 +126,8 @@ test('metadata editing preserves permissions durations identity and assignment d
     $member->assignRole($role);
     $assignedAt = $member->roles()->first()->pivot->assigned_at;
     $this->actingAs($actor, 'central')->get(route('central.roles.edit', $role))->assertOk()
-        ->assertSee('Nom unique du rôle')->assertDontSee('name="permissions[]"', false)->assertDontSee('name="durations[', false);
+        ->assertSee('Identité du rôle')->assertSee('Nom unique du rôle')->assertSee('name="expected_version"', false)
+        ->assertDontSee('name="permissions[]"', false)->assertDontSee('name="durations[', false);
     $this->put(route('central.roles.update', $role), ['expected_version' => 1, 'name' => ' after-name ', 'label' => 'Nouveau libellé'])
         ->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
     $updated = $role->fresh();
@@ -193,7 +194,9 @@ test('delegated role creation offers only owned permissions and refuses derived 
     $actor = module03Actor(['saas.roles.create' => 9999, 'saas.users.create' => 9999, 'saas.countries.view' => 1]);
     $this->travel(1)->days();
     $this->actingAs($actor, 'central')->get(route('central.roles.create'))->assertOk()
-        ->assertSee('Créer des utilisateurs')->assertDontSee('Consulter les utilisateurs')->assertDontSee('Consulter les pays');
+        ->assertSee('Identité du rôle')->assertSee('Gérer les permissions')->assertSee('data-flux-flyout', false)
+        ->assertSee('form="role-form"', false)->assertSee('Créer des utilisateurs')
+        ->assertDontSee('Consulter les utilisateurs')->assertDontSee('Consulter les pays');
     $this->post(route('central.roles.store'), module03Payload('derived-denied', ['saas.users.view' => 5]))->assertForbidden();
     $this->post(route('central.roles.store'), module03Payload('expired-denied', ['saas.countries.view' => 5]))->assertForbidden();
     $this->post(route('central.roles.store'), module03Payload('allowed-role', ['saas.users.create' => 20]))->assertSessionHasNoErrors();

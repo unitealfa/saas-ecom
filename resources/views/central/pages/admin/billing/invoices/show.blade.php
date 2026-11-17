@@ -24,15 +24,15 @@
             <div><dt>Justification sans taxe</dt><dd>{{ $invoice->billing_rule_snapshot['fiscal_policy']['no_tax_reason'] ?? $invoice->billing_rule_snapshot['no_tax_reason'] ?? 'Taxes détaillées ci-dessous' }}</dd></div>
         </dl>
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
-                <thead><tr><th class="p-3">Description</th><th class="p-3">Quantité</th><th class="p-3">Montant net</th><th class="p-3">Taxe</th><th class="p-3">Total</th></tr></thead>
-                <tbody>
+            <flux:table>
+                <flux:table.columns><flux:table.column>Description</flux:table.column><flux:table.column>Quantité</flux:table.column><flux:table.column>Montant net</flux:table.column><flux:table.column>Taxe</flux:table.column><flux:table.column>Total</flux:table.column></flux:table.columns>
+                <flux:table.rows>
                     @foreach ($invoice->lines as $line)
-                        <tr class="border-t border-zinc-200 dark:border-zinc-700"><td class="p-3">{{ $line->description }}</td><td class="p-3">{{ $line->quantity }}</td>
-                            <td class="p-3">{{ $line->net_amount }}</td><td class="p-3">{{ $line->tax_amount }}</td><td class="p-3">{{ $line->total_amount }}</td></tr>
+                        <flux:table.row><flux:table.cell>{{ $line->description }}</flux:table.cell><flux:table.cell>{{ $line->quantity }}</flux:table.cell>
+                            <flux:table.cell>{{ $line->net_amount }}</flux:table.cell><flux:table.cell>{{ $line->tax_amount }}</flux:table.cell><flux:table.cell>{{ $line->total_amount }}</flux:table.cell></flux:table.row>
                     @endforeach
-                </tbody>
-            </table>
+                </flux:table.rows>
+            </flux:table>
         </div>
         @endif
         <flux:heading>Total : {{ $invoice->total_amount }} {{ $invoice->currency }}</flux:heading>

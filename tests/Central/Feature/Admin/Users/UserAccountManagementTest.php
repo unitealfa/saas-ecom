@@ -13,6 +13,7 @@ use App\Services\Central\Authorization\CentralRoleAssignmentService;
 use App\Services\Central\Users\UserManagementService;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Database\Seeders\Central\CountrySeeder;
+use Database\Seeders\Central\FreePlanSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Mail\Transport\ArrayTransport;
@@ -45,6 +46,7 @@ function editableCentralProfile(User $user): array
 }
 
 test('administrative account creation preserves a nonempty first name equal to zero', function (): void {
+    $this->seed(FreePlanSeeder::class);
     $this->actingAs($this->admin, 'central')->post(route('central.users.store'), [
         'last_name' => 'Zero', 'first_name' => '0', 'email' => 'zero-name@example.test',
         'account_kind' => 'merchant',
@@ -52,6 +54,23 @@ test('administrative account creation preserves a nonempty first name equal to z
     ])->assertSessionHasNoErrors();
 
     expect(User::where('email', 'zero-name@example.test')->firstOrFail()->first_name)->toBe('0');
+});
+
+test('central account creation form offers authorized account types and creates staff with an invitation', function (): void {
+    $this->seed(FreePlanSeeder::class);
+    $role = Role::findByName('user-reader', 'central');
+    $this->actingAs($this->admin, 'central')->get(route('central.users.create'))->assertOk()
+        ->assertSee('Identité et coordonnées')->assertSee('name="account_kind"', false)
+        ->assertSee('Commerçant')->assertSee('Personnel SaaS')->assertSee('Rôles du personnel')
+        ->assertSee('name="country_uuid"', false)->assertSee('Informations professionnelles');
+    $this->post(route('central.users.store'), [
+        'last_name' => 'Staff', 'email' => 'central-staff@example.test', 'account_kind' => 'staff',
+        'country_uuid' => Country::where('code', 'DZ')->firstOrFail()->uuid, 'roles' => [$role->uuid],
+    ])->assertSessionHasNoErrors();
+
+    $staff = User::where('email', 'central-staff@example.test')->firstOrFail();
+    expect($staff->hasRole($role))->toBeTrue()->and($staff->hasVerifiedEmail())->toBeFalse();
+    Notification::assertSentTo($staff, AccountInvitation::class);
 });
 
 test('merchants cannot receive SaaS roles or direct permissions through either administration module', function (): void {
@@ -74,6 +93,7 @@ test('merchants cannot receive SaaS roles or direct permissions through either a
 });
 
 test('an admin created account sends its invitation immediately without a queue worker', function (): void {
+    $this->seed(FreePlanSeeder::class);
     Notification::swap(new ChannelManager(app()));
     $transport = Mail::mailer()->getSymfonyTransport();
     expect($transport)->toBeInstanceOf(ArrayTransport::class);
@@ -90,6 +110,7 @@ test('an admin created account sends its invitation immediately without a queue 
 });
 
 test('SMTP failure keeps the new account and shows a warning without exposing the private error', function (): void {
+    $this->seed(FreePlanSeeder::class);
     Notification::swap(new ChannelManager(app()));
     $transport = Mockery::mock(TransportInterface::class);
     $transport->shouldReceive('send')->once()->andThrow(new TransportException('private-smtp-secret'));
@@ -155,7 +176,10 @@ test('merchant edits preserve the real identifiers password and roles and invali
     ])->save();
     $password = $target->password;
     $emailVerifiedAt = $target->email_verified_at;
-    $this->actingAs($manager, 'central')->get(route('central.users.edit', $target))->assertOk();
+    $this->actingAs($manager, 'central')->get(route('central.users.edit', $target))->assertOk()
+        ->assertSee('Identité et coordonnées')->assertSee('name="first_name"', false)
+        ->assertSee('name="email"', false)->assertSee('name="country_uuid"', false)
+        ->assertDontSee('demande une nouvelle approbation');
     $this->put(route('central.users.update', $target), [
         ...editableCentralProfile($target), 'first_name' => ' Nour ', 'last_name' => ' Newname ', 'phone' => '+213555999999',
     ])->assertSessionHasNoErrors()->assertRedirect(route('central.users.show', $target));

@@ -47,11 +47,13 @@ test('central staff see the branded navigation with only authorized sections', f
 });
 
 test('root navigation preserves grouped pages and notifications without obsolete routes', function (): void {
-    $root = adminDashboardActor(['saas.dashboard.view']);
+    $this->seed(AuthorizationSeeder::class);
+    $root = User::factory()->create();
     $root->assignRole(Role::findByName('root', 'central'));
 
     $this->actingAs($root, 'central')->get(route('central.admin-dashboard.index'))
         ->assertOk()->assertSee('Notifications')
+        ->assertDontSee('aydra-context-nav')
         ->assertSee('Personnel SaaS')->assertSee('Boutiques')->assertSee('Transporteurs')
         ->assertSee('Géographie')->assertSee('Plans et offres')->assertSee('Facturation')->assertSee('Abonnements')
         ->assertDontSee('Compteurs de facturation')->assertDontSee('Demandes d’abonnement')
@@ -59,6 +61,7 @@ test('root navigation preserves grouped pages and notifications without obsolete
 
     $this->get(route('central.subscriptions.index'))->assertOk()
         ->assertSee('aria-label="Abonnements"', false)
+        ->assertSeeInOrder(['data-flux-header', 'aria-label="Abonnements"', 'data-flux-main'], false)
         ->assertSee('href="'.route('central.subscription-requests.index').'"', false);
 });
 

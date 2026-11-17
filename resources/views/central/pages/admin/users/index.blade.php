@@ -58,8 +58,19 @@ new #[Title('Utilisateurs')] class extends Component {
     }
 }; ?>
 
-<section class="flex flex-col gap-6">
-    <flux:heading size="xl" level="1">{{ __('Utilisateurs') }}</flux:heading>
+<section class="aydra-users mx-auto flex w-full max-w-screen-2xl flex-col gap-6">
+    <header class="flex flex-wrap items-start justify-between gap-5">
+        <div class="space-y-2">
+            <h1 class="aydra-heading text-3xl font-semibold tracking-tight sm:text-4xl">Utilisateurs</h1>
+            <p class="aydra-muted max-w-2xl text-sm sm:text-base">Retrouvez et gérez les comptes commerçants et le personnel SaaS.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <flux:button :href="route('central.users.pending')" icon="clock">Inscriptions en attente</flux:button>
+            @if (auth('central')->user()->can('create', \App\Models\User::class) || auth('central')->user()->can('createStaff', \App\Models\User::class))
+                <flux:button :href="route('central.users.create')" variant="primary" icon="plus">Créer un compte</flux:button>
+            @endif
+        </div>
+    </header>
     @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
     @if (session('warning'))<flux:callout variant="warning">{{ session('warning') }}</flux:callout>@endif
     @if ($errors->any())
@@ -67,13 +78,15 @@ new #[Title('Utilisateurs')] class extends Component {
             @foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach
         </flux:callout>
     @endif
-    @if (auth('central')->user()->can('create', \App\Models\User::class) || auth('central')->user()->can('createStaff', \App\Models\User::class))
-        <flux:button :href="route('central.users.create')" variant="primary">Créer un compte</flux:button>
-    @endif
-    <flux:button :href="route('central.users.pending')">Inscriptions en attente</flux:button>
-    <flux:text>{{ __('Comptes de la plateforme centrale : commerçants et personnel SaaS.') }}</flux:text>
-    <flux:input wire:model.live.debounce.300ms="search" :label="__('Rechercher par nom ou e-mail')" type="search" />
-    <flux:select wire:model.live="status" label="État du compte">
+    <div class="aydra-users-panel">
+        <div class="aydra-users-toolbar">
+            <div class="min-w-0 flex-1">
+                <h2 class="aydra-heading text-lg font-semibold">Comptes</h2>
+                <p class="aydra-muted mt-1 text-sm">{{ $this->users->total() }} {{ $this->users->total() === 1 ? 'compte trouvé' : 'comptes trouvés' }}</p>
+            </div>
+            <div class="grid w-full gap-3 sm:grid-cols-2 lg:w-auto lg:min-w-[32rem]">
+                <flux:input wire:model.live.debounce.300ms="search" :label="__('Rechercher par nom ou e-mail')" type="search" icon="magnifying-glass" placeholder="Nom ou e-mail" />
+                <flux:select wire:model.live="status" label="État du compte">
         <option value="">Comptes non archivés</option>
         <option value="1">Actifs</option>
         <option value="2">Inactifs</option>
@@ -81,8 +94,10 @@ new #[Title('Utilisateurs')] class extends Component {
         <option value="4">Archivés</option>
         <option value="5">En attente d’approbation</option>
         <option value="6">Refusés</option>
-    </flux:select>
-    <div class="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
+                </flux:select>
+            </div>
+        </div>
+        <div class="aydra-users-table">
         <flux:table :paginate="$this->users">
             <flux:table.columns>
                 <flux:table.column sortable :sorted="$sortBy === 'name'" :direction="$sortDirection" :aria-sort="$sortBy === 'name' ? ($sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'" wire:click="sort('name')">{{ __('Nom') }}</flux:table.column>
@@ -94,11 +109,19 @@ new #[Title('Utilisateurs')] class extends Component {
             <flux:table.rows>
                 @forelse ($this->users as $user)
                     <flux:table.row :key="$user->uuid">
-                        <flux:table.cell><div class="flex items-center gap-2"><flux:avatar :src="$user->profile_photo_url" :name="$user->name" size="sm" />{{ $user->name }}</div></flux:table.cell>
+                        <flux:table.cell variant="strong"><div class="flex items-center gap-3"><flux:avatar :src="$user->profile_photo_url" :name="$user->name" size="sm" /><span>{{ $user->name }}</span></div></flux:table.cell>
                         <flux:table.cell>{{ $user->email }}</flux:table.cell>
                         <flux:table.cell>{{ $user->roles->pluck('label')->join(', ') ?: __('Commerçant') }}</flux:table.cell>
-                        <flux:table.cell>{{ $user->status->label() }}</flux:table.cell>
                         <flux:table.cell>
+                            <flux:badge size="sm" :color="match ($user->status) {
+                                StatusEnum::ACTIVE => 'green',
+                                StatusEnum::PENDING => 'amber',
+                                StatusEnum::SUSPENDED, StatusEnum::REJECTED => 'red',
+                                default => 'zinc',
+                            }">{{ $user->status->label() }}</flux:badge>
+                        </flux:table.cell>
+                        <flux:table.cell>
+                            <div class="flex min-w-56 flex-wrap items-center gap-2">
                             @can('view', $user)
                                 <flux:button :href="route('central.users.show', $user)">Informations</flux:button>
                             @endcan
@@ -114,12 +137,14 @@ new #[Title('Utilisateurs')] class extends Component {
                                 <flux:button :href="route('central.users.tenants.create', $user)">Boutiques</flux:button>
                             @endcan
                             @include('central.pages.admin.users.lifecycle-actions')
+                            </div>
                         </flux:table.cell>
                     </flux:table.row>
                 @empty
-                    <flux:table.row><flux:table.cell colspan="5">{{ __('Aucun utilisateur trouvé.') }}</flux:table.cell></flux:table.row>
+                    <flux:table.row><flux:table.cell colspan="5"><div class="aydra-users-empty"><p class="aydra-heading font-medium">Aucun utilisateur trouvé.</p><p class="aydra-muted mt-1 text-sm">Essayez un autre nom, e-mail ou état de compte.</p></div></flux:table.cell></flux:table.row>
                 @endforelse
             </flux:table.rows>
         </flux:table>
+        </div>
     </div>
 </section>
