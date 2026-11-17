@@ -19,6 +19,7 @@ class ShopProfilePermissionSeeder extends Seeder
 
         DB::transaction(function (): void {
             ShopProfilePermissions::seed();
+            app(AuthorizationSeeder::class)->run();
 
             $registrar = app(PermissionRegistrar::class);
             DB::afterCommit(fn () => $registrar->forgetCachedPermissions());

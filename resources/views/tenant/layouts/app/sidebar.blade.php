@@ -33,9 +33,18 @@
                     </flux:sidebar.item>
                 @endif
 
-                <flux:sidebar.item icon="arrow-left" :href="route('dashboard')">
-                    {{ __('Mon espace Aydra') }}
-                </flux:sidebar.item>
+                @can('viewAny', \App\Models\Tenant\Roles\Role::class)
+                    <flux:sidebar.item icon="users" :href="route('tenant.admin.roles.index', absolute: false)">Profils et rôles</flux:sidebar.item>
+                @endcan
+                @can('viewAny', \App\Models\Tenant\Permissions\Permission::class)
+                    <flux:sidebar.item icon="shield-check" :href="route('tenant.admin.permissions.index', absolute: false)">Permissions</flux:sidebar.item>
+                @endcan
+                @can('viewAny', \App\Models\Tenant\Users\User::class)
+                    <flux:sidebar.item icon="users" :href="route('tenant.admin.users.index', absolute: false)">Équipe</flux:sidebar.item>
+                @endcan
+                @if(auth('tenant')->check() && \App\Services\Tenant\Authorization\TenantAccess::isOwner(auth('tenant')->user()))
+                    <flux:sidebar.item icon="arrow-left" :href="route('dashboard')">Mon espace Aydra</flux:sidebar.item>
+                @endif
             </flux:sidebar.nav>
 
             <flux:spacer />

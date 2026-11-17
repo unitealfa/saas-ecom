@@ -6,6 +6,7 @@ use App\Concerns\HasPublicUuid;
 use App\Concerns\HasRoleMetadata;
 use App\Concerns\LogsSafeActivity;
 use App\Models\Tenant\Permissions\Permission;
+use App\Services\Tenant\Authorization\TenantAuthorizationMode;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Spatie\Permission\Models\Role as PackageRole;
 use Stancl\Tenancy\Database\Concerns\TenantConnection;
@@ -29,6 +30,11 @@ class Role extends PackageRole
         'is_super_admin' => false,
         'permission_version' => 1,
     ];
+
+    public function usesIndividualPermissions(): bool
+    {
+        return TenantAuthorizationMode::individualOnly();
+    }
 
     protected function casts(): array
     {

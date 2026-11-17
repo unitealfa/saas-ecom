@@ -6,6 +6,7 @@ use App\Concerns\HasProfilePhoto;
 use App\Concerns\HasPublicUuid;
 use App\Concerns\HasTimedPermissions;
 use App\Concerns\LogsSafeActivity;
+use App\Services\Tenant\Authorization\TenantAuthorizationMode;
 use App\Enums\Tenant\Users\MembershipStatusEnum;
 use App\Enums\Tenant\Users\StatusEnum;
 use App\Models\Tenant\Media\Media;
@@ -38,11 +39,61 @@ class User extends Authenticatable
     use HasProfilePhoto;
 
     /** @use HasTimedPermissions<Role, Permission> */
-    use HasTimedPermissions;
+    use HasTimedPermissions {
+        hasPermissionTo as private legacyHasPermissionTo;
+        getPermissionsViaRoles as private legacyPermissionsViaRoles;
+        hasPermissionViaRole as private legacyHasPermissionViaRole;
+    }
 
     use LogsSafeActivity;
 
     protected string $guard_name = 'tenant';
+
+    /** Only direct, unexpired, active grants authorize actions after this shop was converted. */
+    public function hasPermissionTo(mixed $permission, ?string $guardName = null): bool
+    {
+        if (! TenantAuthorizationMode::individualOnly()) {
+            return $this->legacyHasPermissionTo($permission, $guardName);
+        }
+        if ($this->status !== StatusEnum::ACTIVE
+            || $this->membership_status !== MembershipStatusEnum::ACTIVE
+            || $this->trashed() || $this->joined_at === null || $this->email_verified_at === null) {
+            return false;
+        }
+        $item = $this->filterPermission($permission, $guardName);
+        $now = now();
+        return $this->permissions()->whereKey($item->getKey())
+            ->wherePivot('assigned_at', '<=', $now)
+            ->wherePivot('expires_at', '>', $now)->exists();
+    }
+
+    /** Spatie's checkPermissionTo/can delegate to the overridden hasPermissionTo. */
+    public function getPermissionsViaRoles(): \Illuminate\Support\Collection
+    {
+        return TenantAuthorizationMode::individualOnly() ? collect() : $this->legacyPermissionsViaRoles();
+    }
+
+    protected function hasPermissionViaRole(\Spatie\Permission\Contracts\Permission $permission): bool
+    {
+        return ! TenantAuthorizationMode::individualOnly()
+            && $this->legacyHasPermissionViaRole($permission);
+    }
+
+    public function getDirectPermissions(): \Illuminate\Support\Collection
+    {
+        if (! TenantAuthorizationMode::individualOnly()) {
+            return $this->permissions;
+        }
+        $now = now();
+        return $this->permissions()->wherePivot('assigned_at', '<=', $now)
+            ->wherePivot('expires_at', '>', $now)->get();
+    }
+
+    public function getAllPermissions(): \Illuminate\Support\Collection
+    {
+        return TenantAuthorizationMode::individualOnly()
+            ? $this->getDirectPermissions() : $this->getDirectPermissions()->merge($this->getPermissionsViaRoles())->unique('id');
+    }
 
     protected function casts(): array
     {
