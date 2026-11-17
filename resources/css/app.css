@@ -243,6 +243,40 @@ html.dark body.aydra-admin .aydra-financial {
 body.aydra-admin .aydra-heading { color: var(--aydra-heading); }
 body.aydra-admin .aydra-muted { color: var(--aydra-muted); }
 
+body.aydra-admin .aydra-users-panel {
+    overflow: hidden;
+    background: var(--aydra-surface);
+    border: 1px solid var(--aydra-border);
+    border-radius: 1rem;
+}
+
+body.aydra-admin .aydra-users-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 1.25rem;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--aydra-border);
+}
+
+body.aydra-admin .aydra-users-table { padding: 0 1.5rem 1.25rem; }
+body.aydra-admin .aydra-users-empty { padding: 2.5rem 0; }
+
+body.aydra-admin .aydra-detail-grid dt {
+    color: var(--aydra-muted);
+    font-size: .8125rem;
+}
+
+body.aydra-admin .aydra-detail-grid dd {
+    margin-top: .375rem;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+    body.aydra-admin .aydra-users-toolbar { padding: 1.25rem; }
+    body.aydra-admin .aydra-users-table { padding-inline: 1.25rem; }
+}
+
 body.aydra-admin .aydra-icon {
     display: inline-flex;
     align-items: center;

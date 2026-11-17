@@ -1,6 +1,25 @@
 <x-layouts::app :title="__('Informations du compte')">
-    <section class="mx-auto flex max-w-3xl flex-col gap-6">
-        <div class="flex items-center gap-3"><flux:avatar :src="$user->profile_photo_url" :name="$user->name" size="lg" /><flux:heading size="xl" level="1">{{ $user->name }}</flux:heading></div>
+    <section class="mx-auto flex w-full max-w-screen-xl flex-col gap-6">
+        <header class="flex flex-wrap items-center justify-between gap-5">
+            <div class="flex min-w-0 items-center gap-4">
+                <flux:avatar :src="$user->profile_photo_url" :name="$user->name" size="lg" />
+                <div class="min-w-0 space-y-2">
+                    <h1 class="aydra-heading break-words text-3xl font-semibold tracking-tight sm:text-4xl">{{ $user->name }}</h1>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="aydra-muted text-sm">{{ $user->roles->isEmpty() ? 'Commerçant' : 'Personnel SaaS' }}</span>
+                        <flux:badge size="sm" :color="match ($user->status) {
+                            \App\Enums\Central\Users\StatusEnum::ACTIVE => 'green',
+                            \App\Enums\Central\Users\StatusEnum::PENDING => 'amber',
+                            \App\Enums\Central\Users\StatusEnum::SUSPENDED, \App\Enums\Central\Users\StatusEnum::REJECTED => 'red',
+                            default => 'zinc',
+                        }">{{ $user->status->label() }}</flux:badge>
+                    </div>
+                </div>
+            </div>
+            @can('update', $user)
+                <flux:button :href="route('central.users.edit', $user)" variant="primary" icon="pencil-square">Modifier</flux:button>
+            @endcan
+        </header>
         @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
         @if (session('warning'))<flux:callout variant="warning">{{ session('warning') }}</flux:callout>@endif
         @if ($errors->any())
@@ -8,7 +27,12 @@
                 @foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach
             </flux:callout>
         @endif
-        <dl class="grid gap-4 sm:grid-cols-2">
+        <section class="aydra-users-panel p-5 sm:p-6" aria-labelledby="account-information">
+        <div class="mb-6">
+            <h2 id="account-information" class="aydra-heading text-lg font-semibold">Informations du compte</h2>
+            <p class="aydra-muted mt-1 text-sm">Coordonnées, vérifications et activité du compte.</p>
+        </div>
+        <dl class="aydra-detail-grid grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
             @foreach ([
                 'Prénom' => $user->first_name, 'Nom de famille' => $user->last_name,
                 'E-mail' => $user->email, 'Téléphone' => $user->phone,
@@ -29,12 +53,16 @@
                 <div><dt class="font-medium">{{ $label }}</dt><dd><flux:text>{{ $value ?? 'Non renseigné' }}</flux:text></dd></div>
             @endforeach
         </dl>
+        </section>
         @if ($user->roles->isNotEmpty())
-            <flux:heading level="2" id="saas-roles">Rôles SaaS</flux:heading>
-            <flux:text>{{ $user->roles->pluck('label')->join(', ') }}</flux:text>
+            <section class="aydra-users-panel p-5 sm:p-6" aria-labelledby="saas-roles">
+                <h2 id="saas-roles" class="aydra-heading text-lg font-semibold">Rôles SaaS</h2>
+                <p class="aydra-muted mt-3 text-sm">{{ $user->roles->pluck('label')->join(', ') }}</p>
+            </section>
         @endif
         @if ($user->roles->isEmpty())
-            <flux:heading level="2">Boutiques</flux:heading>
+            <section class="aydra-users-panel p-5 sm:p-6" aria-labelledby="user-shops">
+            <h2 id="user-shops" class="aydra-heading mb-4 text-lg font-semibold">Boutiques</h2>
             @forelse ($shops as $shop)
                 <flux:text>{{ $shop->shop_name }} — {{ match ($shop->getAttribute('status')->value) {
                     1 => 'En préparation', 2 => 'Active', 3 => 'Inactive', 4 => 'Suspendue',
@@ -43,11 +71,13 @@
             @empty
                 <flux:text>Aucune boutique.</flux:text>
             @endforelse
+            </section>
         @endif
         @can('viewLegal', $user)
-            <flux:heading level="2">Informations professionnelles</flux:heading>
-            <flux:text>Ces informations sont facultatives. L’action Approuver valide aussi le dossier ; Refuser le rejette avec un motif obligatoire.</flux:text>
-            <dl class="grid gap-4 sm:grid-cols-2">
+            <section class="aydra-users-panel p-5 sm:p-6" aria-labelledby="professional-information">
+            <h2 id="professional-information" class="aydra-heading text-lg font-semibold">Informations professionnelles</h2>
+            <p class="aydra-muted mt-1 text-sm">Ces informations sont facultatives. L’action Approuver valide aussi le dossier ; Refuser le rejette avec un motif obligatoire.</p>
+            <dl class="aydra-detail-grid mt-6 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ([
                     'Forme juridique' => $user->getAttribute('legal_form'),
                     'Activité' => $user->getAttribute('activity_nature'),
@@ -71,9 +101,11 @@
                     <div><dt class="font-medium">{{ $label }}</dt><dd><flux:text>{{ $value ?? 'Non renseigné' }}</flux:text></dd></div>
                 @endforeach
             </dl>
+            </section>
         @endcan
         @can('viewAny', \App\Models\Central\Subscriptions\Subscription::class)
-        <flux:heading level="2">Abonnements</flux:heading>
+        <section class="aydra-users-panel p-5 sm:p-6" aria-labelledby="user-subscriptions">
+        <h2 id="user-subscriptions" class="aydra-heading mb-4 text-lg font-semibold">Abonnements</h2>
         @forelse ($subscriptions as $subscription)
             <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
                 <flux:heading level="3">{{ $subscription->plan?->getAttribute('name') ?? 'Offre indisponible' }}</flux:heading>
@@ -103,17 +135,17 @@
             <flux:text>Aucun abonnement enregistré.</flux:text>
         @endforelse
         {{ $subscriptions->links() }}
+        </section>
         @endcan
-        <div class="flex flex-wrap gap-3">
+        <section class="aydra-users-panel p-5 sm:p-6" aria-labelledby="account-actions">
+        <h2 id="account-actions" class="aydra-heading mb-4 text-lg font-semibold">Actions du compte</h2>
+        <div class="flex flex-wrap items-center gap-3">
             @can('assign', \App\Models\Central\Subscriptions\Subscription::class)
                 <flux:button :href="route('central.subscriptions.create', ['owner' => $user->uuid])">Attribuer un abonnement</flux:button>
             @endcan
             @include('central.pages.admin.users.lifecycle-actions')
             @can('viewHistory', $user)
                 <flux:button :href="route('central.users.history', $user)">Historique administratif</flux:button>
-            @endcan
-            @can('update', $user)
-                <flux:button :href="route('central.users.edit', $user)" variant="primary">Modifier</flux:button>
             @endcan
             @can('resendInvitation', $user)
                 @unless ($user->hasVerifiedEmail())
@@ -137,5 +169,6 @@
                 <flux:button :href="route('dashboard')">Retour au dashboard</flux:button>
             @endcan
         </div>
+        </section>
     </section>
 </x-layouts::app>
