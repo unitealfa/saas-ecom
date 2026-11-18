@@ -35,7 +35,7 @@
                     </div>
                 </div>
               </div>
-              <details @if(request()->filled('correlation_id') || request()->filled('actor_uuid') || request()->filled('subject_uuid')) open @endif class="rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-700">
+              <details @if(request()->filled('correlation_id') || request()->filled('actor_uuid') || request()->filled('subject_uuid')) open @endif class="aydra-animated-details rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-700">
                 <summary class="cursor-pointer text-sm font-medium">Filtres avancés</summary>
                 <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <flux:input name="correlation_id" label="UUID de corrélation" :value="request('correlation_id')" list="activity-correlation-suggestions" />

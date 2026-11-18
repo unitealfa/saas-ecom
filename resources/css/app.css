@@ -269,22 +269,22 @@ body.aydra-admin .aydra-users-table { padding: 0 1.5rem 1.25rem; }
 body.aydra-admin .aydra-users-empty { padding: 2.5rem 0; }
 
 @supports (interpolate-size: allow-keywords) {
-    .aydra-permission-group {
+    :is(.aydra-permission-group, .aydra-animated-details) {
         interpolate-size: allow-keywords;
     }
 
-    .aydra-permission-group::details-content {
+    :is(.aydra-permission-group, .aydra-animated-details)::details-content {
         block-size: 0;
         overflow: clip;
         transition: block-size 200ms ease, content-visibility 200ms allow-discrete;
     }
 
-    .aydra-permission-group[open]::details-content {
+    :is(.aydra-permission-group, .aydra-animated-details)[open]::details-content {
         block-size: auto;
     }
 
     @media (prefers-reduced-motion: reduce) {
-        .aydra-permission-group::details-content { transition: none; }
+        :is(.aydra-permission-group, .aydra-animated-details)::details-content { transition: none; }
     }
 }
 

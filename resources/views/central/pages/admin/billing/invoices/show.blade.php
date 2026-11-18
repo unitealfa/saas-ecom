@@ -1,8 +1,8 @@
 <x-layouts::app :title="$invoice->number ?? 'Préparation de facture'">
-    <section class="mx-auto flex w-full max-w-4xl flex-col gap-6">
-        <flux:heading size="xl" level="1">{{ $invoice->number ?? 'Facture — numéro non réservé' }}</flux:heading>
+    <section class="mx-auto flex w-full max-w-screen-xl flex-col gap-6">
+        <header class="flex flex-wrap items-start justify-between gap-5"><div class="space-y-2"><h1 class="aydra-heading text-3xl font-semibold tracking-tight sm:text-4xl">{{ $invoice->number ?? 'Facture — numéro non réservé' }}</h1><p class="aydra-muted text-sm sm:text-base">Consultez le document, son paiement et les opérations associées.</p></div><flux:button :href="route($ownerMode ? 'owner.billing.index' : 'central.invoices.index')" icon="arrow-left">Retour aux factures</flux:button></header>
         @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
-        @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
+        @if ($errors->any())<flux:callout variant="danger" role="alert">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</flux:callout>@endif
         @if ($invoice->status === \App\Enums\Central\Billing\DocumentStatusEnum::ISSUED)
             <flux:callout>Facture émise et PDF conservé. Cette émission ne confirme aucun paiement.</flux:callout>
         @else
@@ -12,7 +12,8 @@
             <flux:text>Préparation limitée de démonstration : les identités fiscales complètes ne sont pas présentes, l’émission définitive est indisponible.</flux:text>
         @endif
         @if ($ownerMode || \Illuminate\Support\Facades\Gate::allows('view', $invoice))
-        <dl class="grid gap-4 sm:grid-cols-2">
+        <section class="aydra-users-panel p-5 sm:p-6"><h2 class="aydra-heading mb-5 text-lg font-semibold">Informations de la facture</h2>
+        <dl class="aydra-detail-grid grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
             <div><dt>État</dt><dd>{{ $invoice->status->label() }}</dd></div>
             <div><dt>Commerçant au moment de la préparation</dt><dd>{{ $invoice->customer_identity_snapshot['name'] ?? trim(($invoice->customer_identity_snapshot['first_name'] ?? '').' '.($invoice->customer_identity_snapshot['last_name'] ?? '')) }}</dd></div>
             <div><dt>Échéance</dt><dd>{{ $invoice->installment->installment_number }}</dd></div>
@@ -23,7 +24,8 @@
             <div><dt>Date limite de paiement</dt><dd>{{ $invoice->due_at->format('d/m/Y') }}</dd></div>
             <div><dt>Justification sans taxe</dt><dd>{{ $invoice->billing_rule_snapshot['fiscal_policy']['no_tax_reason'] ?? $invoice->billing_rule_snapshot['no_tax_reason'] ?? 'Taxes détaillées ci-dessous' }}</dd></div>
         </dl>
-        <div class="overflow-x-auto">
+        </section>
+        <section class="aydra-users-panel p-5 sm:p-6"><h2 class="aydra-heading mb-4 text-lg font-semibold">Lignes de facturation</h2><div class="overflow-x-auto">
             <flux:table>
                 <flux:table.columns><flux:table.column>Description</flux:table.column><flux:table.column>Quantité</flux:table.column><flux:table.column>Montant net</flux:table.column><flux:table.column>Taxe</flux:table.column><flux:table.column>Total</flux:table.column></flux:table.columns>
                 <flux:table.rows>
@@ -33,10 +35,9 @@
                     @endforeach
                 </flux:table.rows>
             </flux:table>
-        </div>
+        </div></section>
         @endif
-        <flux:heading>Total : {{ $invoice->total_amount }} {{ $invoice->currency }}</flux:heading>
-        <flux:text>Avoirs émis : {{ $balance['credits_total'] }} — dû net : {{ $balance['net_due'] }} — reste à payer : {{ $balance['remaining'] }} — surplus : {{ $balance['surplus'] }} {{ $invoice->currency }}.</flux:text>
+        <section class="aydra-users-panel p-5 sm:p-6"><h2 class="aydra-heading text-lg font-semibold">Montant et solde</h2><p class="aydra-heading mt-3 text-2xl font-semibold tabular-nums">{{ $invoice->total_amount }} {{ $invoice->currency }}</p><p class="aydra-muted mt-2 text-sm">Avoirs émis : {{ $balance['credits_total'] }} — dû net : {{ $balance['net_due'] }} — reste à payer : {{ $balance['remaining'] }} — surplus : {{ $balance['surplus'] }} {{ $invoice->currency }}.</p></section>
         @foreach ($credits as $credit)
             @if ($ownerMode)
                 <flux:button :href="route('owner.credit-notes.show', $credit)">{{ $credit->number }} — {{ $credit->total_amount }} {{ $credit->currency }}</flux:button>

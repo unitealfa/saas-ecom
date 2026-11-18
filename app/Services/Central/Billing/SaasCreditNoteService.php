@@ -45,12 +45,20 @@ class SaasCreditNoteService
         abort_if(tenancy()->initialized, 403);
         Gate::forUser($actor)->authorize($own ? 'viewOwn' : 'viewAny', SaasCreditNote::class);
         $search = trim($filters['search'] ?? '');
+        $sort = match ($filters['sort'] ?? null) {
+            'number' => 'number',
+            'total_amount' => 'total_amount',
+            'status' => 'status',
+            default => null,
+        };
+        $direction = ($filters['direction'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
 
         return SaasCreditNote::with(['originalInvoice', 'owner'])
             ->when($own, fn (Builder $query) => $query->where('user_id', $actor->id)->where('status', DocumentStatusEnum::ISSUED))
             ->when(! $own && isset($filters['status']), fn (Builder $query) => $query->where('status', $filters['status']))
             ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query->where('number', 'like', '%'.addcslashes($search, '\\%_').'%')
                 ->orWhere('uuid', $search)->orWhereRelation('originalInvoice', 'number', 'like', '%'.addcslashes($search, '\\%_').'%')))
+            ->when($sort !== null, fn (Builder $query) => $query->orderBy($sort, $direction))
             ->orderByDesc('id')->paginate(20)->withQueryString();
     }
 

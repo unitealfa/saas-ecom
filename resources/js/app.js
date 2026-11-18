@@ -42,5 +42,11 @@ document.addEventListener('alpine:init', () => {
             this.from = today.toISOString().slice(0, 10);
             this.month = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
         },
+        presetExclusive(days) {
+            this.preset(days);
+            const end = new Date(`${this.to}T00:00:00Z`);
+            end.setUTCDate(end.getUTCDate() + 1);
+            this.to = end.toISOString().slice(0, 10);
+        },
     }));
 });
