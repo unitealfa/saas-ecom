@@ -21,7 +21,6 @@ final class FreePlanTeamQuotaService
 {
     public function __construct(
         private readonly AuthorizationMutation $mutations,
-        private readonly FreePlanCatalog $freePlans,
     ) {}
 
     /** @return array<string, array<int, string>> */
@@ -47,7 +46,7 @@ final class FreePlanTeamQuotaService
                 $versions = Plan::withTrashed()->where('code', 'free')
                     ->orderBy('id')->lockForUpdate()->get();
                 $latestVersion = (int) $versions->max('version');
-                $current = $this->freePlans->current(); // Vérifie prix=0 et shops=2.
+                $current = $this->activeFreePlan();
                 if ($source->id !== $current->id || ! $source->is_active
                     || $latestVersion !== (int) $values['expected_latest_version']) {
                     $this->fail('expected_state', 'Version gratuite modifiée. Rechargez le formulaire.');
@@ -144,7 +143,7 @@ final class FreePlanTeamQuotaService
             function (Plan $draft) use ($actor, $expected): Plan {
                 $versions = Plan::withTrashed()->where('code', 'free')
                     ->orderBy('id')->lockForUpdate()->get();
-                $current = $this->freePlans->current();
+                $current = $this->activeFreePlan();
                 if ($draft->trashed() || $draft->is_active || $draft->code !== 'free'
                     || (int) $draft->version !== (int) $versions->max('version')) {
                     $this->fail('plan', 'Seule la dernière version gratuite inactive peut être activée.');
@@ -196,14 +195,28 @@ final class FreePlanTeamQuotaService
 
                 // Revalidation du quota shops=2 sur la version source par FreePlanCatalog.
                 // Toutes les fonctionnalités hors équipe y compris shops sont copiées à l'identique.
-                $current->forceFill(['is_active' => false])->save();
-                $draft->forceFill(['is_active' => true])->save();
+                $wasDefault = (bool) $current->is_default;
+                $current->forceFill(['is_active' => false, 'is_default' => null])->save();
+                $draft->forceFill(['is_active' => true, 'is_default' => $wasDefault ? true : null])->save();
                 activity()->causedBy($actor)->performedOn($draft)
                     ->event('free_plan_team_quotas_activated')
                     ->withProperties(['replaces_uuid' => $current->uuid])
                     ->log('Version gratuite des quotas équipe activée, version antérieure conservée.');
+
                 return $draft;
             });
+    }
+
+    private function activeFreePlan(): Plan
+    {
+        $plan = Plan::where('code', 'free')->where('is_active', true)->orderByDesc('version')->first();
+        if ($plan === null || $plan->monthly_price !== '0.00' || $plan->annual_price !== '0.00'
+            || ! $plan->features()->where('is_active', true)->where('limit', 2)
+                ->whereHas('feature', fn ($query) => $query->where('code', Feature::SHOPS_CODE)->where('is_active', true))->exists()) {
+            $this->fail('plan', 'L’offre gratuite active ou son quota de boutiques est invalide.');
+        }
+
+        return $plan;
     }
 
     private function fail(string $field, string $message): never

@@ -2,8 +2,10 @@
     <section class="flex flex-col gap-6">
         <flux:heading size="xl" level="1">{{ $tenant->shop_name }}</flux:heading>
         @php($primaryDomain = $tenant->domains->firstWhere('is_primary', true))
-        @if ($primaryDomain?->isReadyAsPrimary())
+        @if ($tenant->status === \App\Enums\Central\Tenants\StatusEnum::ACTIVE && $tenant->provisioned_at !== null && filled($tenant->schema_version) && ! $deploymentPending && $primaryDomain?->isReadyAsPrimary())
             <flux:button :href="$primaryDomain->publicUrl()" target="_blank" rel="noopener noreferrer">Ouvrir la boutique — {{ $primaryDomain->domain }}</flux:button>
+        @else
+            <flux:text>État : {{ $deploymentPending || ($tenant->status === \App\Enums\Central\Tenants\StatusEnum::ACTIVE && ($tenant->provisioned_at === null || blank($tenant->schema_version))) ? 'En préparation' : $tenant->status->label() }}. Accès disponible lorsque la boutique sera prête et active.</flux:text>
         @endif
         @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
         @if ($errors->any())<flux:callout variant="danger" role="alert">{{ $errors->first() }}</flux:callout>@endif

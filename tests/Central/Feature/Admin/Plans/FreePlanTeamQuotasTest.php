@@ -21,6 +21,7 @@ test('free offer team quotas create an active version while preserving historica
     $actor->assignRole(Role::findByName('root', 'central'));
 
     $current = app(FreePlanCatalog::class)->current();
+    $current->forceFill(['is_default' => true])->save();
     $owner = User::factory()->create();
     $previousSubscription = Subscription::factory()->create([
         'user_id' => $owner->id, 'plan_id' => $current->id,
@@ -44,6 +45,7 @@ test('free offer team quotas create an active version while preserving historica
         $actor, $draft, $draft->compositionState($draft->features()->orderBy('feature_id')->get()),
     );
     expect($activated->is_active)->toBeTrue()
+        ->and($activated->is_default)->toBeTrue()
         ->and(app(FreePlanCatalog::class)->current()->id)->toBe($activated->id);
 
     $features = $activated->features()->with('feature')->get()->keyBy(fn (PlanFeature $row) => $row->feature->code);

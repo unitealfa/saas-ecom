@@ -54,12 +54,17 @@ test('verified owners enter their shop once through a browser-bound signed grant
     $accepted = $this->get($target)->assertRedirect($base.'/admin');
     $this->withUnencryptedCookie($cookieName, $accepted->getCookie($cookieName, decrypt: false)->getValue());
     $this->withExceptionHandling();
-    $this->get($base.'/admin')->assertOk()->assertSee('Profil de la boutique');
+    $this->get($base.'/admin')->assertOk()->assertSee('Profil de la boutique')
+        ->assertSee('Profils et rôles')->assertSee('Permissions')->assertSee('Équipe');
     $this->get($base.'/admin/shop/profile')->assertOk();
     $this->get($target)->assertForbidden();
     $tenant->run(function () use ($owner): void {
         $local = LocalUser::where('central_user_uuid', $owner->uuid)->sole();
-        expect($local->can('shop.profile.update'))->toBeTrue()
+        expect(TenantAuthorizationMode::individualOnly())->toBeTrue()
+            ->and($local->can('shop.roles.view'))->toBeTrue()
+            ->and($local->can('shop.permissions.view'))->toBeTrue()
+            ->and($local->can('shop.users.view'))->toBeTrue()
+            ->and($local->can('shop.profile.update'))->toBeTrue()
             ->and($local->membership_status)->toBe(MembershipStatusEnum::ACTIVE)
             ->and($local->joined_at)->not->toBeNull();
         $local->revokePermissionTo('shop.profile.update');
@@ -77,7 +82,7 @@ test('verified owners enter their shop once through a browser-bound signed grant
     $this->get($base.'/admin')->assertOk()
         ->assertDontSee('Gérer les rôles')
         ->assertDontSee('Voir les permissions')
-        ->assertDontSee("Gérer l'équipe");
+        ->assertDontSee("Gérer l'équipe", false);
 
     $tenant->run(function () use ($owner): void {
         $result = app(AuthorizationUpgradeService::class)->apply();
@@ -93,7 +98,7 @@ test('verified owners enter their shop once through a browser-bound signed grant
     $this->get($base.'/admin')->assertOk()
         ->assertSee('Gérer les rôles')
         ->assertSee('Voir les permissions')
-        ->assertSee("Gérer l'équipe");
+        ->assertSee("Gérer l'équipe", false);
 
     $tenant->run(function () use ($owner): void {
         $local = LocalUser::where('central_user_uuid', $owner->uuid)->sole();
@@ -108,7 +113,7 @@ test('verified owners enter their shop once through a browser-bound signed grant
     $this->get($base.'/admin')->assertOk()
         ->assertDontSee('Gérer les rôles')
         ->assertSee('Voir les permissions')
-        ->assertSee("Gérer l'équipe");
+        ->assertSee("Gérer l'équipe", false);
     $other = User::factory()->create(['legal_verified_by_id' => $admin->id, 'legal_verification_status' => VerificationStatusEnum::VERIFIED,
         'legal_verified_at' => now(), 'legal_profile_version' => 1]);
     $this->actingAs($other, 'central')->get($access)->assertForbidden();

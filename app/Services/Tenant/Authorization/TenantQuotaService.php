@@ -25,9 +25,8 @@ final class TenantQuotaService
         abort_unless(tenancy()->initialized && $tenant instanceof Tenant && $tenant->owner !== null, 403);
         $current = Subscription::where('user_id', $tenant->owner->id)
             ->whereIn('status', [SubscriptionStatus::ACTIVE, SubscriptionStatus::TRIAL])
-            ->where('period_starts_at', '<=', now())
-            ->orderByDesc('period_starts_at')->first();
-        if ($current === null || ($current->effectiveEndsAt() !== null && $current->effectiveEndsAt()->isPast())) {
+            ->currentlyEffective()->orderByDesc('id')->first();
+        if ($current === null) {
             throw ValidationException::withMessages(['quota' => 'Abonnement actif et vérifié requis.']);
         }
         $feature = Feature::where('code', $featureCode)->where('is_active', true)->first();

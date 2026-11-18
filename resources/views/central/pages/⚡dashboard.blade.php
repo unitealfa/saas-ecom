@@ -6,7 +6,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 new class extends Component {
-    /** @return array{shops: \Illuminate\Support\Collection<string, string>, staff: bool} */
+    /** @return array{shops: \Illuminate\Support\Collection, staff: bool} */
     #[Computed]
     public function overview(): array
     {
@@ -40,13 +40,17 @@ new class extends Component {
             <flux:callout.text>{{ __('Votre compte est actif. Retrouvez vos boutiques ci-dessous et ouvrez leur administration.') }}</flux:callout.text>
         </flux:callout>
         @if ($this->overview['shops']->isNotEmpty())
-            <div id="mes-boutiques" class="space-y-3">
+            <div id="mes-boutiques" class="space-y-3" wire:poll.15s.visible>
                 <flux:heading level="2">{{ __('Vos boutiques') }}</flux:heading>
                 <ul class="space-y-2">
-                    @foreach ($this->overview['shops'] as $index => $shopName)
-                        <li wire:key="shop-name-{{ $index }}">
-                            <flux:text>{{ $shopName }}</flux:text>
-                            <flux:button :href="route('owner.shops.access', $index)">Administrer</flux:button>
+                    @foreach ($this->overview['shops'] as $shop)
+                        <li wire:key="shop-name-{{ $shop['uuid'] }}">
+                            <flux:text>{{ $shop['name'] }} — {{ $shop['status'] }}</flux:text>
+                            @if ($shop['ready'])
+                                <flux:button :href="route('owner.shops.access', $shop['uuid'])">Administrer</flux:button>
+                            @else
+                                <flux:text>Accès indisponible tant que la boutique n’est pas prête et active.</flux:text>
+                            @endif
                         </li>
                     @endforeach
                 </ul>

@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Central\Owner\Tenants;
 
+use App\Enums\Central\Deployments\StatusEnum as DeploymentStatus;
 use App\Http\Controllers\Controller;
+use App\Models\Central\Deployments\TenantSchemaDeployment;
 use App\Models\Central\Tenants\Tenant;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,6 +18,10 @@ class TenantAccessController extends Controller
         $actor = $this->centralActor();
         abort_unless($tenant->user_id === $actor->id, 403);
         Gate::forUser($actor)->authorize('accessOwn', $tenant);
+        if (TenantSchemaDeployment::where('tenant_id', $tenant->id)
+            ->whereIn('status', [DeploymentStatus::PENDING, DeploymentStatus::RUNNING])->exists()) {
+            return redirect()->route('dashboard')->with('warning', 'Cette boutique est en préparation.');
+        }
         $domain = $tenant->domains()->where('is_primary', true)->firstOrFail();
         abort_unless($domain->isReadyAsPrimary(), 403);
         $nonce = $request->query('nonce');
