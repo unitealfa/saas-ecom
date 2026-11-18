@@ -6,6 +6,7 @@ use App\Enums\Central\Features\PeriodEnum;
 use App\Enums\Central\Features\QuotaScopeEnum;
 use App\Enums\Central\Features\ValueTypeEnum;
 use App\Enums\Central\Subscriptions\StatusEnum as SubscriptionStatus;
+use App\Enums\Tenant\Users\MembershipStatusEnum;
 use App\Models\Central\Features\Feature;
 use App\Models\Central\Plans\PlanFeature;
 use App\Models\Central\Subscriptions\Subscription;
@@ -48,6 +49,7 @@ final class TenantQuotaService
         if ($entitlement === null) {
             throw ValidationException::withMessages(['quota' => 'Fonctionnalité non comprise dans l’offre.']);
         }
+
         return $entitlement->limit === null ? null : (int) $entitlement->limit;
     }
 
@@ -57,7 +59,7 @@ final class TenantQuotaService
         $limit = $this->limit('team.custom_roles');
         $used = Role::where('is_system', false)->where('is_protected', false)->count();
         if ($limit !== null && $used >= $limit) {
-            throw ValidationException::withMessages(['quota' => 'Nombre maximum de profils personnalisés atteint.']);
+            throw ValidationException::withMessages(['quota' => "Limite de l’offre atteinte : {$limit} profil(s) personnalisé(s) maximum."]);
         }
     }
 
@@ -67,7 +69,7 @@ final class TenantQuotaService
         $limit = $this->limit('team.members');
         $email = mb_strtolower(trim($email));
         $members = User::whereNull('central_user_uuid')->whereNull('deleted_at')
-            ->where('membership_status', '<>', \App\Enums\Tenant\Users\MembershipStatusEnum::REVOKED->value)
+            ->where('membership_status', '<>', MembershipStatusEnum::REVOKED->value)
             ->pluck('email')->map(fn ($value) => mb_strtolower((string) $value))->unique();
         $pending = TeamInvitation::whereNull('accepted_at')->whereNull('revoked_at')
             ->where('expires_at', '>', now())->pluck('email')
@@ -75,7 +77,7 @@ final class TenantQuotaService
         $seats = $members->merge($pending)->unique();
         $willNeedSeat = ! $seats->contains($email);
         if ($limit !== null && ($seats->count() + ($willNeedSeat ? 1 : 0)) > $limit) {
-            throw ValidationException::withMessages(['quota' => 'Quota des membres de boutique atteint.']);
+            throw ValidationException::withMessages(['quota' => "Limite de l’offre atteinte : {$limit} membre(s) maximum."]);
         }
     }
 }

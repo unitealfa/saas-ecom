@@ -47,7 +47,7 @@ test('member quota counts each boutique independently and does not delete existi
     $one->run(function (): void {
         $member = TenantUser::factory()->create(['email' => 'member-one@example.test']);
         expect(fn () => app(TenantQuotaService::class)->assertCanReserveSeat('member-two@example.test'))
-            ->toThrow(ValidationException::class);
+            ->toThrow(ValidationException::class, 'Limite de l’offre atteinte : 1 membre(s) maximum.');
         expect(TenantUser::whereKey($member->id)->exists())->toBeTrue();
     });
     $two->run(function (): void {

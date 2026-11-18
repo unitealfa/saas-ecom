@@ -5,7 +5,7 @@
         @if(session('status')) <flux:callout>{{ session('status') }}</flux:callout> @endif
         <div class="flex gap-4">
             <form method="GET"><input name="search" value="{{ request('search') }}" placeholder="Rechercher un profil" class="rounded border p-2 text-zinc-900"><button class="rounded border p-2">Rechercher</button></form>
-            @can('create', \App\Models\Tenant\Roles\Role::class)<a class="underline" href="{{ route('tenant.admin.roles.create', absolute: false) }}">Créer un role</a>@endcan
+            @can('create', \App\Models\Tenant\Roles\Role::class)<a class="underline" href="{{ route('tenant.admin.roles.create', absolute: false) }}">Créer un profil</a>@endcan
         </div>
         <div class="divide-y rounded border p-4">
             @forelse($roles as $role)

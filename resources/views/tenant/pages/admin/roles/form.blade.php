@@ -7,13 +7,16 @@
             @csrf @if($role) @method('PUT') <input type="hidden" name="expected_state" value="{{ $expected }}"> @endif
             <label class="block">Code local <input required name="name" value="{{ old('name', $role?->name) }}" maxlength="100" pattern="[a-z][a-z0-9-]*" class="mt-1 block w-full rounded border p-2 text-zinc-900"></label>
             <label class="block">Libellé <input required name="label" value="{{ old('label', $role?->label) }}" maxlength="150" class="mt-1 block w-full rounded border p-2 text-zinc-900"></label>
-            <p>Durée initiale des permissions (en jours). Laissez vide pour ne pas intégrer le droit au profil. Les membres déjà affectés ne seront pas modifiés.</p>
+            <p>Choisissez les permissions et leur durée initiale en jours. Les membres déjà affectés ne seront pas modifiés.</p>
+            <input type="hidden" name="_selection_form" value="1">
             <div class="divide-y rounded border p-3">
                 @foreach($permissions as $permission)
                     <label class="flex items-center gap-3 py-2">
+                        <input type="checkbox" name="selected_permissions[]" value="{{ $permission->uuid }}"
+                            @checked(in_array($permission->uuid, old('_selection_form') ? old('selected_permissions', []) : array_keys($selected), true))>
                         <span class="flex-1"><strong>{{ $permission->label }}</strong><small class="block text-zinc-500">{{ $permission->name }}</small></span>
                         <input type="number" min="1" max="9999" name="permissions[{{ $permission->uuid }}]"
-                            value="{{ old('permissions.'.$permission->uuid, $selected[$permission->uuid] ?? '') }}" placeholder="jours" class="w-28 rounded border p-2 text-zinc-900">
+                            value="{{ old('permissions.'.$permission->uuid, $selected[$permission->uuid] ?? \App\Models\Shared\Authorization\PermissionAssignment::NEVER_EXPIRES_DAYS) }}" aria-label="Durée en jours pour {{ $permission->label }}" class="w-28 rounded border p-2 text-zinc-900">
                     </label>
                 @endforeach
             </div>
