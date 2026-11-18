@@ -35,7 +35,7 @@ class DomainService
     public function __construct(private AuthorizationMutation $mutations) {}
 
     /** @return LengthAwarePaginator<int, Domain> */
-    public function search(User $actor, ?string $search, bool $archived): LengthAwarePaginator
+    public function search(User $actor, ?string $search, bool $archived, ?string $sort = null, ?string $direction = null): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize('viewAny', Domain::class);
 
@@ -52,7 +52,10 @@ class DomainService
                 ->orWhereHas('tenant', fn ($query) => $query->withTrashed()->where('shop_name', 'like', $pattern)));
         }
 
-        return $query->orderBy('domain')->paginate(self::PER_PAGE)->withQueryString();
+        $sort = in_array($sort, ['domain', 'type', 'verification_status', 'certificate_status'], true) ? $sort : 'domain';
+        $direction = $direction === 'desc' ? 'desc' : 'asc';
+
+        return $query->orderBy($sort, $direction)->orderBy('id')->paginate(self::PER_PAGE)->withQueryString();
     }
 
     /** @return LengthAwarePaginator<int, Tenant> */

@@ -13,6 +13,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
 class DomainController extends Controller
 {
@@ -26,9 +27,11 @@ class DomainController extends Controller
         $data = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
             'archived' => ['sometimes', 'boolean'],
+            'sort' => ['nullable', Rule::in(['domain', 'type', 'verification_status', 'certificate_status'])],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
         ]);
 
-        $domains = $this->domains->search($actor, $data['search'] ?? null, $request->boolean('archived'));
+        $domains = $this->domains->search($actor, $data['search'] ?? null, $request->boolean('archived'), $data['sort'] ?? null, $data['direction'] ?? null);
         $items = $domains->getCollection();
 
         $primaryDomains = Domain::whereIn('tenant_id', $items->pluck('tenant_id'))
