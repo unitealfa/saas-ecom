@@ -26,10 +26,10 @@
                                 <flux:button :href="route('central.plan-pages.show', $plan)">Détails</flux:button>
                                 @can('setDefault', $plan)
                                     @if (! $plan->is_default)
-                                        <form method="POST" action="{{ route('central.plan-pages.default', $plan) }}" class="mt-3 flex flex-col gap-2">
+                                        <form method="POST" action="{{ route('central.plan-pages.default', $plan) }}" class="mt-3" onsubmit="return confirm('Attribuer gratuitement ce plan par défaut aux commerçants ?')">
                                             @csrf @method('PATCH')
                                             <input type="hidden" name="expected_state" value="{{ $plan->compositionState($plan->features) }}">
-                                            <flux:checkbox name="confirmed" value="1" label="Attribuer gratuitement ce plan par défaut aux commerçants" required />
+                                            <input type="hidden" name="confirmed" value="1">
                                             <flux:button type="submit">Définir comme plan par défaut</flux:button>
                                         </form>
                                     @endif
