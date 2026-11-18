@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Tenant;
 
 use App\Models\Central\Tenants\Tenant;
 use App\Models\Shared\Authorization\PermissionAssignment;
@@ -30,12 +30,14 @@ final class TenantOwnerTeamAccessCommand extends Command
     {
         if (tenancy()->initialized) {
             $this->error('Commencer cette commande hors du contexte Tenant.');
+
             return self::FAILURE;
         }
 
         $tenant = Tenant::where('uuid', $this->argument('tenant_uuid'))->first();
         if ($tenant === null) {
             $this->error('UUID de boutique inconnu.');
+
             return self::FAILURE;
         }
 
@@ -70,17 +72,20 @@ final class TenantOwnerTeamAccessCommand extends Command
 
             if (! $this->option('apply')) {
                 $this->info('Diagnostic lecture seule terminé ; aucun droit modifié.');
+
                 return self::SUCCESS;
             }
 
             if ($missing === []) {
                 $this->info('Aucune attribution absente. Aucune écriture nécessaire.');
+
                 return self::SUCCESS;
             }
 
             $this->warn('Une révocation volontaire peut faire partie des droits manquants.');
             if (! $this->confirm('Confirmer explicitement leur réattribution au propriétaire ?', false)) {
                 $this->warn('Opération annulée.');
+
                 return self::FAILURE;
             }
 
@@ -120,13 +125,16 @@ final class TenantOwnerTeamAccessCommand extends Command
                         fn () => app(PermissionRegistrar::class)->forgetCachedPermissions(),
                     );
                 }
+
                 return $missing;
             }, 3);
 
             $this->info(count($granted).' permission(s) ajoutée(s). Les droits préexistants sont conservés.');
+
             return self::SUCCESS;
         } catch (Throwable $exception) {
             $this->error('Contrôle ou réparation impossible : '.$exception->getMessage());
+
             return self::FAILURE;
         } finally {
             tenancy()->end();
@@ -153,6 +161,7 @@ final class TenantOwnerTeamAccessCommand extends Command
                 $expired[] = $code;
             }
         }
+
         return [$missing, $expired];
     }
 }

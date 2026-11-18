@@ -16,7 +16,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 final class TeamInvitationService
@@ -62,15 +61,17 @@ final class TeamInvitationService
                 'initial_role_id' => $role->id, 'invited_by_id' => $actor->id,
                 'email' => $email, 'token_hash' => hash('sha256', $secret),
                 'role_permission_version' => $role->permission_version,
-                'expires_at' => now()->addHours((int) config('tenant_team.invitation_ttl_hours', 48)),
+                'expires_at' => now()->addHours((int) config('tenant.team.invitation_ttl_hours', 48)),
             ])->save();
             activity()->causedBy($actor)->performedOn($invite)->event('team_invitation_created')
                 ->withProperties(['role_uuid' => $role->uuid])->log('Invitation créée');
+
             return $invite;
         }, 3);
         $url = $this->urls->make('tenant.invitations.show', ['invitation' => $invitation->uuid, 'token' => $secret]);
         $shopName = Shop::where('singleton', 1)->value('shop_name');
         Notification::route('mail', $email)->notify(new TeamInvitationNotification($url, $shopName));
+
         return $invitation;
     }
 
@@ -114,15 +115,17 @@ final class TeamInvitationService
                 'initial_role_id' => $role->id, 'invited_by_id' => $actor->id,
                 'email' => $current->email, 'token_hash' => hash('sha256', $secret),
                 'role_permission_version' => $role->permission_version,
-                'expires_at' => now()->addHours((int) config('tenant_team.invitation_ttl_hours', 48)),
+                'expires_at' => now()->addHours((int) config('tenant.team.invitation_ttl_hours', 48)),
             ])->save();
             activity()->causedBy($actor)->performedOn($current)->event('team_invitation_resent')
                 ->withProperties(['replacement_uuid' => $replacement->uuid])->log('Invitation remplacée');
+
             return $replacement;
         }, 3);
         $url = $this->urls->make('tenant.invitations.show', ['invitation' => $new->uuid, 'token' => $secret]);
         Notification::route('mail', $new->email)->notify(new TeamInvitationNotification($url,
             Shop::where('singleton', 1)->value('shop_name')));
+
         return $new;
     }
 
@@ -170,11 +173,13 @@ final class TeamInvitationService
             $invite->forceFill(['accepted_at' => now()])->save();
             activity()->causedBy($member)->performedOn($invite)->event('team_invitation_accepted')
                 ->log('Invitation acceptée');
+
             return $member;
         }, 3);
         $url = $this->urls->make('tenant.login');
         $shopName = Shop::where('singleton', 1)->value('shop_name');
         $member->notify(new WelcomeEmployeeNotification($shopName, $url));
+
         return $member;
     }
 }
