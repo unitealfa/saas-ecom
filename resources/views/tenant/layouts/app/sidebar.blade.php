@@ -33,15 +33,27 @@
                     </flux:sidebar.item>
                 @endif
 
-                @can('viewAny', \App\Models\Tenant\Roles\Role::class)
-                    <flux:sidebar.item icon="users" :href="route('tenant.admin.roles.index', absolute: false)">Profils et rôles</flux:sidebar.item>
-                @endcan
-                @can('viewAny', \App\Models\Tenant\Permissions\Permission::class)
-                    <flux:sidebar.item icon="shield-check" :href="route('tenant.admin.permissions.index', absolute: false)">Permissions</flux:sidebar.item>
-                @endcan
-                @can('viewAny', \App\Models\Tenant\Users\User::class)
-                    <flux:sidebar.item icon="users" :href="route('tenant.admin.users.index', absolute: false)">Équipe</flux:sidebar.item>
-                @endcan
+                @php
+                    $actor = auth('tenant')->user();
+                    $showPersonnel = $actor && (
+                        $actor->can('viewAny', \App\Models\Tenant\Roles\Role::class)
+                        || $actor->can('viewAny', \App\Models\Tenant\Permissions\Permission::class)
+                        || $actor->can('viewAny', \App\Models\Tenant\Users\User::class)
+                    );
+                @endphp
+                @if ($showPersonnel)
+                    <flux:sidebar.group heading="Personnel" icon="user-group" expandable :expanded="request()->routeIs('tenant.admin.roles.*', 'tenant.admin.permissions.*', 'tenant.admin.users.*')">
+                        @can('viewAny', \App\Models\Tenant\Roles\Role::class)
+                            <flux:sidebar.item :href="route('tenant.admin.roles.index', absolute: false)" :current="request()->routeIs('tenant.admin.roles.*')">Profils et rôles</flux:sidebar.item>
+                        @endcan
+                        @can('viewAny', \App\Models\Tenant\Permissions\Permission::class)
+                            <flux:sidebar.item :href="route('tenant.admin.permissions.index', absolute: false)" :current="request()->routeIs('tenant.admin.permissions.*')">Permissions</flux:sidebar.item>
+                        @endcan
+                        @can('viewAny', \App\Models\Tenant\Users\User::class)
+                            <flux:sidebar.item :href="route('tenant.admin.users.index', absolute: false)" :current="request()->routeIs('tenant.admin.users.*')">Équipe</flux:sidebar.item>
+                        @endcan
+                    </flux:sidebar.group>
+                @endif
                 @if(auth('tenant')->check() && \App\Services\Tenant\Authorization\TenantAccess::isOwner(auth('tenant')->user()))
                     <flux:sidebar.item icon="arrow-left" :href="route('dashboard')">Mon espace Aydra</flux:sidebar.item>
                 @endif
