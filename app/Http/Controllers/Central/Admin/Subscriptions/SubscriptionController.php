@@ -33,7 +33,7 @@ class SubscriptionController extends Controller
         $status = $request->validated('status');
 
         return view('central.pages.admin.subscriptions.index', [
-            'subscriptions' => $this->subscriptions->paginate($this->centralActor(), $request->validated('search'), $status === null ? null : (int) $status),
+            'subscriptions' => $this->subscriptions->paginate($this->centralActor(), $request->validated('search'), $status === null ? null : (int) $status, $request->validated('sort'), $request->validated('direction')),
             'statuses' => StatusEnum::cases(),
         ]);
     }

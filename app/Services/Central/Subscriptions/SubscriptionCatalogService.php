@@ -39,11 +39,13 @@ class SubscriptionCatalogService
     }
 
     /** @return LengthAwarePaginator<int, Subscription> */
-    public function paginate(User $actor, ?string $search, ?int $status): LengthAwarePaginator
+    public function paginate(User $actor, ?string $search, ?int $status, ?string $sort = null, ?string $direction = null): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize('viewAny', Subscription::class);
         $search = trim((string) $search);
         $pattern = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
+        $sort = in_array($sort, ['status', 'period_starts_at', 'agreed_amount'], true) ? $sort : null;
+        $direction = $direction === 'desc' ? 'desc' : 'asc';
 
         return Subscription::query()->with(['owner', 'plan'])
             ->when($status !== null, fn (Builder $query) => $query->where('status', $status))
@@ -55,6 +57,8 @@ class SubscriptionCatalogService
                         ->orWhere('email', 'like', $pattern))
                     ->orWhereHas('plan', fn (Builder $plan) => $plan->where('name', 'like', $pattern)->orWhere('code', 'like', $pattern));
             }))
+            ->when($sort === 'period_starts_at', fn (Builder $query) => $query->orderByRaw('COALESCE(effective_starts_at, period_starts_at) '.$direction))
+            ->when($sort !== null && $sort !== 'period_starts_at', fn (Builder $query) => $query->orderBy($sort, $direction))
             ->orderByDesc('id')->paginate(20)->withQueryString();
     }
 
