@@ -37,6 +37,19 @@ class PermissionCatalogService
             ->all();
     }
 
+    /** @return \Illuminate\Database\Eloquent\Collection<int, Permission> */
+    public function suggestions(User $actor, ?string $search = null): \Illuminate\Database\Eloquent\Collection
+    {
+        Gate::forUser($actor)->authorize('viewAny', Permission::class);
+        $search = trim((string) $search);
+
+        return Permission::forCentralGuard()
+            ->whereIn('name', array_keys(CentralRoleCatalog::PERMISSIONS))
+            ->when($search !== '', fn (Builder $query) => $this->matching($query, $search))
+            ->orderBy('name')
+            ->get(['name', 'label']);
+    }
+
     /**
      * @param  Builder<Permission>  $query
      * @return Builder<Permission>

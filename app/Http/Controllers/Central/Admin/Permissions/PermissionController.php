@@ -22,6 +22,7 @@ class PermissionController extends Controller
             'permissions' => $this->catalog->paginate($actor, $search),
             'search' => $search,
             'groups' => $this->catalog->groups(),
+            'suggestions' => $this->catalog->suggestions($actor, $search),
         ]);
     }
 }
