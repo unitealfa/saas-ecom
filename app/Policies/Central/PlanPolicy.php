@@ -31,6 +31,20 @@ class PlanPolicy
         return $this->access->allows($actor, 'saas.plans.create');
     }
 
+    /** Seuls les quotas équipe du plan gratuit peuvent être versionnés séparément. */
+    public function configureTeamQuotas(User $actor, Plan $plan): bool
+    {
+        return ! $plan->trashed() && $plan->is_active && strtolower($plan->code) === 'free'
+            && $this->access->allows($actor, 'saas.plans.features.update')
+            && $this->access->allows($actor, 'saas.plans.versions.create');
+    }
+
+    public function activateTeamQuotaVersion(User $actor, Plan $plan): bool
+    {
+        return ! $plan->trashed() && ! $plan->is_active && strtolower($plan->code) === 'free'
+            && $this->access->allows($actor, 'saas.plans.activate');
+    }
+
     public function updateFeatures(User $actor, Plan $plan): bool
     {
         return ! $plan->is_default && ! $plan->trashed() && strtolower($plan->code) !== 'free'

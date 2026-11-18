@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Database\Seeders\Central\CountrySeeder;
 use Database\Seeders\Central\FreePlanSeeder;
+use Database\Seeders\Central\TenantTeamQuotaFeatureSeeder;
 use Database\Seeders\Central\GeographicAreaSeeder;
 use Database\Seeders\Central\LocalAuthenticationSeeder;
 use Database\Seeders\Central\LocalDevelopmentSeeder;
@@ -28,6 +29,7 @@ class DatabaseSeeder extends Seeder
         $this->call(SamexGeoMappingSeeder::class);
         $this->call(SamexShippingRateSeeder::class);
         $this->call(FreePlanSeeder::class);
+        $this->call(TenantTeamQuotaFeatureSeeder::class);
         $this->call(AuthorizationSeeder::class);
 
         $this->call(LocalDevelopmentSeeder::class);

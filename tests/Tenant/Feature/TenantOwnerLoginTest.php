@@ -1,14 +1,19 @@
 <?php
 
 use App\Enums\Central\Tenants\StatusEnum as TenantStatus;
+use App\Enums\Tenant\Users\MembershipStatusEnum;
 use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Tenants\Tenant;
 use App\Models\Tenant\Users\User as LocalUser;
 use App\Models\User;
 use App\Services\Tenant\Auth\OwnerLoginService;
+use App\Services\Tenant\Authorization\AuthorizationUpgradeService;
+use App\Services\Tenant\Authorization\TenantAuthorizationMode;
+use App\Services\Tenant\Authorization\TenantPermissionCatalog;
 use Database\Factories\Central\DomainFactory;
 use Database\Seeders\Central\FreePlanSeeder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
@@ -49,18 +54,66 @@ test('verified owners enter their shop once through a browser-bound signed grant
     $accepted = $this->get($target)->assertRedirect($base.'/admin');
     $this->withUnencryptedCookie($cookieName, $accepted->getCookie($cookieName, decrypt: false)->getValue());
     $this->withExceptionHandling();
-    $this->get($base.'/admin')->assertOk()->assertSee('Profil de la boutique');
+    $this->get($base.'/admin')->assertOk()->assertSee('Profil de la boutique')
+        ->assertSee('Profils et rôles')->assertSee('Permissions')->assertSee('Équipe');
     $this->get($base.'/admin/shop/profile')->assertOk();
     $this->get($target)->assertForbidden();
     $tenant->run(function () use ($owner): void {
         $local = LocalUser::where('central_user_uuid', $owner->uuid)->sole();
-        expect($local->can('shop.profile.update'))->toBeTrue()
+        expect(TenantAuthorizationMode::individualOnly())->toBeTrue()
+            ->and($local->can('shop.roles.view'))->toBeTrue()
+            ->and($local->can('shop.permissions.view'))->toBeTrue()
+            ->and($local->can('shop.users.view'))->toBeTrue()
+            ->and($local->can('shop.profile.update'))->toBeTrue()
+            ->and($local->membership_status)->toBe(MembershipStatusEnum::ACTIVE)
             ->and($local->joined_at)->not->toBeNull();
         $local->revokePermissionTo('shop.profile.update');
+        foreach (array_keys(TenantPermissionCatalog::ALL) as $permission) {
+            $local->revokePermissionTo($permission);
+        }
+        DB::connection('tenant')->table('tenant_authorization_state')->where('id', 1)->update([
+            'individual_only' => false,
+            'converted_at' => null,
+            'updated_at' => now(),
+        ]);
+        expect(TenantAuthorizationMode::individualOnly())->toBeFalse();
+    });
+
+    $this->get($base.'/admin')->assertOk()
+        ->assertDontSee('Gérer les rôles')
+        ->assertDontSee('Voir les permissions')
+        ->assertDontSee("Gérer l'équipe", false);
+
+    $tenant->run(function () use ($owner): void {
+        $result = app(AuthorizationUpgradeService::class)->apply();
+        $local = LocalUser::where('central_user_uuid', $owner->uuid)->sole();
+
+        expect($result['ready'])->toBeTrue()
+            ->and(TenantAuthorizationMode::individualOnly())->toBeTrue()
+            ->and($local->can('shop.roles.view'))->toBeTrue()
+            ->and($local->can('shop.permissions.view'))->toBeTrue()
+            ->and($local->can('shop.users.view'))->toBeTrue();
+    });
+
+    $this->get($base.'/admin')->assertOk()
+        ->assertSee('Gérer les rôles')
+        ->assertSee('Voir les permissions')
+        ->assertSee("Gérer l'équipe", false);
+
+    $tenant->run(function () use ($owner): void {
+        $local = LocalUser::where('central_user_uuid', $owner->uuid)->sole();
+        $local->revokePermissionTo('shop.roles.view');
         $service = app(OwnerLoginService::class);
         $service->accept($owner->uuid, tenant()->uuid, hash('sha256', $owner->email));
-        expect($local->fresh()->can('shop.profile.update'))->toBeFalse();
+
+        expect($local->fresh()->can('shop.roles.view'))->toBeFalse()
+            ->and($local->fresh()->can('shop.permissions.view'))->toBeTrue();
     });
+
+    $this->get($base.'/admin')->assertOk()
+        ->assertDontSee('Gérer les rôles')
+        ->assertSee('Voir les permissions')
+        ->assertSee("Gérer l'équipe", false);
     $other = User::factory()->create(['legal_verified_by_id' => $admin->id, 'legal_verification_status' => VerificationStatusEnum::VERIFIED,
         'legal_verified_at' => now(), 'legal_profile_version' => 1]);
     $this->actingAs($other, 'central')->get($access)->assertForbidden();

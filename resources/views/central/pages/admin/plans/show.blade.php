@@ -37,6 +37,35 @@
                 @endforelse
             </ul>
         </div>
+        {{-- L'offre gratuite reste protégée : seul ce formulaire versionne ses quotas équipe. --}}
+        @if ($plan->is_active && $plan->version === $latestVersion)
+            @can('configureTeamQuotas', $plan)
+                @php($rolesLimit = $plan->features->first(fn ($item) => $item->feature->code === \App\Models\Central\Features\Feature::TEAM_CUSTOM_ROLES_CODE)?->limit)
+                @php($membersLimit = $plan->features->first(fn ($item) => $item->feature->code === \App\Models\Central\Features\Feature::TEAM_MEMBERS_CODE)?->limit)
+                <details class="rounded-xl border border-zinc-300 p-4 dark:border-zinc-700">
+                    <summary>Configurer les quotas d'équipe de l'offre gratuite</summary>
+                    <flux:text>Cette action prépare une nouvelle version gratuite inactive. L'activation est séparée ; les abonnements existants et le quota de boutiques sont conservés. Aucun nombre n'est prérempli si le quota n'existe pas.</flux:text>
+                    <form method="POST" action="{{ route('central.plan-pages.free-team-quotas.update', $plan) }}" class="mt-4 flex max-w-xl flex-col gap-4">
+                        @csrf
+                        <input type="hidden" name="expected_state" value="{{ $state }}">
+                        <input type="hidden" name="expected_latest_version" value="{{ $latestVersion }}">
+                        <flux:input type="number" name="max_roles" min="0" max="2147483647" step="1" required label="Nombre maximal de rôles personnalisés par boutique" :value="old('max_roles', $rolesLimit)" />
+                        <flux:input type="number" name="max_members" min="0" max="2147483647" step="1" required label="Nombre maximal de membres par boutique" :value="old('max_members', $membersLimit)" />
+                        <flux:button type="submit" variant="primary">Préparer la version gratuite avec ces quotas</flux:button>
+                    </form>
+                </details>
+            @endcan
+        @endif
+        @if (! $plan->is_active && $plan->version === $latestVersion)
+            @can('activateTeamQuotaVersion', $plan)
+                <form method="POST" action="{{ route('central.plan-pages.free-team-quotas.activate', $plan) }}" class="rounded-xl border border-zinc-300 p-4 dark:border-zinc-700">
+                    @csrf @method('PATCH')
+                    <input type="hidden" name="expected_state" value="{{ $state }}">
+                    <flux:text>Cette activation distincte commercialise la dernière version gratuite des quotas équipe.</flux:text>
+                    <flux:button type="submit" variant="primary">Activer cette version gratuite</flux:button>
+                </form>
+            @endcan
+        @endif
         @can('updateFeatures', $plan)
             <details class="rounded-xl border border-zinc-300 p-4 dark:border-zinc-700">
                 <summary>Définir les fonctionnalités et quotas</summary>

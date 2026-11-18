@@ -25,7 +25,7 @@ class FreePlanCatalog
         }
 
         $plan = Plan::where('is_default', true)->first()
-            ?? Plan::withTrashed()->where('code', self::PLAN_CODE)->orderByDesc('version')->first()
+            ?? Plan::where('code', self::PLAN_CODE)->where('is_active', true)->orderByDesc('version')->first()
             ?? throw new LogicException('Free plan missing: run FreePlanSeeder first.');
 
         if ($plan->trashed()
