@@ -29,6 +29,27 @@ function planVersionPayload(Plan $plan, int $latestVersion): array
     ];
 }
 
+test('a newly copied version can change its information and feature limits', function (): void {
+    $actor = planVersionActor(['saas.plans.versions.create', 'saas.plans.update', 'saas.plans.features.update']);
+    $source = Plan::factory()->create();
+    $feature = Feature::factory()->create();
+    PlanFeature::factory()->create(['plan_id' => $source->id, 'feature_id' => $feature->id, 'limit' => 2]);
+    $copy = app(PlanVersionService::class)->create($actor, $source, planVersionPayload($source, 1));
+
+    $this->actingAs($actor, 'central')->putJson(route('central.plans.update', $copy->uuid), [
+        'expected_state' => $copy->compositionState($copy->features),
+        'name' => 'Version modifiée', 'description' => 'Nouvelle offre',
+        'monthly_price' => '100.00', 'annual_price' => '1000.00',
+    ])->assertNoContent();
+    $copy->refresh()->load('features');
+    $this->putJson(route('central.plans.features.update', $copy->uuid), [
+        'expected_state' => $copy->compositionState($copy->features),
+        'features' => [['uuid' => $feature->uuid, 'is_active' => true, 'limit' => 3]],
+    ])->assertNoContent();
+    expect($copy->refresh()->name)->toBe('Version modifiée')
+        ->and($copy->features()->firstOrFail()->limit)->toBe(3);
+});
+
 test('a new inactive version copies the source without changing its historical subscriptions', function (): void {
     $actor = planVersionActor(['saas.plans.view', 'saas.plans.versions.create']);
     $owner = User::factory()->create();
