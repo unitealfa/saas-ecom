@@ -31,6 +31,8 @@ class TenantDeploymentController extends Controller
             'search' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', Rule::enum(StatusEnum::class)],
             'operation' => ['nullable', Rule::enum(OperationEnum::class)],
+            'sort' => ['nullable', Rule::in(['operation', 'status', 'attempt_number', 'target_version', 'created_at'])],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
         ]);
 
         return view('central.pages.admin.deployments.index', [
