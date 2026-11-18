@@ -16,7 +16,7 @@
                         @csrf
                         <input type="hidden" name="expected_status" value="{{ $tenant->status->value }}">
                         <flux:input name="reason" label="Motif facultatif" />
-                        <flux:button type="submit" :variant="$action === 'archive' ? 'danger' : 'outline'">{{ $label }}</flux:button>
+                        <flux:button type="submit" class="self-start" :variant="$action === 'archive' ? 'danger' : 'outline'">{{ $label }}</flux:button>
                     </form>
                 @endif
             @endcan

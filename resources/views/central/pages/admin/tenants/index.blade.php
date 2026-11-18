@@ -1,37 +1,33 @@
 <x-layouts::app :title="__('Boutiques')">
-    <section class="flex flex-col gap-6">
-        <flux:heading size="xl" level="1">Administration des boutiques</flux:heading>
-        @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
-        @if ($errors->any())<flux:callout variant="danger" role="alert">{{ $errors->first() }}</flux:callout>@endif
-        @can('create', \App\Models\Central\Tenants\Tenant::class)<flux:button variant="primary" :href="route('central.tenants.create')">Créer une boutique</flux:button>@endcan
-        <form method="GET" action="{{ route('central.tenants.index') }}" class="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <flux:input name="search" label="Nom, slug, propriétaire ou domaine" :value="$search" />
-            <flux:select name="status" label="État">
-                <option value="">Toutes les boutiques non archivées</option>
-                @foreach ($statuses as $choice)<option value="{{ $choice->value }}" @selected($status === $choice)>{{ $choice->label() }}</option>@endforeach
-            </flux:select>
-            <flux:button type="submit">Rechercher</flux:button>
-        </form>
-        <div class="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
-            <table class="w-full text-left text-sm">
-                <thead><tr>@foreach (['Boutique', 'Propriétaire', 'Domaines', 'État'] as $heading)<th class="p-4">{{ $heading }}</th>@endforeach @can('viewAny', \App\Models\Central\Subscriptions\Subscription::class)<th class="p-4">Abonnement</th>@endcan @foreach (['Base MySQL', 'Actions'] as $heading)<th class="p-4">{{ $heading }}</th>@endforeach</tr></thead>
-                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
-                    @forelse ($shops as $tenant)
-                        <tr>
-                            <td class="p-4">{{ $tenant->shop_name }}<br>{{ $tenant->slug }}</td>
-                            <td class="p-4">{{ $tenant->owner?->name ?? 'Compte archivé' }}<br>{{ $tenant->owner?->email }}</td>
-                            <td class="p-4">{{ $tenant->domains->pluck('domain')->join(', ') ?: 'Aucun domaine' }}</td>
-                            <td class="p-4">{{ $tenant->status->label() }}</td>
-                            @can('viewAny', \App\Models\Central\Subscriptions\Subscription::class)<td class="p-4">{{ $subscriptions->get($tenant->user_id)?->plan?->name ?? 'Aucun abonnement actif enregistré' }}</td>@endcan
-                            <td class="p-4">{{ $tenant->getInternal('db_name') ?? 'Non réservée' }}</td>
-                            <td class="p-4">@include('central.pages.admin.tenants.actions', ['detail' => false])</td>
-                        </tr>
-                    @empty
-                        <tr><td class="p-4" colspan="7">Aucune boutique ne correspond à la recherche.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        {{ $shops->links() }}
+    <section class="mx-auto flex w-full max-w-screen-2xl flex-col gap-6">
+        <header class="flex flex-wrap items-start justify-between gap-5"><div class="space-y-2"><h1 class="aydra-heading text-3xl font-semibold tracking-tight sm:text-4xl">Administration des boutiques</h1><p class="aydra-muted max-w-2xl text-sm sm:text-base">Retrouvez les boutiques, leur propriétaire et leur état de préparation.</p></div>@can('create', \App\Models\Central\Tenants\Tenant::class)<flux:button variant="primary" icon="plus" :href="route('central.tenants.create')">Créer une boutique</flux:button>@endcan</header>
+        @if (session('status'))<flux:callout role="status">{{ session('status') }}</flux:callout>@endif
+        @if ($errors->any())<flux:callout variant="danger" role="alert">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</flux:callout>@endif
+        <section class="aydra-users-panel p-5 sm:p-6" aria-labelledby="tenant-search"><h2 id="tenant-search" class="aydra-heading text-lg font-semibold">Rechercher une boutique</h2><p class="aydra-muted mt-1 text-sm">Les suggestions proviennent des boutiques affichées sur cette page.</p>
+            <form method="GET" action="{{ route('central.tenants.index') }}" class="mt-5 flex flex-wrap items-end gap-3">
+                <flux:input name="search" label="Nom, slug, propriétaire ou domaine" :value="$search" type="search" icon="magnifying-glass" list="tenant-suggestions" class="min-w-0 flex-1 sm:min-w-72" />
+                <datalist id="tenant-suggestions">@foreach ($shops as $tenant)<option value="{{ $tenant->shop_name }}"></option><option value="{{ $tenant->slug }}"></option>@if($tenant->owner?->name)<option value="{{ $tenant->owner->name }}"></option>@endif @if($tenant->owner?->email)<option value="{{ $tenant->owner->email }}"></option>@endif @foreach($tenant->domains as $domain)<option value="{{ $domain->domain }}"></option>@endforeach @endforeach</datalist>
+                <div class="w-full sm:w-64" x-data="{ value: '', label: '' }" data-value="{{ $status?->value ?? '' }}" data-label="{{ $status?->label() ?? 'Toutes les boutiques non archivées' }}" x-init="value = $el.dataset.value; label = $el.dataset.label"><label id="tenant-status-label" class="mb-2 block text-sm font-medium">État</label><input type="hidden" name="status" :value="value" value="{{ $status?->value ?? '' }}"><flux:dropdown><flux:button type="button" icon:trailing="chevron-down" class="w-full justify-between" aria-labelledby="tenant-status-label tenant-status-value"><span id="tenant-status-value" x-text="label">Toutes les boutiques non archivées</span></flux:button><flux:menu><flux:menu.item type="button" data-value="" @click="value = $el.dataset.value; label = $el.textContent.trim()">Toutes les boutiques non archivées</flux:menu.item>@foreach ($statuses as $choice)<flux:menu.item type="button" data-value="{{ $choice->value }}" @click="value = $el.dataset.value; label = $el.textContent.trim()">{{ $choice->label() }}</flux:menu.item>@endforeach</flux:menu></flux:dropdown></div>
+                @if(request()->filled('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}"><input type="hidden" name="direction" value="{{ request('direction', 'asc') }}">@endif
+                <flux:button type="submit" variant="primary">Rechercher</flux:button><flux:button :href="route('central.tenants.index')">Effacer</flux:button>
+            </form>
+        </section>
+        @php($sortBy = request('sort')) @php($sortDirection = request('direction', 'asc'))
+        <section class="aydra-users-panel" aria-labelledby="tenant-list"><div class="aydra-users-toolbar"><div><h2 id="tenant-list" class="aydra-heading text-lg font-semibold">Boutiques</h2><p class="aydra-muted mt-1 text-sm">{{ $shops->total() }} {{ $shops->total() === 1 ? 'boutique trouvée' : 'boutiques trouvées' }}</p></div></div>
+            <div class="aydra-users-table"><flux:table class="whitespace-normal"><flux:table.columns>
+                <flux:table.column sortable :sorted="$sortBy === 'shop_name'" :direction="$sortDirection" :aria-sort="$sortBy === 'shop_name' ? ($sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'" :data-sort-url="route('central.tenants.index', [...request()->only(['search', 'status']), 'sort' => 'shop_name', 'direction' => $sortBy === 'shop_name' && $sortDirection === 'asc' ? 'desc' : 'asc'])" onclick="window.location.assign(this.dataset.sortUrl)">Boutique</flux:table.column>
+                <flux:table.column>Propriétaire</flux:table.column><flux:table.column>Domaines</flux:table.column>
+                <flux:table.column sortable :sorted="$sortBy === 'status'" :direction="$sortDirection" :aria-sort="$sortBy === 'status' ? ($sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'" :data-sort-url="route('central.tenants.index', [...request()->only(['search', 'status']), 'sort' => 'status', 'direction' => $sortBy === 'status' && $sortDirection === 'asc' ? 'desc' : 'asc'])" onclick="window.location.assign(this.dataset.sortUrl)">État</flux:table.column>
+                @can('viewAny', \App\Models\Central\Subscriptions\Subscription::class)<flux:table.column>Abonnement</flux:table.column>@endcan <flux:table.column>Base MySQL</flux:table.column><flux:table.column>Actions</flux:table.column>
+            </flux:table.columns><flux:table.rows>
+                @forelse ($shops as $tenant)
+                    <flux:table.row :key="$tenant->uuid"><flux:table.cell variant="strong">{{ $tenant->shop_name }}<div class="aydra-muted mt-1 text-xs">{{ $tenant->slug }}</div></flux:table.cell><flux:table.cell>{{ $tenant->owner?->name ?? 'Compte archivé' }}<div class="aydra-muted mt-1 text-xs">{{ $tenant->owner?->email }}</div></flux:table.cell><flux:table.cell>{{ $tenant->domains->pluck('domain')->join(', ') ?: 'Aucun domaine' }}</flux:table.cell>
+                        <flux:table.cell><flux:badge size="sm" :color="match ($tenant->status) { \App\Enums\Central\Tenants\StatusEnum::ACTIVE => 'green', \App\Enums\Central\Tenants\StatusEnum::PROVISIONING, \App\Enums\Central\Tenants\StatusEnum::OVER_QUOTA => 'amber', \App\Enums\Central\Tenants\StatusEnum::SUSPENDED, \App\Enums\Central\Tenants\StatusEnum::PROVISIONING_FAILED => 'red', default => 'zinc' }">{{ $tenant->status->label() }}</flux:badge></flux:table.cell>
+                        @can('viewAny', \App\Models\Central\Subscriptions\Subscription::class)<flux:table.cell>{{ $subscriptions->get($tenant->user_id)?->plan?->name ?? 'Aucun abonnement actif enregistré' }}</flux:table.cell>@endcan <flux:table.cell>{{ $tenant->getInternal('db_name') ?? 'Non réservée' }}</flux:table.cell><flux:table.cell>@include('central.pages.admin.tenants.actions', ['detail' => false])</flux:table.cell></flux:table.row>
+                @empty <flux:table.row><flux:table.cell :colspan="Gate::allows('viewAny', \App\Models\Central\Subscriptions\Subscription::class) ? 7 : 6"><div class="aydra-users-empty"><p class="aydra-heading font-medium">Aucune boutique ne correspond à la recherche.</p><p class="aydra-muted mt-1 text-sm">Essayez d’autres critères de recherche.</p></div></flux:table.cell></flux:table.row> @endforelse
+            </flux:table.rows></flux:table>
+            @if ($shops->hasPages())<nav aria-label="Pagination des boutiques" class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 pt-4 dark:border-zinc-700"><span class="aydra-muted text-sm">Page {{ $shops->currentPage() }} sur {{ $shops->lastPage() }}</span><div class="flex gap-2">@if ($shops->onFirstPage())<flux:button disabled icon="chevron-left">Précédent</flux:button>@else<flux:button :href="$shops->previousPageUrl()" icon="chevron-left">Précédent</flux:button>@endif @if ($shops->hasMorePages())<flux:button :href="$shops->nextPageUrl()" icon:trailing="chevron-right">Suivant</flux:button>@else<flux:button disabled icon:trailing="chevron-right">Suivant</flux:button>@endif</div></nav>@endif
+            </div>
+        </section>
     </section>
 </x-layouts::app>
