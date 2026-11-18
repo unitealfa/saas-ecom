@@ -34,6 +34,10 @@ class Feature extends Model
 
     public const string SHOPS_CODE = 'shops';
 
+    public const string TEAM_CUSTOM_ROLES_CODE = 'team.custom_roles';
+
+    public const string TEAM_MEMBERS_CODE = 'team.members';
+
     /** Format du jeton `expected_state` (empreinte SHA-256 en hexadécimal). */
     public const string STATE_PATTERN = '/^[a-f0-9]{64}$/D';
 
@@ -76,7 +80,9 @@ class Feature extends Model
 
     public function isSystem(): bool
     {
-        return $this->code === self::SHOPS_CODE;
+        return in_array($this->code, [
+            self::SHOPS_CODE, self::TEAM_CUSTOM_ROLES_CODE, self::TEAM_MEMBERS_CODE,
+        ], true);
     }
 
     /** @return HasMany<PlanFeature, $this> */

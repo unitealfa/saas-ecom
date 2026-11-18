@@ -2,6 +2,9 @@
 
 namespace App\Services\Tenant\Authorization;
 
+use App\Enums\Central\Features\PeriodEnum;
+use App\Enums\Central\Features\QuotaScopeEnum;
+use App\Enums\Central\Features\ValueTypeEnum;
 use App\Enums\Central\Subscriptions\StatusEnum as SubscriptionStatus;
 use App\Models\Central\Features\Feature;
 use App\Models\Central\Plans\PlanFeature;
@@ -29,6 +32,16 @@ final class TenantQuotaService
         $feature = Feature::where('code', $featureCode)->where('is_active', true)->first();
         if ($feature === null) {
             throw ValidationException::withMessages(['quota' => 'Fonctionnalité non disponible dans l’offre.']);
+        }
+        // Ces deux quotas commerciaux comptent une occupation par base boutique,
+        // et jamais des permissions Spatie individuelles.
+        if (in_array($featureCode, [Feature::TEAM_CUSTOM_ROLES_CODE, Feature::TEAM_MEMBERS_CODE], true)
+            && ($feature->value_type !== ValueTypeEnum::QUANTITY
+                || $feature->quota_scope !== QuotaScopeEnum::TENANT
+                || $feature->period !== PeriodEnum::LIFETIME)) {
+            throw ValidationException::withMessages([
+                'quota' => 'Le quota commercial d’équipe présente une portée ou un type incohérent.',
+            ]);
         }
         $entitlement = PlanFeature::where('plan_id', $current->plan_id)->where('feature_id', $feature->id)
             ->where('is_active', true)->first();

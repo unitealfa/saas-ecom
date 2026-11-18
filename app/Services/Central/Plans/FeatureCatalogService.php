@@ -122,7 +122,7 @@ class FeatureCatalogService
     {
         $this->mutations->run($actor, 'activate', fn () => $this->lock($feature, $expected),
             function (Feature $feature) use ($actor, $active): void {
-                if (! $active && $feature->planFeatures()->exists()) {
+                if (! $active && ($feature->isSystem() || $feature->planFeatures()->exists())) {
                     $this->fail('feature', 'Cette fonctionnalité appartient à une offre. Sa désactivation est bloquée pour préserver les abonnements.');
                 }
 
@@ -140,7 +140,7 @@ class FeatureCatalogService
     {
         $this->mutations->run($actor, 'archive', fn () => $this->lock($feature, $expected),
             function (Feature $feature) use ($actor): void {
-                if ($this->isReferenced($feature)) {
+                if ($feature->isSystem() || $this->isReferenced($feature)) {
                     $this->fail('feature', 'Cette fonctionnalité est utilisée par une offre, un compteur ou une référence de permission. Elle ne peut pas être archivée.');
                 }
 

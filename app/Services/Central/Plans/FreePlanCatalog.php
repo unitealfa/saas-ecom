@@ -24,7 +24,8 @@ class FreePlanCatalog
             throw new LogicException('The free plan belongs to the central context.');
         }
 
-        $plan = Plan::withTrashed()->where('code', self::PLAN_CODE)->orderByDesc('version')->first()
+        $plan = Plan::where('code', self::PLAN_CODE)->where('is_active', true)
+            ->orderByDesc('version')->first()
             ?? throw new LogicException('Free plan missing: run FreePlanSeeder first.');
 
         if ($plan->trashed()

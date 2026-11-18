@@ -5,6 +5,22 @@
             <flux:text>{{ $dashboard->shopName }}</flux:text>
         </div>
 
+        @php($tenantActor = auth('tenant')->user())
+        @if ($tenantActor instanceof \App\Models\Tenant\Users\User
+            && \App\Services\Tenant\Authorization\TenantAccess::isOwner($tenantActor))
+            @if (! \App\Services\Tenant\Authorization\TenantAuthorizationMode::individualOnly())
+                <flux:callout variant="warning">
+                    La gestion des rôles et de l’équipe nécessite la conversion contrôlée des autorisations de cette boutique.
+                    Demandez à l’administrateur technique le diagnostic tenant:authorization-upgrade.
+                </flux:callout>
+            @elseif (! $tenantActor->can('shop.roles.view') || ! $tenantActor->can('shop.users.view'))
+                <flux:callout variant="warning">
+                    Les permissions de gestion de l’équipe ne sont pas toutes attribuées à ce compte.
+                    Une vérification explicite est nécessaire avant toute réattribution.
+                </flux:callout>
+            @endif
+        @endif
+
         <div class="flex flex-wrap gap-3">
             @can('viewAny', \App\Models\Tenant\Roles\Role::class)
                 <flux:button :href="route('tenant.admin.roles.index', absolute: false)">

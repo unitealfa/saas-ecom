@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Central\Admin\Plans\PlanController;
 use App\Http\Controllers\Central\Admin\Plans\PlanPageController;
+use App\Http\Controllers\Central\Admin\Plans\FreePlanTeamQuotaController;
 use Illuminate\Support\Facades\Route;
 
 Route::controller(PlanController::class)->prefix('plans')->name('plans.')->group(function (): void {
@@ -14,6 +15,12 @@ Route::controller(PlanController::class)->prefix('plans')->name('plans.')->group
     Route::patch('{plan}/activation', 'activate')->name('activate');
     Route::delete('{plan}', 'archive')->name('archive');
 });
+
+Route::controller(FreePlanTeamQuotaController::class)->prefix('offres/{plan}/team-quotas')
+    ->name('plan-pages.free-team-quotas.')->group(function (): void {
+        Route::post('/', 'store')->name('update');
+        Route::patch('activation', 'activate')->name('activate');
+    });
 
 Route::controller(PlanPageController::class)->prefix('offres')->name('plan-pages.')->group(function (): void {
     Route::get('/', 'index')->name('index');
