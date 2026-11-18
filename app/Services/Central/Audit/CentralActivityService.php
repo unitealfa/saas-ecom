@@ -32,6 +32,18 @@ class CentralActivityService
         return $page;
     }
 
+    /** @return array{log_name: \Illuminate\Support\Collection, event: \Illuminate\Support\Collection} */
+    public function suggestions(User $actor): array
+    {
+        Gate::forUser($actor)->authorize('viewAny', Activity::class);
+        $recent = Activity::query()->select(['log_name', 'event'])->orderByDesc('id')->limit(500)->get();
+
+        return [
+            'log_name' => $recent->pluck('log_name')->filter()->unique()->sort()->values(),
+            'event' => $recent->pluck('event')->filter()->unique()->sort()->values(),
+        ];
+    }
+
     /** @return array{activity: Activity, actorUuid: ?string, subjectUuid: ?string} */
     public function details(User $actor, Activity $activity): array
     {

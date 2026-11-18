@@ -250,6 +250,12 @@ body.aydra-admin .aydra-users-panel {
     border-radius: 1rem;
 }
 
+body.aydra-admin .aydra-users-panel.aydra-activity-filters {
+    position: relative;
+    z-index: 10;
+    overflow: visible;
+}
+
 body.aydra-admin .aydra-users-toolbar {
     display: flex;
     flex-wrap: wrap;
