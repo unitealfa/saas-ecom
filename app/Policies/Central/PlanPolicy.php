@@ -20,6 +20,12 @@ class PlanPolicy
         return $this->viewAny($actor);
     }
 
+    public function setDefault(User $actor, Plan $plan): bool
+    {
+        return ! tenancy()->initialized && ! $plan->trashed() && $plan->is_active
+            && $this->access->allows($actor, 'saas.plans.activate');
+    }
+
     public function create(User $actor): bool
     {
         return $this->access->allows($actor, 'saas.plans.create');
@@ -41,7 +47,7 @@ class PlanPolicy
 
     public function updateFeatures(User $actor, Plan $plan): bool
     {
-        return ! $plan->trashed() && strtolower($plan->code) !== 'free'
+        return ! $plan->is_default && ! $plan->trashed() && strtolower($plan->code) !== 'free'
             && $this->access->allows($actor, 'saas.plans.features.update');
     }
 
@@ -59,13 +65,13 @@ class PlanPolicy
 
     public function activate(User $actor, Plan $plan): bool
     {
-        return ! $plan->trashed() && strtolower($plan->code) !== 'free'
+        return ! $plan->is_default && ! $plan->trashed() && strtolower($plan->code) !== 'free'
             && $this->access->allows($actor, 'saas.plans.activate');
     }
 
     public function archive(User $actor, Plan $plan): bool
     {
-        return ! $plan->trashed() && strtolower($plan->code) !== 'free'
+        return ! $plan->is_default && ! $plan->trashed() && strtolower($plan->code) !== 'free'
             && $this->access->allows($actor, 'saas.plans.archive');
     }
 }

@@ -10,7 +10,7 @@
                         <tr>
                             <td class="p-4">{{ $entry->plan?->name ?? 'Offre indisponible' }}@if ($entry->plan) — v{{ $entry->plan->version }}@endif</td>
                             <td class="p-4">{{ $entry->status?->label() ?? 'Non renseigné' }}</td>
-                            <td class="p-4">{{ $entry->period_starts_at?->format('d/m/Y') }} — {{ $entry->period_ends_at?->format('d/m/Y') ?? 'Sans échéance' }}</td>
+                            <td class="p-4">{{ $entry->effectiveStartsAt()?->format('d/m/Y') }} — {{ $entry->effectiveEndsAt()?->format('d/m/Y') ?? 'Sans échéance' }}</td>
                             <td class="p-4">{{ $entry->agreed_amount !== null ? $entry->agreed_amount.' DZD' : 'Non renseigné' }}</td>
                             <td class="p-4">{{ $entry->ended_at?->format('d/m/Y H:i') ?? '—' }}</td>
                             <td class="p-4">@can('view', $entry)<flux:button :href="route('central.subscriptions.show', $entry)">Détails</flux:button>@endcan</td>

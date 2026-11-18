@@ -58,7 +58,7 @@ class SubscriptionRequestController extends Controller
 
     public function initialProof(SubscriptionRequest $subscriptionRequest, PaymentDocumentService $documents): StreamedResponse
     {
-        return $documents->downloadRequestProof($this->centralActor(), $subscriptionRequest);
+        return $documents->downloadRequestProof($this->centralActor(), $subscriptionRequest, inline: request()->boolean('inline'));
     }
 
     private function redirectWithStatus(SubscriptionRequest $request, string $message): RedirectResponse

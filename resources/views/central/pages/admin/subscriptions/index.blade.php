@@ -32,7 +32,7 @@
                             <td class="p-4">{{ $subscription->owner?->name ?? 'Compte indisponible' }}<div>{{ $subscription->owner?->email }}</div></td>
                             <td class="p-4">{{ $subscription->plan?->name ?? 'Offre indisponible' }}@if ($subscription->plan) — v{{ $subscription->plan->version }}@endif</td>
                             <td class="p-4">{{ $subscription->status?->label() ?? 'Non renseigné' }}</td>
-                            <td class="p-4">{{ $subscription->period_starts_at?->format('d/m/Y') }} — {{ $subscription->period_ends_at?->format('d/m/Y') ?? 'Sans échéance' }}</td>
+                            <td class="p-4">{{ $subscription->effectiveStartsAt()?->format('d/m/Y') }} — {{ $subscription->effectiveEndsAt()?->format('d/m/Y') ?? 'Sans échéance' }}</td>
                             <td class="p-4">{{ $subscription->agreed_amount !== null ? $subscription->agreed_amount.' DZD' : 'Non renseigné' }}</td>
                             <td class="p-4"><flux:button :href="route('central.subscriptions.show', $subscription)">Détails</flux:button>
                                 @can('history', $subscription)

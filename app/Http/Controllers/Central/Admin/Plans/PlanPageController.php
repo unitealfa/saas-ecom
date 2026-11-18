@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Central\Admin\Plans;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Plans\ArchivePlanRequest;
 use App\Http\Requests\Central\Plans\SearchPlansRequest;
+use App\Http\Requests\Central\Plans\SetDefaultPlanRequest;
 use App\Http\Requests\Central\Plans\StorePlanRequest;
 use App\Http\Requests\Central\Plans\StorePlanVersionRequest;
 use App\Http\Requests\Central\Plans\UpdatePlanActivationRequest;
@@ -97,6 +98,13 @@ class PlanPageController extends Controller
         $this->activation->setActive($this->centralActor(), $plan, $request->validated());
 
         return $this->redirectWithStatus($plan, 'Commercialisation mise à jour.');
+    }
+
+    public function setDefault(SetDefaultPlanRequest $request, Plan $plan): RedirectResponse
+    {
+        $this->activation->setDefault($this->centralActor(), $plan, $request->validated('expected_state'));
+
+        return $this->redirectWithStatus($plan, 'Plan par défaut enregistré. Son attribution automatique est gratuite.');
     }
 
     public function archive(ArchivePlanRequest $request, Plan $plan): RedirectResponse

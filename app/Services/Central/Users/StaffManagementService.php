@@ -26,9 +26,19 @@ class StaffManagementService
     public function __construct(private UserManagementService $users) {}
 
     /** @return LengthAwarePaginator<int, User> */
-    public function search(User $actor, string $search, ?StatusEnum $status = null): LengthAwarePaginator
+    public function search(User $actor, string $search, ?StatusEnum $status = null, string $sortBy = 'id', string $sortDirection = 'asc'): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize(self::ABILITY_VIEW_ANY, User::class);
+
+        $order = match ($sortBy) {
+            'id' => 'id',
+            'name' => "TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')))",
+            'email' => 'email',
+            default => throw new \InvalidArgumentException('Tri du personnel invalide.'),
+        };
+        if (! in_array($sortDirection, ['asc', 'desc'], true)) {
+            throw new \InvalidArgumentException('Direction de tri invalide.');
+        }
 
         return User::query()
             ->whereHas('roles', fn (Builder $query) => $query->where('guard_name', self::GUARD))
@@ -37,6 +47,7 @@ class StaffManagementService
             ->when($status === StatusEnum::DELETED, fn (Builder $query) => $query->onlyTrashed())
             ->when($status !== null, fn (Builder $query) => $query->withStatus($status))
             ->when(trim($search) !== '', fn (Builder $query) => $this->applySearch($query, $search))
+            ->orderByRaw($order.' '.$sortDirection)
             ->orderBy('id')
             ->paginate(self::PER_PAGE);
     }

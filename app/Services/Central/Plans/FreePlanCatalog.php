@@ -30,8 +30,8 @@ class FreePlanCatalog
 
         if ($plan->trashed()
             || ! $plan->is_active
-            || $plan->monthly_price !== self::ZERO_PRICE
-            || $plan->annual_price !== self::ZERO_PRICE) {
+            || (! $plan->is_default && ($plan->monthly_price !== self::ZERO_PRICE
+                || $plan->annual_price !== self::ZERO_PRICE))) {
             throw new LogicException('The latest free plan must be non-archived, active and free of charge.');
         }
 
@@ -44,7 +44,7 @@ class FreePlanCatalog
         $hasQuota = PlanFeature::where('plan_id', $plan->id)
             ->where('feature_id', $feature->id)
             ->where('is_active', true)
-            ->where('limit', self::SHOP_LIMIT)
+            ->when(! $plan->is_default, fn ($query) => $query->where('limit', self::SHOP_LIMIT))
             ->exists();
 
         if (! $hasQuota) {

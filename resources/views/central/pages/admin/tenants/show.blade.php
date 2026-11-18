@@ -15,8 +15,8 @@
                 'Base MySQL' => $tenant->getInternal('db_name'),
                 ...(Gate::allows('viewAny', \App\Models\Central\Subscriptions\Subscription::class) ? [
                     'Abonnement' => $subscription?->plan?->name,
-                    'Début de la période' => $subscription?->period_starts_at?->format('d/m/Y H:i'),
-                    'Fin de la période' => $subscription?->period_ends_at?->format('d/m/Y H:i'),
+                    'Début de la période' => $subscription?->effectiveStartsAt()?->format('d/m/Y H:i'),
+                    'Fin de la période' => $subscription?->effectiveEndsAt()?->format('d/m/Y H:i'),
                 ] : []),
                 'Priorité' => $tenant->activation_priority, 'Boutique principale' => $tenant->is_primary ? 'Oui' : 'Non',
                 'Préparation terminée le' => $tenant->provisioned_at?->format('d/m/Y H:i'),

@@ -19,8 +19,8 @@
                 'Périodicité' => $subscription->period?->label(),
                 'Montant convenu' => $subscription->agreed_amount !== null ? $subscription->agreed_amount.' DZD' : null,
                 'Début' => $subscription->started_at?->format('d/m/Y H:i'),
-                'Début de période' => $subscription->period_starts_at?->format('d/m/Y H:i'),
-                'Fin de période' => $subscription->period_ends_at?->format('d/m/Y H:i') ?? 'Sans échéance',
+                'Début de période' => $subscription->effectiveStartsAt()?->format('d/m/Y H:i'),
+                'Fin de période' => $subscription->effectiveEndsAt()?->format('d/m/Y H:i') ?? 'Sans échéance',
                 'Fin de l’essai' => $subscription->trial_ends_at?->format('d/m/Y H:i'),
                 'Fin de l’abonnement' => $subscription->ended_at?->format('d/m/Y H:i'),
                 'Renouvellement automatique' => $subscription->auto_renew === null ? null : ($subscription->auto_renew ? 'Oui' : 'Non'),
@@ -39,7 +39,7 @@
             @can('history', $subscription)
                 <flux:button :href="route('central.subscriptions.history', $subscription)">Historique des abonnements</flux:button>
             @endcan
-            @if (in_array($subscription->status, [\App\Enums\Central\Subscriptions\StatusEnum::ACTIVE, \App\Enums\Central\Subscriptions\StatusEnum::TRIAL], true) && ! $subscription->period_starts_at->isFuture() && $subscription->plan?->code !== 'free' && ($subscription->effectiveEndsAt() === null || $subscription->effectiveEndsAt()->isFuture()))
+            @if (in_array($subscription->status, [\App\Enums\Central\Subscriptions\StatusEnum::ACTIVE, \App\Enums\Central\Subscriptions\StatusEnum::TRIAL], true) && ! $subscription->effectiveStartsAt()->isFuture() && ! $subscription->isFree() && ($subscription->effectiveEndsAt() === null || $subscription->effectiveEndsAt()->isFuture()))
                 @can('deactivate', $subscription)
                     <form method="POST" action="{{ route('central.subscriptions.deactivate', $subscription) }}" x-data x-on:submit="if (! window.confirm('Désactiver immédiatement cet abonnement et appliquer l’offre gratuite ? Le quota des boutiques sera recalculé.')) $event.preventDefault()">
                         @csrf
@@ -48,7 +48,7 @@
                     </form>
                 @endcan
             @endif
-            @if ($subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::ACTIVE && $subscription->period_ends_at?->isFuture() && $subscription->ended_at === null && $subscription->plan?->code !== 'free')
+            @if ($subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::ACTIVE && $subscription->effectiveEndsAt()?->isFuture() && $subscription->ended_at === null && ! $subscription->isFree())
                 @can('change', $subscription)
                     @can('saas.payments.validate')
                     <flux:button :href="route('central.subscriptions.change.form', $subscription)">Changer l’offre</flux:button>

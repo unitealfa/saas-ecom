@@ -31,9 +31,23 @@ class SubscriptionRequestController extends Controller
         abort_unless($actor->id === $subscriptionRequest->user_id, 403);
         Gate::forUser($actor)->authorize('view', $subscriptionRequest);
 
-        return view('central.pages.admin.subscriptions.requests.show', ['subscriptionRequest' => $subscriptionRequest->load(['owner', 'subscription.plan', 'invoice.media', 'payment', 'decider']),
-            'currentSubscription' => $this->requests->currentSubscription($actor, $subscriptionRequest),
+        return view('central.pages.admin.subscriptions.requests.show', ['subscriptionRequest' => $subscriptionRequest->load(['owner', 'subscription.plan.features.feature', 'invoice.media', 'payment', 'decider']),
+            'currentSubscription' => $this->requests->currentSubscription($actor, $subscriptionRequest)?->load('plan.features.feature'),
             'ownerMode' => true, 'plans' => $this->plans->available(), 'history' => Activity::forSubject($subscriptionRequest)->with('causer')->orderByDesc('id')->paginate(20)]);
+    }
+
+    public function revise(SubscriptionRequestActionRequest $request, SubscriptionRequest $subscriptionRequest): RedirectResponse
+    {
+        $current = $this->requests->revise($this->centralActor(), $subscriptionRequest, $request->validated('expected_state'), $request->safe()->except('expected_state'));
+
+        return to_route('owner.subscription-requests.show', $current)->with('status', 'Offre ou période modifiée. Aucun paiement ni droit supplémentaire confirmé.');
+    }
+
+    public function cancel(SubscriptionRequestActionRequest $request, SubscriptionRequest $subscriptionRequest): RedirectResponse
+    {
+        $this->requests->cancel($this->centralActor(), $subscriptionRequest, $request->validated('expected_state'));
+
+        return to_route('owner.subscriptions.index')->with('status', 'Demande annulée. Vous pouvez choisir une autre offre. L’historique et les justificatifs sont conservés.');
     }
 
     public function choice(SubscriptionRequestActionRequest $request, SubscriptionRequest $subscriptionRequest): RedirectResponse
@@ -52,6 +66,6 @@ class SubscriptionRequestController extends Controller
 
     public function initialProof(SubscriptionRequest $subscriptionRequest, PaymentDocumentService $documents): StreamedResponse
     {
-        return $documents->downloadRequestProof($this->centralActor(), $subscriptionRequest);
+        return $documents->downloadRequestProof($this->centralActor(), $subscriptionRequest, inline: request()->boolean('inline'));
     }
 }

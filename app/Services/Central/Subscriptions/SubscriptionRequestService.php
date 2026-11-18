@@ -91,9 +91,7 @@ class SubscriptionRequestService
         Gate::forUser($actor)->authorize('view', $request);
 
         return Subscription::where('user_id', $request->user_id)->whereIn('status', [StatusEnum::ACTIVE, StatusEnum::TRIAL])
-            ->where('period_starts_at', '<=', now())
-            ->where(fn (Builder $query) => $query->whereNull('period_ends_at')->orWhere('period_ends_at', '>', now()))
-            ->where(fn (Builder $query) => $query->whereNull('ended_at')->orWhere('ended_at', '>', now()))
+            ->currentlyEffective()
             ->with('plan')->orderByDesc('id')->first();
     }
 
@@ -400,6 +398,9 @@ class SubscriptionRequestService
             }
             $subscription = $current->subscription()->lockForUpdate()->firstOrFail();
             $values['transition_mode'] ??= $subscription->transition_mode->value;
+            if ((int) $values['transition_mode'] === TransitionModeEnum::IMMEDIATE->value) {
+                Validator::make($data, ['confirm_replacement' => ['required', 'accepted']])->validate();
+            }
             if ($subscription->plan->uuid === strtolower($values['plan_uuid']) && $subscription->period->value === (int) $values['period']
                 && $subscription->transition_mode->value === (int) $values['transition_mode']) {
                 if ($subscription->agreed_amount !== $values['expected_amount']) {

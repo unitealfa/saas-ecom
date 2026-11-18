@@ -58,10 +58,10 @@
     @if ($sidebar)
         <flux:sidebar.item :icon="$icons[$label]" :href="route($visible->first()['route'])" :current="$current" wire:navigate>{{ $label }}</flux:sidebar.item>
     @elseif ($current)
-        <nav aria-label="{{ $label }}" class="mb-6 flex flex-wrap gap-2">
+        <flux:navbar scrollable aria-label="{{ $label }}" class="aydra-context-nav">
             @foreach ($visible as $item)
-                <flux:button :href="route($item['route'])" :variant="request()->routeIs(...$item['matches']) ? 'primary' : 'outline'" wire:navigate>{{ $item['label'] }}</flux:button>
+                <flux:navbar.item :href="route($item['route'])" :current="request()->routeIs(...$item['matches'])" wire:navigate>{{ $item['label'] }}</flux:navbar.item>
             @endforeach
-        </nav>
+        </flux:navbar>
     @endif
 @endforeach

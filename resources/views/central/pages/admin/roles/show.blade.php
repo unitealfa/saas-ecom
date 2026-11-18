@@ -1,50 +1,53 @@
 <x-layouts::app :title="$role->label">
-    <section class="flex flex-col gap-6">
-        <flux:heading size="xl" level="1">{{ $role->label }}</flux:heading>
-        <flux:text>Nom du rôle : {{ $role->name }}</flux:text>
+    <section class="mx-auto flex w-full max-w-screen-xl flex-col gap-6">
+        <header class="space-y-2"><h1 class="aydra-heading break-words text-3xl font-semibold tracking-tight sm:text-4xl">{{ $role->label }}</h1><p class="aydra-muted text-sm">Nom du rôle : {{ $role->name }}</p></header>
         @if ($role->is_system || $role->is_protected)<flux:callout>Rôle système protégé.</flux:callout>@endif
         @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
         @if ($errors->any())<flux:callout variant="danger">{{ $errors->first() }}</flux:callout>@endif
         @if ($permissions !== null)
-            <flux:heading level="2">Permissions et durées</flux:heading>
+            <section class="aydra-users-panel p-5 sm:p-6" aria-labelledby="role-permissions">
+            <h2 id="role-permissions" class="aydra-heading mb-4 text-lg font-semibold">Permissions et durées</h2>
             @if ($role->is_super_admin)
                 <flux:text>Accès Super Admin protégé : les droits sont implicites.</flux:text>
             @else
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead><tr><th class="p-3">Permission</th><th class="p-3">Durée</th></tr></thead>
-                        <tbody>
+                    <flux:table>
+                        <flux:table.columns><flux:table.column>Permission</flux:table.column><flux:table.column>Durée</flux:table.column></flux:table.columns>
+                        <flux:table.rows>
                             @foreach ($permissions as $permission)
-                                <tr class="border-t border-zinc-200 dark:border-zinc-700"><td class="p-3">{{ $permission->label }}</td><td class="p-3">{{ $permission->pivot->duration_days }} jours</td></tr>
+                                <flux:table.row><flux:table.cell>{{ $permission->label }}</flux:table.cell><flux:table.cell>{{ $permission->pivot->duration_days }} jours</flux:table.cell></flux:table.row>
                             @endforeach
-                        </tbody>
-                    </table>
+                        </flux:table.rows>
+                    </flux:table>
                 </div>
                 <flux:text>Ces droits et durées sont copiés lors d’une nouvelle attribution du profil. Les permissions individuelles existantes ne sont pas modifiées.</flux:text>
             @endif
+            </section>
         @endif
         @if ($assignments !== null)
-            <flux:heading level="2">Administrateurs possédant ce rôle</flux:heading>
+            <section class="aydra-users-panel p-5 sm:p-6" aria-labelledby="role-assignments">
+            <h2 id="role-assignments" class="aydra-heading mb-4 text-lg font-semibold">Administrateurs possédant ce rôle</h2>
             <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm">
-                    <thead><tr><th class="p-3">Compte</th><th class="p-3">État</th><th class="p-3">Attribué le (UTC)</th><th class="p-3">Informations</th></tr></thead>
-                    <tbody>
+                <flux:table>
+                    <flux:table.columns><flux:table.column>Compte</flux:table.column><flux:table.column>État</flux:table.column><flux:table.column>Attribué le (UTC)</flux:table.column><flux:table.column>Informations</flux:table.column></flux:table.columns>
+                    <flux:table.rows>
                         @forelse ($assignments as $user)
-                            <tr class="border-t border-zinc-200 dark:border-zinc-700">
-                                <td class="p-3">{{ $user->name }}<br>{{ $user->email }}</td>
-                                <td class="p-3">{{ $user->trashed() ? 'Archivé' : $user->status->label() }}</td>
-                                <td class="p-3">{{ $user->roles->first()->pivot->assigned_at }}</td>
-                                <td class="p-3">@can('viewStaff', $user)<flux:button :href="route('central.staff.show', $user)">Informations</flux:button>@endcan</td>
-                            </tr>
+                            <flux:table.row>
+                                <flux:table.cell>{{ $user->name }}<br>{{ $user->email }}</flux:table.cell>
+                                <flux:table.cell>{{ $user->trashed() ? 'Archivé' : $user->status->label() }}</flux:table.cell>
+                                <flux:table.cell>{{ $user->roles->first()->pivot->assigned_at }}</flux:table.cell>
+                                <flux:table.cell>@can('viewStaff', $user)<flux:button :href="route('central.staff.show', $user)">Informations</flux:button>@endcan</flux:table.cell>
+                            </flux:table.row>
                         @empty
-                            <tr><td class="p-3" colspan="4">Aucun administrateur ne possède ce rôle.</td></tr>
+                            <flux:table.row><flux:table.cell colspan="4">Aucun administrateur ne possède ce rôle.</flux:table.cell></flux:table.row>
                         @endforelse
-                    </tbody>
-                </table>
+                    </flux:table.rows>
+                </flux:table>
             </div>
             {{ $assignments->links() }}
+            </section>
         @endif
-        <div class="flex flex-wrap gap-3">
+        <div class="flex flex-wrap items-center gap-3">
             @can('edit', $role)<flux:button :href="route('central.roles.edit', $role)">Modifier</flux:button>@endcan
             @can('delete', $role)
                 <form method="POST" action="{{ route('central.roles.destroy', $role) }}" x-data x-on:submit="if (!confirm('Supprimer ce rôle inutilisé ?')) $event.preventDefault()">

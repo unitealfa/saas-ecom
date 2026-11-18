@@ -24,8 +24,10 @@ class PaidSubscriptionActivation
             || $subscription->period_ends_at === null || $subscription->period_ends_at->lessThanOrEqualTo(now())) {
             throw ValidationException::withMessages(['payment' => 'Cette période est expirée, annulée ou ne correspond plus à l’abonnement. Aucun droit modifié.']);
         }
-        $due->forceFill(['installment_status' => InstallmentStatusEnum::PAID])->save();
-        if ($subscription->period_starts_at->isFuture()) {
+        if ($due->installment_status !== InstallmentStatusEnum::PAID) {
+            $due->forceFill(['installment_status' => InstallmentStatusEnum::PAID])->save();
+        }
+        if ($subscription->effectiveStartsAt()->isFuture()) {
             return;
         }
         $others = Subscription::where('user_id', $subscription->user_id)->whereKeyNot($subscription->id)
@@ -34,7 +36,7 @@ class PaidSubscriptionActivation
             $end = $current->effectiveEndsAt();
             $replacement = $subscription->transition_mode === TransitionModeEnum::IMMEDIATE
                 && $subscription->getAttribute('replaces_subscription_id') === $current->id;
-            if ($current->plan?->code !== 'free' && ($end === null || $end->isFuture()) && ! $replacement) {
+            if (! $current->isFree() && ($end === null || $end->isFuture()) && ! $replacement) {
                 throw ValidationException::withMessages(['payment' => 'Une autre période payante est encore active. Préservez ses droits et vérifiez les dates avant de confirmer.']);
             }
             $current->forceFill(['status' => $end !== null && $end->lessThanOrEqualTo(now()) ? StatusEnum::EXPIRED : StatusEnum::CANCELLED,

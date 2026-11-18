@@ -1,11 +1,12 @@
 <x-layouts::app title="Permissions individuelles">
-    <section class="mx-auto flex max-w-6xl flex-col gap-6">
-        <flux:heading size="xl" level="1">Permissions de {{ $user->name }}</flux:heading>
-        <flux:text>Profils : {{ $user->roles->pluck('label')->join(', ') }}</flux:text>
+    <section class="mx-auto flex w-full max-w-screen-2xl flex-col gap-6">
+        <header class="flex flex-wrap items-start justify-between gap-4">
+            <div class="space-y-2"><h1 class="aydra-heading break-words text-3xl font-semibold tracking-tight sm:text-4xl">Permissions de {{ $user->name }}</h1><p class="aydra-muted text-sm">Profils : {{ $user->roles->pluck('label')->join(', ') }}</p></div>
         @can('assignStaffRoles', $user)
             <flux:button :href="route('central.staff.roles.edit', $user)">Rôles de {{ $user->name }}</flux:button>
         @endcan
-        <flux:text>Les profils fournissent les droits de départ. Modifier les permissions ci-dessous concerne uniquement ce compte. Une attribution conservée garde ses dates ; une attribution expirée ne donne plus accès.</flux:text>
+        </header>
+        <flux:callout>Les profils fournissent les droits de départ. Modifier les permissions ci-dessous concerne uniquement ce compte. Une attribution conservée garde ses dates ; une attribution expirée ne donne plus accès.</flux:callout>
         @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
         @if ($errors->any())
             <flux:callout variant="danger">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</flux:callout>
@@ -16,7 +17,8 @@
             @csrf @method('PUT')
             <input type="hidden" name="expected_state" value="{{ old('expected_state', $expectedState) }}">
         @endif
-            <div class="overflow-x-auto">
+            <div class="aydra-users-panel p-5 sm:p-6">
+              <div class="overflow-x-auto">
                 <table class="w-full text-left text-sm">
                     <thead><tr><th class="p-3">Permission</th><th class="p-3">Attribuée</th><th class="p-3">Source et dates UTC</th><th class="p-3">Accès actuel</th><th class="p-3">Durée et renouvellement</th></tr></thead>
                     <tbody>
@@ -63,6 +65,7 @@
                     @endforelse
                     </tbody>
                 </table>
+              </div>
             </div>
             @if ($canEdit)
                 <flux:textarea name="reason" label="Motif — obligatoire pour un renouvellement" :value="old('reason')" />

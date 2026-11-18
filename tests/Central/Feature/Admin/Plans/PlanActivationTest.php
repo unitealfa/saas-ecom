@@ -1,13 +1,21 @@
 <?php
 
+use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Models\Central\Audit\Activity;
+use App\Models\Central\Features\Feature;
 use App\Models\Central\Plans\Plan;
+use App\Models\Central\Plans\PlanFeature;
 use App\Models\Central\Roles\Role;
 use App\Models\Central\Subscriptions\Subscription;
+use App\Models\Central\Subscriptions\SubscriptionInstallment;
 use App\Models\User;
 use App\Services\Central\Plans\PlanActivationService;
+use App\Services\Central\Subscriptions\DefaultSubscription;
 use Database\Seeders\Central\AuthorizationSeeder;
+use Database\Seeders\Central\FreePlanSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
 function planActivationActor(array $permissions): User
@@ -100,4 +108,48 @@ test('activating an already active version resolves other active versions withou
     expect($first->refresh()->is_active)->toBeFalse()->and($second->refresh()->is_active)->toBeTrue();
     expect(Activity::forSubject($first)->where('event', 'plan_activation_updated')->count())->toBe(1)
         ->and(Activity::forSubject($second)->where('event', 'plan_activation_updated')->count())->toBe(0);
+});
+
+test('default plan selection grants an existing priced offer for free only after current rights expire', function (): void {
+    $actor = planActivationActor(['saas.plans.view', 'saas.plans.activate', 'saas.plans.archive']);
+    $this->seed(FreePlanSeeder::class);
+    $plan = Plan::factory()->create(['is_active' => true, 'monthly_price' => '3000.00', 'annual_price' => '36000.00']);
+    (new PlanFeature)->forceFill(['plan_id' => $plan->id,
+        'feature_id' => Feature::where('code', 'shops')->sole()->id,
+        'limit' => 3, 'is_active' => true])->save();
+    $owner = User::factory()->create();
+    $paid = Subscription::factory()->create(['user_id' => $owner->id, 'plan_id' => $plan->id,
+        'agreed_amount' => '3000.00', 'status' => StatusEnum::ACTIVE,
+        'period_starts_at' => now()->subDays(29), 'period_ends_at' => now()->addDay()]);
+    $data = ['expected_state' => planActivationState($plan), 'confirmed' => 1];
+    $this->actingAs($actor, 'central')->patch(route('central.plan-pages.default', $plan), $data)
+        ->assertRedirect()->assertSessionHasNoErrors();
+    $defaults = app(DefaultSubscription::class);
+    expect($plan->refresh()->is_default)->toBeTrue()->and($plan->monthly_price)->toBe('3000.00')
+        ->and($defaults->ensure($owner)->id)->toBe($paid->id);
+    $this->travel(2)->days();
+    $fallback = $defaults->ensure($owner);
+    expect($fallback->plan_id)->toBe($plan->id)->and($fallback->agreed_amount)->toBe('0.00')
+        ->and($fallback->period_ends_at)->toBeNull()
+        ->and($paid->refresh()->status)->toBe(StatusEnum::EXPIRED)
+        ->and($defaults->ensure($owner)->id)->toBe($fallback->id)
+        ->and(SubscriptionInstallment::where('subscription_id', $fallback->id)->exists())->toBeFalse()
+        ->and(Gate::forUser($actor)->allows('activate', $plan))->toBeFalse()
+        ->and(Gate::forUser($actor)->allows('archive', $plan))->toBeFalse();
+});
+
+test('default plan selection checks permission confirmation composition and SQL uniqueness', function (): void {
+    $actor = planActivationActor(['saas.plans.view', 'saas.plans.activate']);
+    $this->seed(FreePlanSeeder::class);
+    $free = Plan::where('code', 'free')->sole();
+    $url = route('central.plan-pages.default', $free);
+    $data = ['expected_state' => planActivationState($free), 'confirmed' => 1];
+    $this->actingAs(planActivationActor(['saas.plans.view']), 'central')->patch($url, $data)->assertForbidden();
+    $this->actingAs($actor, 'central')->patch($url, ['expected_state' => $data['expected_state']])->assertSessionHasErrors('confirmed');
+    $this->patch($url, [...$data, 'expected_state' => str_repeat('0', 64)])->assertSessionHasErrors('expected_state');
+    $this->patch($url, $data)->assertRedirect()->assertSessionHasNoErrors();
+    $invalid = Plan::factory()->create(['is_active' => true]);
+    $this->patch(route('central.plan-pages.default', $invalid), ['expected_state' => planActivationState($invalid), 'confirmed' => 1])->assertSessionHasErrors('plan');
+    expect($free->refresh()->is_default)->toBeTrue()->and($invalid->refresh()->is_default)->toBeNull();
+    expect(fn () => $invalid->forceFill(['is_default' => true])->save())->toThrow(UniqueConstraintViolationException::class);
 });

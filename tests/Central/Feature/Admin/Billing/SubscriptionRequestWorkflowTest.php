@@ -15,6 +15,7 @@ use App\Models\Central\Media\Media;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Plans\PlanFeature;
 use App\Models\Central\Roles\Role;
+use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Subscriptions\SubscriptionRequest;
 use App\Models\User;
 use App\Notifications\Central\Subscriptions\SubscriptionWorkflowNotification;
@@ -692,4 +693,150 @@ test('an initial external proof receives its submission date automatically and r
     expect($replay->id)->toBe($request->id)
         ->and($replay->getAttribute('submitted_payment')['occurred_at'])->toBe($occurredAt)
         ->and(SubscriptionRequest::count())->toBe(1);
+});
+
+test('initial proof preview stays private and preserves the download option', function (): void {
+    $f = requestFixture();
+    $request = requestWithInitialProof($f);
+    $media = Media::where('uuid', $request->getAttribute('submitted_payment')['proof_uuid'])->sole();
+
+    foreach (['owner' => $f['owner'], 'central' => $f['actor']] as $prefix => $actor) {
+        $this->actingAs($actor, 'central');
+        $preview = URL::temporarySignedRoute($prefix.'.subscription-requests.initial-proof', now()->addMinutes(5), ['subscriptionRequest' => $request, 'inline' => 1]);
+        $response = $this->get($preview)->assertOk()->assertHeader('content-type', 'application/pdf')
+            ->assertHeader('x-content-type-options', 'nosniff')
+            ->assertStreamedContent(Storage::disk($media->disk)->get($media->storage_key));
+        expect($response->headers->get('content-disposition'))->toStartWith('inline;');
+        $this->get(route($prefix.'.subscription-requests.show', $request))->assertOk()
+            ->assertSee('<iframe', false)->assertSee('title="Consulter le justificatif initial"', false);
+        $download = URL::temporarySignedRoute($prefix.'.subscription-requests.initial-proof', now()->addMinutes(5), ['subscriptionRequest' => $request]);
+        expect($this->get($download)->assertOk()->headers->get('content-disposition'))->toStartWith('attachment;');
+        $this->get($download.'&inline=1')->assertForbidden();
+    }
+
+    $this->actingAs(User::factory()->create(), 'central')->get($preview)->assertForbidden();
+    Storage::disk($media->disk)->put($media->storage_key, 'altered');
+    $this->actingAs($f['owner'], 'central')->get(URL::temporarySignedRoute('owner.subscription-requests.initial-proof', now()->addMinutes(5), ['subscriptionRequest' => $request, 'inline' => 1]))->assertStatus(409);
+});
+
+test('subscription self-service cancels an unpaid request and allows a new offer without deleting history', function (): void {
+    $f = requestFixture();
+    $service = app(SubscriptionRequestService::class);
+    $request = $service->create($f['owner'], subscriptionRequestInput($f));
+    $originalSubscription = $request->subscription;
+    $url = route('owner.subscription-requests.cancel', $request);
+    $state = $request->managementState();
+
+    $this->actingAs($f['owner'], 'central')->get(route('owner.subscriptions.index'))->assertOk()
+        ->assertSee('action="'.$url.'"', false)->assertSee('Modifier l’offre ou la période');
+    $this->get(route('owner.subscriptions.show', $originalSubscription))->assertOk()
+        ->assertSee('href="'.route('owner.subscription-requests.show', $request).'#modifier"', false);
+    $this->actingAs(User::factory()->create(), 'central')->post($url, ['expected_state' => $state])->assertForbidden();
+    $this->actingAs($f['owner'], 'central')->post($url, ['expected_state' => str_repeat('0', 64)])->assertSessionHasErrors('conflict');
+    expect($request->refresh()->subscription->status)->toBe(StatusEnum::SCHEDULED);
+    $this->post($url, ['expected_state' => $state])->assertRedirect(route('owner.subscriptions.index'))->assertSessionHasNoErrors();
+    expect($request->refresh()->status)->toBe(RequestStatusEnum::CANCELLED)
+        ->and($originalSubscription->refresh()->status)->toBe(StatusEnum::CANCELLED)
+        ->and($request->periods()->count())->toBe(1);
+
+    $this->post(route('owner.subscriptions.store'), subscriptionRequestInput($f))->assertRedirect()->assertSessionHasNoErrors();
+    expect(SubscriptionRequest::where('user_id', $f['owner']->id)->count())->toBe(2)
+        ->and($request->refresh()->status)->toBe(RequestStatusEnum::CANCELLED);
+});
+
+test('subscription self-service replaces an unpaid period through the existing protected action', function (): void {
+    $f = requestFixture();
+    $request = app(SubscriptionRequestService::class)->create($f['owner'], subscriptionRequestInput($f));
+    $previous = $request->subscription;
+    $data = [...subscriptionRequestInput($f), 'period' => 2, 'expected_amount' => '36000.00', 'expected_state' => $request->managementState()];
+    $url = route('owner.subscription-requests.revise', $request);
+
+    $this->actingAs(User::factory()->create(), 'central')->put($url, $data)->assertForbidden();
+    $this->actingAs($f['owner'], 'central')->put($url, $data)
+        ->assertRedirect(route('owner.subscription-requests.show', $request))->assertSessionHasNoErrors();
+    expect($request->refresh()->subscription->period->value)->toBe(2)
+        ->and($request->subscription->agreed_amount)->toBe('36000.00')
+        ->and($previous->refresh()->status)->toBe(StatusEnum::CANCELLED)
+        ->and($request->periods()->count())->toBe(2);
+    $this->put($url, $data)->assertSessionHasErrors('conflict');
+});
+
+test('subscription self-service cannot cancel a request with confirmed funds', function (): void {
+    $f = requestFixture();
+    $service = app(SubscriptionRequestService::class);
+    $request = $service->create($f['owner'], subscriptionRequestInput($f));
+    $request = $service->accept($f['actor'], $request, $request->managementState(), [
+        'amount' => '3000.00', 'received' => true, 'operation_id' => (string) Str::uuid(), 'occurred_at' => now()->toDateTimeString(),
+    ]);
+
+    $this->actingAs($f['owner'], 'central')->post(route('owner.subscription-requests.cancel', $request), ['expected_state' => $request->managementState()])->assertForbidden();
+    expect($request->refresh()->status)->toBe(RequestStatusEnum::ACCEPTED)
+        ->and($request->payment->getAttribute('transfer_status'))->toBe(TransferStatusEnum::VERIFIED);
+});
+
+function paidScheduledRequestFixture(): array
+{
+    $f = requestFixture();
+    $active = Subscription::factory()->create([
+        'user_id' => $f['owner']->id, 'agreed_amount' => '1000.00', 'status' => StatusEnum::ACTIVE,
+        'period_starts_at' => now()->subDays(10), 'period_ends_at' => now()->addDays(20),
+    ]);
+    $service = app(SubscriptionRequestService::class);
+    $request = $service->create($f['owner'], subscriptionRequestInput($f));
+    $request = $service->accept($f['actor'], $request, $request->managementState(), [
+        'amount' => '3000.00', 'received' => true, 'operation_id' => (string) Str::uuid(), 'occurred_at' => now()->toDateTimeString(),
+    ]);
+
+    return [...$f, 'active' => $active, 'request' => $request];
+}
+
+test('planned activation starts a full paid period now without rewriting financial history', function (): void {
+    $f = paidScheduledRequestFixture();
+    $next = $f['request']->subscription;
+    $invoice = $f['request']->invoice;
+    $invoiceBefore = $invoice->getAttributes();
+    $paymentBefore = $f['request']->payment->getAttributes();
+    $requestBefore = $f['request']->getAttributes();
+    $periodBefore = [$next->period_starts_at->toISOString(), $next->period_ends_at->toISOString()];
+    $url = route('owner.subscriptions.start-now', $next);
+    $data = ['expected_state' => $next->transitionState(), 'confirmed' => 1,
+        'expected_active_uuid' => $f['active']->uuid, 'expected_active_state' => $f['active']->transitionState()];
+
+    $this->actingAs($f['owner'], 'central')->get(route('owner.subscriptions.show', $next))->assertOk()
+        ->assertSee('Appliquer ce plan maintenant')->assertSee($f['active']->plan->name)
+        ->assertSee($f['active']->period_ends_at->format('d/m/Y H:i'));
+    $this->post($url, $data)->assertRedirect(route('owner.subscriptions.show', $next))->assertSessionHasNoErrors();
+    $next->refresh();
+    expect($next->status)->toBe(StatusEnum::ACTIVE)
+        ->and($next->effectiveStartsAt()->isSameSecond(now()))->toBeTrue()
+        ->and($next->effectiveEndsAt()->equalTo($next->effectiveStartsAt()->addMonthNoOverflow()))->toBeTrue()
+        ->and($f['active']->refresh()->status)->toBe(StatusEnum::CANCELLED)
+        ->and([$next->period_starts_at->toISOString(), $next->period_ends_at->toISOString()])->toBe($periodBefore)
+        ->and($invoice->refresh()->getAttributes())->toBe($invoiceBefore)
+        ->and($f['request']->payment->refresh()->getAttributes())->toBe($paymentBefore)
+        ->and($f['request']->refresh()->getAttributes())->toBe($requestBefore)
+        ->and(Subscription::whereKey($next->id)->currentlyEffective()->exists())->toBeTrue();
+    $this->post($url, $data)->assertForbidden();
+});
+
+test('planned activation requires ownership confirmation and unchanged current rights', function (): void {
+    $f = paidScheduledRequestFixture();
+    $next = $f['request']->subscription;
+    $url = route('owner.subscriptions.start-now', $next);
+    $data = ['expected_state' => $next->transitionState(), 'confirmed' => 1,
+        'expected_active_uuid' => $f['active']->uuid, 'expected_active_state' => $f['active']->transitionState()];
+    $this->actingAs(User::factory()->create(), 'central')->post($url, $data)->assertForbidden();
+    $this->actingAs($f['owner'], 'central')->post($url, Arr::except($data, 'confirmed'))->assertSessionHasErrors('confirmed');
+    $this->post($url, [...$data, 'expected_active_state' => str_repeat('0', 64)])->assertSessionHasErrors('expected_state');
+    expect($next->refresh()->status)->toBe(StatusEnum::SCHEDULED)
+        ->and($f['active']->refresh()->status)->toBe(StatusEnum::ACTIVE);
+});
+
+test('planned activation cannot bypass full payment for a pending request', function (): void {
+    $f = requestFixture();
+    $request = app(SubscriptionRequestService::class)->create($f['owner'], subscriptionRequestInput($f));
+    $this->actingAs($f['owner'], 'central')->post(route('owner.subscriptions.start-now', $request->subscription), [
+        'expected_state' => $request->subscription->transitionState(), 'confirmed' => 1,
+    ])->assertForbidden();
+    expect($request->subscription->refresh()->status)->toBe(StatusEnum::SCHEDULED);
 });

@@ -62,7 +62,7 @@ class SubscriptionController extends Controller
         return view('central.pages.admin.subscriptions.create', [
             'selectedUuid' => is_string($selected) && Str::isUuid($selected) ? strtolower($selected) : null,
             'search' => $request->validated('search') ?? '',
-            'plans' => Plan::active()->where('code', '!=', 'free')->orderBy('name')->orderByDesc('version')->get(),
+            'plans' => Plan::active()->whereNull('is_default')->where('code', '!=', 'free')->orderBy('name')->orderByDesc('version')->get(),
             'operationKey' => (string) Str::uuid(),
         ]);
     }
@@ -98,7 +98,7 @@ class SubscriptionController extends Controller
 
         return view('central.pages.admin.subscriptions.change', [
             'subscription' => $subscription,
-            'plans' => Plan::active()->where('code', '!=', 'free')->whereKeyNot($subscription->plan_id)->orderBy('name')->get(),
+            'plans' => Plan::active()->whereNull('is_default')->where('code', '!=', 'free')->whereKeyNot($subscription->plan_id)->orderBy('name')->get(),
             'operationKey' => (string) Str::uuid(),
         ]);
     }
