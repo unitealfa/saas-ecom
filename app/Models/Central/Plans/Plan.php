@@ -3,6 +3,9 @@
 namespace App\Models\Central\Plans;
 
 use App\Concerns\HasPublicUuid;
+use App\Enums\Central\Subscriptions\InstallmentStatusEnum;
+use App\Enums\Central\Subscriptions\StatusEnum;
+use App\Models\Central\Subscriptions\Subscription;
 use App\Services\Central\Plans\PublicPlanCatalog;
 use Database\Factories\Central\PlanFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -25,6 +28,20 @@ class Plan extends Model
 {
     /** @use HasFactory<PlanFactory> */
     use CentralConnection, HasFactory, HasPublicUuid, SoftDeletes;
+
+    public function activeSubscriberCount(): int
+    {
+        return Subscription::where('plan_id', $this->id)
+            ->whereIn('status', [StatusEnum::ACTIVE, StatusEnum::TRIAL])->currentlyEffective()
+            ->lockForUpdate()->get(['user_id'])->unique('user_id')->count();
+    }
+
+    public function hasPaidScheduledSubscription(): bool
+    {
+        return Subscription::where('plan_id', $this->id)->where('status', StatusEnum::SCHEDULED)
+            ->whereHas('installments', fn ($query) => $query->where('installment_status', InstallmentStatusEnum::PAID))
+            ->lockForUpdate()->exists();
+    }
 
     protected static function booted(): void
     {

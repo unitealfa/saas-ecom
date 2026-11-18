@@ -42,6 +42,14 @@ class PlanUpdateService
                     $this->fail('expected_state', 'Le plan a changé. Rechargez avant de recommencer.');
                 }
 
+                $activeUsers = $plan->activeSubscriberCount();
+                if ($activeUsers > 0) {
+                    $this->fail('plan', "Modification impossible : {$activeUsers} commerçant(s) utilisent actuellement ce plan. Créez une nouvelle version.");
+                }
+                if ($plan->hasPaidScheduledSubscription()) {
+                    $this->fail('plan', 'Modification impossible : un abonnement payé est programmé avec ce plan. Créez une nouvelle version.');
+                }
+
                 // Une version déjà souscrite est figée : toute modification passe par une nouvelle version.
                 if (DB::table('subscriptions')->where('plan_id', $plan->id)->lockForUpdate()->value('id') !== null) {
                     $this->fail('plan', 'Cette version est liée à un abonnement et ne peut plus être modifiée.');
