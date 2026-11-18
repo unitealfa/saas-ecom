@@ -1,7 +1,7 @@
 <x-layouts::app :title="__('Plans et offres')">
     <section class="flex flex-col gap-6">
         <flux:heading size="xl" level="1">Plans et offres</flux:heading>
-        <flux:text>Consultez les versions, leur commercialisation et leurs fonctionnalités.</flux:text>
+        <flux:text>Choisissez le plan attribué gratuitement aux nouveaux commerçants et utilisé lorsque leurs autres abonnements expirent.</flux:text>
         @if (session('status'))<flux:text role="status">{{ session('status') }}</flux:text>@endif
         @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
         @can('create', \App\Models\Central\Plans\Plan::class)
@@ -29,7 +29,7 @@
                                         <form method="POST" action="{{ route('central.plan-pages.default', $plan) }}" class="mt-3 flex flex-col gap-2">
                                             @csrf @method('PATCH')
                                             <input type="hidden" name="expected_state" value="{{ $plan->compositionState($plan->features) }}">
-                                            <flux:checkbox name="confirmed" value="1" label="Attribuer cette offre gratuitement par défaut" required />
+                                            <flux:checkbox name="confirmed" value="1" label="Attribuer gratuitement ce plan par défaut aux commerçants" required />
                                             <flux:button type="submit">Définir comme plan par défaut</flux:button>
                                         </form>
                                     @endif

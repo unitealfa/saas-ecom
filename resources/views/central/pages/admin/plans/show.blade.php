@@ -3,7 +3,7 @@
         <flux:heading size="xl" level="1">{{ $plan->name }} — version {{ $plan->version }}</flux:heading>
         @if (session('status'))<flux:text role="status">{{ session('status') }}</flux:text>@endif
         @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
-        @if ($plan->is_default)<flux:callout>Plan par défaut : attribution automatique gratuite à l’expiration des autres périodes.</flux:callout>@endif
+        @if ($plan->is_default)<flux:callout>Plan par défaut : attribution automatique gratuite aux nouveaux commerçants et à l’expiration des autres périodes.</flux:callout>@endif
         <dl class="grid gap-3 sm:grid-cols-2">
             <div><dt>Code permanent</dt><dd>{{ $plan->code }}</dd></div>
             <div><dt>Commercialisation</dt><dd>{{ $plan->trashed() ? 'Archivée' : ($plan->is_active ? 'Active' : 'Inactive') }}</dd></div>
