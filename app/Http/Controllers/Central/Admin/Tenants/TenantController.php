@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Central\Admin\Tenants;
 
 use App\DTOs\Tenant\Shop\ShopSettings;
+use App\Enums\Central\Deployments\StatusEnum as DeploymentStatus;
 use App\Enums\Central\Tenants\StatusEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Tenants\ChangeTenantStatusRequest;
@@ -10,8 +11,9 @@ use App\Http\Requests\Central\Tenants\SearchTenantsRequest;
 use App\Http\Requests\Central\Tenants\StoreTenantRequest;
 use App\Http\Requests\Central\Tenants\UpdateTenantPrioritiesRequest;
 use App\Http\Requests\Central\Tenants\UpdateTenantRequest;
-use App\Models\Central\Tenants\Tenant;
+use App\Models\Central\Deployments\TenantSchemaDeployment;
 use App\Models\Central\Subscriptions\Subscription;
+use App\Models\Central\Tenants\Tenant;
 use App\Models\Central\Users\User;
 use App\Services\Central\Tenants\TenantCreator;
 use App\Services\Central\Tenants\TenantManagementService;
@@ -84,6 +86,8 @@ class TenantController extends Controller
 
         return view('central.pages.admin.tenants.show', [
             'tenant' => $tenant,
+            'deploymentPending' => TenantSchemaDeployment::where('tenant_id', $tenant->id)
+                ->whereIn('status', [DeploymentStatus::PENDING, DeploymentStatus::RUNNING])->exists(),
             'subscription' => Gate::allows('viewAny', Subscription::class)
                 ? $this->tenants->subscriptions($this->centralActor(), collect([$tenant]))->get($tenant->user_id) : null,
         ]);

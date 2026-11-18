@@ -3,6 +3,7 @@
 use App\Enums\Central\Tenants\StatusEnum;
 use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Audit\Activity;
+use App\Models\Central\Domains\Domain;
 use App\Models\Central\Roles\Role;
 use App\Models\Central\Tenants\Tenant;
 use App\Models\User;
@@ -49,13 +50,20 @@ test('merchant dashboard shows only the owners shops and refuses the administrat
         'legal_verified_at' => now(), 'legal_verified_by_id' => $reviewer->id]);
     $other = User::factory()->create();
     Event::fake([TenantCreated::class]);
-    Tenant::factory()->create(['user_id' => $owner->id, 'shop_name' => 'Boutique de Karim',
+    $ready = Tenant::factory()->create(['user_id' => $owner->id, 'shop_name' => 'Boutique de Karim',
         'status' => StatusEnum::ACTIVE, 'schema_version' => 'test-prepared', 'provisioned_at' => now()]);
+    Domain::factory()->create(['tenant_id' => $ready->id, 'is_primary' => true,
+        'verification_status' => VerificationStatusEnum::VERIFIED, 'verified_at' => now()]);
+    $preparing = Tenant::factory()->create(['user_id' => $owner->id, 'shop_name' => 'Boutique en préparation',
+        'status' => StatusEnum::PROVISIONING]);
     Tenant::factory()->create(['user_id' => $other->id, 'shop_name' => 'Boutique privée de Nadia']);
-    Event::assertDispatched(TenantCreated::class, 2);
+    Event::assertDispatched(TenantCreated::class, 3);
 
     $this->actingAs($owner, 'central')->get(route('dashboard'))
         ->assertOk()->assertSee('Bonjour, Karim Benameur')->assertSee('Boutique de Karim')
+        ->assertSee('Boutique en préparation')->assertSee('En préparation')
+        ->assertSee(route('owner.shops.access', $ready->uuid), false)
+        ->assertDontSee(route('owner.shops.access', $preparing->uuid), false)
         ->assertSee(route('owner.shops.create'), false)
         ->assertDontSee('Boutique privée de Nadia')->assertDontSee('Consulter les utilisateurs');
     $this->get(route('central.users.index'))->assertForbidden();
