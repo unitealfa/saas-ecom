@@ -7,6 +7,7 @@ use App\Enums\Tenant\Users\StatusEnum;
 use App\Models\Central\Tenants\Tenant;
 use App\Models\Tenant\Users\User;
 use App\Services\Tenant\Authorization\ShopProfilePermissions;
+use App\Services\Tenant\Authorization\TenantPermissionCatalog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
@@ -28,9 +29,10 @@ class OwnerLoginService
                 && $local->email === $owner->email, 403);
             if ($local->membership_status === MembershipStatusEnum::INVITED) {
                 ShopProfilePermissions::seed();
+                TenantPermissionCatalog::seed();
                 $local->forceFill(['membership_status' => MembershipStatusEnum::ACTIVE,
                     'joined_at' => now(), 'email_verified_at' => now()])->save();
-                $local->givePermissionTo(array_keys(ShopProfilePermissions::ALL));
+                $local->givePermissionTo([...array_keys(ShopProfilePermissions::ALL), ...array_keys(TenantPermissionCatalog::ALL)]);
             }
             abort_unless($local->joined_at !== null && $local->email_verified_at !== null, 403);
             activity()->causedBy($local)->performedOn($local)->event('shop_owner_signed_in')->log('Connexion du proprietaire de la boutique.');

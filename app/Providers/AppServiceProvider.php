@@ -35,6 +35,7 @@ use App\Models\Tenant\Audit\Activity as TenantActivity;
 use App\Models\Tenant\Media\Media as TenantMedia;
 use App\Models\Tenant\Permissions\Permission as TenantPermission;
 use App\Models\Tenant\Roles\Role as TenantRole;
+use App\Models\Tenant\Users\TeamInvitation as TenantTeamInvitation;
 use App\Models\Tenant\Shop\Shop;
 use App\Models\Tenant\Shop\ShopAddress;
 use App\Models\Tenant\Shop\ShopSocialLink;
@@ -68,6 +69,10 @@ use App\Policies\Central\UserPolicy;
 use App\Policies\Tenant\ShopAddressPolicy;
 use App\Policies\Tenant\ShopPolicy;
 use App\Policies\Tenant\ShopSocialLinkPolicy;
+use App\Policies\Tenant\RolePolicy as TenantRolePolicy;
+use App\Policies\Tenant\PermissionPolicy as TenantPermissionPolicy;
+use App\Policies\Tenant\UserPolicy as TenantUserPolicy;
+use App\Policies\Tenant\TeamInvitationPolicy as TenantTeamInvitationPolicy;
 use App\Services\Central\Subscriptions\DefaultSubscription;
 use App\Services\Central\Tenants\TenantStatusService;
 use App\Services\SchemaBlueprint;
@@ -115,6 +120,10 @@ class AppServiceProvider extends ServiceProvider
         Shop::class => ShopPolicy::class,
         ShopAddress::class => ShopAddressPolicy::class,
         ShopSocialLink::class => ShopSocialLinkPolicy::class,
+        TenantRole::class => TenantRolePolicy::class,
+        TenantPermission::class => TenantPermissionPolicy::class,
+        ShopUser::class => TenantUserPolicy::class,
+        TenantTeamInvitation::class => TenantTeamInvitationPolicy::class,
     ];
 
     public function register(): void
