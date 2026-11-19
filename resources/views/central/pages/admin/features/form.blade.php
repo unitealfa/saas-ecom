@@ -1,6 +1,7 @@
-@foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
-@if ($referenced)<flux:text>Cette fonctionnalité est utilisée ou réservée au système : seul son nom peut être modifié.</flux:text>@endif
-<form method="POST" action="{{ $feature === null ? route('central.features.store') : route('central.features.update', $feature) }}" class="flex flex-col gap-5">
+@if ($errors->any())<flux:callout variant="danger" role="alert">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</flux:callout>@endif
+@if ($referenced)<flux:callout>Cette fonctionnalité est utilisée ou réservée au système : seul son nom peut être modifié.</flux:callout>@endif
+<form method="POST" action="{{ $feature === null ? route('central.features.store') : route('central.features.update', $feature) }}" class="aydra-users-panel flex flex-col gap-5 p-5 sm:p-6">
+    <div><h2 class="aydra-heading text-lg font-semibold">Informations de la fonctionnalité</h2><p class="aydra-muted mt-1 text-sm">Définissez son identité et les règles de comptage.</p></div>
     @csrf
     @if ($feature !== null)
         @method('PUT')

@@ -11,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
 class FeatureController extends Controller
 {
@@ -25,6 +26,8 @@ class FeatureController extends Controller
             'search' => ['nullable', 'string', 'max:255'],
             'archived' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
+            'sort' => ['nullable', Rule::in(['name', 'value_type', 'quota_scope', 'period', 'is_active'])],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
         ]);
 
         return view('central.pages.admin.features.index', [
