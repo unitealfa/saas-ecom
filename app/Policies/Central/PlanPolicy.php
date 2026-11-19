@@ -23,7 +23,9 @@ class PlanPolicy
     public function setDefault(User $actor, Plan $plan): bool
     {
         return ! tenancy()->initialized && ! $plan->trashed() && $plan->is_active
-            && $this->access->allows($actor, 'saas.plans.activate');
+            && $this->access->allows($actor, 'saas.plans.activate')
+            && (($plan->monthly_price === '0.00' && $plan->annual_price === '0.00')
+                || $this->access->allows($actor, 'saas.plans.versions.create'));
     }
 
     public function create(User $actor): bool
