@@ -110,8 +110,8 @@ test('activating an already active version resolves other active versions withou
         ->and(Activity::forSubject($second)->where('event', 'plan_activation_updated')->count())->toBe(0);
 });
 
-test('default plan selection grants an existing priced offer for free only after current rights expire', function (): void {
-    $actor = planActivationActor(['saas.plans.view', 'saas.plans.activate', 'saas.plans.archive']);
+test('default plan selection creates a free version without changing the paid version', function (): void {
+    $actor = planActivationActor(['saas.plans.view', 'saas.plans.activate', 'saas.plans.archive', 'saas.plans.versions.create']);
     $this->seed(FreePlanSeeder::class);
     $plan = Plan::factory()->create(['is_active' => true, 'monthly_price' => '3000.00', 'annual_price' => '36000.00']);
     (new PlanFeature)->forceFill(['plan_id' => $plan->id,
@@ -125,17 +125,21 @@ test('default plan selection grants an existing priced offer for free only after
     $this->actingAs($actor, 'central')->patch(route('central.plan-pages.default', $plan), $data)
         ->assertRedirect()->assertSessionHasNoErrors();
     $defaults = app(DefaultSubscription::class);
-    expect($plan->refresh()->is_default)->toBeTrue()->and($plan->monthly_price)->toBe('3000.00')
+    $freeVersion = Plan::where('code', $plan->code)->where('is_default', true)->sole();
+    expect($plan->refresh()->is_default)->not->toBeTrue()->and($plan->monthly_price)->toBe('3000.00')
+        ->and($plan->is_active)->toBeFalse()->and($freeVersion->name)->toBe($plan->name.' Free')
+        ->and($freeVersion->monthly_price)->toBe('0.00')->and($freeVersion->annual_price)->toBe('0.00')
+        ->and($freeVersion->features()->sole()->limit)->toBe(3)
         ->and($defaults->ensure($owner)->id)->toBe($paid->id);
     $this->travel(2)->days();
     $fallback = $defaults->ensure($owner);
-    expect($fallback->plan_id)->toBe($plan->id)->and($fallback->agreed_amount)->toBe('0.00')
+    expect($fallback->plan_id)->toBe($freeVersion->id)->and($fallback->agreed_amount)->toBe('0.00')
         ->and($fallback->period_ends_at)->toBeNull()
         ->and($paid->refresh()->status)->toBe(StatusEnum::EXPIRED)
         ->and($defaults->ensure($owner)->id)->toBe($fallback->id)
         ->and(SubscriptionInstallment::where('subscription_id', $fallback->id)->exists())->toBeFalse()
-        ->and(Gate::forUser($actor)->allows('activate', $plan))->toBeFalse()
-        ->and(Gate::forUser($actor)->allows('archive', $plan))->toBeFalse();
+        ->and(Gate::forUser($actor)->allows('activate', $freeVersion))->toBeFalse()
+        ->and(Gate::forUser($actor)->allows('archive', $freeVersion))->toBeFalse();
 });
 
 test('default plan selection checks permission confirmation composition and SQL uniqueness', function (): void {

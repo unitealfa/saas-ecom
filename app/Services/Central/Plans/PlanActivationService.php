@@ -16,7 +16,11 @@ class PlanActivationService
         'deleted_at', 'features',
     ];
 
-    public function __construct(private readonly AuthorizationMutation $mutations, private readonly FreePlanCatalog $defaults) {}
+    public function __construct(
+        private readonly AuthorizationMutation $mutations,
+        private readonly FreePlanCatalog $defaults,
+        private readonly PlanVersionService $versions,
+    ) {}
 
     /** @return array<string, array<int, string>> */
     public static function rules(): array
@@ -71,6 +75,20 @@ class PlanActivationService
             }
             if ($target->is_default) {
                 return;
+            }
+            $source = $target;
+            if ($source->monthly_price !== '0.00' || $source->annual_price !== '0.00') {
+                $target = $this->versions->create($actor, $source, [
+                    'expected_state' => $expected,
+                    'expected_latest_version' => (int) Plan::withTrashed()->where('code', $source->code)->max('version'),
+                ]);
+                $target->forceFill([
+                    'name' => mb_substr($source->name, 0, 250).' Free',
+                    'monthly_price' => '0.00',
+                    'annual_price' => '0.00',
+                ])->save();
+                $this->change($actor, $source, false, $target->uuid);
+                $this->change($actor, $target, true, null);
             }
             $previous = Plan::where('is_default', true)->first();
             $previous?->forceFill(['is_default' => null])->save();
