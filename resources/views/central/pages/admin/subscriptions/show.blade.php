@@ -1,14 +1,15 @@
 <x-layouts::app :title="__('Abonnement')">
-    <section class="flex flex-col gap-6">
-        <flux:heading size="xl" level="1">Détail de l’abonnement</flux:heading>
+    <section class="mx-auto flex w-full max-w-screen-xl flex-col gap-6">
+        <header class="flex flex-wrap items-start justify-between gap-5"><div class="space-y-2"><h1 class="aydra-heading text-3xl font-semibold tracking-tight sm:text-4xl">Détail de l’abonnement</h1><p class="aydra-muted text-sm sm:text-base">Consultez les informations et les actions disponibles pour cet abonnement.</p></div><flux:button :href="route('central.subscriptions.index')" icon="arrow-left">Retour aux abonnements</flux:button></header>
         @if ($subscription->request)
             @can('viewAny', \App\Models\Central\Subscriptions\SubscriptionRequest::class)
-                <flux:button :href="route('central.subscription-requests.show', $subscription->request)">Consulter la demande et son paiement</flux:button>
+                <flux:button class="self-start" :href="route('central.subscription-requests.show', $subscription->request)">Consulter la demande et son paiement</flux:button>
             @endcan
         @endif
-        @if (session('status'))<flux:text role="status">{{ session('status') }}</flux:text>@endif
-        @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
-        <dl class="grid gap-4 sm:grid-cols-2">
+        @if (session('status'))<flux:callout role="status">{{ session('status') }}</flux:callout>@endif
+        @if ($errors->any())<flux:callout variant="danger" role="alert">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</flux:callout>@endif
+        <section class="aydra-users-panel p-5 sm:p-6"><h2 class="aydra-heading mb-5 text-lg font-semibold">Informations de l’abonnement</h2>
+        <dl class="aydra-detail-grid grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
             @foreach ([
                 'Identifiant' => $subscription->uuid,
                 'Propriétaire' => $subscription->owner?->name,
@@ -29,10 +30,11 @@
                 <div><dt class="font-medium">{{ $label }}</dt><dd><flux:text>{{ $value ?? 'Non renseigné' }}</flux:text></dd></div>
             @endforeach
         </dl>
+        </section>
         @if ($subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::SCHEDULED)
             <flux:callout>Cette période est réservée. La facture définitive et le reçu sont produits après contrôle des fonds ; les droits attendent la finalisation et la date de début.</flux:callout>
         @endif
-        <div class="flex flex-wrap gap-3">
+        <section class="aydra-users-panel p-5 sm:p-6"><h2 class="aydra-heading mb-4 text-lg font-semibold">Actions</h2><div class="flex flex-wrap gap-3">
             @if ($subscription->request)
                 @can('view', $subscription->request)<flux:button :href="route('central.subscription-requests.show', $subscription->request)">Demande et facturation</flux:button>@endcan
             @endif
@@ -63,6 +65,6 @@
                 @endcan
             @endif
             <flux:button :href="route('central.subscriptions.index')">Retour aux abonnements</flux:button>
-        </div>
+        </div></section>
     </section>
 </x-layouts::app>

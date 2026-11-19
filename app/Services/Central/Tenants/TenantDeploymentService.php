@@ -61,6 +61,13 @@ class TenantDeploymentService
             }
         }
 
+        $sort = $filters['sort'] ?? null;
+        $sort = in_array($sort, ['operation', 'status', 'attempt_number', 'target_version', 'created_at'], true) ? $sort : null;
+        $direction = ($filters['direction'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
+        if ($sort !== null) {
+            $query->orderBy($sort, $direction);
+        }
+
         return $query->orderByDesc('id')->paginate(self::PER_PAGE)->withQueryString();
     }
 

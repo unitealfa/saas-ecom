@@ -31,6 +31,8 @@ class SearchSubscriptionsRequest extends FormRequest
         return [
             'search' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'integer', Rule::enum(StatusEnum::class)],
+            'sort' => ['nullable', Rule::in(['status', 'period_starts_at', 'agreed_amount'])],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
             'page' => ['sometimes', 'integer', 'min:1'],
         ];
     }

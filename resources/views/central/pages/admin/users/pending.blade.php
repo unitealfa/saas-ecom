@@ -1,47 +1,53 @@
 <x-layouts::app :title="__('Inscriptions en attente')">
-    <section class="flex flex-col gap-6">
-        <flux:heading size="xl" level="1">Inscriptions en attente d’approbation</flux:heading>
-        <flux:text>Les comptes en attente disposent d’une session limitée. Approuver leur inscription permet ensuite de configurer la première boutique, après vérification de l’adresse e-mail.</flux:text>
+    <section class="mx-auto flex w-full max-w-screen-2xl flex-col gap-6">
+        <header class="flex flex-wrap items-start justify-between gap-5">
+            <div class="space-y-2">
+                <h1 class="aydra-heading text-3xl font-semibold tracking-tight sm:text-4xl">Inscriptions en attente d’approbation</h1>
+                <p class="aydra-muted max-w-2xl text-sm sm:text-base">Consultez les comptes en attente et prenez une décision sur leur inscription.</p>
+            </div>
+            <flux:button :href="route('central.users.index')" icon="arrow-left">Tous les utilisateurs</flux:button>
+        </header>
+        <flux:callout>Les comptes en attente disposent d’une session limitée. Après approbation et vérification de l’adresse e-mail, le commerçant peut configurer sa première boutique.</flux:callout>
         @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
         @if ($errors->any())
             <flux:callout variant="danger" role="alert">
                 @foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach
             </flux:callout>
         @endif
-        <div class="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
-            <table class="w-full text-left text-sm">
-                <thead class="bg-zinc-50 dark:bg-zinc-900">
-                    <tr>
-                        <th class="p-4">Nom</th>
-                        <th class="p-4">E-mail</th>
-                        <th class="p-4">Téléphone</th>
-                        <th class="p-4">Pays</th>
-                        <th class="p-4">Inscription</th>
-                        <th class="p-4">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+        <div class="aydra-users-panel">
+            <div class="aydra-users-toolbar"><div>
+                <h2 class="aydra-heading text-lg font-semibold">Comptes en attente</h2>
+                <p class="aydra-muted mt-1 text-sm">{{ $users->total() }} {{ $users->total() === 1 ? 'inscription en attente' : 'inscriptions en attente' }}</p>
+            </div></div>
+            <div class="aydra-users-table">
+            <flux:table>
+                <flux:table.columns>
+                    <flux:table.column>Nom</flux:table.column><flux:table.column>E-mail</flux:table.column>
+                    <flux:table.column>Téléphone</flux:table.column><flux:table.column>Pays</flux:table.column>
+                    <flux:table.column>Inscription</flux:table.column><flux:table.column>Actions</flux:table.column>
+                </flux:table.columns>
+                <flux:table.rows>
                     @forelse ($users as $user)
-                        <tr>
-                            <td class="p-4">{{ $user->name }}</td>
-                            <td class="p-4">{{ $user->email }}</td>
-                            <td class="p-4">{{ $user->phone ?? 'Non renseigné' }}</td>
-                            <td class="p-4">{{ $user->country?->name_fr }}</td>
-                            <td class="p-4">{{ $user->created_at?->format('d/m/Y H:i') }}</td>
-                            <td class="p-4">
+                        <flux:table.row>
+                            <flux:table.cell variant="strong"><div class="flex items-center gap-3"><flux:avatar :name="$user->name" size="sm" /><span>{{ $user->name }}</span></div></flux:table.cell>
+                            <flux:table.cell>{{ $user->email }}</flux:table.cell>
+                            <flux:table.cell>{{ $user->phone ?? 'Non renseigné' }}</flux:table.cell>
+                            <flux:table.cell>{{ $user->country?->name_fr }}</flux:table.cell>
+                            <flux:table.cell>{{ $user->created_at?->format('d/m/Y H:i') }}</flux:table.cell>
+                            <flux:table.cell><div class="flex min-w-56 flex-wrap items-center gap-2">
                                 @can('view', $user)
                                     <flux:button :href="route('central.users.show', $user)">Informations</flux:button>
                                 @endcan
                                 @include('central.pages.admin.users.lifecycle-actions')
-                            </td>
-                        </tr>
+                            </div></flux:table.cell>
+                        </flux:table.row>
                     @empty
-                        <tr><td colspan="6" class="p-4">Aucune inscription en attente.</td></tr>
+                        <flux:table.row><flux:table.cell colspan="6"><div class="aydra-users-empty"><p class="aydra-heading font-medium">Aucune inscription en attente.</p><p class="aydra-muted mt-1 text-sm">Les nouvelles inscriptions à examiner apparaîtront ici.</p></div></flux:table.cell></flux:table.row>
                     @endforelse
-                </tbody>
-            </table>
+                </flux:table.rows>
+            </flux:table>
+            <div class="mt-4">{{ $users->links() }}</div>
+            </div>
         </div>
-        {{ $users->links() }}
-        <flux:button :href="route('central.users.index')">Tous les utilisateurs</flux:button>
     </section>
 </x-layouts::app>

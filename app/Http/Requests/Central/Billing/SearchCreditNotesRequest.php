@@ -28,6 +28,11 @@ class SearchCreditNotesRequest extends FormRequest
      */
     public function rules(): array
     {
-        return ['search' => ['nullable', 'string', 'max:255'], 'status' => ['nullable', 'integer', Rule::enum(DocumentStatusEnum::class)]];
+        return [
+            'search' => ['nullable', 'string', 'max:255'],
+            'status' => ['nullable', 'integer', Rule::enum(DocumentStatusEnum::class)],
+            'sort' => ['nullable', Rule::in(['number', 'total_amount', 'status'])],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
+        ];
     }
 }

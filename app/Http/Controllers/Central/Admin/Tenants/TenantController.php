@@ -35,7 +35,7 @@ class TenantController extends Controller
     {
         $search = $request->validated('search');
         $status = StatusEnum::tryFrom((int) $request->validated('status'));
-        $shops = $this->tenants->search($this->centralActor(), $search, $status);
+        $shops = $this->tenants->search($this->centralActor(), $search, $status, $request->validated('sort'), $request->validated('direction'));
 
         return view('central.pages.admin.tenants.index', [
             'shops' => $shops,

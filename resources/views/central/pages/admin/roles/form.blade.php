@@ -40,8 +40,17 @@
                     <div><flux:heading size="lg">Permissions et durées</flux:heading><flux:text class="mt-2">Les consultations sont des permissions explicites. Vos choix seront enregistrés avec le rôle.</flux:text></div>
             @foreach ($permissionGroups as $groupLabel => $permissionNames)
             @if ($permissions->whereIn('name', $permissionNames)->isNotEmpty())
-            <fieldset class="flex flex-col gap-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
-                <legend class="px-2 font-medium">{{ $groupLabel }}</legend>
+            <details name="role-permission-groups" class="aydra-permission-group group rounded-lg border border-zinc-200 dark:border-zinc-700">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-4 font-medium text-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-zinc-100 [&::-webkit-details-marker]:hidden">
+                    {{ $groupLabel }}
+                    <flux:icon.chevron-down class="size-4 shrink-0 transition-transform duration-200 motion-reduce:transition-none group-open:rotate-180" aria-hidden="true" />
+                </summary>
+            <fieldset class="flex flex-col gap-4 border-t border-zinc-200 p-4 dark:border-zinc-700">
+                <legend class="sr-only">{{ $groupLabel }}</legend>
+                <flux:checkbox.group>
+                @if ($canChangePermissions)
+                    <flux:checkbox.all :label="'Tout sélectionner : '.$groupLabel" />
+                @endif
                 @foreach ($permissions->whereIn('name', $permissionNames) as $permission)
                     <div class="grid gap-3 rounded-lg border border-zinc-200 p-4 sm:grid-cols-2 dark:border-zinc-700">
                         @if ($canChangePermissions)
@@ -51,12 +60,14 @@
                             <flux:text>{{ $permission->label }}</flux:text>
                         @endif
                         @if ($canChangeDurations)
-                            <flux:input type="number" name="durations[{{ $permission->uuid }}]" form="role-form" label="Durée en jours" x-on:invalid="$flux.modal('role-permissions').show()"
+                            <flux:input type="number" name="durations[{{ $permission->uuid }}]" form="role-form" label="Durée en jours" x-on:invalid="if ($el.form.querySelector(':invalid') === $el) { $el.closest('details').open = true; $flux.modal('role-permissions').show() }"
                                 min="1" max="9999" :value="old('durations.'.$permission->uuid, $grants[$permission->uuid] ?? 9999)" required />
                         @endif
                     </div>
                 @endforeach
+                </flux:checkbox.group>
             </fieldset>
+            </details>
             @endif
             @endforeach
                     <flux:modal.close><flux:button type="button" variant="primary">Terminé</flux:button></flux:modal.close>

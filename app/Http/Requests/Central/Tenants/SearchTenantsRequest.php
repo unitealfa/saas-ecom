@@ -30,6 +30,8 @@ class SearchTenantsRequest extends FormRequest
         return [
             'search' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', Rule::enum(StatusEnum::class)],
+            'sort' => ['nullable', Rule::in(['shop_name', 'status'])],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
             'page' => ['sometimes', 'integer', 'min:1'],
         ];
     }

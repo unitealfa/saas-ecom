@@ -1,27 +1,14 @@
 <x-layouts::app :title="__('Historique des abonnements')">
-    <section class="flex flex-col gap-6">
-        <flux:heading size="xl" level="1">Historique des abonnements</flux:heading>
-        <flux:text>Commerçant : {{ $subscription->owner?->name ?? 'Compte indisponible' }}</flux:text>
-        <div class="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
-            <table class="w-full text-left text-sm">
-                <thead><tr>@foreach (['Offre', 'État', 'Période', 'Montant convenu', 'Fin', 'Actions'] as $heading)<th class="p-4">{{ $heading }}</th>@endforeach</tr></thead>
-                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
-                    @forelse ($history as $entry)
-                        <tr>
-                            <td class="p-4">{{ $entry->plan?->name ?? 'Offre indisponible' }}@if ($entry->plan) — v{{ $entry->plan->version }}@endif</td>
-                            <td class="p-4">{{ $entry->status?->label() ?? 'Non renseigné' }}</td>
-                            <td class="p-4">{{ $entry->effectiveStartsAt()?->format('d/m/Y') }} — {{ $entry->effectiveEndsAt()?->format('d/m/Y') ?? 'Sans échéance' }}</td>
-                            <td class="p-4">{{ $entry->agreed_amount !== null ? $entry->agreed_amount.' DZD' : 'Non renseigné' }}</td>
-                            <td class="p-4">{{ $entry->ended_at?->format('d/m/Y H:i') ?? '—' }}</td>
-                            <td class="p-4">@can('view', $entry)<flux:button :href="route('central.subscriptions.show', $entry)">Détails</flux:button>@endcan</td>
-                        </tr>
-                    @empty
-                        <tr><td colspan="6" class="p-4">Aucun abonnement trouvé.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        {{ $history->links() }}
-        @can('view', $subscription)<flux:button :href="route('central.subscriptions.show', $subscription)">Retour à l’abonnement</flux:button>@endcan
+    <section class="mx-auto flex w-full max-w-screen-2xl flex-col gap-6">
+        <header class="flex flex-wrap items-start justify-between gap-5"><div class="space-y-2"><h1 class="aydra-heading text-3xl font-semibold tracking-tight sm:text-4xl">Historique des abonnements</h1><p class="aydra-muted text-sm sm:text-base">Commerçant : {{ $subscription->owner?->name ?? 'Compte indisponible' }}</p></div>@can('view', $subscription)<flux:button :href="route('central.subscriptions.show', $subscription)" icon="arrow-left">Retour à l’abonnement</flux:button>@endcan</header>
+        <section class="aydra-users-panel"><div class="aydra-users-toolbar"><div><h2 class="aydra-heading text-lg font-semibold">Périodes d’abonnement</h2><p class="aydra-muted mt-1 text-sm">{{ $history->total() }} {{ $history->total() === 1 ? 'abonnement trouvé' : 'abonnements trouvés' }}</p></div></div>
+            <div class="aydra-users-table"><flux:table class="whitespace-normal"><flux:table.columns>@foreach (['Offre', 'État', 'Période', 'Montant convenu', 'Fin', 'Actions'] as $heading)<flux:table.column>{{ $heading }}</flux:table.column>@endforeach</flux:table.columns><flux:table.rows>
+                @forelse ($history as $entry)
+                    <flux:table.row :key="$entry->uuid"><flux:table.cell variant="strong">{{ $entry->plan?->name ?? 'Offre indisponible' }}@if ($entry->plan) — v{{ $entry->plan->version }}@endif</flux:table.cell><flux:table.cell><flux:badge size="sm">{{ $entry->status?->label() ?? 'Non renseigné' }}</flux:badge></flux:table.cell><flux:table.cell class="whitespace-nowrap">{{ $entry->effectiveStartsAt()?->format('d/m/Y') }} — {{ $entry->effectiveEndsAt()?->format('d/m/Y') ?? 'Sans échéance' }}</flux:table.cell><flux:table.cell class="whitespace-nowrap tabular-nums">{{ $entry->agreed_amount !== null ? $entry->agreed_amount.' DZD' : 'Non renseigné' }}</flux:table.cell><flux:table.cell>{{ $entry->ended_at?->format('d/m/Y H:i') ?? '—' }}</flux:table.cell><flux:table.cell>@can('view', $entry)<flux:button :href="route('central.subscriptions.show', $entry)">Détails</flux:button>@endcan</flux:table.cell></flux:table.row>
+                @empty <flux:table.row><flux:table.cell colspan="6"><div class="aydra-users-empty">Aucun abonnement trouvé.</div></flux:table.cell></flux:table.row> @endforelse
+            </flux:table.rows></flux:table>
+            @if ($history->hasPages())<nav aria-label="Pagination de l’historique" class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 pt-4 dark:border-zinc-700"><span class="aydra-muted text-sm">Page {{ $history->currentPage() }} sur {{ $history->lastPage() }}</span><div class="flex gap-2">@if ($history->onFirstPage())<flux:button disabled icon="chevron-left">Précédent</flux:button>@else<flux:button :href="$history->previousPageUrl()" icon="chevron-left">Précédent</flux:button>@endif @if ($history->hasMorePages())<flux:button :href="$history->nextPageUrl()" icon:trailing="chevron-right">Suivant</flux:button>@else<flux:button disabled icon:trailing="chevron-right">Suivant</flux:button>@endif</div></nav>@endif
+            </div>
+        </section>
     </section>
 </x-layouts::app>

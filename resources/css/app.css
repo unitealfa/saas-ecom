@@ -250,6 +250,12 @@ body.aydra-admin .aydra-users-panel {
     border-radius: 1rem;
 }
 
+body.aydra-admin .aydra-users-panel.aydra-activity-filters {
+    position: relative;
+    z-index: 10;
+    overflow: visible;
+}
+
 body.aydra-admin .aydra-users-toolbar {
     display: flex;
     flex-wrap: wrap;
@@ -261,6 +267,26 @@ body.aydra-admin .aydra-users-toolbar {
 
 body.aydra-admin .aydra-users-table { padding: 0 1.5rem 1.25rem; }
 body.aydra-admin .aydra-users-empty { padding: 2.5rem 0; }
+
+@supports (interpolate-size: allow-keywords) {
+    :is(.aydra-permission-group, .aydra-animated-details) {
+        interpolate-size: allow-keywords;
+    }
+
+    :is(.aydra-permission-group, .aydra-animated-details)::details-content {
+        block-size: 0;
+        overflow: clip;
+        transition: block-size 200ms ease, content-visibility 200ms allow-discrete;
+    }
+
+    :is(.aydra-permission-group, .aydra-animated-details)[open]::details-content {
+        block-size: auto;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        :is(.aydra-permission-group, .aydra-animated-details)::details-content { transition: none; }
+    }
+}
 
 body.aydra-admin .aydra-detail-grid dt {
     color: var(--aydra-muted);

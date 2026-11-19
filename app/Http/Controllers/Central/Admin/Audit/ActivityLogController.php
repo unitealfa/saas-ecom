@@ -15,7 +15,12 @@ class ActivityLogController extends Controller
 
     public function index(SearchActivityRequest $request): View
     {
-        return view('central.pages.admin.activity-log.index', ['activities' => $this->activities->search($this->centralActor(), $request->validated())]);
+        $actor = $this->centralActor();
+
+        return view('central.pages.admin.activity-log.index', [
+            'activities' => $this->activities->search($actor, $request->validated()),
+            'suggestions' => $this->activities->suggestions($actor),
+        ]);
     }
 
     public function show(Activity $activity): View

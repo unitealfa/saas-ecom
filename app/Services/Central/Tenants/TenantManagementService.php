@@ -28,7 +28,7 @@ class TenantManagementService
     public function __construct(private AuthorizationMutation $mutations) {}
 
     /** @return LengthAwarePaginator<int, Tenant> */
-    public function search(User $actor, ?string $search, ?StatusEnum $status): LengthAwarePaginator
+    public function search(User $actor, ?string $search, ?StatusEnum $status, ?string $sort = null, ?string $direction = null): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize('viewAny', Tenant::class);
 
@@ -54,8 +54,12 @@ class TenantManagementService
             });
         }
 
-        return $query->orderBy('id')->paginate(self::PER_PAGE)
-            ->appends(['search' => $search === '' ? null : $search, 'status' => $status?->value]);
+        $sort = in_array($sort, ['shop_name', 'status'], true) ? $sort : null;
+        $direction = $direction === 'desc' ? 'desc' : 'asc';
+
+        return $query->when($sort !== null, fn (Builder $query) => $query->orderBy($sort, $direction))
+            ->orderBy('id')->paginate(self::PER_PAGE)
+            ->appends(['search' => $search === '' ? null : $search, 'status' => $status?->value, 'sort' => $sort, 'direction' => $sort === null ? null : $direction]);
     }
 
     /** @return LengthAwarePaginator<int, User> */

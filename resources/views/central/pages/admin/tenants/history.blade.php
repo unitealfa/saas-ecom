@@ -1,24 +1,13 @@
 <x-layouts::app :title="__('Historique de la boutique')">
-    <section class="flex flex-col gap-6">
-        <flux:heading size="xl" level="1">Historique de {{ $tenant->shop_name }}</flux:heading>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
-                <thead><tr><th class="p-4">Date</th><th class="p-4">Auteur</th><th class="p-4">Action</th><th class="p-4">Détails</th></tr></thead>
-                <tbody>
-                    @forelse ($history as $activity)
-                        <tr class="border-t border-zinc-200 dark:border-zinc-700">
-                            <td class="p-4">{{ $activity->created_at->format('d/m/Y H:i') }}</td>
-                            <td class="p-4">{{ $activity->causer?->name ?? 'Système' }}</td>
-                            <td class="p-4">{{ $activity->description }}</td>
-                            <td class="p-4">{{ json_encode($activity->properties->only(['before', 'after', 'reason']), JSON_UNESCAPED_UNICODE) }}</td>
-                        </tr>
-                    @empty
-                        <tr><td class="p-4" colspan="4">Aucune action administrative enregistrée.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        {{ $history->links() }}
-        <flux:button :href="route('central.tenants.show', $tenant)">Retour à la boutique</flux:button>
+    <section class="mx-auto flex w-full max-w-screen-2xl flex-col gap-6">
+        <header class="flex flex-wrap items-start justify-between gap-5"><div class="space-y-2"><h1 class="aydra-heading text-3xl font-semibold tracking-tight sm:text-4xl">Historique de la boutique</h1><p class="aydra-muted text-sm sm:text-base">{{ $tenant->shop_name }}</p></div><flux:button :href="route('central.tenants.show', $tenant)" icon="arrow-left">Retour à la boutique</flux:button></header>
+        <section class="aydra-users-panel"><div class="aydra-users-toolbar"><div><h2 class="aydra-heading text-lg font-semibold">Actions administratives</h2><p class="aydra-muted mt-1 text-sm">{{ $history->total() }} {{ $history->total() === 1 ? 'action enregistrée' : 'actions enregistrées' }}</p></div></div>
+            <div class="aydra-users-table"><flux:table class="whitespace-normal"><flux:table.columns><flux:table.column>Date</flux:table.column><flux:table.column>Auteur</flux:table.column><flux:table.column>Action</flux:table.column><flux:table.column>Détails</flux:table.column></flux:table.columns><flux:table.rows>
+                @forelse ($history as $activity)<flux:table.row><flux:table.cell class="whitespace-nowrap">{{ $activity->created_at->format('d/m/Y H:i') }}</flux:table.cell><flux:table.cell>{{ $activity->causer?->name ?? 'Système' }}</flux:table.cell><flux:table.cell variant="strong">{{ $activity->description }}</flux:table.cell><flux:table.cell class="break-words">{{ json_encode($activity->properties->only(['before', 'after', 'reason']), JSON_UNESCAPED_UNICODE) }}</flux:table.cell></flux:table.row>
+                @empty <flux:table.row><flux:table.cell colspan="4"><div class="aydra-users-empty"><p class="aydra-heading font-medium">Aucune action administrative enregistrée.</p></div></flux:table.cell></flux:table.row> @endforelse
+            </flux:table.rows></flux:table>
+            @if ($history->hasPages())<nav aria-label="Pagination de l’historique" class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 pt-4 dark:border-zinc-700"><span class="aydra-muted text-sm">Page {{ $history->currentPage() }} sur {{ $history->lastPage() }}</span><div class="flex gap-2">@if ($history->onFirstPage())<flux:button disabled icon="chevron-left">Précédent</flux:button>@else<flux:button :href="$history->previousPageUrl()" icon="chevron-left">Précédent</flux:button>@endif @if ($history->hasMorePages())<flux:button :href="$history->nextPageUrl()" icon:trailing="chevron-right">Suivant</flux:button>@else<flux:button disabled icon:trailing="chevron-right">Suivant</flux:button>@endif</div></nav>@endif
+            </div>
+        </section>
     </section>
 </x-layouts::app>
