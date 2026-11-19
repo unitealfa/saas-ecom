@@ -49,8 +49,9 @@ class UserApprovalService
         Gate::forUser($actor)->authorize('viewAny', User::class);
 
         return User::withStatus(StatusEnum::PENDING)
+            ->whereNotNull('email_verified_at')
             ->select([
-                'id', 'uuid', 'first_name', 'last_name', 'email', 'phone', 'country_id',
+                'id', 'uuid', 'first_name', 'last_name', 'email', 'email_verified_at', 'phone', 'country_id',
                 'status', 'legal_profile_version', 'legal_verification_status', 'created_at',
             ])
             ->with(['country:id,name_fr', 'roles:id,guard_name,is_super_admin'])
@@ -66,6 +67,9 @@ class UserApprovalService
             ability: $approved ? 'approve' : 'reject',
             loadTarget: fn (): User => $this->lock($target),
             mutation: function (User $target) use ($actor, $approved, $reason, $version, $expectedStatus): void {
+                if ($target->status === StatusEnum::PENDING && ! $target->hasVerifiedEmail()) {
+                    throw ValidationException::withMessages(['email' => 'Le commerçant doit d’abord vérifier son adresse e-mail.']);
+                }
                 if ($target->status !== $expectedStatus) {
                     throw ValidationException::withMessages([
                         'expected_status' => 'Une autre décision a déjà modifié ce compte. Rechargez sa fiche.',
