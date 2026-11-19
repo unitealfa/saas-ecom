@@ -8,6 +8,7 @@ use App\Models\Central\Tenants\Tenant;
 use App\Models\Central\Users\User;
 use App\Notifications\Central\Auth\AccountInvitation;
 use Database\Seeders\Central\AuthorizationSeeder;
+use Database\Seeders\Central\FreePlanSeeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 
@@ -22,8 +23,23 @@ beforeEach(function (): void {
     $this->admin->assignRole(Role::findByName('root', 'central'));
 });
 
-test('approval validates the account and dossier atomically without verifying email or creating a shop', function (): void {
+test('a new registration becomes available for approval only after email verification', function (): void {
     $merchant = User::factory()->unverified()->create(['status' => StatusEnum::PENDING]);
+    activity()->performedOn($merchant)->event('central_registration_requested')->log('Inscription de test.');
+    $this->actingAs($this->admin, 'central')->get(route('central.users.pending'))
+        ->assertOk()->assertDontSee($merchant->email);
+    $this->get(route('central.users.index'))->assertOk()->assertDontSee($merchant->email);
+    $this->post(route('central.users.approve', $merchant), merchantDecisionSnapshot($merchant))->assertForbidden();
+    $merchant->markEmailAsVerified();
+    $this->get(route('central.users.pending'))->assertOk()->assertSee($merchant->email);
+    $this->get(route('central.users.index'))->assertOk()->assertSee($merchant->email);
+    $this->post(route('central.users.approve', $merchant), merchantDecisionSnapshot($merchant))
+        ->assertSessionHasNoErrors();
+    expect($merchant->refresh()->status)->toBe(StatusEnum::ACTIVE);
+});
+
+test('approval validates the verified account and dossier atomically without creating a shop', function (): void {
+    $merchant = User::factory()->create(['status' => StatusEnum::PENDING]);
     $this->actingAs($this->admin, 'central')->post(route('central.users.approve', $merchant), merchantDecisionSnapshot($merchant))
         ->assertRedirect(route('central.users.index'))->assertSessionHasNoErrors();
     $updated = $merchant->fresh();
@@ -32,7 +48,7 @@ test('approval validates the account and dossier atomically without verifying em
         ->and($updated->legal_profile_version)->toBe(1)
         ->and($updated->legal_verified_at)->not->toBeNull()
         ->and($updated->legal_verified_by_id)->toBe($this->admin->id)
-        ->and($updated->hasVerifiedEmail())->toBeFalse();
+        ->and($updated->hasVerifiedEmail())->toBeTrue();
     expect(Tenant::count())->toBe(0);
     $this->get(route('central.users.show', $updated))->assertOk()
         ->assertDontSee('action="'.route('central.users.approve', $updated).'"', false)
@@ -73,7 +89,7 @@ test('controller corrections preserve legacy legal decisions under the current p
 });
 
 test('merchant decisions return to the page that submitted the form', function (string $action, string $origin): void {
-    $merchant = User::factory()->unverified()->create(['status' => StatusEnum::PENDING]);
+    $merchant = User::factory()->create(['status' => StatusEnum::PENDING]);
     $previousUrl = $origin === 'show'
         ? route('central.users.show', $merchant)
         : route('central.users.'.$origin, ['search' => 'commerçant', 'page' => 2]);
@@ -159,6 +175,7 @@ test('legacy legal permission alone cannot approve an account through the former
 });
 
 test('an administrative merchant is approved and invited before secure password setup and mandatory first shop', function (): void {
+    $this->seed(FreePlanSeeder::class);
     Notification::fake();
     $creator = User::factory()->create();
     $creator->assignRole(Role::findByName('user-manager', 'central'));
@@ -194,6 +211,7 @@ test('an administrative merchant is approved and invited before secure password 
 });
 
 test('an expired activation invitation can be replaced without verifying the address early', function (): void {
+    $this->seed(FreePlanSeeder::class);
     Notification::fake();
     $this->actingAs($this->admin, 'central')->post(route('central.users.store'), [
         'last_name' => 'Invité', 'email' => 'expired-invite@example.test',

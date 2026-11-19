@@ -223,6 +223,7 @@ class UserPolicy
             || ($target->status === StatusEnum::ACTIVE && $target->legal_verification_status !== VerificationStatusEnum::VERIFIED);
 
         return ! $target->trashed() && $actor->id !== $target->id
+            && ($target->status !== StatusEnum::PENDING || $target->hasVerifiedEmail())
             && ($needsReview || ($action === 'approve' && $target->status === StatusEnum::REJECTED))
             && ! $this->access->isStaff($target)
             && $this->access->allows($actor, 'saas.users.'.$action);

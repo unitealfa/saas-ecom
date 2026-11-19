@@ -6,6 +6,7 @@ use App\Models\Central\Tenants\Tenant;
 use App\Models\User;
 use App\Services\Central\Auth\RegistrationVerificationNotification;
 use Database\Seeders\Central\CountrySeeder;
+use Database\Seeders\Central\FreePlanSeeder;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Log;
@@ -17,6 +18,7 @@ use Symfony\Component\Mailer\Transport\TransportInterface;
 
 beforeEach(function () {
     $this->skipUnlessFortifyHas(Features::registration());
+    $this->seed(FreePlanSeeder::class);
 });
 
 test('registration screen can be rendered', function () {
@@ -38,18 +40,18 @@ test('new users can register', function () {
     ]);
 
     $response->assertSessionHasNoErrors()
-        ->assertRedirect(route('verification.notice'))
+        ->assertRedirect(route('login'))
         ->assertSessionHas('registration_created');
 
-    $this->assertAuthenticated('central');
+    $this->assertGuest('central');
     $user = User::where('email', 'test@example.com')->firstOrFail();
     expect($user->status)->toBe(StatusEnum::PENDING);
     expect($user->hasVerifiedEmail())->toBeFalse();
     Notification::assertSentTo($user, VerifyEmail::class);
     Notification::assertSentTimes(VerifyEmail::class, 1);
-    $this->get(route('verification.notice'))->assertOk()
-        ->assertSee('registration-created', false)->assertSee('Votre compte Aydra a été créé avec succès !')
-        ->assertSee('Renvoyer l’e-mail de vérification');
+    $this->get(route('login'))->assertOk()->assertSee('Votre compte a bien été créé');
+    $this->post(route('login.store'), ['email' => 'test@example.com', 'password' => 'password'])
+        ->assertRedirect(route('verification.notice'));
     expect(Tenant::count())->toBe(0);
 });
 
@@ -88,13 +90,18 @@ test('registration survives SMTP failure without claiming that verification mail
         $response->assertCreated()->assertJsonPath('status', StatusEnum::PENDING->value)
             ->assertJsonPath('email_sent', false)->assertJsonPath('redirect', route('verification.notice'));
     } else {
-        $response->assertRedirect(route('verification.notice'))->assertSessionHasNoErrors()
+        $response->assertRedirect(route('login'))->assertSessionHasNoErrors()
             ->assertSessionHas('registration_created', true)->assertSessionHas('registration_email_sent', false);
     }
     $response->assertDontSee('private-smtp-secret');
     $user = User::where('email', $payload['email'])->firstOrFail();
     expect($user->status)->toBe(StatusEnum::PENDING)->and($user->hasVerifiedEmail())->toBeFalse();
-    $this->assertAuthenticatedAs($user, 'central');
+    if ($json) {
+        $this->assertAuthenticatedAs($user, 'central');
+    } else {
+        $this->assertGuest('central');
+        $this->get(route('login'))->assertOk()->assertSee('L’e-mail n’a pas pu être envoyé.');
+    }
     Log::shouldHaveReceived('warning')->once()->with('Central account email delivery failed.', [
         'operation' => 'verification', 'user_uuid' => $user->uuid, 'exception_class' => TransportException::class,
     ]);
