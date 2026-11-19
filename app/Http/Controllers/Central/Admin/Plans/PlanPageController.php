@@ -23,6 +23,7 @@ use App\Services\Central\Plans\PlanVersionService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
 class PlanPageController extends Controller
 {
@@ -38,8 +39,13 @@ class PlanPageController extends Controller
 
     public function index(SearchPlansRequest $request): View
     {
+        $sort = $request->validate([
+            'sort' => ['nullable', Rule::in(['name', 'version', 'monthly_price', 'annual_price', 'is_active'])],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
+        ]);
+
         return view('central.pages.admin.plans.index', [
-            'plans' => $this->plans->paginate($this->centralActor(), $request->validated('search')),
+            'plans' => $this->plans->paginate($this->centralActor(), $request->validated('search'), $sort['sort'] ?? null, $sort['direction'] ?? null),
         ]);
     }
 
@@ -61,14 +67,23 @@ class PlanPageController extends Controller
     {
         $actor = $this->centralActor();
         $plan = $this->plans->details($actor, $plan);
-        $availableFeatures = Gate::forUser($actor)->allows('updateFeatures', $plan)
-            ? Feature::query()->active()->orderBy('name')->get()
-            : collect();
-
         return view('central.pages.admin.plans.show', [
             'plan' => $plan,
             'latestVersion' => $this->plans->latestVersion($actor, $plan),
-            'availableFeatures' => $availableFeatures,
+        ]);
+    }
+
+    public function edit(Plan $plan): View
+    {
+        $actor = $this->centralActor();
+        $plan = $this->plans->details($actor, $plan);
+        abort_unless(Gate::forUser($actor)->any(['update', 'updateFeatures'], $plan), 403);
+
+        return view('central.pages.admin.plans.edit', [
+            'plan' => $plan,
+            'availableFeatures' => Gate::forUser($actor)->allows('updateFeatures', $plan)
+                ? Feature::query()->active()->orderBy('name')->get()
+                : collect(),
         ]);
     }
 
