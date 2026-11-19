@@ -15,20 +15,23 @@ class PlanCatalogService
     private const int PER_PAGE = 20;
 
     /** @return LengthAwarePaginator<int, Plan> */
-    public function paginate(User $actor, ?string $search = null): LengthAwarePaginator
+    public function paginate(User $actor, ?string $search = null, ?string $sort = null, ?string $direction = null): LengthAwarePaginator
     {
         Gate::forUser($actor)->authorize('viewAny', Plan::class);
 
         $search = trim((string) $search);
         $pattern = '%'.addcslashes($search, '\\%_').'%';
+        $sort = in_array($sort, ['name', 'version', 'monthly_price', 'annual_price', 'is_active'], true) ? $sort : null;
+        $direction = $direction === 'desc' ? 'desc' : 'asc';
 
         return Plan::withTrashed()->with('features')
             ->when($search !== '', fn (Builder $query) => $query->where(
                 fn (Builder $query) => $query->where('code', 'like', $pattern)->orWhere('name', 'like', $pattern),
             ))
+            ->when($sort !== null, fn (Builder $query) => $query->orderBy($sort, $direction))
             ->orderBy('code')->orderByDesc('version')->orderBy('id')
             ->paginate(self::PER_PAGE)
-            ->appends($search === '' ? [] : ['search' => $search]);
+            ->appends(['search' => $search === '' ? null : $search, 'sort' => $sort, 'direction' => $sort === null ? null : $direction]);
     }
 
     public function details(User $actor, Plan $plan): Plan

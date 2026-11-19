@@ -1,52 +1,31 @@
 <x-layouts::app :title="__('Fonctionnalités commerciales')">
-    <section class="flex flex-col gap-6">
-        <flux:heading size="xl" level="1">Fonctionnalités commerciales du SaaS</flux:heading>
-        <flux:text>Ce catalogue décrit les possibilités des offres, comme le nombre de boutiques. Les permissions du personnel SaaS sont gérées séparément.</flux:text>
-        @if (session('status'))<flux:text role="status">{{ session('status') }}</flux:text>@endif
-        @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
-        @can('create', \App\Models\Central\Features\Feature::class)
-            <div><flux:button :href="route('central.features.create')" variant="primary">Créer une fonctionnalité</flux:button></div>
-        @endcan
-        <form method="GET" action="{{ route('central.features.index') }}" class="flex flex-wrap items-end gap-3">
-            <flux:input name="search" label="Rechercher" :value="request('search')" placeholder="Nom ou code" />
-            <flux:select name="is_active" label="Disponibilité">
-                <option value="">Toutes</option>
-                <option value="1" @selected(request('is_active') === '1')>Actives</option>
-                <option value="0" @selected(request('is_active') === '0')>Inactives</option>
-            </flux:select>
-            <flux:select name="archived" label="Catalogue">
-                <option value="0" @selected(! request()->boolean('archived'))>Actuel</option>
-                <option value="1" @selected(request()->boolean('archived'))>Archivé</option>
-            </flux:select>
-            <flux:button type="submit">Filtrer</flux:button>
-        </form>
-        <div class="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
-            <table class="w-full text-left text-sm">
-                <thead><tr>
-                    @foreach (['Fonctionnalité', 'Type', 'Portée', 'Période', 'État', 'Offres liées', 'Actions'] as $heading)<th class="p-4">{{ $heading }}</th>@endforeach
-                </tr></thead>
-                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
-                    @forelse ($features as $feature)
-                        <tr>
-                            <td class="p-4">{{ $feature->name }}<div class="text-xs">{{ $feature->code }}</div>
-                                @if ($feature->isSystem())<flux:badge>Système</flux:badge>@endif
-                            </td>
-                            <td class="p-4">{{ $feature->value_type->label() }}</td>
-                            <td class="p-4">{{ $feature->quota_scope->label() }}</td>
-                            <td class="p-4">{{ $feature->period->label() }}</td>
-                            <td class="p-4">{{ $feature->trashed() ? 'Archivée' : ($feature->is_active ? 'Active' : 'Inactive') }}</td>
-                            <td class="p-4">{{ $feature->plan_features_count }}</td>
-                            <td class="p-4"><div class="flex flex-wrap gap-2">
-                                <flux:button :href="route('central.features.show', $feature)">Informations</flux:button>
-                                @can('update', $feature)<flux:button :href="route('central.features.edit', $feature)">Modifier</flux:button>@endcan
-                            </div></td>
-                        </tr>
-                    @empty
-                        <tr><td colspan="7" class="p-4">Aucune fonctionnalité trouvée.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        {{ $features->links() }}
+    <section class="mx-auto flex w-full max-w-screen-2xl flex-col gap-6">
+        <header class="flex flex-wrap items-start justify-between gap-5"><div class="space-y-2"><h1 class="aydra-heading text-3xl font-semibold tracking-tight sm:text-4xl">Fonctionnalités commerciales du SaaS</h1><p class="aydra-muted max-w-2xl text-sm sm:text-base">Ce catalogue décrit les possibilités des offres, comme le nombre de boutiques. Les permissions du personnel SaaS sont gérées séparément.</p></div>@can('create', \App\Models\Central\Features\Feature::class)<flux:button :href="route('central.features.create')" variant="primary" icon="plus">Créer une fonctionnalité</flux:button>@endcan</header>
+        @if (session('status'))<flux:callout role="status">{{ session('status') }}</flux:callout>@endif
+        @if ($errors->any())<flux:callout variant="danger" role="alert">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</flux:callout>@endif
+        <section class="aydra-users-panel p-5 sm:p-6" aria-labelledby="feature-search"><h2 id="feature-search" class="aydra-heading text-lg font-semibold">Rechercher une fonctionnalité</h2><p class="aydra-muted mt-1 text-sm">Les suggestions proviennent des fonctionnalités affichées sur cette page.</p>
+            <form method="GET" action="{{ route('central.features.index') }}" class="mt-5 flex flex-wrap items-end gap-3">
+                <flux:input name="search" label="Nom ou code" :value="request('search')" type="search" icon="magnifying-glass" placeholder="Nom ou code" list="feature-suggestions" class="min-w-0 flex-1 sm:min-w-72" />
+                <datalist id="feature-suggestions">@foreach ($features as $feature)<option value="{{ $feature->name }}"></option><option value="{{ $feature->code }}"></option>@endforeach</datalist>
+                <div class="w-full sm:w-44" x-data="{ value: '', label: '' }" data-value="{{ request('is_active', '') }}" data-label="{{ match ((string) request('is_active', '')) { '1' => 'Actives', '0' => 'Inactives', default => 'Toutes' } }}" x-init="value = $el.dataset.value; label = $el.dataset.label"><label id="feature-active-label" class="mb-2 block text-sm font-medium">Disponibilité</label><input type="hidden" name="is_active" :value="value" value="{{ request('is_active', '') }}"><flux:dropdown><flux:button type="button" icon:trailing="chevron-down" class="w-full justify-between" aria-labelledby="feature-active-label feature-active-value"><span id="feature-active-value" x-text="label">Toutes</span></flux:button><flux:menu>@foreach (['' => 'Toutes', '1' => 'Actives', '0' => 'Inactives'] as $value => $label)<flux:menu.item type="button" data-value="{{ $value }}" @click="value = $el.dataset.value; label = $el.textContent.trim()">{{ $label }}</flux:menu.item>@endforeach</flux:menu></flux:dropdown></div>
+                <div class="w-full sm:w-44" x-data="{ value: '', label: '' }" data-value="{{ request()->boolean('archived') ? '1' : '0' }}" data-label="{{ request()->boolean('archived') ? 'Archivé' : 'Actuel' }}" x-init="value = $el.dataset.value; label = $el.dataset.label"><label id="feature-catalog-label" class="mb-2 block text-sm font-medium">Catalogue</label><input type="hidden" name="archived" :value="value" value="{{ request()->boolean('archived') ? '1' : '0' }}"><flux:dropdown><flux:button type="button" icon:trailing="chevron-down" class="w-full justify-between" aria-labelledby="feature-catalog-label feature-catalog-value"><span id="feature-catalog-value" x-text="label">Actuel</span></flux:button><flux:menu><flux:menu.item type="button" data-value="0" @click="value = $el.dataset.value; label = $el.textContent.trim()">Actuel</flux:menu.item><flux:menu.item type="button" data-value="1" @click="value = $el.dataset.value; label = $el.textContent.trim()">Archivé</flux:menu.item></flux:menu></flux:dropdown></div>
+                @if(request()->filled('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}"><input type="hidden" name="direction" value="{{ request('direction', 'asc') }}">@endif
+                <flux:button type="submit" variant="primary">Rechercher</flux:button><flux:button :href="route('central.features.index')">Effacer</flux:button>
+            </form>
+        </section>
+        @php($sortBy = request('sort', 'name')) @php($sortDirection = request('direction', 'asc'))
+        <section class="aydra-users-panel"><div class="aydra-users-toolbar"><div><h2 class="aydra-heading text-lg font-semibold">Fonctionnalités</h2><p class="aydra-muted mt-1 text-sm">{{ $features->total() }} {{ $features->total() === 1 ? 'fonctionnalité trouvée' : 'fonctionnalités trouvées' }}</p></div></div>
+            <div class="aydra-users-table"><flux:table class="whitespace-normal"><flux:table.columns>
+                @foreach (['name' => 'Fonctionnalité', 'value_type' => 'Type', 'quota_scope' => 'Portée', 'period' => 'Période', 'is_active' => 'État', 'plans' => 'Offres liées', 'actions' => 'Actions'] as $column => $heading)
+                    @if (in_array($column, ['name', 'value_type', 'quota_scope', 'period', 'is_active'], true))<flux:table.column sortable :sorted="$sortBy === $column" :direction="$sortDirection" :aria-sort="$sortBy === $column ? ($sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'" :data-sort-url="route('central.features.index', [...request()->only(['search', 'is_active', 'archived']), 'sort' => $column, 'direction' => $sortBy === $column && $sortDirection === 'asc' ? 'desc' : 'asc'])" onclick="window.location.assign(this.dataset.sortUrl)">{{ $heading }}</flux:table.column>@else <flux:table.column>{{ $heading }}</flux:table.column> @endif
+                @endforeach
+            </flux:table.columns><flux:table.rows>
+                @forelse ($features as $feature)
+                    <flux:table.row :key="$feature->uuid"><flux:table.cell variant="strong">{{ $feature->name }}<div class="aydra-muted mt-1 text-xs">{{ $feature->code }}</div>@if ($feature->isSystem())<flux:badge size="sm">Système</flux:badge>@endif</flux:table.cell><flux:table.cell>{{ $feature->value_type->label() }}</flux:table.cell><flux:table.cell>{{ $feature->quota_scope->label() }}</flux:table.cell><flux:table.cell>{{ $feature->period->label() }}</flux:table.cell><flux:table.cell><flux:badge size="sm" :color="$feature->trashed() ? 'zinc' : ($feature->is_active ? 'green' : 'amber')">{{ $feature->trashed() ? 'Archivée' : ($feature->is_active ? 'Active' : 'Inactive') }}</flux:badge></flux:table.cell><flux:table.cell>{{ $feature->plan_features_count }}</flux:table.cell><flux:table.cell><div class="flex flex-wrap gap-2"><flux:button :href="route('central.features.show', $feature)">Informations</flux:button>@can('update', $feature)<flux:button :href="route('central.features.edit', $feature)">Modifier</flux:button>@endcan</div></flux:table.cell></flux:table.row>
+                @empty <flux:table.row><flux:table.cell colspan="7"><div class="aydra-users-empty"><p class="aydra-heading font-medium">Aucune fonctionnalité trouvée.</p><p class="aydra-muted mt-1 text-sm">Essayez d’autres critères de recherche.</p></div></flux:table.cell></flux:table.row> @endforelse
+            </flux:table.rows></flux:table>
+            @if ($features->hasPages())<nav aria-label="Pagination des fonctionnalités" class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 pt-4 dark:border-zinc-700"><span class="aydra-muted text-sm">Page {{ $features->currentPage() }} sur {{ $features->lastPage() }}</span><div class="flex gap-2">@if ($features->onFirstPage())<flux:button disabled icon="chevron-left">Précédent</flux:button>@else<flux:button :href="$features->previousPageUrl()" icon="chevron-left">Précédent</flux:button>@endif @if ($features->hasMorePages())<flux:button :href="$features->nextPageUrl()" icon:trailing="chevron-right">Suivant</flux:button>@else<flux:button disabled icon:trailing="chevron-right">Suivant</flux:button>@endif</div></nav>@endif
+            </div>
+        </section>
     </section>
 </x-layouts::app>
