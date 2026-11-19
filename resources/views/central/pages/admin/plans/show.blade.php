@@ -1,7 +1,11 @@
 <x-layouts::app :title="$plan->name">
     <section class="flex flex-col gap-6">
         <flux:heading size="xl" level="1">{{ $plan->name }} — version {{ $plan->version }}</flux:heading>
-        @if (session('status'))<flux:text role="status">{{ session('status') }}</flux:text>@endif
+        @if (session('status'))
+            <flux:callout variant="success" icon="check-circle" role="status">
+                {{ session('status') }}
+            </flux:callout>
+        @endif
         @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
         @if ($plan->is_default)<flux:callout>Plan par défaut : attribution automatique gratuite aux nouveaux commerçants et à l’expiration des autres périodes.</flux:callout>@endif
         <dl class="grid gap-3 sm:grid-cols-2">
