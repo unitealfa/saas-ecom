@@ -78,8 +78,8 @@ test('email can be verified', function () {
     Event::assertDispatched(Verified::class);
 
     expect($user->fresh()->hasVerifiedEmail())->toBeTrue();
-    $response->assertRedirect(route('login'));
-    $this->assertGuest('central');
+    $response->assertRedirect(route('registration.status'));
+    $this->assertAuthenticatedAs($user, 'central');
 });
 
 test('verified email responses preserve the native staff session', function (bool $json): void {
@@ -101,14 +101,14 @@ test('verified email responses preserve the native staff session', function (boo
     $this->assertAuthenticatedAs($user, 'central');
 })->with(['web staff response' => [false], 'JSON staff response' => [true]]);
 
-test('verified email JSON responses disconnect merchants after proving email ownership', function (): void {
+test('verified email JSON responses keep the merchant session after proving email ownership', function (): void {
     $user = User::factory()->unverified()->create(['status' => StatusEnum::PENDING]);
     $url = URL::temporarySignedRoute('verification.verify', now()->addMinutes(30),
         ['id' => $user->id, 'hash' => sha1($user->email)]);
 
     $this->actingAs($user, 'central')->getJson($url)->assertNoContent();
     expect($user->fresh()->hasVerifiedEmail())->toBeTrue();
-    $this->assertGuest('central');
+    $this->assertAuthenticatedAs($user, 'central');
 });
 
 test('email is not verified with invalid hash', function () {
@@ -139,7 +139,7 @@ test('already verified user visiting verification link is redirected without fir
     );
 
     $this->actingAs($user)->get($verificationUrl)
-        ->assertRedirect(route('login'));
+        ->assertRedirect(route('registration.status'));
 
     expect($user->fresh()->hasVerifiedEmail())->toBeTrue();
     Event::assertNotDispatched(Verified::class);

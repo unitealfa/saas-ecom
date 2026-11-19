@@ -25,11 +25,14 @@ beforeEach(function (): void {
 
 test('a new registration becomes available for approval only after email verification', function (): void {
     $merchant = User::factory()->unverified()->create(['status' => StatusEnum::PENDING]);
+    activity()->performedOn($merchant)->event('central_registration_requested')->log('Inscription de test.');
     $this->actingAs($this->admin, 'central')->get(route('central.users.pending'))
         ->assertOk()->assertDontSee($merchant->email);
+    $this->get(route('central.users.index'))->assertOk()->assertDontSee($merchant->email);
     $this->post(route('central.users.approve', $merchant), merchantDecisionSnapshot($merchant))->assertForbidden();
     $merchant->markEmailAsVerified();
     $this->get(route('central.users.pending'))->assertOk()->assertSee($merchant->email);
+    $this->get(route('central.users.index'))->assertOk()->assertSee($merchant->email);
     $this->post(route('central.users.approve', $merchant), merchantDecisionSnapshot($merchant))
         ->assertSessionHasNoErrors();
     expect($merchant->refresh()->status)->toBe(StatusEnum::ACTIVE);

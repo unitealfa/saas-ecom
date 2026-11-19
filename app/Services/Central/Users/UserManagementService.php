@@ -77,6 +77,16 @@ class UserManagementService
         }
 
         return User::query()
+            ->where(function (Builder $query): void {
+                $query->where('status', '!=', StatusEnum::PENDING)
+                    ->orWhereNotNull('email_verified_at')
+                    ->orWhereNotExists(function ($query): void {
+                        $query->selectRaw('1')->from('activity_log')
+                            ->whereColumn('activity_log.subject_id', 'users.id')
+                            ->where('activity_log.subject_type', (new User)->getMorphClass())
+                            ->where('activity_log.event', 'central_registration_requested');
+                    });
+            })
             ->select([
                 'id', 'uuid', 'first_name', 'last_name', 'email', 'status', 'email_verified_at',
                 'legal_verification_status', 'legal_profile_version', 'deleted_at',

@@ -2,6 +2,13 @@
     <div class="flex flex-col gap-6">
         <x-auth-header :title="__('Log in to your account')" :description="__('Enter your email and password below to log in')" />
 
+        @if (session('registration_created'))
+            <flux:callout variant="success" icon="check-circle" role="status">Votre compte a bien été créé. Connectez-vous pour vérifier votre adresse e-mail.</flux:callout>
+            @unless (session('registration_email_sent'))
+                <flux:callout variant="warning" role="alert">L’e-mail n’a pas pu être envoyé. Après connexion, vous pourrez demander un nouvel envoi.</flux:callout>
+            @endunless
+        @endif
+
         <!-- Session Status -->
         <x-auth-session-status class="text-center" :status="session('status')" />
 
