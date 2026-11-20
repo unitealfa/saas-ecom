@@ -1,36 +1,30 @@
 <x-layouts::app title="Fichiers centraux">
-    <section class="flex flex-col gap-6">
-        <flux:heading size="xl" level="1">Fichiers centraux</flux:heading>
-        <flux:text>Fichiers de la plateforme centrale uniquement. Les fichiers des boutiques restent isolés dans leurs propres espaces.</flux:text>
-        @if (session('status'))<flux:text role="status">{{ session('status') }}</flux:text>@endif
-        @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
-        @can('upload', \App\Models\Central\Media\Media::class)<flux:button :href="route('central.media.create')" variant="primary">Importer un fichier</flux:button>@endcan
-        <form method="GET" action="{{ route('central.media.index') }}" class="flex flex-wrap items-end gap-3">
-            <flux:input name="search" label="Nom du fichier" :value="request('search')" />
-            <flux:checkbox name="archived" value="1" label="Archives uniquement" :checked="request()->boolean('archived')" />
-            <flux:button type="submit">Filtrer</flux:button>
-        </form>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left">
-                <thead><tr><th class="p-2">Fichier</th><th class="p-2">Type</th><th class="p-2">Taille</th><th class="p-2">Usage</th><th class="p-2">Visibilité</th><th class="p-2">État</th><th class="p-2">Actions</th></tr></thead>
-                <tbody>
-                    @forelse ($files as $media)
-                        <tr class="border-t border-zinc-200 dark:border-zinc-700">
-                            <td class="p-2">{{ $media->original_name }}</td>
-                            <td class="p-2">{{ $media->mime_type }}</td>
-                            <td class="p-2">{{ number_format($media->size_bytes / 1024, 1, ',', ' ') }} Ko</td>
-                            <td class="p-2">{{ $media->isAdministrativeDocument() ? 'Document administratif' : ($media->collection_name === 'profile_photo' ? 'Photo de profil' : 'Pièce métier') }}</td>
-                            <td class="p-2">{{ $media->visibility === \App\Enums\MediaVisibilityEnum::PRIVATE ? 'Privé' : 'Public' }}</td>
-                            <td class="p-2">{{ $media->trashed() ? 'Archivé' : 'Disponible au catalogue' }}</td>
-                            <td class="p-2"><div class="flex flex-wrap gap-2">
-                                <flux:button :href="route('central.media.show', $media)">Informations</flux:button>
-                                @include('central.pages.admin.media.archive-action')
-                            </div></td>
-                        </tr>
-                    @empty<tr><td colspan="7" class="p-2">Aucun fichier central.</td></tr>@endforelse
-                </tbody>
-            </table>
-        </div>
-        {{ $files->links() }}
+    <section class="mx-auto flex w-full max-w-screen-2xl flex-col gap-6">
+        <header class="flex flex-wrap items-start justify-between gap-5"><div class="space-y-2"><h1 class="aydra-heading text-3xl font-semibold tracking-tight sm:text-4xl">Fichiers centraux</h1><p class="aydra-muted max-w-2xl text-sm sm:text-base">Fichiers de la plateforme centrale uniquement. Les fichiers des boutiques restent isolés dans leurs propres espaces.</p></div>@can('upload', \App\Models\Central\Media\Media::class)<flux:button :href="route('central.media.create')" variant="primary" icon="plus">Importer un fichier</flux:button>@endcan</header>
+        @if (session('status'))<flux:callout role="status">{{ session('status') }}</flux:callout>@endif
+        @if ($errors->any())<flux:callout variant="danger" role="alert">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</flux:callout>@endif
+        <section class="aydra-users-panel p-5 sm:p-6" aria-labelledby="media-search"><h2 id="media-search" class="aydra-heading text-lg font-semibold">Rechercher un fichier</h2><p class="aydra-muted mt-1 text-sm">Les suggestions proviennent des fichiers affichés sur cette page.</p>
+            <form method="GET" action="{{ route('central.media.index') }}" class="mt-5 flex flex-wrap items-end gap-3">
+                <flux:input name="search" label="Nom du fichier" :value="request('search')" type="search" icon="magnifying-glass" list="media-suggestions" placeholder="Nom du fichier" class="min-w-0 flex-1 sm:min-w-72" />
+                <datalist id="media-suggestions">@foreach ($files as $media)<option value="{{ $media->original_name }}"></option>@endforeach</datalist>
+                <div class="w-full sm:w-56" x-data="{ value: '', label: '' }" data-value="{{ request()->boolean('archived') ? '1' : '0' }}" data-label="{{ request()->boolean('archived') ? 'Fichiers archivés' : 'Fichiers disponibles' }}" x-init="value = $el.dataset.value; label = $el.dataset.label"><label id="media-state-label" class="mb-2 block text-sm font-medium">Catalogue</label><input type="hidden" name="archived" :value="value" value="{{ request()->boolean('archived') ? '1' : '0' }}"><flux:dropdown><flux:button type="button" icon:trailing="chevron-down" class="w-full justify-between" aria-labelledby="media-state-label media-state-value"><span id="media-state-value" x-text="label">Fichiers disponibles</span></flux:button><flux:menu><flux:menu.item type="button" data-value="0" @click="value = $el.dataset.value; label = $el.textContent.trim()">Fichiers disponibles</flux:menu.item><flux:menu.item type="button" data-value="1" @click="value = $el.dataset.value; label = $el.textContent.trim()">Fichiers archivés</flux:menu.item></flux:menu></flux:dropdown></div>
+                @if(request()->filled('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}"><input type="hidden" name="direction" value="{{ request('direction', 'asc') }}">@endif
+                <flux:button type="submit" variant="primary">Rechercher</flux:button><flux:button :href="route('central.media.index')">Effacer</flux:button>
+            </form>
+        </section>
+        @php($sortBy = request('sort')) @php($sortDirection = request('direction', 'asc'))
+        <section class="aydra-users-panel"><div class="aydra-users-toolbar"><div><h2 class="aydra-heading text-lg font-semibold">Fichiers</h2><p class="aydra-muted mt-1 text-sm">{{ $files->total() }} {{ $files->total() === 1 ? 'fichier trouvé' : 'fichiers trouvés' }}</p></div></div>
+            <div class="aydra-users-table"><flux:table class="whitespace-normal"><flux:table.columns>
+                @foreach (['original_name' => 'Fichier', 'mime_type' => 'Type', 'size_bytes' => 'Taille', 'usage' => 'Usage', 'visibility' => 'Visibilité', 'state' => 'État', 'created_at' => 'Ajouté le', 'actions' => 'Actions'] as $column => $heading)
+                    @if (in_array($column, ['original_name', 'mime_type', 'size_bytes', 'visibility', 'created_at'], true))<flux:table.column sortable :sorted="$sortBy === $column" :direction="$sortDirection" :aria-sort="$sortBy === $column ? ($sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'" :data-sort-url="route('central.media.index', [...request()->only(['search', 'archived']), 'sort' => $column, 'direction' => $sortBy === $column && $sortDirection === 'asc' ? 'desc' : 'asc'])" onclick="window.location.assign(this.dataset.sortUrl)">{{ $heading }}</flux:table.column>@else <flux:table.column>{{ $heading }}</flux:table.column> @endif
+                @endforeach
+            </flux:table.columns><flux:table.rows>
+                @forelse ($files as $media)
+                    <flux:table.row :key="$media->uuid"><flux:table.cell variant="strong" class="break-words">{{ $media->original_name }}</flux:table.cell><flux:table.cell>{{ $media->mime_type }}</flux:table.cell><flux:table.cell class="whitespace-nowrap tabular-nums">{{ number_format($media->size_bytes / 1024, 1, ',', ' ') }} Ko</flux:table.cell><flux:table.cell>{{ $media->isAdministrativeDocument() ? 'Document administratif' : ($media->collection_name === 'profile_photo' ? 'Photo de profil' : 'Pièce métier') }}</flux:table.cell><flux:table.cell>{{ $media->visibility === \App\Enums\MediaVisibilityEnum::PRIVATE ? 'Privé' : 'Public' }}</flux:table.cell><flux:table.cell><flux:badge size="sm" :color="$media->trashed() ? 'zinc' : 'green'">{{ $media->trashed() ? 'Archivé' : 'Disponible au catalogue' }}</flux:badge></flux:table.cell><flux:table.cell class="whitespace-nowrap">{{ $media->created_at?->format('d/m/Y H:i') ?? '—' }}</flux:table.cell><flux:table.cell><div class="flex flex-wrap gap-2"><flux:button :href="route('central.media.show', $media)">Informations</flux:button>@include('central.pages.admin.media.archive-action')</div></flux:table.cell></flux:table.row>
+                @empty <flux:table.row><flux:table.cell colspan="8"><div class="aydra-users-empty"><p class="aydra-heading font-medium">Aucun fichier trouvé.</p><p class="aydra-muted mt-1 text-sm">Essayez un autre nom ou consultez les archives.</p></div></flux:table.cell></flux:table.row> @endforelse
+            </flux:table.rows></flux:table>
+            @if ($files->hasPages())<nav aria-label="Pagination des fichiers" class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 pt-4 dark:border-zinc-700"><span class="aydra-muted text-sm">Page {{ $files->currentPage() }} sur {{ $files->lastPage() }}</span><div class="flex gap-2">@if ($files->onFirstPage())<flux:button disabled icon="chevron-left">Précédent</flux:button>@else<flux:button :href="$files->previousPageUrl()" icon="chevron-left">Précédent</flux:button>@endif @if ($files->hasMorePages())<flux:button :href="$files->nextPageUrl()" icon:trailing="chevron-right">Suivant</flux:button>@else<flux:button disabled icon:trailing="chevron-right">Suivant</flux:button>@endif</div></nav>@endif
+            </div>
+        </section>
     </section>
 </x-layouts::app>
