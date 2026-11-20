@@ -3,12 +3,13 @@
         @foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach
     </flux:callout>
 @endif
-<form method="POST" action="{{ $area === null ? route('central.geography.store') : route('central.geography.update', $area->uuid) }}" class="flex flex-col gap-5">
+<form method="POST" action="{{ $area === null ? route('central.geography.store') : route('central.geography.update', $area->uuid) }}" class="aydra-users-panel flex flex-col gap-5 p-5 sm:p-6">
+    <div><h2 class="aydra-heading text-lg font-semibold">Informations de la zone</h2><p class="aydra-muted mt-1 text-sm">Identité, rattachement et informations du référentiel.</p></div>
     @csrf
     @if ($area !== null)
         @method('PUT')
         <input type="hidden" name="expected_state" value="{{ $area->stateToken() }}">
-        <dl class="grid gap-3 sm:grid-cols-2">
+        <dl class="aydra-detail-grid grid gap-x-8 gap-y-5 sm:grid-cols-2">
             <div><dt>Pays</dt><dd>{{ $area->country->name_fr }}</dd></div>
             <div><dt>Type</dt><dd>{{ $area->type->label() }}</dd></div>
             <div><dt>Wilaya parente</dt><dd>{{ $area->parent?->name_fr ?? 'Aucune' }}</dd></div>
