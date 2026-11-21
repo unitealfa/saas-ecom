@@ -36,6 +36,15 @@
     }
 }
 
+@media (prefers-reduced-motion: no-preference) {
+    html.aydra-theme-transition,
+    html.aydra-theme-transition *,
+    html.aydra-theme-transition *::before,
+    html.aydra-theme-transition *::after {
+        transition: background-color 220ms ease, color 220ms ease, border-color 220ms ease, fill 220ms ease, stroke 220ms ease, box-shadow 220ms ease;
+    }
+}
+
 /* L'identité Aydra est limitée aux comptes du personnel central. */
 body.aydra-admin {
     --color-accent: #3459da;
@@ -72,12 +81,6 @@ body.aydra-admin .aydra-admin-sidebar::-webkit-scrollbar {
 body.aydra-admin .aydra-context-header {
     background: var(--aydra-surface);
     border-bottom: 1px solid var(--aydra-border);
-}
-
-@media (min-width: 64rem) {
-    .aydra-context-header:not(:has(.aydra-context-nav)) {
-        display: none !important;
-    }
 }
 
 body.aydra-admin [data-flux-main-inset] {

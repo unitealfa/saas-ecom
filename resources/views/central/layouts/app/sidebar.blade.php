@@ -25,12 +25,6 @@
                         Tableau de bord
                     </flux:sidebar.item>
 
-                    @can('viewAny', \App\Models\Central\Notifications\DatabaseNotification::class)
-                        <flux:sidebar.item icon="bell" :href="route('notifications.index')" :current="request()->routeIs('notifications.*')" wire:navigate>
-                            Notifications ({{ auth('central')->user()->unreadNotifications()->count() }})
-                        </flux:sidebar.item>
-                    @endcan
-
                     @canany(['viewOperations', 'reconcileSubscriptions', 'reconcilePayments'], \App\Models\User::class)
                         <flux:sidebar.item icon="server" :href="route('central.operations.index')" :current="request()->routeIs('central.operations.*')" wire:navigate>Exploitation</flux:sidebar.item>
                     @endcanany
@@ -65,17 +59,27 @@
             <x-central::components.desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
         </flux:sidebar>
 
-        <!-- Mobile User Menu -->
+        <!-- Navigation and account controls -->
         <flux:header class="aydra-context-header block!">
-            <div class="flex min-h-14 w-full items-center lg:hidden">
+            <div class="flex min-h-14 w-full items-center gap-2">
             <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
             @if ($isStaff)
-                <a href="{{ route($dashboardRoute) }}" aria-label="Aydra — tableau de bord" wire:navigate>
+                <a href="{{ route($dashboardRoute) }}" class="lg:hidden" aria-label="Aydra — tableau de bord" wire:navigate>
                     <img src="{{ asset('images/brand/aydra-mark-compact.svg') }}" alt="Aydra" class="h-8 w-8 object-contain">
                 </a>
             @endif
-            <flux:spacer />
-            <flux:dropdown position="top" align="end">
+            <div class="hidden min-w-0 flex-1 lg:block"><x-central::components.admin-navigation /></div>
+            <flux:spacer class="lg:hidden" />
+            <div class="flex shrink-0 items-center gap-1">
+                <flux:button type="button" variant="ghost" square x-data="{ themeTimer: null }" x-on:click="clearTimeout(themeTimer); document.documentElement.classList.add('aydra-theme-transition'); $flux.appearance = $flux.dark ? 'light' : 'dark'; themeTimer = setTimeout(() => document.documentElement.classList.remove('aydra-theme-transition'), 240)" x-bind:aria-label="$flux.dark ? 'Activer le thème clair' : 'Activer le thème sombre'" x-bind:title="$flux.dark ? 'Activer le thème clair' : 'Activer le thème sombre'" aria-label="Changer le thème">
+                    <flux:icon.sun x-show="$flux.dark" x-cloak class="size-5" />
+                    <flux:icon.moon x-show="! $flux.dark" x-cloak class="size-5" />
+                </flux:button>
+                @can('viewAny', \App\Models\Central\Notifications\DatabaseNotification::class)
+                    <flux:button variant="ghost" square icon="bell" :href="route('notifications.index')" aria-label="Notifications" title="Notifications" wire:navigate />
+                @endcan
+            </div>
+            <flux:dropdown position="top" align="end" class="lg:hidden">
                 <flux:profile :avatar="auth()->user()->profile_photo_url" :initials="auth()->user()->initials()" icon-trailing="chevron-down" />
                 <flux:menu>
                     <flux:menu.radio.group>
@@ -101,7 +105,7 @@
                 </flux:menu>
             </flux:dropdown>
             </div>
-            <x-central::components.admin-navigation />
+            <div class="lg:hidden"><x-central::components.admin-navigation /></div>
         </flux:header>
 
         {{ $slot }}
