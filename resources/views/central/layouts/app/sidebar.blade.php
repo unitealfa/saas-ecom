@@ -5,22 +5,27 @@
     <head>
         @include('partials.head')
     </head>
-    <body @class(['min-h-screen bg-white dark:bg-zinc-800', 'aydra-admin' => $isStaff])>
-        <flux:sidebar sticky collapsible="mobile" @class(['border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900', 'aydra-admin-sidebar' => $isStaff])>
+    <body x-data="sidebarResize" :style="`--aydra-sidebar-width: ${width}px`" :class="{ 'aydra-sidebar-resizing': resizing }" @class(['min-h-screen bg-white dark:bg-zinc-800', 'aydra-admin' => $isStaff])>
+        <flux:sidebar sticky :collapsible="true" @class(['aydra-resizable-sidebar border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900', 'aydra-admin-sidebar' => $isStaff])>
             <flux:sidebar.header>
                 @if ($isStaff)
-                    <a href="{{ route($dashboardRoute) }}" class="aydra-admin-brand" aria-label="Aydra — tableau de bord" wire:navigate>
+                    <a href="{{ route($dashboardRoute) }}" class="aydra-admin-brand in-data-flux-sidebar-collapsed-desktop:hidden" aria-label="Aydra — tableau de bord" wire:navigate>
                         <img src="{{ asset('images/brand/aydra-logo-light.svg') }}" alt="Aydra" class="h-9 w-auto dark:hidden">
                         <img src="{{ asset('images/brand/aydra-logo-dark.svg') }}" alt="Aydra" class="hidden h-9 w-auto dark:block">
                     </a>
                 @else
-                    <x-app-logo :sidebar="true" href="{{ route($dashboardRoute) }}" wire:navigate />
+                    <span class="in-data-flux-sidebar-collapsed-desktop:hidden"><x-app-logo :sidebar="true" href="{{ route($dashboardRoute) }}" wire:navigate /></span>
                 @endif
+                <a href="{{ route($dashboardRoute) }}" class="hidden in-data-flux-sidebar-collapsed-desktop:flex items-center justify-center w-10" aria-label="Aydra — tableau de bord" wire:navigate>
+                    <img src="{{ asset('images/brand/aydra-mark-compact.svg') }}" alt="" class="size-8 object-contain">
+                </a>
                 <flux:sidebar.collapse class="lg:hidden" />
             </flux:sidebar.header>
 
             <flux:sidebar.nav>
-                <flux:sidebar.group :heading="$isStaff ? 'Administration' : __('Mon espace')" class="grid">
+                <div class="grid" data-flux-sidebar-group>
+                    <div class="px-3 py-2 text-sm font-medium leading-none text-zinc-400 in-data-flux-sidebar-collapsed-desktop:hidden">{{ $isStaff ? 'Administration' : __('Mon espace') }}</div>
+                    <div class="flex min-w-0 flex-col">
                     <flux:sidebar.item icon="home" :href="route($dashboardRoute)" :current="request()->routeIs($dashboardRoute === 'dashboard' ? 'dashboard' : 'central.admin-dashboard.*')" wire:navigate>
                         Tableau de bord
                     </flux:sidebar.item>
@@ -52,15 +57,21 @@
                         <flux:sidebar.item icon="credit-card" :href="route('owner.subscriptions.index')" :current="request()->routeIs('owner.subscriptions.*')" wire:navigate>Mon abonnement et les offres</flux:sidebar.item>
                     @endcan
 
-                </flux:sidebar.group>
+                    </div>
+                </div>
             </flux:sidebar.nav>
 
         </flux:sidebar>
+
+        <div class="aydra-sidebar-resize-handle" role="separator" aria-label="Redimensionner la barre latérale" aria-orientation="vertical" aria-valuemin="208" aria-valuemax="360" :aria-valuenow="width" tabindex="0"
+            @pointerdown.prevent="start($event)" @pointermove="move($event)" @pointerup="finish($event)" @pointercancel="finish($event)" @lostpointercapture="resizing = false"
+            @keydown.left.prevent="adjust(-16)" @keydown.right.prevent="adjust(16)"></div>
 
         <!-- Navigation and account controls -->
         <flux:header class="aydra-context-header block!">
             <div class="flex min-h-14 w-full items-center gap-2">
             <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
+            <flux:sidebar.toggle class="max-lg:hidden" icon="bars-3-bottom-left" title="Afficher ou réduire la barre latérale" />
             @if ($isStaff)
                 <a href="{{ route($dashboardRoute) }}" class="lg:hidden" aria-label="Aydra — tableau de bord" wire:navigate>
                     <img src="{{ asset('images/brand/aydra-mark-compact.svg') }}" alt="Aydra" class="h-8 w-8 object-contain">

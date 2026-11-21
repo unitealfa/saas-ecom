@@ -1,4 +1,40 @@
 document.addEventListener('alpine:init', () => {
+    Alpine.data('sidebarResize', () => ({
+        width: 256,
+        resizing: false,
+        init() {
+            try {
+                const saved = Number(localStorage.getItem('aydra.sidebar.width'));
+                if (saved >= 208 && saved <= 360) this.width = saved;
+            } catch { /* The sidebar remains usable when storage is unavailable. */ }
+        },
+        setWidth(value) {
+            this.width = Math.round(Math.min(360, Math.max(208, value)));
+        },
+        save() {
+            try { localStorage.setItem('aydra.sidebar.width', this.width); } catch { /* Storage is optional. */ }
+        },
+        start(event) {
+            if (event.button !== 0) return;
+            this.resizing = true;
+            event.currentTarget.setPointerCapture(event.pointerId);
+        },
+        move(event) {
+            if (!this.resizing) return;
+            this.setWidth(document.dir === 'rtl' ? window.innerWidth - event.clientX : event.clientX);
+        },
+        finish(event) {
+            if (!this.resizing) return;
+            this.resizing = false;
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+            this.save();
+        },
+        adjust(amount) {
+            this.setWidth(this.width + (document.dir === 'rtl' ? -amount : amount));
+            this.save();
+        },
+    }));
+
     Alpine.data('activityDateRange', () => ({
         open: false,
         from: '',
