@@ -55,8 +55,6 @@
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 
-            <flux:spacer />
-            <x-central::components.desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
         </flux:sidebar>
 
         <!-- Navigation and account controls -->
@@ -70,7 +68,7 @@
             @endif
             <div class="hidden min-w-0 flex-1 lg:block"><x-central::components.admin-navigation /></div>
             <flux:spacer class="lg:hidden" />
-            <div class="flex shrink-0 items-center gap-1">
+            <div class="flex shrink-0 items-center gap-1 rounded-xl border border-zinc-200 bg-zinc-50/70 p-1 dark:border-zinc-700 dark:bg-zinc-800/60">
                 <flux:button type="button" variant="ghost" square x-data="{ themeTimer: null }" x-on:click="clearTimeout(themeTimer); document.documentElement.classList.add('aydra-theme-transition'); $flux.appearance = $flux.dark ? 'light' : 'dark'; themeTimer = setTimeout(() => document.documentElement.classList.remove('aydra-theme-transition'), 240)" x-bind:aria-label="$flux.dark ? 'Activer le thème clair' : 'Activer le thème sombre'" x-bind:title="$flux.dark ? 'Activer le thème clair' : 'Activer le thème sombre'" aria-label="Changer le thème">
                     <flux:icon.sun x-show="$flux.dark" x-cloak class="size-5" />
                     <flux:icon.moon x-show="! $flux.dark" x-cloak class="size-5" />
@@ -78,9 +76,8 @@
                 @can('viewAny', \App\Models\Central\Notifications\DatabaseNotification::class)
                     <flux:button variant="ghost" square icon="bell" :href="route('notifications.index')" aria-label="Notifications" title="Notifications" wire:navigate />
                 @endcan
-            </div>
-            <flux:dropdown position="top" align="end" class="lg:hidden">
-                <flux:profile :avatar="auth()->user()->profile_photo_url" :initials="auth()->user()->initials()" icon-trailing="chevron-down" />
+            <flux:dropdown position="bottom" align="end" class="border-s border-zinc-200 ps-1 dark:border-zinc-700">
+                <flux:profile :avatar="auth()->user()->profile_photo_url" :name="auth()->user()->name" :initials="auth()->user()->initials()" icon-trailing="chevron-down" class="max-w-48 max-lg:[&>span]:hidden" aria-label="Menu du compte" />
                 <flux:menu>
                     <flux:menu.radio.group>
                         <div class="p-0 text-sm font-normal">
@@ -104,6 +101,7 @@
                     </form>
                 </flux:menu>
             </flux:dropdown>
+            </div>
             </div>
             <div class="lg:hidden"><x-central::components.admin-navigation /></div>
         </flux:header>
