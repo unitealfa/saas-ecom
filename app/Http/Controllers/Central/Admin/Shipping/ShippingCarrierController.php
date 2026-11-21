@@ -25,6 +25,8 @@ class ShippingCarrierController extends Controller
             'search' => ['nullable', 'string', 'max:255'],
             'is_active' => ['nullable', 'boolean'],
             'archived' => ['nullable', 'boolean'],
+            'sort' => ['nullable', 'in:name,code,is_active'],
+            'direction' => ['nullable', 'in:asc,desc'],
         ]);
 
         return view('central.pages.admin.shipping.carriers.index', [

@@ -38,9 +38,12 @@ class GeographyController extends Controller
             default => $query->withTrashed(),
         };
 
+        $sort = $filters['sort'] ?? 'code';
+        $direction = $filters['direction'] ?? 'asc';
+
         return view('central.pages.admin.geography.index', [
             ...$this->options(),
-            'areas' => $query->orderBy('code')->paginate(self::PER_PAGE)->withQueryString(),
+            'areas' => $query->orderBy($sort, $direction)->orderBy('id')->paginate(self::PER_PAGE)->withQueryString(),
         ]);
     }
 

@@ -8,19 +8,43 @@ use App\Http\Requests\Central\Countries\StoreCountryRequest;
 use App\Models\Central\Countries\Country;
 use App\Services\Central\Countries\CountryService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
 class CountryController extends Controller
 {
     public function __construct(private CountryService $countries) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
         Gate::authorize('viewAny', Country::class);
 
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'state' => ['nullable', Rule::in(['all', 'active', 'inactive'])],
+            'sort' => ['nullable', Rule::in(['code', 'name_fr', 'name_en', 'name_ar', 'is_active'])],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
+        ]);
+        $search = trim($filters['search'] ?? '');
+        $pattern = '%'.addcslashes($search, '\\%_').'%';
+        $sort = $filters['sort'] ?? 'name_fr';
+        $direction = $filters['direction'] ?? 'asc';
+
+        $query = Country::query()
+            ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query
+                ->where('code', 'like', $pattern)->orWhere('name_fr', 'like', $pattern)
+                ->orWhere('name_en', 'like', $pattern)->orWhere('name_ar', 'like', $pattern)));
+        $query = match ($filters['state'] ?? 'all') {
+            'active' => $query->active(),
+            'inactive' => $query->inactive(),
+            default => $query,
+        };
+
         return view('central.pages.admin.countries.index', [
-            'countries' => Country::orderBy('name_fr')->orderBy('id')->paginate(20),
+            'countries' => $query->orderBy($sort, $direction)->orderBy('id')->paginate(20)->withQueryString(),
         ]);
     }
 

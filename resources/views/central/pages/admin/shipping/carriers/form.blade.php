@@ -1,5 +1,6 @@
-@foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
-<form method="POST" action="{{ $carrier === null ? route('central.carriers.store') : route('central.carriers.update', $carrier) }}" class="flex flex-col gap-5">
+@if ($errors->any())<flux:callout variant="danger" role="alert">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</flux:callout>@endif
+<form method="POST" action="{{ $carrier === null ? route('central.carriers.store') : route('central.carriers.update', $carrier) }}" class="aydra-users-panel flex flex-col gap-5 p-5 sm:p-6">
+    <h2 class="aydra-heading text-lg font-semibold">Informations du transporteur</h2>
     @csrf
     @if ($carrier !== null)
         @method('PUT')

@@ -54,6 +54,8 @@ class CarrierGeoMappingService
 
         $search = trim((string) ($filters['search'] ?? ''));
         $pattern = '%'.addcslashes($search, '\\%_').'%';
+        $sort = in_array($filters['sort'] ?? null, ['external_code', 'external_name', 'external_province_code', 'mapping_version', 'is_active'], true) ? $filters['sort'] : null;
+        $direction = ($filters['direction'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
 
         return CarrierGeoMapping::query()->with(['carrier', 'area'])
             ->when($filters['carrier_uuid'] ?? null, fn (Builder $query, string $uuid) => $query->whereRelation('carrier', 'uuid', $uuid))
@@ -62,6 +64,7 @@ class CarrierGeoMappingService
                 ->where('external_code', 'like', $pattern)
                 ->orWhere('external_name', 'like', $pattern)
                 ->orWhereHas('area', fn (Builder $area) => $area->where('name_fr', 'like', $pattern))))
+            ->when($sort !== null, fn (Builder $query) => $query->orderBy($sort, $direction))
             ->orderBy('carrier_id')->orderBy('geographic_area_id')
             ->paginate(self::PER_PAGE)
             ->withQueryString();

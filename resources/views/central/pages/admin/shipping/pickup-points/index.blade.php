@@ -1,43 +1,25 @@
 <x-layouts::app title="Bureaux de retrait">
-    <section class="flex flex-col gap-6">
-        <flux:heading size="xl" level="1">Bureaux de retrait</flux:heading>
-        @if (session('status'))<flux:text role="status">{{ session('status') }}</flux:text>@endif
-        @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
-        <div class="flex gap-3">
+    <section class="mx-auto flex w-full max-w-screen-2xl flex-col gap-6">
+        <header class="flex flex-wrap items-start justify-between gap-5"><div class="space-y-2"><h1 class="aydra-heading text-3xl font-semibold tracking-tight sm:text-4xl">Bureaux de retrait</h1><p class="aydra-muted max-w-2xl text-sm sm:text-base">Consultez les bureaux et leur disponibilité dans les réseaux de transporteurs.</p></div><div class="flex flex-wrap gap-2">
             @can('create', \App\Models\Central\Shipping\PickupPoint::class)<flux:button :href="route('central.pickup-points.create')" variant="primary">Ajouter un bureau</flux:button>@endcan
             @can('import', \App\Models\Central\Shipping\PickupPoint::class)<flux:button :href="route('central.pickup-points.import')">Importer les bureaux officiels</flux:button>@endcan
-        </div>
-        <form method="GET" action="{{ route('central.pickup-points.index') }}" class="flex flex-wrap items-end gap-3">
-            <flux:input name="search" label="Nom ou code" :value="request('search')" />
-            <flux:select name="carrier_uuid" label="Transporteur">
-                <option value="">Tous</option>
-                @foreach ($carriers as $carrier)<option value="{{ $carrier->uuid }}" @selected(request('carrier_uuid') === $carrier->uuid)>{{ $carrier->name }}</option>@endforeach
-            </flux:select>
-            <flux:select name="is_carrier_active" label="Disponibilité">
-                <option value="">Toutes</option>
-                <option value="1" @selected(request('is_carrier_active') === '1')>Actif</option>
-                <option value="0" @selected(request('is_carrier_active') === '0')>Inactif</option>
-            </flux:select>
+        </div></header>
+        @if (session('status'))<flux:callout role="status">{{ session('status') }}</flux:callout>@endif
+        @if ($errors->any())<flux:callout variant="danger" role="alert">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</flux:callout>@endif
+        <section class="aydra-users-panel p-5 sm:p-6"><h2 class="aydra-heading text-lg font-semibold">Rechercher un bureau</h2><p class="aydra-muted mt-1 text-sm">Les suggestions proviennent des résultats affichés sur cette page.</p><form method="GET" action="{{ route('central.pickup-points.index') }}" class="mt-5 flex flex-wrap items-end gap-3">
+            <flux:input name="search" label="Nom ou code" :value="request('search')" type="search" icon="magnifying-glass" list="pickup-suggestions" class="min-w-0 flex-1 sm:min-w-72" />
+            <datalist id="pickup-suggestions">@foreach ($points as $point)<option value="{{ $point->name }}"></option><option value="{{ $point->external_code }}"></option>@endforeach</datalist>
+            <div class="w-full sm:w-56" x-data="{ value: '', label: '' }" data-value="{{ request('carrier_uuid', '') }}" data-label="{{ $carriers->firstWhere('uuid', request('carrier_uuid'))?->name ?? 'Tous' }}" x-init="value = $el.dataset.value; label = $el.dataset.label"><label id="pickup-carrier-label" class="mb-2 block text-sm font-medium">Transporteur</label><input type="hidden" name="carrier_uuid" :value="value" value="{{ request('carrier_uuid', '') }}"><flux:dropdown><flux:button type="button" icon:trailing="chevron-down" class="w-full justify-between" aria-labelledby="pickup-carrier-label pickup-carrier-value"><span id="pickup-carrier-value" x-text="label">Tous</span></flux:button><flux:menu class="max-h-80 overflow-y-auto"><flux:menu.item type="button" data-value="" @click="value = $el.dataset.value; label = $el.textContent.trim()">Tous</flux:menu.item>@foreach ($carriers as $carrier)<flux:menu.item type="button" data-value="{{ $carrier->uuid }}" @click="value = $el.dataset.value; label = $el.textContent.trim()">{{ $carrier->name }}</flux:menu.item>@endforeach</flux:menu></flux:dropdown></div>
+            <div class="w-full sm:w-44" x-data="{ value: '', label: '' }" data-value="{{ request('is_carrier_active', '') }}" data-label="{{ match ((string) request('is_carrier_active', '')) { '1' => 'Actif', '0' => 'Inactif', default => 'Toutes' } }}" x-init="value = $el.dataset.value; label = $el.dataset.label"><label id="pickup-active-label" class="mb-2 block text-sm font-medium">Disponibilité</label><input type="hidden" name="is_carrier_active" :value="value" value="{{ request('is_carrier_active', '') }}"><flux:dropdown><flux:button type="button" icon:trailing="chevron-down" class="w-full justify-between" aria-labelledby="pickup-active-label pickup-active-value"><span id="pickup-active-value" x-text="label">Toutes</span></flux:button><flux:menu>@foreach (['' => 'Toutes', '1' => 'Actif', '0' => 'Inactif'] as $value => $label)<flux:menu.item type="button" data-value="{{ $value }}" @click="value = $el.dataset.value; label = $el.textContent.trim()">{{ $label }}</flux:menu.item>@endforeach</flux:menu></flux:dropdown></div>
             <flux:checkbox name="archived" value="1" label="Archives uniquement" :checked="request()->boolean('archived')" />
-            <flux:button type="submit">Filtrer</flux:button>
-        </form>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left">
-                <thead><tr><th class="p-2">Transporteur</th><th class="p-2">Code</th><th class="p-2">Bureau</th><th class="p-2">Wilaya / commune</th><th class="p-2">État</th><th class="p-2">Actions</th></tr></thead>
-                <tbody>
+            @if(request()->filled('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}"><input type="hidden" name="direction" value="{{ request('direction', 'asc') }}">@endif
+            <flux:button type="submit" variant="primary">Rechercher</flux:button><flux:button :href="route('central.pickup-points.index')">Effacer</flux:button>
+        </form></section>
+        @php($sortBy = request('sort', 'name')) @php($sortDirection = request('direction', 'asc'))
+        <section class="aydra-users-panel"><div class="aydra-users-toolbar"><div><h2 class="aydra-heading text-lg font-semibold">Bureaux</h2><p class="aydra-muted mt-1 text-sm">{{ $points->total() }} {{ $points->total() === 1 ? 'bureau trouvé' : 'bureaux trouvés' }}</p></div></div><div class="aydra-users-table"><flux:table class="whitespace-normal"><flux:table.columns>@foreach (['carrier' => 'Transporteur', 'external_code' => 'Code', 'name' => 'Bureau', 'area' => 'Wilaya / commune', 'is_carrier_active' => 'État', 'actions' => 'Actions'] as $column => $heading) @if(in_array($column, ['external_code', 'name', 'is_carrier_active'], true))<flux:table.column sortable :sorted="$sortBy === $column" :direction="$sortDirection" :aria-sort="$sortBy === $column ? ($sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'" :data-sort-url="route('central.pickup-points.index', [...request()->only(['search', 'carrier_uuid', 'is_carrier_active', 'archived']), 'sort' => $column, 'direction' => $sortBy === $column && $sortDirection === 'asc' ? 'desc' : 'asc'])" onclick="window.location.assign(this.dataset.sortUrl)">{{ $heading }}</flux:table.column>@else<flux:table.column>{{ $heading }}</flux:table.column>@endif @endforeach</flux:table.columns><flux:table.rows>
                     @forelse ($points as $point)
-                        <tr class="border-t border-zinc-200 dark:border-zinc-700">
-                            <td class="p-2">{{ $point->carrier->name }}</td>
-                            <td class="p-2">{{ $point->external_code }}</td>
-                            <td class="p-2">{{ $point->name }}</td>
-                            <td class="p-2">{{ $point->province->name_fr }} / {{ $point->municipality?->name_fr ?? 'Non précisée' }}</td>
-                            <td class="p-2">{{ $point->trashed() ? 'Archivé' : ($point->is_carrier_active ? 'Actif' : 'Inactif') }}</td>
-                            <td class="p-2">@include('central.pages.admin.shipping.pickup-points.actions')</td>
-                        </tr>
-                    @empty<tr><td colspan="6" class="p-2">Aucun bureau de retrait.</td></tr>@endforelse
-                </tbody>
-            </table>
-        </div>
-        {{ $points->links() }}
+                        <flux:table.row :key="$point->uuid"><flux:table.cell>{{ $point->carrier->name }}</flux:table.cell><flux:table.cell>{{ $point->external_code }}</flux:table.cell><flux:table.cell variant="strong">{{ $point->name }}</flux:table.cell><flux:table.cell>{{ $point->province->name_fr }} / {{ $point->municipality?->name_fr ?? 'Non précisée' }}</flux:table.cell><flux:table.cell><flux:badge size="sm" :color="$point->trashed() ? 'zinc' : ($point->is_carrier_active ? 'green' : 'amber')">{{ $point->trashed() ? 'Archivé' : ($point->is_carrier_active ? 'Actif' : 'Inactif') }}</flux:badge></flux:table.cell><flux:table.cell>@include('central.pages.admin.shipping.pickup-points.actions')</flux:table.cell></flux:table.row>
+                    @empty<flux:table.row><flux:table.cell colspan="6"><div class="aydra-users-empty">Aucun bureau de retrait.</div></flux:table.cell></flux:table.row>@endforelse
+                </flux:table.rows></flux:table>@if ($points->hasPages())<nav aria-label="Pagination des bureaux" class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 pt-4 dark:border-zinc-700"><span class="aydra-muted text-sm">Page {{ $points->currentPage() }} sur {{ $points->lastPage() }}</span><div class="flex gap-2">@if ($points->onFirstPage())<flux:button disabled icon="chevron-left">Précédent</flux:button>@else<flux:button :href="$points->previousPageUrl()" icon="chevron-left">Précédent</flux:button>@endif @if ($points->hasMorePages())<flux:button :href="$points->nextPageUrl()" icon:trailing="chevron-right">Suivant</flux:button>@else<flux:button disabled icon:trailing="chevron-right">Suivant</flux:button>@endif</div></nav>@endif</div></section>
     </section>
 </x-layouts::app>

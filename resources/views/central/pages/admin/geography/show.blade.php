@@ -1,9 +1,9 @@
 <x-layouts::app :title="$area->name_fr">
-    <section class="flex flex-col gap-6">
-        <flux:heading size="xl" level="1">{{ $area->name_fr }}</flux:heading>
-        @if (session('status'))<flux:text role="status">{{ session('status') }}</flux:text>@endif
-        @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
-        <dl class="grid gap-3 sm:grid-cols-2">
+    <section class="mx-auto flex w-full max-w-screen-xl flex-col gap-6">
+        <header class="flex flex-wrap items-start justify-between gap-5"><div class="min-w-0 space-y-2"><h1 class="aydra-heading break-words text-3xl font-semibold tracking-tight sm:text-4xl">{{ $area->name_fr }}</h1><div class="flex flex-wrap items-center gap-2"><span class="aydra-muted text-sm">{{ $area->code }} · {{ $area->type->label() }}</span><flux:badge size="sm" :color="$area->trashed() ? 'zinc' : ($area->is_active ? 'green' : 'amber')">{{ $area->trashed() ? 'Archivée' : ($area->is_active ? 'Active' : 'Inactive') }}</flux:badge></div></div><flux:button :href="route('central.geography.index')" icon="arrow-left">Retour au référentiel</flux:button></header>
+        @if (session('status'))<flux:callout role="status">{{ session('status') }}</flux:callout>@endif
+        @if ($errors->any())<flux:callout variant="danger" role="alert">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</flux:callout>@endif
+        <section class="aydra-users-panel p-5 sm:p-6"><h2 class="aydra-heading text-lg font-semibold">Informations de la zone</h2><p class="aydra-muted mt-1 text-sm">Identité, rattachement et provenance.</p><dl class="aydra-detail-grid mt-6 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
             <div><dt>Code permanent</dt><dd>{{ $area->code }}</dd></div>
             <div><dt>Type</dt><dd>{{ $area->type->label() }}</dd></div>
             <div><dt>Pays</dt><dd>{{ $area->country->name_fr }}</dd></div>
@@ -13,9 +13,9 @@
             <div><dt>Source</dt><dd>{{ $area->reference_source }}</dd></div>
             <div><dt>Version</dt><dd>{{ $area->reference_version }}</dd></div>
             <div><dt>Date de prise d’effet</dt><dd>{{ $area->effective_at?->format('d/m/Y') ?? 'Non renseignée' }}</dd></div>
-        </dl>
+        </dl></section>
         <flux:text>Les codes « dz-{post_code} » reprennent le code postal du fichier source ; ils restent distincts des identifiants internes et des codes propres aux transporteurs.</flux:text>
-        <div class="flex flex-wrap gap-3">
+        <section class="aydra-users-panel p-5 sm:p-6"><h2 class="aydra-heading mb-4 text-lg font-semibold">Actions</h2><div class="flex flex-wrap gap-3">
             @can('update', $area)<flux:button :href="route('central.geography.edit', $area->uuid)">Modifier</flux:button>@endcan
             @can('activate', $area)
                 <form method="POST" action="{{ route('central.geography.activate', $area->uuid) }}">
@@ -33,28 +33,21 @@
                 </form>
             @endcan
             <flux:button :href="route('central.geography.index')">Retour au référentiel</flux:button>
-        </div>
+        </div></section>
         @if ($area->type === \App\Enums\Central\Geography\GeoZoneTypeEnum::PROVINCE)
-            <flux:heading size="lg" level="2">Communes de cette wilaya</flux:heading>
-            <div class="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
-                <table class="w-full text-left text-sm">
-                    <caption class="sr-only">Communes rattachées à {{ $area->name_fr }}</caption>
-                    <thead><tr><th scope="col" class="p-4">Code</th><th scope="col" class="p-4">Commune</th><th scope="col" class="p-4">État</th><th scope="col" class="p-4">Actions</th></tr></thead>
-                    <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+            <section class="aydra-users-panel"><div class="aydra-users-toolbar"><div><h2 class="aydra-heading text-lg font-semibold">Communes de cette wilaya</h2><p class="aydra-muted mt-1 text-sm">{{ $communes->total() }} {{ $communes->total() === 1 ? 'commune rattachée' : 'communes rattachées' }}</p></div></div>
+            <div class="aydra-users-table"><flux:table class="whitespace-normal">
+                    <flux:table.columns><flux:table.column>Code</flux:table.column><flux:table.column>Commune</flux:table.column><flux:table.column>État</flux:table.column><flux:table.column>Actions</flux:table.column></flux:table.columns>
+                    <flux:table.rows>
                         @forelse ($communes as $commune)
-                            <tr>
-                                <td class="p-4">{{ $commune->code }}</td>
-                                <th scope="row" class="p-4 font-normal">{{ $commune->name_fr }}@if ($commune->name_ar)<div dir="rtl" lang="ar">{{ $commune->name_ar }}</div>@endif</th>
-                                <td class="p-4">{{ $commune->trashed() ? 'Archivée' : ($commune->is_active ? 'Active' : 'Inactive') }}</td>
-                                <td class="p-4"><flux:button :href="route('central.geography.show', $commune->uuid)">Informations</flux:button></td>
-                            </tr>
+                            <flux:table.row :key="$commune->uuid"><flux:table.cell>{{ $commune->code }}</flux:table.cell><flux:table.cell variant="strong">{{ $commune->name_fr }}@if ($commune->name_ar)<div class="aydra-muted mt-1 text-xs" dir="rtl" lang="ar">{{ $commune->name_ar }}</div>@endif</flux:table.cell><flux:table.cell><flux:badge size="sm" :color="$commune->trashed() ? 'zinc' : ($commune->is_active ? 'green' : 'amber')">{{ $commune->trashed() ? 'Archivée' : ($commune->is_active ? 'Active' : 'Inactive') }}</flux:badge></flux:table.cell><flux:table.cell><flux:button :href="route('central.geography.show', $commune->uuid)">Informations</flux:button></flux:table.cell></flux:table.row>
                         @empty
-                            <tr><td colspan="4" class="p-4">Aucune commune rattachée.</td></tr>
+                            <flux:table.row><flux:table.cell colspan="4"><div class="aydra-users-empty">Aucune commune rattachée.</div></flux:table.cell></flux:table.row>
                         @endforelse
-                    </tbody>
-                </table>
-            </div>
-            {{ $communes->links() }}
+                    </flux:table.rows>
+                </flux:table>
+                @if ($communes->hasPages())<nav aria-label="Pagination des communes" class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 pt-4 dark:border-zinc-700"><span class="aydra-muted text-sm">Page {{ $communes->currentPage() }} sur {{ $communes->lastPage() }}</span><div class="flex gap-2">@if ($communes->onFirstPage())<flux:button disabled icon="chevron-left">Précédent</flux:button>@else<flux:button :href="$communes->previousPageUrl()" icon="chevron-left">Précédent</flux:button>@endif @if ($communes->hasMorePages())<flux:button :href="$communes->nextPageUrl()" icon:trailing="chevron-right">Suivant</flux:button>@else<flux:button disabled icon:trailing="chevron-right">Suivant</flux:button>@endif</div></nav>@endif
+            </div></section>
         @endif
     </section>
 </x-layouts::app>

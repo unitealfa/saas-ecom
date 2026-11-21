@@ -13,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CentralMediaController extends Controller
@@ -28,7 +29,12 @@ class CentralMediaController extends Controller
     {
         $actor = $this->centralActor();
         Gate::forUser($actor)->authorize('viewAny', Media::class);
-        $filters = $request->validate(['search' => ['nullable', 'string', 'max:255'], 'archived' => ['nullable', 'boolean']]);
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'archived' => ['nullable', 'boolean'],
+            'sort' => ['nullable', Rule::in(['original_name', 'mime_type', 'size_bytes', 'visibility', 'created_at'])],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
+        ]);
 
         return view('central.pages.admin.media.index', ['files' => $this->media->search($actor, $filters)]);
     }
