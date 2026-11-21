@@ -1,5 +1,6 @@
-@foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
-<form method="POST" action="{{ $point === null ? route('central.pickup-points.store') : route('central.pickup-points.update', $point) }}" class="flex flex-col gap-5">
+@if ($errors->any())<flux:callout variant="danger" role="alert">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</flux:callout>@endif
+<form method="POST" action="{{ $point === null ? route('central.pickup-points.store') : route('central.pickup-points.update', $point) }}" class="aydra-users-panel flex flex-col gap-5 p-5 sm:p-6">
+    <h2 class="aydra-heading text-lg font-semibold">Informations du bureau</h2>
     @csrf
     @if ($point !== null)
         @method('PUT')
@@ -26,7 +27,7 @@
     <flux:input name="map_url" label="Lien de carte (facultatif, HTTP ou HTTPS)" type="url" :value="old('map_url', $point?->map_url)" />
     <flux:input name="reference_source" label="Source officielle contrôlée" :value="old('reference_source', $point?->reference_source)" placeholder="Nom ou lien du document officiel du transporteur" required />
     <flux:text>Renseignez seulement les informations publiques communes au réseau, jamais les identifiants privés d’un compte. Un nouveau bureau est inactif ; l’activation est une action distincte.</flux:text>
-    <div class="flex gap-3">
+    <div class="flex flex-wrap gap-3">
         <flux:button type="submit" variant="primary">Enregistrer</flux:button>
         @can('viewAny', \App\Models\Central\Shipping\PickupPoint::class)<flux:button :href="route('central.pickup-points.index')">Retour aux bureaux</flux:button>@endcan
     </div>

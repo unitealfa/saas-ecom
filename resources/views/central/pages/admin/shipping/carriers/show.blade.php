@@ -1,21 +1,19 @@
 <x-layouts::app :title="$carrier->name">
-    @can('viewAny', \App\Models\Central\Shipping\PickupPoint::class)
-        <flux:button :href="route('central.pickup-points.index', ['carrier_uuid' => $carrier->uuid])">Bureaux de retrait</flux:button>
-    @endcan
-    <section class="flex flex-col gap-6">
-        <flux:heading size="xl">{{ $carrier->name }}</flux:heading>
-        @if (session('status'))<flux:text role="status">{{ session('status') }}</flux:text>@endif
-        @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
-        <dl class="grid gap-4 sm:grid-cols-2">
+    <section class="mx-auto flex w-full max-w-screen-xl flex-col gap-6">
+        <header class="flex flex-wrap items-start justify-between gap-5"><div class="space-y-2"><h1 class="aydra-heading text-3xl font-semibold tracking-tight sm:text-4xl">{{ $carrier->name }}</h1><div class="flex flex-wrap items-center gap-2"><span class="aydra-muted text-sm">{{ $carrier->code }}</span><flux:badge size="sm" :color="$carrier->trashed() ? 'zinc' : ($carrier->is_active ? 'green' : 'amber')">{{ $carrier->trashed() ? 'Archivé' : ($carrier->is_active ? 'Actif' : 'Inactif') }}</flux:badge></div></div><flux:button :href="route('central.carriers.index')" icon="arrow-left">Retour aux transporteurs</flux:button></header>
+        @if (session('status'))<flux:callout role="status">{{ session('status') }}</flux:callout>@endif
+        @if ($errors->any())<flux:callout variant="danger" role="alert">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</flux:callout>@endif
+        <section class="aydra-users-panel p-5 sm:p-6"><h2 class="aydra-heading text-lg font-semibold">Informations du transporteur</h2><dl class="aydra-detail-grid mt-6 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
             <div><dt>Code permanent</dt><dd>{{ $carrier->code }}</dd></div>
             <div><dt>État</dt><dd>{{ $carrier->trashed() ? 'Archivé' : ($carrier->is_active ? 'Actif' : 'Inactif') }}</dd></div>
             <div><dt>Connecteur prévu</dt><dd>{{ $carrier->adapter === \App\Models\Central\Shipping\ShippingCarrier::UNCONFIGURED_ADAPTER ? 'Non configuré' : $carrier->adapter }}</dd></div>
             <div><dt>Adresse API par défaut</dt><dd>{{ $carrier->default_api_url ?? 'Non configurée' }}</dd></div>
             <div><dt>Source du catalogue</dt><dd>{{ $carrier->reference_source }}</dd></div>
             <div><dt>Version du catalogue</dt><dd>{{ $carrier->reference_version }}</dd></div>
-        </dl>
+        </dl></section>
         <flux:text>L’activation rend ce transporteur disponible dans le catalogue. Elle ne connecte aucun compte et ne lance aucune livraison. La connexion API sera traitée séparément.</flux:text>
-        <div class="flex flex-wrap gap-3">
+        <section class="aydra-users-panel p-5 sm:p-6"><h2 class="aydra-heading mb-4 text-lg font-semibold">Actions</h2><div class="flex flex-wrap gap-3">
+            @can('viewAny', \App\Models\Central\Shipping\PickupPoint::class)<flux:button :href="route('central.pickup-points.index', ['carrier_uuid' => $carrier->uuid])">Bureaux de retrait</flux:button>@endcan
             @can('viewAny', \App\Models\Central\Shipping\CarrierGeoMapping::class)
                 <flux:button :href="route('central.carrier-mappings.index', ['carrier_uuid' => $carrier->uuid])">Correspondances géographiques</flux:button>
             @endcan
@@ -41,6 +39,6 @@
                 </flux:modal>
             @endcan
             <flux:button :href="route('central.carriers.index')">Retour aux transporteurs</flux:button>
-        </div>
+        </div></section>
     </section>
 </x-layouts::app>

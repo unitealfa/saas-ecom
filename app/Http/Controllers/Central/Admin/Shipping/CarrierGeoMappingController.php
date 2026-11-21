@@ -29,6 +29,8 @@ class CarrierGeoMappingController extends Controller
             'carrier_uuid' => ['nullable', 'uuid'],
             'search' => ['nullable', 'string', 'max:255'],
             'is_active' => ['nullable', 'boolean'],
+            'sort' => ['nullable', 'in:external_code,external_name,external_province_code,mapping_version,is_active'],
+            'direction' => ['nullable', 'in:asc,desc'],
         ]);
 
         return view('central.pages.admin.shipping.geo-mappings.index', [

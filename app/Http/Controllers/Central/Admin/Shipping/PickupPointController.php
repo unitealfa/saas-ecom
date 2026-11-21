@@ -41,6 +41,8 @@ class PickupPointController extends Controller
             'search' => ['nullable', 'string', 'max:255'],
             'is_carrier_active' => ['nullable', 'boolean'],
             'archived' => ['nullable', 'boolean'],
+            'sort' => ['nullable', 'in:external_code,name,is_carrier_active'],
+            'direction' => ['nullable', 'in:asc,desc'],
         ]);
 
         return view('central.pages.admin.shipping.pickup-points.index', [
