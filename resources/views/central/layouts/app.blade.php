@@ -25,7 +25,12 @@
                 </div>
             </div>
         @endif
-        <x-central::components.breadcrumbs />
-        {{ $slot }}
+        <div data-page-content>
+            <x-central::components.breadcrumbs />
+            {{ $slot }}
+        </div>
+        <div data-page-loading hidden>
+            @include('partials.loading-skeleton')
+        </div>
     </flux:main>
 </x-layouts::app.sidebar>

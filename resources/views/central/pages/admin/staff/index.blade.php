@@ -91,6 +91,10 @@ new #[Layout('layouts::app'), Title('Personnel SaaS')] class extends Component
             </div>
         </div>
         <div class="aydra-users-table">
+        <div class="w-full" wire:loading.delay wire:target="search,status,sort,setPage,gotoPage,previousPage,nextPage" style="display: none;">
+            @include('partials.loading-skeleton', ['variant' => 'table'])
+        </div>
+        <div wire:loading.remove.delay wire:target="search,status,sort,setPage,gotoPage,previousPage,nextPage">
         <flux:table :paginate="$this->staff">
             <flux:table.columns>
                 <flux:table.column sortable :sorted="$sortBy === 'name'" :direction="$sortDirection" :aria-sort="$sortBy === 'name' ? ($sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'" wire:click="sort('name')">Nom</flux:table.column>
@@ -119,6 +123,7 @@ new #[Layout('layouts::app'), Title('Personnel SaaS')] class extends Component
                 @endforelse
             </flux:table.rows>
         </flux:table>
+        </div>
         </div>
     </div>
 </section>

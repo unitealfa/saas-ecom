@@ -76,8 +76,13 @@
         </flux:header>
 
         <flux:main>
-            <x-tenant::components.breadcrumbs />
-            {{ $slot }}
+            <div data-page-content>
+                <x-tenant::components.breadcrumbs />
+                {{ $slot }}
+            </div>
+            <div data-page-loading hidden>
+                @include('partials.loading-skeleton')
+            </div>
         </flux:main>
 
         @persist('toast')

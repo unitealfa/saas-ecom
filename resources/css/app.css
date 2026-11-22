@@ -8,6 +8,11 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@media (prefers-reduced-motion: reduce) {
+    [data-loading-skeleton] [data-flux-skeleton],
+    [data-loading-skeleton] [data-flux-skeleton-line] { animation: none; }
+}
+
 /* L'astérisque suit l'état réel du champ, y compris les champs conditionnels. */
 form [data-flux-field]:not(:has([data-flux-field])):has(input:required:not(:disabled):not([readonly]), select:required:not(:disabled), textarea:required:not(:disabled), [data-flux-checkbox][required]:not([disabled]), [data-flux-otp][aria-required="true"]) > [data-flux-label]::after,
 form label:not([data-flux-label]):has(> :is(input:not([type="radio"]):not([type="checkbox"]), select, textarea):required:not(:disabled):not([readonly]))::before,

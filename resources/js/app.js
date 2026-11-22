@@ -1,3 +1,71 @@
+// Keep the current page usable when navigation is cancelled or fails.
+let pageLoadingTimer;
+let pageLoadingFallback;
+let navigationVersion = 0;
+
+function finishPageLoading() {
+    navigationVersion++;
+    clearTimeout(pageLoadingTimer);
+    clearTimeout(pageLoadingFallback);
+    const content = document.querySelector('[data-page-content]');
+    const placeholder = document.querySelector('[data-page-loading]');
+    if (content) {
+        content.hidden = false;
+        content.removeAttribute('aria-busy');
+    }
+    if (placeholder) placeholder.hidden = true;
+}
+
+function beginPageLoading() {
+    clearTimeout(pageLoadingTimer);
+    clearTimeout(pageLoadingFallback);
+    const version = ++navigationVersion;
+    pageLoadingTimer = setTimeout(() => {
+        if (version !== navigationVersion) return;
+        const content = document.querySelector('[data-page-content]');
+        const placeholder = document.querySelector('[data-page-loading]');
+        if (!content || !placeholder) return;
+        content.setAttribute('aria-busy', 'true');
+        content.hidden = true;
+        placeholder.hidden = false;
+    }, 200);
+    pageLoadingFallback = setTimeout(finishPageLoading, 30000);
+}
+
+function isPageDestination(value) {
+    const url = new URL(value, window.location.href);
+    if (!['http:', 'https:'].includes(url.protocol) || url.origin !== window.location.origin) return false;
+    if (url.pathname === window.location.pathname && url.search === window.location.search) return false;
+    if (url.searchParams.has('signature') || /\/(?:export|download)(?:\/|$)/i.test(url.pathname)) return false;
+    return !/\.(?:pdf|csv|xlsx?|zip|png|jpe?g|webp|svg)$/i.test(url.pathname);
+}
+
+document.addEventListener('livewire:navigate', (event) => {
+    const version = navigationVersion;
+    queueMicrotask(() => {
+        if (!event.defaultPrevented && version === navigationVersion) beginPageLoading();
+    });
+});
+document.addEventListener('livewire:navigated', finishPageLoading);
+window.addEventListener('pageshow', finishPageLoading);
+
+document.addEventListener('click', (event) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const link = event.target.closest('a[href]');
+    const sort = event.target.closest('[data-sort-url]');
+    if (link && (link.hasAttribute('download') || (link.target && link.target !== '_self'))) return;
+    const destination = link?.href || sort?.dataset.sortUrl;
+    if (!destination || !isPageDestination(destination)) return;
+    queueMicrotask(() => { if (!event.defaultPrevented) beginPageLoading(); });
+});
+
+document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || form.method.toLowerCase() !== 'get' || (form.target && form.target !== '_self')) return;
+    if (!isPageDestination(form.action) && !form.action.startsWith(window.location.origin + window.location.pathname)) return;
+    queueMicrotask(() => { if (!event.defaultPrevented) beginPageLoading(); });
+});
+
 document.addEventListener('alpine:init', () => {
     Alpine.data('sidebarResize', () => ({
         width: 256,
