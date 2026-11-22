@@ -267,7 +267,7 @@ body.aydra-admin .aydra-admin-sidebar [data-flux-sidebar-item][data-current] {
     background: #eaf1ff;
     border-color: transparent;
     color: #2748bd;
-    box-shadow: inset 3px 0 #3459da;
+    box-shadow: none;
 }
 
 body.aydra-admin .aydra-admin-sidebar [data-flux-sidebar-item]:focus-visible,
@@ -283,7 +283,6 @@ html.dark body.aydra-admin .aydra-admin-sidebar [data-flux-sidebar-group] > div:
 html.dark body.aydra-admin .aydra-admin-sidebar [data-flux-sidebar-item][data-current] {
     background: #263c62;
     color: #c5dcff;
-    box-shadow: inset 3px 0 #7eafff;
 }
 
 /* Une seule surface réunit les indicateurs qui décrivent la plateforme. */
@@ -376,14 +375,6 @@ body.aydra-admin .aydra-overview-note {
     border-top: 1px solid var(--aydra-border);
     color: var(--aydra-muted);
     font-size: .75rem;
-}
-
-body.aydra-admin .aydra-financial {
-    border-left: 4px solid #3459da;
-}
-
-html.dark body.aydra-admin .aydra-financial {
-    border-left-color: #7eafff;
 }
 
 @media (max-width: 1100px) {
