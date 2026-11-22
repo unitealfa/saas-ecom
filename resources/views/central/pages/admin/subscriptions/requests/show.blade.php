@@ -147,7 +147,6 @@
                             @foreach ([\App\Enums\Central\Billing\TransferMethodEnum::BANK_TRANSFER, \App\Enums\Central\Billing\TransferMethodEnum::CCP_TRANSFER, \App\Enums\Central\Billing\TransferMethodEnum::BARIDIMOB] as $method)<option value="{{ $method->value }}">{{ $method->label() }}</option>@endforeach
                         </flux:select>
                         <flux:input name="payment[amount]" label="Montant versé (DZD)" :value="$item->subscription->agreed_amount" required />
-                        <flux:input name="payment[reference]" label="Référence du versement" maxlength="255" />
                         <flux:input type="file" name="proof" label="Justificatif PDF/JPG/PNG" accept="application/pdf,image/jpeg,image/png" required />
                     </fieldset>
                     <flux:button type="submit" class="self-start">Enregistrer mon choix</flux:button>
@@ -163,7 +162,6 @@
                         </flux:select>
                         <flux:input name="amount" label="Montant réellement versé (DZD)" :value="$item->subscription->agreed_amount" required />
                         <flux:input type="datetime-local" name="occurred_at" label="Date du versement" required />
-                        <flux:input name="reference" label="Référence du versement (si disponible)" maxlength="255" />
                         <flux:input type="file" name="proof" label="Photo ou PDF du justificatif — 8 Mo maximum" accept="application/pdf,image/jpeg,image/png" required />
                         <flux:button type="submit" class="max-w-full self-start whitespace-normal">Soumettre le justificatif pour vérification</flux:button>
                     </form>
@@ -184,34 +182,10 @@
                             @else
                                 <flux:text>En acceptant, vous confirmez avoir reçu et contrôlé le montant intégral de {{ $item->subscription->agreed_amount }} DZD. Le montant et la date de confirmation sont renseignés automatiquement.</flux:text>
                             @endif
-                            @if (! $cash && ! $zeroPrice)
-                                <flux:input
-                                    name="account"
-                                    label="Compte destinataire contrôlé (IBAN ou CCP)"
-                                    :value="old('account', $item->payment?->getAttribute('encrypted_transfer_details')['account'] ?? '')"
-                                    maxlength="255"
-                                    required
-                                />
-
-                                <flux:input
-                                    name="reference"
-                                    label="Référence du versement"
-                                    :value="old('reference', $item->payment?->getAttribute('transfer_reference') ?? '')"
-                                    maxlength="255"
-                                    required
-                                />
-
-                                <flux:checkbox
-                                    name="received"
-                                    value="1"
-                                    label="J’ai consulté et vérifié le justificatif et confirmé la réception intégrale des fonds."
-                                    required
-                                />
-                            @endif
                             @if (filled($item->getAttribute('invoice_error')))
                                 <flux:checkbox name="acknowledged" value="1" label="J’ai lu et approuvé ce message." description="Cette confirmation ne remplace pas les vérifications fiscales et techniques nécessaires à la facture." required />
                             @endif
-                            @if (filled($item->getAttribute('submitted_payment')['proof_uuid'] ?? null) || $item->payment?->getAttribute('proof_media_id') !== null)
+                            @if (! $cash && ! $zeroPrice)
                                 <flux:checkbox name="proof_reviewed" value="1" label="J’ai consulté et vérifié le justificatif." required />
                             @endif
                             <flux:button type="submit" variant="primary" class="self-start">Accepter la demande</flux:button>

@@ -65,18 +65,37 @@
             @endif
             @if ($payment->getAttribute('transfer_status') === \App\Enums\Central\Billing\TransferStatusEnum::DECLARED)
                 @if ($payment->getAttribute('proof_media_id') !== null)
-                    @foreach (['reconcile' => 'Enregistrer le rapprochement sans confirmer les fonds', 'verify' => 'Confirmer la réception intégrale des fonds'] as $action => $label)
-                        @can($action, $payment)
-                            <form method="POST" action="{{ route('central.payments.'.$action, $payment) }}" class="flex flex-col gap-3">
+                    @if ($payment->getAttribute('transfer_method') === \App\Enums\Central\Billing\TransferMethodEnum::CASH_IN_PERSON)
+                        @can('verify', $payment)
+                            <form method="POST" action="{{ route('central.payments.resume-cash', $payment) }}" class="flex flex-col gap-3">
                                 @csrf<input type="hidden" name="expected_state" value="{{ $payment->managementState() }}">
-                                <flux:input name="account" label="Compte destinataire réellement contrôlé (IBAN ou CCP)" :value="$oldText('account', $payment->getAttribute('encrypted_transfer_details')['account'] ?? ($payment->getAttribute('transfer_method') === \App\Enums\Central\Billing\TransferMethodEnum::CASH_IN_PERSON ? 'cash:central' : ''))" required />
-                                <flux:input name="reference" label="Référence réelle contrôlée ou référence interne espèces" :value="$oldText('reference', $payment->getAttribute('transfer_reference'))" required />
-                                <flux:input type="datetime-local" name="occurred_at" label="Date réelle de réception" :value="$oldText('occurred_at', $payment->getAttribute('occurred_at')->format('Y-m-d\TH:i:s'))" required />
-                                @if ($action === 'verify')<flux:checkbox name="received" value="1" label="J’ai contrôlé la réception réelle du montant intégral, son destinataire et sa référence." required />@endif
-                                <flux:button type="submit" variant="primary">{{ $label }}</flux:button>
+                                <flux:checkbox name="received" value="1" label="Je confirme les espèces déjà déclarées reçues." required />
+                                <flux:button type="submit">Reprendre l’encaissement</flux:button>
                             </form>
                         @endcan
-                    @endforeach
+                    @else
+                        @can('reconcile', $payment)
+                            <form method="POST" action="{{ route('central.payments.reconcile', $payment) }}" class="flex flex-col gap-3">
+                                @csrf<input type="hidden" name="expected_state" value="{{ $payment->managementState() }}">
+                                <flux:textarea name="review_note" label="Note administrative privée" required maxlength="2000">{{ $oldText('review_note') }}</flux:textarea>
+                                <flux:button type="submit">Consigner le contrôle sans confirmer les fonds</flux:button>
+                            </form>
+                        @endcan
+                        @if ($payment->invoice->subscription->request)
+                            @can('accept', $payment->invoice->subscription->request)
+                                <flux:button :href="route('central.subscription-requests.show', $payment->invoice->subscription->request)">Consulter et décider de la demande</flux:button>
+                            @endcan
+                        @else
+                            @can('verify', $payment)
+                                <form method="POST" action="{{ route('central.payments.verify', $payment) }}" class="flex flex-col gap-3">
+                                    @csrf<input type="hidden" name="expected_state" value="{{ $payment->managementState() }}">
+                                    <flux:text>En confirmant, vous attestez la réception réelle du montant intégral des fonds.</flux:text>
+                                    <flux:checkbox name="proof_reviewed" value="1" label="J’ai consulté et vérifié le justificatif." required />
+                                    <flux:button type="submit" variant="primary">Confirmer le paiement</flux:button>
+                                </form>
+                            @endcan
+                        @endif
+                    @endif
                 @endif
                 @can('reject', $payment)
                     <form method="POST" action="{{ route('central.payments.reject', $payment) }}" class="flex flex-col gap-3">

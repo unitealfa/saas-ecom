@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -73,11 +74,8 @@ class SaasPaymentService
     public function reconcilePayment(User $actor, SaasPayment $payment, array $data): SaasPayment
     {
         abort_if(tenancy()->initialized, 403);
-        $rules = self::verificationRules();
-        unset($rules['received']);
-        if ($payment->getAttribute('transfer_status') === TransferStatusEnum::UNCERTAIN) {
-            $rules = ['expected_state' => $rules['expected_state'], 'review_note' => ['required', 'string', 'max:2000']];
-        }
+        $rules = ['expected_state' => ['required', 'string', 'regex:'.SaasPayment::STATE_PATTERN],
+            'review_note' => ['required', 'string', 'max:2000']];
         $values = Validator::make($data, $rules)->validate();
 
         return $this->mutations->run($actor, 'reconcile', fn () => $this->lockPayment($payment),
@@ -98,12 +96,9 @@ class SaasPaymentService
                     $this->fail('Seule une déclaration externe inchangée peut recevoir ce rapprochement. Les encaissements vérifiés restent immuables.');
                 }
                 $this->documents->assertProof($current);
-                $account = $this->normalizeReference($values['account']);
                 $details = $current->getAttribute('encrypted_transfer_details') ?? [];
-                $current->forceFill(['transfer_reference' => $this->normalizeReference($values['reference']),
-                    'financial_account_key' => hash('sha256', $current->getAttribute('transfer_method')->network().':'.$account),
-                    'encrypted_transfer_details' => [...$details, 'account' => $account],
-                    'occurred_at' => CarbonImmutable::parse($values['occurred_at'])])->save();
+                $current->forceFill(['encrypted_transfer_details' => [...$details, 'reconciliation_note' => $values['review_note'],
+                    'reconciled_by_id' => $actor->id, 'reconciled_at' => now()->toISOString()]])->save();
                 $this->audit($actor, $current, self::RECONCILED, 'Rapprochement renseigné sans confirmation de réception des fonds ni activation.');
 
                 return $current;
@@ -118,18 +113,22 @@ class SaasPaymentService
             'currency' => ['required', Rule::in([SaasInvoice::CURRENCY])], 'operation_id' => ['required', 'uuid:4'],
             'occurred_at' => ['required', 'date', 'before_or_equal:now'],
             ...($cash ? ['received' => ['required', 'accepted']] : [
-                'method' => ['required', 'integer', Rule::in([TransferMethodEnum::BANK_TRANSFER->value, TransferMethodEnum::CCP_TRANSFER->value, TransferMethodEnum::BARIDIMOB->value])], 'reference' => ['nullable', 'string', 'max:255']]),
+                'method' => ['required', 'integer', Rule::in([TransferMethodEnum::BANK_TRANSFER->value, TransferMethodEnum::CCP_TRANSFER->value, TransferMethodEnum::BARIDIMOB->value])]]),
             ...array_fill_keys(['user_id', 'document_id', 'transfer_status', 'validated_by_id', 'validated_at', 'proof_media_id',
                 'source_proof_media_id', 'record_type', 'original_payment_id', 'credit_note_id', 'refund_reason', 'reversal_of_id',
                 'transaction_fingerprint', 'financial_account_key', 'operation_key', 'encrypted_transfer_details'], ['missing'])];
     }
 
     /** @return array<string, mixed> */
-    public static function verificationRules(): array
+    public static function verificationRules(?SaasPayment $payment = null): array
     {
-        return ['expected_state' => ['required', 'string', 'regex:'.SaasPayment::STATE_PATTERN], 'received' => ['required', 'accepted'],
-            'account' => ['required', 'string', 'max:255'], 'reference' => ['required', 'string', 'max:255'],
-            'occurred_at' => ['required', 'date', 'before_or_equal:now']];
+        $rules = ['expected_state' => ['required', 'string', 'regex:'.SaasPayment::STATE_PATTERN]];
+        if ($payment?->getAttribute('transfer_method') === TransferMethodEnum::CASH_IN_PERSON) {
+            return [...$rules, 'received' => ['required', 'accepted'],
+                'occurred_at' => ['required', 'date', 'before_or_equal:now']];
+        }
+
+        return [...$rules, 'proof_reviewed' => ['required', 'accepted']];
     }
 
     /** @param array<string, mixed> $data */
@@ -236,7 +235,7 @@ class SaasPaymentService
                 $method = $cash ? TransferMethodEnum::CASH_IN_PERSON : TransferMethodEnum::from((int) $values['method']);
                 $date = CarbonImmutable::parse($values['occurred_at'])->startOfSecond();
                 $payload = hash('sha256', json_encode([$current->uuid, $amount, $values['currency'], $method->value, $date->toISOString(),
-                    $cash ? true : hash('sha256', $proof->getContent()), $values['reference'] ?? null], JSON_THROW_ON_ERROR));
+                    $cash ? true : hash('sha256', $proof->getContent()), null], JSON_THROW_ON_ERROR));
                 $key = 'saas:payment:'.$current->owner->uuid.':'.strtolower($values['operation_id']);
                 $replay = SaasPayment::where('operation_key', $key)->lockForUpdate()->first();
                 if ($replay !== null) {
@@ -264,7 +263,7 @@ class SaasPaymentService
                     'transfer_status' => $anomaly ? TransferStatusEnum::UNCERTAIN : TransferStatusEnum::DECLARED,
                     'amount' => $amount, 'currency' => $values['currency'], 'occurred_at' => $date,
                     'created_by_id' => $actor->id, 'operation_key' => $key, 'correlation_id' => (string) Str::uuid(),
-                    'transfer_reference' => $cash ? 'CASH-'.$uuid : ($values['reference'] ?? null),
+                    'transfer_reference' => $cash ? 'CASH-'.$uuid : null,
                     'encrypted_transfer_details' => ['payload' => $payload, 'cash_received' => $cash, 'payment_required' => true],
                     'reason' => $anomaly ? 'Montant ou obligation à rapprocher ; aucun droit supplémentaire accordé.' : null])->save();
                 $this->requests->declared($actor, $current, $payment);
@@ -279,20 +278,14 @@ class SaasPaymentService
     public function verifyPayment(User $actor, SaasPayment $payment, array $data): SaasPayment
     {
         abort_if(tenancy()->initialized, 403);
-        $values = Validator::make($data, self::verificationRules())->validate();
+        $values = Validator::make($data, self::verificationRules($payment))->validate();
         try {
             $result = $this->mutations->run($actor, 'verify', fn () => $this->lockPayment($payment),
                 function (SaasPayment $current) use ($actor, $values): SaasPayment {
                     abort_if($actor->id === $current->getAttribute('user_id'), 403);
-                    $reference = $this->normalizeReference($values['reference']);
-                    $account = $this->normalizeReference($values['account']);
-                    $accountKey = $current->getAttribute('transfer_method') === TransferMethodEnum::CASH_IN_PERSON
-                        ? self::CASH_ACCOUNT : hash('sha256', $current->getAttribute('transfer_method')->network().':'.$account);
-                    $fingerprint = hash('sha256', $current->getAttribute('transfer_method')->network().':'.$accountKey.':received:'.$reference);
+                    $cash = $current->getAttribute('transfer_method') === TransferMethodEnum::CASH_IN_PERSON;
                     if ($current->getAttribute('transfer_status') === TransferStatusEnum::VERIFIED) {
-                        if ($current->getAttribute('transaction_fingerprint') !== $fingerprint) {
-                            $this->fail('Cet encaissement est déjà confirmé avec une autre référence.');
-                        }
+                        $this->documents->assertProof($current);
 
                         return $current;
                     }
@@ -309,17 +302,32 @@ class SaasPaymentService
                         || $current->getAttribute('currency') !== $invoice->currency) {
                         $this->fail('Cette obligation exige un seul paiement intégral non encore confirmé, dans la bonne devise.');
                     }
-                    if ($current->getAttribute('transfer_method') === TransferMethodEnum::CASH_IN_PERSON
-                        && ($reference !== $this->normalizeReference($current->getAttribute('transfer_reference')) || $account !== strtoupper(self::CASH_ACCOUNT))) {
-                        $this->fail('Les espèces utilisent leur référence interne et le registre central, sans référence bancaire.');
+                    $proof = $this->documents->assertProof($current);
+                    $hashes = [];
+                    if ($cash) {
+                        $reference = $current->getAttribute('transfer_reference');
+                        $account = strtoupper(self::CASH_ACCOUNT);
+                        $accountKey = self::CASH_ACCOUNT;
+                        $fingerprint = hash('sha256', 'cash:'.$accountKey.':received:'.$this->normalizeReference($reference));
+                    } else {
+                        $sourceId = $current->getAttribute('source_proof_media_id');
+                        $source = $sourceId === null ? null : $current->documents()->whereKey($sourceId)->first();
+                        $hashes = array_values(array_unique(array_filter([$proof->file_hash, $source?->file_hash])));
+                        if ($hashes === [] || count(array_filter($hashes, fn ($hash) => preg_match('/^[a-f0-9]{64}$/D', $hash))) !== count($hashes)) {
+                            $this->fail('Empreinte du justificatif indisponible.');
+                        }
+                        sort($hashes, SORT_STRING);
+                        $reference = $current->getAttribute('transfer_reference'); // historical only
+                        $account = ($current->getAttribute('encrypted_transfer_details') ?? [])['account'] ?? null;
+                        $accountKey = $current->getAttribute('financial_account_key'); // historical only
+                        $fingerprint = hash('sha256', 'external-proof:v1:'.($source?->file_hash ?? $proof->file_hash));
                     }
-                    $this->documents->assertProof($current);
                     $netDue = $invoice->status === DocumentStatusEnum::ISSUED ? $this->balances->balance($actor, $invoice)['net_due'] : $invoice->total_amount;
-                    $received = ['occurred_at' => CarbonImmutable::parse($values['occurred_at']),
-                        'transfer_reference' => $current->getAttribute('transfer_method') === TransferMethodEnum::CASH_IN_PERSON ? $current->getAttribute('transfer_reference') : $reference,
+                    $received = ['occurred_at' => $cash ? CarbonImmutable::parse($values['occurred_at']) : ($current->getAttribute('occurred_at') ?? now()),
+                        'transfer_reference' => $reference,
                         'financial_account_key' => $accountKey,
                         'encrypted_transfer_details' => [...($current->getAttribute('encrypted_transfer_details') ?? []),
-                            'account' => $account, 'receipt_reported_by_id' => $actor->id, 'receipt_reported_at' => now()->toISOString(), 'settlement_total' => $netDue]];
+                            ...($account === null ? [] : ['account' => $account]), 'receipt_reported_by_id' => $actor->id, 'receipt_reported_at' => now()->toISOString(), 'settlement_total' => $netDue]];
                     if ($current->getAttribute('amount') !== $netDue || ! $due->matchesFullPeriod($invoice->subscription) || $due->installment_status !== InstallmentStatusEnum::PENDING
                         || $invoice->subscription->period_ends_at?->lessThanOrEqualTo(now())
                         || $invoice->subscription->status === StatusEnum::CANCELLED
@@ -329,6 +337,11 @@ class SaasPaymentService
                         $this->audit($actor, $current, self::ANOMALY, 'Réception supplémentaire ou hors période conservée sans double activation ni remboursement automatique.');
 
                         return $current->refresh();
+                    }
+                    // Claim every available hash atomically in the same transaction as verification.
+                    // No owner/method/date scope: the same file cannot pay another invoice.
+                    foreach ($hashes as $hash) {
+                        DB::table('saas_payment_proof_claims')->insert(['proof_hash' => $hash, 'payment_id' => $current->id]);
                     }
                     $current->forceFill([...$received, 'transfer_status' => TransferStatusEnum::VERIFIED, 'validated_by_id' => $actor->id,
                         'validated_at' => now(), 'transaction_fingerprint' => $fingerprint])->save();
@@ -342,7 +355,8 @@ class SaasPaymentService
                     return $current->refresh();
                 });
         } catch (UniqueConstraintViolationException $exception) {
-            if (! str_contains($exception->getMessage(), 'active_transaction_fingerprint')) {
+            if (! str_contains($exception->getMessage(), 'active_transaction_fingerprint')
+                && ! str_contains($exception->getMessage(), 'saas_payment_proof_claims')) {
                 throw $exception;
             }
             $this->fail('Cette réception de fonds est déjà associée à un paiement vérifié. Aucun second règlement enregistré.');

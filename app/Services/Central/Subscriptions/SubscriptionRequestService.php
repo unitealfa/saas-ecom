@@ -109,11 +109,10 @@ class SubscriptionRequestService
     public static function initialPaymentRules(): array
     {
         return ['proof' => ['required_if:payment_choice,'.PaymentChoiceEnum::EXTERNAL->value, 'prohibited_unless:payment_choice,'.PaymentChoiceEnum::EXTERNAL->value, 'nullable', 'file', 'mimetypes:application/pdf,image/jpeg,image/png', 'max:'.PaymentDocumentService::MAX_KB],
-            'payment' => ['required_if:payment_choice,'.PaymentChoiceEnum::EXTERNAL->value, 'prohibited_unless:payment_choice,'.PaymentChoiceEnum::EXTERNAL->value, 'array:method,amount,occurred_at,reference'],
+            'payment' => ['required_if:payment_choice,'.PaymentChoiceEnum::EXTERNAL->value, 'prohibited_unless:payment_choice,'.PaymentChoiceEnum::EXTERNAL->value, 'array:method,amount,occurred_at'],
             'payment.method' => ['required_with:payment', 'integer', Rule::in([TransferMethodEnum::BANK_TRANSFER->value, TransferMethodEnum::CCP_TRANSFER->value, TransferMethodEnum::BARIDIMOB->value])],
             'payment.amount' => ['required_with:payment', 'string', 'regex:/^\d{1,6}(?:\.\d{1,2})?$/D', 'gt:0'],
-            'payment.occurred_at' => ['sometimes', 'date', 'before_or_equal:now'],
-            'payment.reference' => ['nullable', 'string', 'max:255']];
+            'payment.occurred_at' => ['sometimes', 'date', 'before_or_equal:now']];
     }
 
     /** @param array<string, mixed> $data */
@@ -282,7 +281,7 @@ class SubscriptionRequestService
             if ($current->status->isFinal()) {
                 $this->fail('Cette demande est déjà terminée.');
             }
-            if (filled($current->getAttribute('submitted_payment')['proof_uuid'] ?? null) || $current->payment?->getAttribute('proof_media_id') !== null) {
+            if ($current->payment_choice === PaymentChoiceEnum::EXTERNAL && $current->subscription?->agreed_amount !== '0.00') {
                 Validator::make($data, ['proof_reviewed' => ['required', 'accepted']])->validate();
             }
             if ($current->payment_choice === PaymentChoiceEnum::EXTERNAL && $current->payment === null && $current->getAttribute('submitted_payment') === null) {
@@ -312,13 +311,6 @@ class SubscriptionRequestService
         }
         $data += ['received' => true, 'occurred_at' => now()->toDateTimeString(),
             'amount' => $current->subscription->agreed_amount, 'operation_id' => (string) Str::uuid()];
-        if ($current->payment_choice === PaymentChoiceEnum::EXTERNAL) {
-            $details = $current->payment->getAttribute('encrypted_transfer_details') ?? [];
-            $data += ['account' => $details['account'] ?? null, 'reference' => $current->payment->getAttribute('transfer_reference')];
-            if (blank($data['account']) || blank($data['reference'])) {
-                $this->fail('Rapprochez d’abord le compte destinataire et la référence depuis le détail du paiement, puis acceptez la demande.');
-            }
-        }
         try {
             if ($current->payment_choice === PaymentChoiceEnum::CASH) {
                 if ($current->payment === null) {

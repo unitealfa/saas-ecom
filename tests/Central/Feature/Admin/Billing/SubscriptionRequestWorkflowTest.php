@@ -896,3 +896,61 @@ test('planned activation cannot bypass full payment for a pending request', func
     ])->assertForbidden();
     expect($request->subscription->refresh()->status)->toBe(StatusEnum::SCHEDULED);
 });
+
+test('external request accepts only after proof review and without bank fields', function (): void {
+    Notification::fake();
+    $f = requestFixture();
+    $request = requestWithInitialProof($f);
+    $this->actingAs($f['actor'], 'central')->get(route('central.subscription-requests.show', $request))
+        ->assertOk()->assertSee('name="proof_reviewed"', false)
+        ->assertDontSee('name="account"', false)->assertDontSee('name="reference"', false)
+        ->assertDontSee('name="received"', false);
+    $decision = ['expected_state' => $request->managementState(),
+        'expected_payment_state' => $request->payment->managementState()];
+    $url = route('central.subscription-requests.accept', $request);
+    $this->post($url, $decision)->assertSessionHasErrors('proof_reviewed');
+    expect($request->refresh()->status)->toBe(RequestStatusEnum::REVIEW);
+    $this->post($url, [...$decision, 'proof_reviewed' => '1'])->assertSessionHasNoErrors()->assertRedirect();
+    $request->refresh();
+    expect($request->status)->toBe(RequestStatusEnum::ACCEPTED)
+        ->and($request->payment->getAttribute('transfer_status'))->toBe(TransferStatusEnum::VERIFIED)
+        ->and($request->payment->getAttribute('amount'))->toBe('3000.00')
+        ->and($request->payment->getAttribute('transfer_reference'))->toBeNull()
+        ->and($request->payment->getAttribute('financial_account_key'))->toBeNull()
+        ->and($request->payment->documents()->where('collection_name', PaymentDocumentService::RECEIPT)->exists())->toBeTrue();
+    expect(DB::table('saas_payment_proof_claims')->where('payment_id', $request->payment->id)->exists())->toBeTrue();
+});
+
+test('identical original external proof cannot settle two owners requests', function (): void {
+    Notification::fake();
+    $f = requestFixture();
+    $first = requestWithInitialProof($f);
+    $proof = app(PaymentDocumentService::class)->retainedProof($first);
+    $bytes = $proof->getContent();
+    $approve = fn ($request) => $this->post(route('central.subscription-requests.accept', $request), [
+        'expected_state' => $request->managementState(),
+        'expected_payment_state' => $request->payment->managementState(), 'proof_reviewed' => '1',
+    ]);
+    $this->actingAs($f['actor'], 'central');
+    $approve($first)->assertSessionHasNoErrors();
+    $first->refresh();
+    expect($first->status)->toBe(RequestStatusEnum::ACCEPTED);
+
+    $owner = User::factory()->create();
+    $owner->forceFill(['legal_address' => 'Adresse fictive de test', 'nif' => '223456789012345',
+        'legal_verification_status' => $f['owner']->legal_verification_status, 'legal_verified_at' => now()->subDay(),
+        'legal_verified_by_id' => $f['actor']->id, 'legal_profile_version' => 1])->save();
+    $customers = config('central.billing.customers', []);
+    $customers[$owner->uuid] = [...$customers[$f['owner']->uuid], 'name' => trim($owner->first_name.' '.$owner->last_name),
+        'nif' => $owner->getAttribute('nif')];
+    config(['central.billing.customers' => $customers]);
+    $data = manualExternalPayload();
+    unset($data['operation_id'], $data['currency']);
+    $second = app(SubscriptionRequestService::class)->create($owner, [
+        ...subscriptionRequestInput($f), 'payment_choice' => PaymentChoiceEnum::EXTERNAL->value, 'payment' => $data,
+    ], UploadedFile::fake()->createWithContent('duplicate.png', $bytes));
+    $approve($second)->assertSessionHasErrors();
+    expect($second->refresh()->status)->not->toBe(RequestStatusEnum::ACCEPTED)
+        ->and($second->payment->getAttribute('transfer_status'))->not->toBe(TransferStatusEnum::VERIFIED);
+});
+

@@ -73,12 +73,12 @@ function manualPaymentFixture(bool $future = false, bool $purchase = false, arra
 function manualExternalPayload(string $amount = '3000.00'): array
 {
     return ['amount' => $amount, 'currency' => 'DZD', 'occurred_at' => now()->toDateTimeString(),
-        'operation_id' => (string) Str::uuid(), 'method' => 3, 'reference' => 'DECLARED-TEST'];
+        'operation_id' => (string) Str::uuid(), 'method' => 3];
 }
 
 /** @return array<string, mixed> */
 function manualVerification(SaasPayment $payment): array
 {
-    return ['expected_state' => $payment->managementState(), 'received' => true, 'account' => 'TEST-CCP-001',
-        'reference' => 'TEST-REFERENCE-001', 'occurred_at' => now()->toDateTimeString()];
+    return ['expected_state' => $payment->managementState(), 'received' => true, 'proof_reviewed' => true,
+        'occurred_at' => now()->toDateTimeString()];
 }

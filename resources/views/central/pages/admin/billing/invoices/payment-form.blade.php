@@ -15,7 +15,6 @@
                         <option value="{{ $method->value }}" @selected($oldText('method') === (string) $method->value)>{{ $method->label() }}</option>
                     @endforeach
                 </flux:select>
-                <flux:input name="reference" label="Référence du justificatif, si disponible" :value="$oldText('reference')" />
                 <flux:input type="file" name="proof" label="Photo JPEG/PNG ou PDF — 8 Mo maximum" accept="application/pdf,image/jpeg,image/png" required />
                 <flux:text>Utilisez un versement déjà effectué hors Aydra. L’administration vérifiera la réception réelle des fonds. Aucun paiement par carte n’est proposé ici.</flux:text>
             @endif

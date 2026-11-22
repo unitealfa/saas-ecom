@@ -69,15 +69,6 @@ class SubscriptionRequestActionRequest extends FormRequest
                     $request->payment_choice === PaymentChoiceEnum::EXTERNAL
                     && $request->subscription?->agreed_amount !== '0.00'
                 ) {
-                    $rules['account'] = ['required', 'string', 'max:255'];
-                    $rules['reference'] = ['required', 'string', 'max:255'];
-                    $rules['received'] = ['required', 'accepted'];
-                }
-
-                if (
-                    filled($request->getAttribute('submitted_payment')['proof_uuid'] ?? null)
-                    || $request->payment?->getAttribute('proof_media_id') !== null
-                ) {
                     $rules['proof_reviewed'] = ['required', 'accepted'];
                 }
 
