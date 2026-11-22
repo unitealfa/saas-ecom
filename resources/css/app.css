@@ -40,7 +40,7 @@ html.dark .aydra-login {
     --color-accent: #7eafff;
     --color-accent-content: #a8c9ff;
     --color-accent-foreground: #101a3b;
-    background: #0b1429;
+    background: #151f3a;
 }
 
 .aydra-login-layout { min-height: 100svh; display: grid; }
@@ -52,7 +52,7 @@ html.dark .aydra-login-heading { color: #f4f8ff; }
 .aydra-login-footer { position: absolute; bottom: 1.5rem; color: #718096; font-size: .75rem; }
 .aydra-login-aside { display: none; }
 .aydra-login .aydra-passkey-separator { background: #fff; }
-html.dark .aydra-login .aydra-passkey-separator { background: #0b1429; }
+html.dark .aydra-login .aydra-passkey-separator { background: #151f3a; }
 
 @media (min-width: 64rem) {
     .aydra-login-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
@@ -69,28 +69,77 @@ html.dark .aydra-login .aydra-passkey-separator { background: #0b1429; }
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 
-    --color-zinc-50: #fafafa;
-    --color-zinc-100: #f5f5f5;
-    --color-zinc-200: #e5e5e5;
-    --color-zinc-300: #d4d4d4;
-    --color-zinc-400: #a3a3a3;
-    --color-zinc-500: #737373;
-    --color-zinc-600: #525252;
-    --color-zinc-700: #404040;
-    --color-zinc-800: #262626;
-    --color-zinc-900: #171717;
-    --color-zinc-950: #0a0a0a;
+    /* Les neutres Flux partagent la palette bleue Aydra. */
+    --color-zinc-50: #f5f8ff;
+    --color-zinc-100: #eaf1ff;
+    --color-zinc-200: #d6e2f7;
+    --color-zinc-300: #b8cae8;
+    --color-zinc-400: #91a9cd;
+    --color-zinc-500: #526c95;
+    --color-zinc-600: #3c5682;
+    --color-zinc-700: #2b4169;
+    --color-zinc-800: #192b4d;
+    --color-zinc-900: #101d38;
+    --color-zinc-950: #0b1429;
 
-    --color-accent: var(--color-neutral-800);
-    --color-accent-content: var(--color-neutral-800);
+    --color-neutral-50: #f5f8ff;
+    --color-neutral-100: #eaf1ff;
+    --color-neutral-200: #d6e2f7;
+    --color-neutral-300: #b8cae8;
+    --color-neutral-400: #91a9cd;
+    --color-neutral-500: #526c95;
+    --color-neutral-600: #3c5682;
+    --color-neutral-700: #2b4169;
+    --color-neutral-800: #192b4d;
+    --color-neutral-900: #101d38;
+    --color-neutral-950: #0b1429;
+
+    --color-gray-50: #f5f8ff;
+    --color-gray-100: #eaf1ff;
+    --color-gray-200: #d6e2f7;
+    --color-gray-300: #b8cae8;
+    --color-gray-400: #91a9cd;
+    --color-gray-500: #526c95;
+    --color-gray-600: #3c5682;
+    --color-gray-700: #2b4169;
+    --color-gray-800: #192b4d;
+    --color-gray-900: #101d38;
+    --color-gray-950: #0b1429;
+
+    --color-stone-50: #f5f8ff;
+    --color-stone-100: #eaf1ff;
+    --color-stone-200: #d6e2f7;
+    --color-stone-300: #b8cae8;
+    --color-stone-400: #91a9cd;
+    --color-stone-500: #526c95;
+    --color-stone-600: #3c5682;
+    --color-stone-700: #2b4169;
+    --color-stone-800: #192b4d;
+    --color-stone-900: #101d38;
+    --color-stone-950: #0b1429;
+
+    --color-slate-50: #f5f8ff;
+    --color-slate-100: #eaf1ff;
+    --color-slate-200: #d6e2f7;
+    --color-slate-300: #b8cae8;
+    --color-slate-400: #91a9cd;
+    --color-slate-500: #526c95;
+    --color-slate-600: #3c5682;
+    --color-slate-700: #2b4169;
+    --color-slate-800: #192b4d;
+    --color-slate-900: #101d38;
+    --color-slate-950: #0b1429;
+
+    --color-accent: #3459da;
+    --color-accent-content: #2748bd;
     --color-accent-foreground: var(--color-white);
 }
 
 @layer theme {
     .dark {
-        --color-accent: var(--color-white);
-        --color-accent-content: var(--color-white);
-        --color-accent-foreground: var(--color-neutral-800);
+        --color-accent: #7eafff;
+        --color-accent-content: #a8c9ff;
+        --color-accent-foreground: #101a3b;
     }
 }
 
@@ -159,11 +208,11 @@ html.dark body.aydra-admin {
     --color-accent: #7eafff;
     --color-accent-content: #a8c9ff;
     --color-accent-foreground: #101a3b;
-    --aydra-surface: #151f3a;
+    --aydra-surface: #0b1429;
     --aydra-border: #2b3b5c;
     --aydra-heading: #f4f8ff;
     --aydra-muted: #a7b5cf;
-    background: #0b1429;
+    background: #151f3a;
 }
 
 body.aydra-admin .aydra-admin-sidebar {
@@ -187,7 +236,7 @@ body.aydra-admin [data-flux-main-inset] {
 }
 
 html.dark body.aydra-admin [data-flux-main-inset] {
-    background: #0b1429;
+    background: #151f3a;
 }
 
 body.aydra-admin .aydra-admin-brand {
