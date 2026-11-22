@@ -8,6 +8,44 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* La page de connexion reprend la palette centrale sans modifier les autres parcours d'authentification. */
+.aydra-login {
+    --color-accent: #3459da;
+    --color-accent-content: #2748bd;
+    --color-accent-foreground: #fff;
+    background: #fff;
+}
+
+html.dark .aydra-login {
+    --color-accent: #7eafff;
+    --color-accent-content: #a8c9ff;
+    --color-accent-foreground: #101a3b;
+    background: #0b1429;
+}
+
+.aydra-login-layout { min-height: 100svh; display: grid; }
+.aydra-login-main { position: relative; display: flex; align-items: center; justify-content: center; padding: 5rem 1.5rem; }
+.aydra-login-content { width: 100%; max-width: 24rem; }
+.aydra-login-logo { display: inline-flex; margin-bottom: 3rem; }
+.aydra-login-heading { color: #151e63; }
+html.dark .aydra-login-heading { color: #f4f8ff; }
+.aydra-login-footer { position: absolute; bottom: 1.5rem; color: #718096; font-size: .75rem; }
+.aydra-login-aside { display: none; }
+.aydra-login .aydra-passkey-separator { background: #fff; }
+html.dark .aydra-login .aydra-passkey-separator { background: #0b1429; }
+
+@media (min-width: 64rem) {
+    .aydra-login-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .aydra-login-aside { display: flex; padding: 1rem; }
+    .aydra-login-aside-content { position: relative; display: flex; width: 100%; flex-direction: column; justify-content: space-between; overflow: hidden; padding: clamp(3rem, 5vw, 5rem); border-radius: 1.25rem; background: #151e63; color: #fff; }
+    .aydra-login-aside-content::after { position: absolute; right: -8rem; bottom: -13rem; width: 32rem; height: 32rem; border: 1px solid rgb(168 201 255 / 16%); border-radius: 50%; content: ''; pointer-events: none; }
+    .aydra-login-mark { width: 3.5rem; height: 3.5rem; object-fit: contain; }
+    .aydra-login-aside-content > div { position: relative; z-index: 1; max-width: 30rem; }
+    .aydra-login-aside-name { margin-bottom: 1rem; color: #a8c9ff; font-size: .875rem; font-weight: 600; }
+    .aydra-login-aside h2 { max-width: 12ch; font-size: clamp(2.25rem, 3.5vw, 3.75rem); font-weight: 600; line-height: 1.08; letter-spacing: -.035em; }
+    .aydra-login-aside h2 + p { max-width: 26rem; margin-top: 1.25rem; color: #c5d7f4; font-size: 1rem; line-height: 1.6; }
+}
+
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 

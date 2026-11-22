@@ -1,6 +1,9 @@
-<x-layouts::auth :title="__('Register')">
+<x-layouts::auth.split title="Créer un compte">
     <div class="flex flex-col gap-6">
-        <x-auth-header :title="__('Create an account')" :description="__('Enter your details below to create your account')" />
+        <div class="space-y-2">
+            <flux:heading level="1" size="xl" class="aydra-login-heading">Créez votre compte</flux:heading>
+            <flux:text>Renseignez vos informations pour rejoindre Aydra.</flux:text>
+        </div>
 
         <!-- Session Status -->
         <x-auth-session-status class="text-center" :status="session('status')" />
@@ -24,7 +27,7 @@
             <!-- Email Address -->
             <flux:input
                 name="email"
-                :label="__('Email address')"
+                label="Adresse e-mail"
                 :value="old('email')"
                 type="email"
                 required
@@ -35,11 +38,11 @@
             <!-- Password -->
             <flux:input
                 name="password"
-                :label="__('Password')"
+                label="Mot de passe"
                 type="password"
                 required
                 autocomplete="new-password"
-                :placeholder="__('Password')"
+                placeholder="Votre mot de passe"
                 passwordrules="{{ \Illuminate\Validation\Rules\Password::defaults()->toPasswordRulesString() }}"
                 viewable
             />
@@ -47,25 +50,25 @@
             <!-- Confirm Password -->
             <flux:input
                 name="password_confirmation"
-                :label="__('Confirm password')"
+                label="Confirmer le mot de passe"
                 type="password"
                 required
                 autocomplete="new-password"
-                :placeholder="__('Confirm password')"
+                placeholder="Confirmez votre mot de passe"
                 passwordrules="{{ \Illuminate\Validation\Rules\Password::defaults()->toPasswordRulesString() }}"
                 viewable
             />
 
             <div class="flex items-center justify-end">
                 <flux:button type="submit" variant="primary" class="w-full" data-test="register-user-button">
-                    {{ __('Create account') }}
+                    Créer mon compte
                 </flux:button>
             </div>
         </form>
 
         <div class="space-x-1 rtl:space-x-reverse text-center text-sm text-zinc-600 dark:text-zinc-400">
-            <span>{{ __('Already have an account?') }}</span>
-            <flux:link :href="route('login')" wire:navigate>{{ __('Log in') }}</flux:link>
+            <span>Vous avez déjà un compte ?</span>
+            <flux:link :href="route('login')" wire:navigate>Se connecter</flux:link>
         </div>
     </div>
-</x-layouts::auth>
+</x-layouts::auth.split>
