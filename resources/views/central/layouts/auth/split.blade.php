@@ -30,6 +30,7 @@
         @persist('toast')
             <flux:toast.group><flux:toast /></flux:toast.group>
         @endpersist
+        @include('partials.flash-toasts')
         @fluxScripts
     </body>
 </html>

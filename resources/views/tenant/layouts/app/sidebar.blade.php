@@ -85,6 +85,7 @@
             </flux:toast.group>
         @endpersist
 
+        @include('partials.flash-toasts')
         @fluxScripts
     </body>
 </html>
