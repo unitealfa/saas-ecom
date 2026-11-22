@@ -76,6 +76,7 @@
         </flux:header>
 
         <flux:main>
+            <x-tenant::components.breadcrumbs />
             {{ $slot }}
         </flux:main>
 

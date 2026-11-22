@@ -25,6 +25,7 @@
                 </div>
             </div>
         @endif
+        <x-central::components.breadcrumbs />
         {{ $slot }}
     </flux:main>
 </x-layouts::app.sidebar>
