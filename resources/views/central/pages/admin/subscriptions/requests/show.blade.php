@@ -1,6 +1,7 @@
 @php
     $item = $subscriptionRequest;
     $cash = $item->payment_choice === \App\Enums\Central\Subscriptions\PaymentChoiceEnum::CASH;
+    $zeroPrice = $item->subscription?->agreed_amount === '0.00';
     $prefix = $ownerMode ? 'owner' : 'central';
     $issued = $item->invoice?->status === \App\Enums\Central\Billing\DocumentStatusEnum::ISSUED;
 @endphp
@@ -9,7 +10,7 @@
         <header class="flex flex-wrap items-start justify-between gap-5">
             <div class="min-w-0 space-y-2">
                 <h1 class="aydra-heading text-3xl font-semibold tracking-tight sm:text-4xl">Demande d’abonnement</h1>
-                <div class="flex flex-wrap items-center gap-3"><span class="aydra-muted text-sm">{{ $item->subscription?->plan?->name ?? 'Offre indisponible' }}</span><flux:badge size="sm" :color="match ($item->status) { \App\Enums\Central\Subscriptions\RequestStatusEnum::ACCEPTED => 'green', \App\Enums\Central\Subscriptions\RequestStatusEnum::REJECTED, \App\Enums\Central\Subscriptions\RequestStatusEnum::CANCELLED => 'red', \App\Enums\Central\Subscriptions\RequestStatusEnum::REVIEW => 'amber', default => 'zinc' }">{{ $item->status->label() }}</flux:badge></div>
+                <div class="flex flex-wrap items-center gap-3"><span class="aydra-muted text-sm">{{ $item->subscription?->plan?->name ?? 'Offre indisponible' }}</span><flux:badge size="sm" :color="match ($item->status) { \App\Enums\Central\Subscriptions\RequestStatusEnum::ACCEPTED => 'green', \App\Enums\Central\Subscriptions\RequestStatusEnum::REJECTED, \App\Enums\Central\Subscriptions\RequestStatusEnum::CANCELLED => 'red', \App\Enums\Central\Subscriptions\RequestStatusEnum::REVIEW => 'amber', default => 'zinc' }">{{ $item->statusLabel() }}</flux:badge></div>
             </div>
             <flux:button :href="route($prefix.'.subscription-requests.index')" icon="arrow-left">Retour aux demandes</flux:button>
         </header>
@@ -22,12 +23,12 @@
             <div><dt>Date de soumission</dt><dd>{{ $item->submitted_at?->format('d/m/Y H:i') }}</dd></div>
             <div><dt>Commerçant</dt><dd>{{ $item->owner?->name }}</dd></div>
             <div><dt>E-mail</dt><dd>{{ $item->owner?->email }}</dd></div>
-            <div><dt>État</dt><dd>{{ $item->status->label() }}</dd></div>
+            <div><dt>État</dt><dd>{{ $item->statusLabel() }}</dd></div>
             <div><dt>Abonnement actuel</dt><dd>{{ $currentSubscription?->plan?->name ?? 'Aucun abonnement actif' }}</dd></div>
             <div><dt>Nouvelle offre demandée</dt><dd>{{ $item->subscription?->plan?->name }}</dd></div>
             <div><dt>Périodicité</dt><dd>{{ $item->subscription?->period?->label() }}</dd></div>
             <div><dt>Montant TTC</dt><dd>{{ $item->subscription?->agreed_amount }} DZD</dd></div>
-            <div><dt>Moyen choisi</dt><dd>{{ $item->payment_choice->label() }}</dd></div>
+            @unless ($zeroPrice)<div><dt>Moyen choisi</dt><dd>{{ $item->payment_choice->label() }}</dd></div>@endunless
             <div><dt>Période</dt><dd>{{ $item->subscription?->period_starts_at?->format('d/m/Y') }} — {{ $item->subscription?->period_ends_at?->format('d/m/Y') }}</dd></div>
             @if ($item->subscription?->effective_starts_at)
                 <div><dt>Période d’accès après démarrage anticipé</dt><dd>{{ $item->subscription->effectiveStartsAt()->format('d/m/Y') }} — {{ $item->subscription->effectiveEndsAt()?->format('d/m/Y') }}</dd></div>
@@ -49,7 +50,7 @@
         @if ($issued)
             <flux:text>Facture {{ $item->invoice->number }}. Elle constate le montant dû ; elle ne prouve pas un paiement.</flux:text>
             <div class="flex flex-wrap items-start gap-3">
-            @can($ownerMode ? 'viewOwnInvoice' : 'view', $item->invoice)
+            @can($ownerMode ? 'viewOwnInvoice' : 'viewBillingDossier', $item->invoice)
                 <flux:button :href="route($prefix.'.invoices.show', $item->invoice)">Consulter la facture</flux:button>
             @endcan
             @can('download', $item->invoice)
@@ -57,7 +58,7 @@
             @endcan
             </div>
         @else
-            <flux:callout>{{ $item->getAttribute('invoice_error') ?? 'Préparation interne sans numéro ni PDF définitif. La facture et le reçu suivront la confirmation du paiement intégral.' }}</flux:callout>
+            <flux:callout>{{ $item->getAttribute('invoice_error') ?? ($zeroPrice ? 'La facture à 0,00 DZD sera disponible après validation administrative.' : 'La facture et le reçu suivront la confirmation du paiement intégral.') }}</flux:callout>
         @endif
         </div></section>
         @if ($item->getAttribute('submitted_payment') !== null)
@@ -102,10 +103,10 @@
                 <form method="POST" action="{{ route('owner.subscription-requests.revise', $item) }}" class="flex flex-col gap-3">@csrf @method('PUT')
                     <input type="hidden" name="expected_state" value="{{ $item->managementState() }}">
                     <input type="hidden" name="operation_id" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
-                    @php($paidPlans = array_values(array_filter($plans, fn ($plan) => $plan['code'] !== 'free' && ! $plan['is_default'])))
-                    <div x-data="{ plans: @js($paidPlans), plan: @js($item->subscription->plan->uuid), period: @js((string) $item->subscription->period->value), mode: @js((string) $item->subscription->transition_mode->value) }" class="flex flex-col gap-3">
+                    @php($requestablePlans = array_values(array_filter($plans, fn ($plan) => ! $plan['is_default'])))
+                    <div x-data="{ plans: @js($requestablePlans), plan: @js($item->subscription->plan->uuid), period: @js((string) $item->subscription->period->value), mode: @js((string) $item->subscription->transition_mode->value) }" class="flex flex-col gap-3">
                         <flux:select name="plan_uuid" label="Nouvelle offre" x-model="plan" required>
-                            @foreach ($paidPlans as $plan)<option value="{{ $plan['uuid'] }}">{{ $plan['name'] }} — {{ $plan['monthly_price'] }} DZD/mois, {{ $plan['annual_price'] }} DZD/an</option>@endforeach
+                            @foreach ($requestablePlans as $plan)<option value="{{ $plan['uuid'] }}">{{ $plan['name'] }} — {{ $plan['monthly_price'] }} DZD/mois, {{ $plan['annual_price'] }} DZD/an</option>@endforeach
                         </flux:select>
                         <flux:select name="period" label="Période" x-model="period" required><option value="1">Mensuelle</option><option value="2">Annuelle</option></flux:select>
                         <input type="hidden" name="expected_amount" x-bind:value="plans.find(p => p.uuid === plan)?.[period === '1' ? 'monthly_price' : 'annual_price'] ?? ''">
@@ -135,11 +136,19 @@
                     <input type="hidden" name="expected_state" value="{{ $item->managementState() }}">
                     <flux:button type="submit">Annuler la demande non payée</flux:button>
                 </form>
-                <form method="POST" action="{{ route('owner.subscription-requests.choice', $item) }}" class="flex flex-col gap-3">@csrf @method('PATCH')
+                @unless ($zeroPrice)
+                <form method="POST" enctype="multipart/form-data" action="{{ route('owner.subscription-requests.choice', $item) }}" class="flex flex-col gap-3" x-data="{ choice: @js((string) $item->payment_choice->value) }">@csrf @method('PATCH')
                     <input type="hidden" name="expected_state" value="{{ $item->managementState() }}">
-                    <flux:select name="payment_choice" label="Modifier mon moyen de paiement">
+                    <flux:select name="payment_choice" label="Modifier mon moyen de paiement" x-model="choice">
                         @foreach (\App\Enums\Central\Subscriptions\PaymentChoiceEnum::cases() as $choice)<option value="{{ $choice->value }}" @selected($item->payment_choice === $choice)>{{ $choice->label() }}</option>@endforeach
                     </flux:select>
+                    <fieldset x-show="choice === '2'" x-bind:disabled="choice !== '2'" x-cloak class="flex flex-col gap-3">
+                        <flux:select name="payment[method]" label="Réseau du versement" required>
+                            @foreach ([\App\Enums\Central\Billing\TransferMethodEnum::BANK_TRANSFER, \App\Enums\Central\Billing\TransferMethodEnum::CCP_TRANSFER, \App\Enums\Central\Billing\TransferMethodEnum::BARIDIMOB] as $method)<option value="{{ $method->value }}">{{ $method->label() }}</option>@endforeach
+                        </flux:select>
+                        <flux:input name="payment[amount]" label="Montant versé (DZD)" :value="$item->subscription->agreed_amount" required />
+                        <flux:input type="file" name="proof" label="Justificatif PDF/JPG/PNG" accept="application/pdf,image/jpeg,image/png" required />
+                    </fieldset>
                     <flux:button type="submit" class="self-start">Enregistrer mon choix</flux:button>
                 </form>
                 @if ($cash)<flux:callout>Présentez votre référence de demande au bureau Aydra. Seul l’administrateur peut constater les espèces réellement reçues. Aucun droit ne sera activé avant ce contrôle. {{ config('central.billing.cash_instructions') }}</flux:callout>
@@ -153,11 +162,11 @@
                         </flux:select>
                         <flux:input name="amount" label="Montant réellement versé (DZD)" :value="$item->subscription->agreed_amount" required />
                         <flux:input type="datetime-local" name="occurred_at" label="Date du versement" required />
-                        <flux:input name="reference" label="Référence du versement (si disponible)" maxlength="255" />
                         <flux:input type="file" name="proof" label="Photo ou PDF du justificatif — 8 Mo maximum" accept="application/pdf,image/jpeg,image/png" required />
                         <flux:button type="submit" class="max-w-full self-start whitespace-normal">Soumettre le justificatif pour vérification</flux:button>
                     </form>
                 @endif
+                @endunless
             @endcan
         @elseif (! $ownerMode && ! $item->status->isFinal())
             <section class="aydra-users-panel flex flex-col gap-4 p-5 sm:p-6" aria-labelledby="request-decision">
@@ -168,9 +177,16 @@
                         <form method="POST" action="{{ route('central.subscription-requests.accept', $item) }}" class="flex flex-col gap-3">@csrf
                             <input type="hidden" name="expected_state" value="{{ $item->managementState() }}">
                             <input type="hidden" name="expected_payment_state" value="{{ $item->payment?->managementState() }}">
-                            <flux:text>En acceptant, vous confirmez avoir reçu et contrôlé le montant intégral de {{ $item->subscription->agreed_amount }} DZD. Le montant et la date de confirmation sont renseignés automatiquement.</flux:text>
+                            @if ($zeroPrice)
+                                <flux:text>En acceptant, vous approuvez l’offre et émettez la facture à 0,00 DZD.</flux:text>
+                            @else
+                                <flux:text>En acceptant, vous confirmez avoir reçu et contrôlé le montant intégral de {{ $item->subscription->agreed_amount }} DZD. Le montant et la date de confirmation sont renseignés automatiquement.</flux:text>
+                            @endif
                             @if (filled($item->getAttribute('invoice_error')))
                                 <flux:checkbox name="acknowledged" value="1" label="J’ai lu et approuvé ce message." description="Cette confirmation ne remplace pas les vérifications fiscales et techniques nécessaires à la facture." required />
+                            @endif
+                            @if (! $cash && ! $zeroPrice)
+                                <flux:checkbox name="proof_reviewed" value="1" label="J’ai consulté et vérifié le justificatif." required />
                             @endif
                             <flux:button type="submit" variant="primary" class="self-start">Accepter la demande</flux:button>
                         </form>

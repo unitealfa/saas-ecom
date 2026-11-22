@@ -1,9 +1,11 @@
 @php($paymentText = static fn (string $key, mixed $default = null): string => is_scalar($value = old($key, $default)) ? (string) $value : '')
+@unless ($hideTransition ?? false)
 <flux:select name="transition_mode" label="Début de la nouvelle période">
     @foreach (\App\Enums\Central\Subscriptions\TransitionModeEnum::cases() as $mode)
         <option value="{{ $mode->value }}" @selected($paymentText('transition_mode', 2) === (string) $mode->value)>{{ $mode->label() }}</option>
     @endforeach
 </flux:select>
+@endunless
 <flux:text>Tarif intégral, sans prorata ni remboursement automatique. Les droits actuels restent conservés avant confirmation.</flux:text>
 <div x-data="{ choice: @js($paymentText('payment_choice', '1')) }" class="flex flex-col gap-3">
     <flux:select name="payment_choice" label="Moyen de paiement" x-model="choice" required>
@@ -19,7 +21,6 @@
                 @endforeach
             </flux:select>
             <flux:input name="payment[amount]" label="Montant réellement versé (DZD)" :value="$paymentText('payment.amount')" required />
-            <flux:input name="payment[reference]" label="Référence du versement" :value="$paymentText('payment.reference')" maxlength="255" />
             <flux:input type="file" name="proof" label="Justificatif PDF/JPG/PNG (8 Mo maximum)" accept="application/pdf,image/jpeg,image/png" required />
         </fieldset>
     </div>

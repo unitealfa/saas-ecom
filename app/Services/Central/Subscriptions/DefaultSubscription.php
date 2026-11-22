@@ -10,6 +10,7 @@ use App\Enums\Central\Subscriptions\PeriodEnum;
 use App\Enums\Central\Subscriptions\RequestStatusEnum;
 use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Models\Central\Billing\SaasInvoice;
+use App\Models\Central\Plans\Plan;
 use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Subscriptions\SubscriptionInstallment;
 use App\Models\Central\Users\User;
@@ -17,6 +18,8 @@ use App\Services\Central\Plans\FreePlanCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use LogicException;
 
 class DefaultSubscription
@@ -61,7 +64,7 @@ class DefaultSubscription
                 $end = $current->effectiveEndsAt();
 
                 if ($end === null || $end->isFuture()) {
-                    $paidNext = $current->isFree() && $this->paidDocuments()->where('user_id', $owner->id)
+                    $paidNext = $current->isFree() && $this->settledDocuments()->where('user_id', $owner->id)
                         ->whereHas('subscription', fn (Builder $query) => $query->where('status', StatusEnum::SCHEDULED)
                             ->where('period_starts_at', '<=', now())->where('period_ends_at', '>', now()))->exists();
                     if (! $current->isFree() || (! $paidNext && $current->plan_id === $this->catalog->current()->id)) {
@@ -92,7 +95,7 @@ class DefaultSubscription
                 }
                 $obligation = SubscriptionInstallment::where('subscription_id', $next->id)
                     ->where('period_starts_at', $next->period_starts_at)->where('period_ends_at', $next->period_ends_at)->exists();
-                if ($obligation && ! $this->paidDocuments()->where('subscription_id', $next->id)
+                if ($obligation && ! $this->settledDocuments()->where('subscription_id', $next->id)
                     ->where('period_starts_at', $next->period_starts_at)->where('period_ends_at', $next->period_ends_at)->exists()) {
                     continue;
                 }
@@ -119,6 +122,50 @@ class DefaultSubscription
 
             return $this->resolved($owner, $this->createDefaultSubscription($owner, $assignedBy, $previous), $assignedBy);
         }, self::ATTEMPTS);
+    }
+
+    public function switchToDefault(User $owner, Subscription $source, string $expected, string $planUuid, string $planState): Subscription
+    {
+        Gate::forUser($owner)->authorize('purchase', Subscription::class);
+        abort_unless($source->user_id === $owner->id, 403);
+
+        return DB::transaction(function () use ($owner, $source, $expected, $planUuid, $planState): Subscription {
+            $owner = User::whereKey($owner->id)->lockForUpdate()->firstOrFail();
+            Gate::forUser($owner)->authorize('purchase', Subscription::class);
+            $current = Subscription::whereKey($source->id)->where('user_id', $owner->id)
+                ->whereIn('status', [StatusEnum::ACTIVE, StatusEnum::TRIAL])->currentlyEffective()->lockForUpdate()->first();
+            $plan = Plan::where('uuid', $planUuid)->where('is_default', true)->active()->lockForUpdate()->first();
+            if ($current === null || $plan === null || $this->catalog->current()->id !== $plan->id
+                || ! hash_equals($current->transitionState(), $expected)
+                || ! hash_equals($plan->compositionState($plan->features()->lockForUpdate()->get()), $planState)
+                || ($current->isFree() && $current->plan_id === $plan->id)) {
+                throw ValidationException::withMessages(['subscription' => 'Les offres ont changé. Relisez la comparaison avant de confirmer.']);
+            }
+            if (Subscription::where('user_id', $owner->id)->whereKeyNot($current->id)
+                ->whereIn('status', [StatusEnum::ACTIVE, StatusEnum::TRIAL])->currentlyEffective()->lockForUpdate()->exists()
+                || Subscription::where('user_id', $owner->id)->where('status', StatusEnum::SCHEDULED)
+                    ->where('period_ends_at', '>', now())->lockForUpdate()->exists()) {
+                throw ValidationException::withMessages(['subscription' => 'Une autre période est en cours ou prévue. Consultez-la avant de changer d’offre.']);
+            }
+            $current->forceFill(['status' => StatusEnum::CANCELLED, 'ended_at' => now(), 'auto_renew' => false])->save();
+            $next = $this->createDefaultSubscription($owner, null, $current, $plan);
+            activity('central')->causedBy($owner)->performedOn($next)->event('subscription_default_selected')
+                ->withProperties(['previous_subscription_uuid' => $current->uuid])->log('Passage au plan par défaut confirmé par le commerçant.');
+
+            return $this->resolved($owner, $next, $owner);
+        }, self::ATTEMPTS);
+    }
+
+    /** @return Builder<SaasInvoice> */
+    private function settledDocuments(): Builder
+    {
+        return SaasInvoice::where('status', DocumentStatusEnum::ISSUED)
+            ->where(fn (Builder $query) => $query->whereIn('id', $this->paidDocuments()->select('id'))
+                ->orWhere(fn (Builder $query) => $query->where('total_amount', '0.00')
+                    ->whereHas('subscription.request', fn (Builder $request) => $request
+                        ->where('status', RequestStatusEnum::ACCEPTED)->where('accepted_without_payment', true)
+                        ->whereColumn('subscription_requests.current_invoice_id', 'saas_invoices.id')
+                        ->whereColumn('subscription_requests.current_subscription_id', 'saas_invoices.subscription_id'))));
     }
 
     private function resolved(User $owner, Subscription $subscription, ?User $actor): Subscription
@@ -157,10 +204,11 @@ class DefaultSubscription
     private function createDefaultSubscription(
         User $owner,
         ?User $assignedBy,
-        ?Subscription $previous
+        ?Subscription $previous,
+        ?Plan $plan = null,
     ): Subscription {
         // Lire le plan gratuit directement depuis la BDD.
-        $plan = $this->catalog->current();
+        $plan ??= $this->catalog->current();
 
         return Subscription::create([
             'user_id' => $owner->id,

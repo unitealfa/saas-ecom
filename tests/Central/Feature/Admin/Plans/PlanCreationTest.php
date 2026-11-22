@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Central\Audit\Activity;
+use App\Models\Central\Features\Feature;
 use App\Models\Central\Plans\Plan;
 use App\Models\Central\Roles\Role;
 use App\Models\User;
@@ -14,14 +15,21 @@ function planCreationActor(string $permission): User
 {
     test()->seed(AuthorizationSeeder::class);
     $actor = User::factory()->create();
-    $actor->assignRole(Role::createWithPermissions('plan-creator-'.Str::random(10), [$permission => 7]));
+    $permissions = [$permission => 7];
+    if ($permission === 'saas.plans.create') {
+        $permissions['saas.plans.features.update'] = 7;
+    }
+    $actor->assignRole(Role::createWithPermissions('plan-creator-'.Str::random(10), $permissions));
 
     return $actor;
 }
 
 function planCreationPayload(): array
 {
-    return ['code' => ' PRO ', 'name' => ' Offre Pro ', 'description' => ' Une offre ', 'monthly_price' => '3000.00', 'annual_price' => '30000.00'];
+    $feature = Feature::factory()->create();
+
+    return ['code' => ' PRO ', 'name' => ' Offre Pro ', 'description' => ' Une offre ', 'monthly_price' => '3000.00', 'annual_price' => '30000.00',
+        'features' => [['uuid' => $feature->uuid, 'limit' => 3, 'unlimited' => false]]];
 }
 
 test('an authorized creator can create an inactive first version without consultation rights', function (): void {
@@ -32,7 +40,7 @@ test('an authorized creator can create an inactive first version without consult
 
     expect($plan->code)->toBe('pro')->and($plan->name)->toBe('Offre Pro')
         ->and($plan->description)->toBe('Une offre')->and($plan->version)->toBe(1)
-        ->and($plan->is_active)->toBeFalse()->and($plan->features()->count())->toBe(0);
+        ->and($plan->is_active)->toBeFalse()->and($plan->features()->count())->toBe(1);
     expect(Activity::forSubject($plan)->where('event', 'plan_created')->count())->toBe(1);
     $this->getJson(route('central.plans.show', $plan->uuid))->assertForbidden();
 });
@@ -41,6 +49,14 @@ test('creation is denied without its own permission including direct service cal
     $actor = planCreationActor('saas.plans.view');
     $this->actingAs($actor, 'central')->postJson(route('central.plans.store'), planCreationPayload())->assertForbidden();
     expect(fn () => app(PlanCreationService::class)->create($actor, planCreationPayload()))->toThrow(AuthorizationException::class);
+    expect(Plan::count())->toBe(0);
+});
+
+test('creation requires both the plan and feature permissions', function (): void {
+    test()->seed(AuthorizationSeeder::class);
+    $actor = User::factory()->create();
+    $actor->assignRole(Role::createWithPermissions('plan-create-only', ['saas.plans.create' => 7]));
+    $this->actingAs($actor, 'central')->postJson(route('central.plans.store'), planCreationPayload())->assertForbidden();
     expect(Plan::count())->toBe(0);
 });
 
@@ -78,5 +94,24 @@ test('creation rejects invalid prices and protected fields', function (array $ch
     [['code' => ['invalid']], 'code'],
     [['is_active' => true], 'is_active'],
     [['version' => 2], 'version'],
-    [['features' => [['limit' => 5]]], 'features'],
+    [['features' => []], 'features'],
 ]);
+
+test('quantity requires a limit or an explicit unlimited choice', function (): void {
+    $actor = planCreationActor('saas.plans.create');
+    $data = planCreationPayload();
+    $data['features'][0]['limit'] = null;
+    $this->actingAs($actor, 'central')->postJson(route('central.plans.store'), $data)->assertUnprocessable();
+    $data['features'][0]['unlimited'] = true;
+    $this->postJson(route('central.plans.store'), $data)->assertCreated();
+});
+
+test('a zero price plan is created as an ordinary non-default version', function (): void {
+    $actor = planCreationActor('saas.plans.create');
+    $data = array_replace(planCreationPayload(), ['monthly_price' => '0.00', 'annual_price' => '0.00']);
+    $uuid = $this->actingAs($actor, 'central')->postJson(route('central.plans.store'), $data)
+        ->assertCreated()->json('data.uuid');
+    $plan = Plan::where('uuid', $uuid)->sole();
+    expect($plan->is_active)->toBeFalse()->and($plan->is_default)->toBeNull()
+        ->and($plan->features()->count())->toBe(1);
+});

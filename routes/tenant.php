@@ -2,13 +2,13 @@
 
 use App\Http\Controllers\Storefront\ShopBrandingController;
 use App\Http\Controllers\Tenant\Admin\Dashboard\DashboardController;
-use App\Http\Controllers\Tenant\Auth\OwnerLoginController;
-use App\Http\Controllers\Tenant\Auth\LoginController;
-use App\Http\Controllers\Tenant\Auth\PasswordResetController;
 use App\Http\Controllers\Tenant\Auth\AcceptTeamInvitationController;
-use App\Http\Middleware\Tenant\EnsureActiveTenantAccount;
+use App\Http\Controllers\Tenant\Auth\LoginController;
+use App\Http\Controllers\Tenant\Auth\OwnerLoginController;
+use App\Http\Controllers\Tenant\Auth\PasswordResetController;
 use App\Http\Controllers\Tenant\Diagnostics\DatabaseDiagnosticsController;
 use App\Http\Middleware\EnsureLocalDiagnostics;
+use App\Http\Middleware\Tenant\EnsureActiveTenantAccount;
 use App\Http\Middleware\Tenant\EnsureTenantAvailable;
 use App\Http\Middleware\Tenant\FinishTenantRequest;
 use Illuminate\Support\Facades\Route;
@@ -33,6 +33,10 @@ Route::middleware([
         ->whereUuid('invitation')->name('invitations.show');
     Route::post('invitations/{invitation}/accept', [AcceptTeamInvitationController::class, 'accept'])
         ->whereUuid('invitation')->middleware('throttle:6,1')->name('invitations.accept');
+    Route::post('invitations/{invitation}/changer-de-compte', [AcceptTeamInvitationController::class, 'switchAccount'])
+        ->whereUuid('invitation')->middleware('auth:tenant')->name('invitations.switch-account');
+    Route::get('auth/owner/start', [OwnerLoginController::class, 'start'])
+        ->middleware('signed:relative')->block(10, 10)->name('owner-login.start');
     Route::get('auth/owner', [OwnerLoginController::class, 'accept'])
         ->middleware('signed:relative')->block(10, 10)->name('owner-login');
     Route::post('logout', [OwnerLoginController::class, 'logout'])

@@ -230,6 +230,10 @@ class InvoicePaymentService
      */
     private function resolve(SaasInvoice $invoice, Collection $transfers, Collection $credits): array
     {
+        if ($invoice->total_amount === '0.00' && $transfers->isEmpty()) {
+            return [PaymentStateEnum::NO_PAYMENT_REQUIRED, null];
+        }
+
         if ($credits->isNotEmpty()) {
             if ($this->hasForeignTransfer($invoice, $transfers)) {
                 return [PaymentStateEnum::ANOMALY, null];

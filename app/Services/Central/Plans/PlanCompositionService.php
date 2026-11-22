@@ -10,13 +10,44 @@ use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class PlanCompositionService
 {
     public function __construct(private readonly AuthorizationMutation $mutations) {}
+
+    /**
+     * @param  Collection<int, PlanFeature>  $current
+     * @param  list<array<string, mixed>>|null  $items
+     * @return array<int, array{uuid: string, is_active: bool, limit: ?int}>
+     */
+    public function versionConfiguration(Collection $current, ?array $items = null): array
+    {
+        if ($items !== null) {
+            $values = Validator::make(self::normalize(['features' => $items]),
+                array_diff_key(self::rules(), ['expected_state' => true]))->validate();
+            $items = $values['features'];
+        }
+
+        $catalog = $this->lockFeatures($current, array_column($items ?? [], 'uuid'));
+        $before = [];
+        foreach ($current as $row) {
+            $item = $catalog->get($row->feature_id) ?? $this->fail('features', 'Une fonctionnalité du plan source est introuvable.');
+            $before[$row->feature_id] = ['uuid' => $item->uuid, 'is_active' => $row->is_active, 'limit' => $row->limit];
+        }
+
+        $configuration = $items === null ? $before : $this->desired($items, $catalog->keyBy('uuid'), $current->keyBy('feature_id'));
+        foreach ($configuration as $featureId => $row) {
+            $item = $catalog->get($featureId);
+            if ($item === null || $item->trashed() || ! $item->is_active) {
+                $this->fail('features', 'Retirez les fonctionnalités indisponibles avant de créer la version.');
+            }
+        }
+        ksort($configuration);
+
+        return $configuration;
+    }
 
     /** @return array<string, array<int, string>> */
     public static function rules(): array
@@ -55,49 +86,7 @@ class PlanCompositionService
     {
         $this->mutations->run($actor, 'updateFeatures',
             fn (): Plan => Plan::whereKey($plan->id)->lockForUpdate()->firstOrFail(),
-            function (Plan $plan) use ($actor, $data): void {
-                $values = Validator::make(self::normalize($data), self::rules())->validate();
-                $current = $plan->features()->orderBy('feature_id')->lockForUpdate()->get();
-
-                if (! hash_equals($plan->compositionState($current), $values['expected_state'])) {
-                    $this->fail('expected_state', 'Le plan a changé. Rechargez avant de recommencer.');
-                }
-
-                $activeUsers = $plan->activeSubscriberCount();
-                if ($activeUsers > 0) {
-                    $this->fail('plan', "Modification impossible : {$activeUsers} commerçant(s) utilisent actuellement ce plan. Créez une nouvelle version.");
-                }
-                if ($plan->hasPaidScheduledSubscription()) {
-                    $this->fail('plan', 'Modification impossible : un abonnement payé est programmé avec ce plan. Créez une nouvelle version.');
-                }
-
-                // Une version déjà souscrite est figée : toute modification passe par une nouvelle version.
-                if (DB::table('subscriptions')->where('plan_id', $plan->id)->lockForUpdate()->value('id') !== null) {
-                    $this->fail('plan', 'Cette version est déjà utilisée par un abonnement et ne peut plus être modifiée.');
-                }
-
-                $features = $this->lockFeatures($current, array_column($values['features'], 'uuid'));
-                $currentByFeature = $current->keyBy('feature_id');
-
-                $before = $current->map(fn (PlanFeature $item): array => [
-                    'uuid' => $features->get($item->feature_id)->uuid,
-                    'is_active' => $item->is_active,
-                    'limit' => $item->limit,
-                ])->sortBy('uuid')->values()->all();
-
-                $desired = $this->desired($values['features'], $features->keyBy('uuid'), $currentByFeature);
-                $after = collect($desired)->sortBy('uuid')->values()->all();
-
-                if ($before === $after) {
-                    return;
-                }
-
-                $this->sync($plan, $current, $currentByFeature, $desired);
-
-                activity()->causedBy($actor)->performedOn($plan)->event('plan_features_updated')
-                    ->withProperties(['before' => $before, 'after' => $after])
-                    ->log('Fonctionnalités et quotas du plan modifiés.');
-            });
+            fn () => $this->fail('plan', 'Créez une nouvelle version pour modifier les fonctionnalités et quotas.'));
     }
 
     /**

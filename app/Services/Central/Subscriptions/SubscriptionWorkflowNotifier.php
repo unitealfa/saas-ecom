@@ -17,6 +17,8 @@ use Throwable;
 
 class SubscriptionWorkflowNotifier
 {
+    public const string ZERO_PRICE_ACCEPTED = 'subscription_zero_price_accepted';
+
     public const string RECEIPT_READY = 'subscription_payment_receipt_ready';
 
     public const string ACTIVATED = 'subscription_scheduled_activated';
@@ -24,6 +26,7 @@ class SubscriptionWorkflowNotifier
     public function request(SubscriptionRequest $request, string $event): void
     {
         $message = match ($event) {
+            self::ZERO_PRICE_ACCEPTED => 'Votre demande à 0,00 DZD est acceptée et sa facture est disponible.',
             SubscriptionRequestService::CREATED => 'Votre demande d’abonnement a été reçue.',
             SubscriptionRequestService::INVOICE_READY => 'Votre facture définitive est disponible après confirmation du paiement.',
             SubscriptionRequestPaymentState::SUBMITTED => 'Votre justificatif bancaire a été reçu. Votre paiement est en vérification.',

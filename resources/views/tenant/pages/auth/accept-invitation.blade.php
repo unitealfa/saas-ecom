@@ -1,17 +1,32 @@
 <x-tenant::layouts.auth title="Accepter une invitation">
-    <flux:heading size="xl">Rejoindre l’équipe</flux:heading>
-    <p>Invitation à rejoindre cette boutique pour {{ $invitation->email }}.</p>
-    @if($errors->any())@foreach($errors->all() as $error)<p class="text-red-500">{{ $error }}</p>@endforeach@endif
-    <form method="POST" action="{{ route('tenant.invitations.accept', $invitation, false) }}" class="space-y-3">
-        @csrf <input type="hidden" name="token" value="{{ $token }}">
-        @guest('tenant')
-            <p>Si vous possédez déjà un compte local pour cette boutique, connectez-vous d'abord puis revenez sur le lien d'invitation.</p>
-            <label class="block">Nom <input name="last_name" maxlength="150" class="block w-full rounded border p-2 text-zinc-900"></label>
-            <label class="block">Prénom <input name="first_name" maxlength="150" class="block w-full rounded border p-2 text-zinc-900"></label>
-            <label class="block">Mot de passe (12 caractères, majuscule, minuscule, chiffre et symbole)
-                <input name="password" type="password" autocomplete="new-password" class="block w-full rounded border p-2 text-zinc-900"></label>
-            <label class="block">Confirmation <input name="password_confirmation" type="password" class="block w-full rounded border p-2 text-zinc-900"></label>
-        @endguest
-        <button class="rounded border p-3">Accepter l’invitation</button>
-    </form>
+    <div class="space-y-4">
+        <flux:heading size="xl">Rejoindre l’équipe</flux:heading>
+        <flux:text>Vous êtes invité à rejoindre {{ $shopName }} avec l’adresse {{ $invitation->email }}.</flux:text>
+
+        @foreach ($errors->all() as $error)
+            <flux:text role="alert">{{ $error }}</flux:text>
+        @endforeach
+
+        @if ($switchAccount)
+            <flux:text>Vous êtes connecté avec un autre compte dans cette boutique.</flux:text>
+            <form method="POST" action="{{ route('tenant.invitations.switch-account', $invitation, false) }}">
+                @csrf
+                <input type="hidden" name="token" value="{{ $token }}">
+                <flux:button type="submit">Se déconnecter et continuer</flux:button>
+            </form>
+        @elseif (! $hasAccount)
+            <flux:button variant="primary" :href="route('tenant.invitations.show', ['invitation' => $invitation, 'token' => $token, 'compte' => 1], false)">
+                Accepter l’invitation
+            </flux:button>
+        @elseif (auth('tenant')->guest())
+            <flux:text>Connectez-vous avec votre compte de cette boutique, puis rouvrez le lien d’invitation.</flux:text>
+            <flux:button :href="route('tenant.login', absolute: false)">Se connecter</flux:button>
+        @else
+            <form method="POST" action="{{ route('tenant.invitations.accept', $invitation, false) }}">
+                @csrf
+                <input type="hidden" name="token" value="{{ $token }}">
+                <flux:button type="submit" variant="primary">Accepter l’invitation</flux:button>
+            </form>
+        @endif
+    </div>
 </x-tenant::layouts.auth>

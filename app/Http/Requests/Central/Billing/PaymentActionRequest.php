@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Central\Billing;
 
-use App\Enums\Central\Billing\TransferStatusEnum;
 use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Users\User;
 use App\Services\Central\Billing\PaymentDocumentService;
@@ -35,19 +34,16 @@ class PaymentActionRequest extends FormRequest
     public function rules(): array
     {
         $action = $this->route()?->getActionMethod();
-        $rules = SaasPaymentService::verificationRules();
+        $payment = $this->route('payment');
+        $rules = SaasPaymentService::verificationRules($payment instanceof SaasPayment ? $payment : null);
         if ($action === 'resumeCash') {
-            $rules = ['expected_state' => $rules['expected_state'], 'received' => $rules['received']];
+            $rules = ['expected_state' => $rules['expected_state'], 'received' => ['required', 'accepted']];
         } elseif ($action === 'resumeProof') {
             $rules = ['expected_state' => $rules['expected_state'], 'proof' => ['required', 'file', 'mimetypes:application/pdf,image/jpeg,image/png', 'max:'.PaymentDocumentService::MAX_KB]];
         } elseif ($action === 'reject') {
             $rules = ['expected_state' => $rules['expected_state'], 'reason' => ['required', 'string', 'max:2000']];
         } elseif ($action === 'reconcile') {
-            unset($rules['received']);
-            $payment = $this->route('payment');
-            if ($payment instanceof SaasPayment && $payment->getAttribute('transfer_status') === TransferStatusEnum::UNCERTAIN) {
-                $rules = ['expected_state' => $rules['expected_state'], 'review_note' => ['required', 'string', 'max:2000']];
-            }
+            $rules = ['expected_state' => $rules['expected_state'], 'review_note' => ['required', 'string', 'max:2000']];
         }
 
         return [...$rules, ...array_fill_keys(['amount', 'currency', 'user_id', 'document_id', 'transfer_status', 'validated_by_id', 'validated_at',

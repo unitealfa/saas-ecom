@@ -25,15 +25,16 @@ test('plan pages require consultation permission and show versions', function ()
     $this->get(route('central.plan-pages.create'))->assertForbidden();
 });
 
-test('plan information updates require permission and reject stale state', function (): void {
+test('the plan details page edits information only in the new version dialog', function (): void {
     $plan = Plan::factory()->create(['code' => 'example', 'name' => 'Avant']);
-    $actor = planInterfaceActor(['saas.plans.view', 'saas.plans.update']);
-    $data = ['name' => 'Après', 'description' => null, 'monthly_price' => '20.00', 'annual_price' => '200.00', 'expected_state' => $plan->compositionState($plan->features)];
-    $this->actingAs($actor, 'central')->put(route('central.plan-pages.update', $plan), $data)->assertRedirect();
-    expect($plan->fresh()->name)->toBe('Après');
-    $this->put(route('central.plan-pages.update', $plan), $data)->assertSessionHasErrors('expected_state');
-    $reader = planInterfaceActor(['saas.plans.view']);
-    $this->actingAs($reader, 'central')->put(route('central.plan-pages.update', $plan), $data)->assertForbidden();
+    $actor = planInterfaceActor(['saas.plans.view', 'saas.plans.update', 'saas.plans.versions.create']);
+    $url = route('central.plan-pages.show', $plan);
+
+    $this->actingAs($actor, 'central')->get($url)->assertOk()
+        ->assertDontSee('name="monthly_price"', false)
+        ->assertSee('name="draft[information][monthly_price]"', false);
+    $this->put($url, ['name' => 'Après'])->assertStatus(405);
+    expect($plan->refresh()->name)->toBe('Avant');
 });
 
 test('used and free plan versions cannot be edited', function (): void {
@@ -46,33 +47,36 @@ test('used and free plan versions cannot be edited', function (): void {
     $this->putJson(route('central.plans.update', $free), $data)->assertForbidden();
 });
 
-test('the composition form submits selected features and quotas', function (): void {
-    $actor = planInterfaceActor(['saas.plans.view', 'saas.plans.features.update']);
+test('the version form submits selected features and quotas', function (): void {
+    $actor = planInterfaceActor(['saas.plans.view', 'saas.plans.versions.create', 'saas.plans.features.update']);
     $plan = Plan::factory()->create();
     $feature = Feature::factory()->create(['is_active' => true]);
-    $this->actingAs($actor, 'central')->put(route('central.plan-pages.features.update', $plan), [
-        'expected_state' => $plan->compositionState($plan->features),
-        'selected' => [$feature->uuid], 'enabled' => [$feature->uuid => '1'], 'limits' => [$feature->uuid => '12'],
-    ])->assertRedirect(route('central.plan-pages.show', $plan));
-    expect($plan->features()->firstOrFail()->limit)->toBe(12);
+    $this->actingAs($actor, 'central')->post(route('central.plan-pages.versions.store', $plan), [
+        'expected_state' => $plan->compositionState($plan->features), 'expected_latest_version' => $plan->version,
+        'draft' => ['preview' => '1', 'edit_features' => '1',
+            'selected' => [$feature->uuid], 'enabled' => [$feature->uuid => '1'], 'limits' => [$feature->uuid => '12']],
+    ])->assertSessionHasNoErrors()->assertRedirect();
+    expect(Plan::where('code', $plan->code)->where('version', 2)->sole()->features()->sole()->limit)->toBe(12)
+        ->and($plan->features()->count())->toBe(0);
 });
 
 test('the composition form preserves choices and a rejected quota after validation failure', function (): void {
-    $actor = planInterfaceActor(['saas.plans.view', 'saas.plans.features.update']);
+    $actor = planInterfaceActor(['saas.plans.view', 'saas.plans.versions.create', 'saas.plans.features.update']);
     $plan = Plan::factory()->create();
     $feature = Feature::factory()->create(['is_active' => true]);
     $url = route('central.plan-pages.show', $plan);
 
     $this->actingAs($actor, 'central')->from($url)
-        ->put(route('central.plan-pages.features.update', $plan), [
-            '_composition' => '1', 'expected_state' => $plan->compositionState($plan->features),
-            'selected' => [$feature->uuid], 'enabled' => [$feature->uuid => '1'], 'limits' => [$feature->uuid => '-1'],
+        ->post(route('central.plan-pages.versions.store', $plan), [
+            'expected_state' => $plan->compositionState($plan->features), 'expected_latest_version' => $plan->version,
+            'draft' => ['preview' => '1', 'edit_features' => '1',
+                'selected' => [$feature->uuid], 'enabled' => [$feature->uuid => '1'], 'limits' => [$feature->uuid => '-1']],
         ])->assertRedirect($url)->assertSessionHasErrors('features.0.limit');
 
     $response = $this->get($url)->assertOk();
-    $response->assertSee('name="selected[]" value="'.$feature->uuid.'" checked', false);
-    $response->assertSee('name="enabled['.$feature->uuid.']" value="1" checked', false);
-    $response->assertSee('name="limits['.$feature->uuid.']" value="-1"', false);
+    $response->assertSee('name="draft[selected][]" value="'.$feature->uuid.'" checked', false);
+    $response->assertSee('name="draft[enabled]['.$feature->uuid.']" value="1" checked', false);
+    $response->assertSee('name="draft[limits]['.$feature->uuid.']" value="-1"', false);
     expect($plan->features()->count())->toBe(0);
 });
 

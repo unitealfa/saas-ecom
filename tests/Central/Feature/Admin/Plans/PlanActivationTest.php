@@ -110,9 +110,13 @@ test('activating an already active version resolves other active versions withou
         ->and(Activity::forSubject($second)->where('event', 'plan_activation_updated')->count())->toBe(0);
 });
 
-test('default plan selection creates a free version without changing the paid version', function (): void {
+test('default plan selection migrates unlimited subscriptions and preserves paid periods', function (): void {
     $actor = planActivationActor(['saas.plans.view', 'saas.plans.activate', 'saas.plans.archive', 'saas.plans.versions.create']);
     $this->seed(FreePlanSeeder::class);
+    $previous = Plan::where('code', 'free')->sole();
+    $previous->forceFill(['is_default' => true])->save();
+    $freeOwner = User::factory()->create();
+    $unlimited = app(DefaultSubscription::class)->ensure($freeOwner);
     $plan = Plan::factory()->create(['is_active' => true, 'monthly_price' => '3000.00', 'annual_price' => '36000.00']);
     (new PlanFeature)->forceFill(['plan_id' => $plan->id,
         'feature_id' => Feature::where('code', 'shops')->sole()->id,
@@ -125,21 +129,44 @@ test('default plan selection creates a free version without changing the paid ve
     $this->actingAs($actor, 'central')->patch(route('central.plan-pages.default', $plan), $data)
         ->assertRedirect()->assertSessionHasNoErrors();
     $defaults = app(DefaultSubscription::class);
-    $freeVersion = Plan::where('code', $plan->code)->where('is_default', true)->sole();
-    expect($plan->refresh()->is_default)->not->toBeTrue()->and($plan->monthly_price)->toBe('3000.00')
-        ->and($plan->is_active)->toBeFalse()->and($freeVersion->name)->toBe($plan->name.' Free')
-        ->and($freeVersion->monthly_price)->toBe('0.00')->and($freeVersion->annual_price)->toBe('0.00')
-        ->and($freeVersion->features()->sole()->limit)->toBe(3)
+    expect($plan->refresh()->is_default)->toBeTrue()->and($plan->monthly_price)->toBe('3000.00')
+        ->and($plan->is_active)->toBeTrue()->and($previous->refresh()->is_active)->toBeFalse()
+        ->and($unlimited->refresh()->plan_id)->toBe($plan->id)
         ->and($defaults->ensure($owner)->id)->toBe($paid->id);
     $this->travel(2)->days();
     $fallback = $defaults->ensure($owner);
-    expect($fallback->plan_id)->toBe($freeVersion->id)->and($fallback->agreed_amount)->toBe('0.00')
+    expect($fallback->plan_id)->toBe($plan->id)->and($fallback->agreed_amount)->toBe('0.00')
         ->and($fallback->period_ends_at)->toBeNull()
         ->and($paid->refresh()->status)->toBe(StatusEnum::EXPIRED)
         ->and($defaults->ensure($owner)->id)->toBe($fallback->id)
         ->and(SubscriptionInstallment::where('subscription_id', $fallback->id)->exists())->toBeFalse()
-        ->and(Gate::forUser($actor)->allows('activate', $freeVersion))->toBeFalse()
-        ->and(Gate::forUser($actor)->allows('archive', $freeVersion))->toBeFalse();
+        ->and(Gate::forUser($actor)->allows('activate', $plan))->toBeFalse()
+        ->and(Gate::forUser($actor)->allows('archive', $plan))->toBeFalse();
+});
+
+test('activating a new version preserves an active default version', function (): void {
+    $actor = planActivationActor(['saas.plans.activate']);
+    $old = Plan::factory()->create(['code' => 'pro', 'version' => 1, 'is_active' => true, 'is_default' => true]);
+    $new = Plan::factory()->create(['code' => 'pro', 'version' => 2, 'is_active' => false]);
+    $this->actingAs($actor, 'central')->patchJson(route('central.plans.activate', $new->uuid), [
+        'expected_state' => planActivationState($new), 'is_active' => true,
+    ])->assertNoContent();
+    expect($old->refresh()->is_default)->toBeTrue()->and($old->is_active)->toBeTrue()
+        ->and($new->refresh()->is_active)->toBeTrue()->and($new->is_default)->toBeNull();
+});
+
+test('scheduled resolution returns an expired subscription to the current default', function (): void {
+    $this->seed(FreePlanSeeder::class);
+    $default = Plan::where('code', 'free')->sole();
+    $default->forceFill(['is_default' => true])->save();
+    $owner = User::factory()->create();
+    $expired = Subscription::factory()->create([
+        'user_id' => $owner->id, 'status' => StatusEnum::ACTIVE,
+        'period_starts_at' => now()->subMonth(), 'period_ends_at' => now()->subDay(),
+    ]);
+    $this->artisan('aydra:resolve-subscriptions')->assertSuccessful();
+    expect($expired->refresh()->status)->toBe(StatusEnum::EXPIRED)
+        ->and(Subscription::where('user_id', $owner->id)->where('status', StatusEnum::ACTIVE)->sole()->plan_id)->toBe($default->id);
 });
 
 test('default plan selection checks permission confirmation composition and SQL uniqueness', function (): void {

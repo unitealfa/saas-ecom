@@ -55,15 +55,87 @@
                 </form>
             @endcan
         @endif
-        <section class="aydra-users-panel p-5 sm:p-6"><h2 class="aydra-heading mb-4 text-lg font-semibold">Actions du plan</h2><div class="flex flex-wrap gap-3">
-            @canany(['update', 'updateFeatures'], $plan)<flux:button :href="route('central.plan-pages.edit', $plan)" icon="pencil-square">Modifier le plan</flux:button>@endcanany
+        <section class="aydra-users-panel p-5 sm:p-6">
+            <h2 class="aydra-heading mb-4 text-lg font-semibold">Actions du plan</h2>
+            <div class="flex flex-wrap gap-3">
             @can('createVersion', $plan)
-                <form method="POST" action="{{ route('central.plan-pages.versions.store', $plan) }}">
-                    @csrf
-                    <input type="hidden" name="expected_state" value="{{ $state }}">
-                    <input type="hidden" name="expected_latest_version" value="{{ $latestVersion }}">
-                    <flux:button type="submit">Créer une nouvelle version</flux:button>
-                </form>
+                @php($restoreDraft = old('draft.preview') === '1' && ! $errors->hasAny(['expected_state', 'expected_latest_version']))
+                @php($confirmCopy = $restoreDraft && $errors->has('copy_confirmation'))
+                @php($draftValue = static fn (string $key, mixed $fallback) => $restoreDraft && is_scalar($value = old('draft.'.$key, $fallback)) ? $value : ($restoreDraft ? '' : $fallback))
+                @php($versionFeatures = $plan->features->keyBy('feature_id'))
+                @php($draftSelected = (array) old('draft.selected', []))
+                <flux:modal.trigger name="create-plan-version">
+                    <flux:button type="button">Créer une nouvelle version</flux:button>
+                </flux:modal.trigger>
+                <flux:modal name="create-plan-version" class="w-full md:max-w-3xl" :dismissible="false">
+                    <form method="POST" action="{{ route('central.plan-pages.versions.store', $plan) }}" class="flex flex-col gap-4"
+                        x-data="{ confirmed: @js($confirmCopy) }" x-ref="versionForm"
+                        @if ($restoreDraft) x-init="$nextTick(() => $flux.modal('create-plan-version').show())" @endif>
+                        @csrf
+                        <input type="hidden" name="expected_state" value="{{ $state }}">
+                        <input type="hidden" name="expected_latest_version" value="{{ $latestVersion }}">
+                        <input type="hidden" name="draft[preview]" value="1">
+                        <flux:heading size="lg">Créer la version {{ $latestVersion + 1 }}</flux:heading>
+                        @if ($confirmCopy)
+                            <flux:callout variant="warning" role="alert" x-show="confirmed">{{ $errors->first('copy_confirmation') }}</flux:callout>
+                            <input type="hidden" name="draft[confirmed_copy]" value="1" x-bind:disabled="! confirmed">
+                        @elseif ($restoreDraft && $errors->any())
+                            <flux:callout variant="danger" role="alert">
+                                @foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach
+                            </flux:callout>
+                        @endif
+                        <div x-show="! confirmed" class="max-h-[60vh] space-y-4 overflow-y-auto p-1">
+                            <details open class="rounded-lg border border-zinc-300 p-4 dark:border-zinc-700">
+                                <summary>Modifier les informations</summary>
+                                <div class="mt-3 flex flex-col gap-3">
+                                    @can('update', $plan)
+                                        <flux:input name="draft[information][name]" label="Nom" :value="$draftValue('information.name', $suggestedVersionName)" maxlength="255" required />
+                                        <flux:textarea name="draft[information][description]" label="Description">{{ $draftValue('information.description', $plan->description) }}</flux:textarea>
+                                        <flux:input type="number" min="0" step="0.01" name="draft[information][monthly_price]" label="Prix mensuel (DZD)" :value="$draftValue('information.monthly_price', $plan->monthly_price)" required />
+                                        <flux:input type="number" min="0" step="0.01" name="draft[information][annual_price]" label="Prix annuel (DZD)" :value="$draftValue('information.annual_price', $plan->annual_price)" required />
+                                    @else
+                                        <flux:text>{{ $suggestedVersionName }}</flux:text>
+                                        <flux:text>{{ $plan->description }}</flux:text>
+                                        <flux:text>{{ $plan->monthly_price }} DZD par mois · {{ $plan->annual_price }} DZD par an</flux:text>
+                                    @endcan
+                                </div>
+                            </details>
+                            <details open class="rounded-lg border border-zinc-300 p-4 dark:border-zinc-700">
+                                <summary>Définir les fonctionnalités et quotas</summary>
+                                <div class="mt-3 flex flex-col gap-3">
+                                    @can('updateVersionFeatures', $plan)
+                                        <input type="hidden" name="draft[edit_features]" value="1">
+                                        @foreach ($availableFeatures->merge($plan->features->pluck('feature'))->unique('id')->sortBy('name') as $feature)
+                                            @php($current = $versionFeatures->get($feature->id))
+                                            <fieldset class="flex flex-wrap items-center gap-3">
+                                                <legend class="mb-1 font-medium">{{ $feature->name }}</legend>
+                                                <label><input type="checkbox" name="draft[selected][]" value="{{ $feature->uuid }}" @checked($restoreDraft ? in_array($feature->uuid, $draftSelected, true) : $current !== null)> Inclure</label>
+                                                <label><input type="checkbox" name="draft[enabled][{{ $feature->uuid }}]" value="1" @checked($restoreDraft ? old('draft.enabled.'.$feature->uuid) === '1' : ($current?->is_active ?? true))> Activer</label>
+                                                @if ($feature->value_type === \App\Enums\Central\Features\ValueTypeEnum::QUANTITY)
+                                                    <label>Limite
+                                                        <input class="w-28 rounded border border-zinc-300 bg-transparent p-1" type="number" min="0" name="draft[limits][{{ $feature->uuid }}]" value="{{ $restoreDraft ? $draftValue('limits.'.$feature->uuid, '') : $current?->limit }}">
+                                                        {{ $feature->unit }}
+                                                    </label>
+                                                @endif
+                                                @if ($feature->trashed() || ! $feature->is_active)<flux:text>Indisponible</flux:text>@endif
+                                            </fieldset>
+                                        @endforeach
+                                    @else
+                                        @forelse ($plan->features as $item)
+                                            <flux:text>{{ $item->feature->name }} · {{ $item->is_active ? 'Activée' : 'Désactivée' }}@if ($item->limit !== null) · {{ $item->limit }} {{ $item->feature->unit }}@endif</flux:text>
+                                        @empty
+                                            <flux:text>Aucune fonctionnalité configurée.</flux:text>
+                                        @endforelse
+                                    @endcan
+                                </div>
+                            </details>
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <flux:modal.close><flux:button type="button" x-on:click="confirmed = false; $refs.versionForm.reset()"><span x-text="confirmed ? 'Non' : 'Annuler'">Annuler</span></flux:button></flux:modal.close>
+                            <flux:button type="submit" variant="primary"><span x-text="confirmed ? 'Oui' : 'Créer'">Créer</span></flux:button>
+                        </div>
+                    </form>
+                </flux:modal>
             @endcan
             @can('activate', $plan)
                 <form method="POST" action="{{ route('central.plan-pages.activate', $plan) }}">
@@ -81,6 +153,11 @@
                 </form>
             @endcan
             <flux:button :href="route('central.plan-pages.index')">Retour aux plans</flux:button>
-        </div><p class="aydra-muted mt-4 text-sm">Activer une version désactive les autres versions commercialisées du même plan. Les abonnements existants ne changent pas.</p></section>
+            </div>
+            <p class="aydra-muted mt-4 text-sm">
+                Activer une version désactive les autres versions commercialisées du même plan,
+                sauf le plan par défaut. Les abonnements existants ne changent pas.
+            </p>
+        </section>
     </section>
 </x-layouts::app>

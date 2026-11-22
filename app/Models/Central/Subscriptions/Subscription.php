@@ -109,7 +109,7 @@ class Subscription extends Model
 
     public function isFree(): bool
     {
-        return $this->agreed_amount === '0.00';
+        return $this->agreed_amount === '0.00' && $this->period_ends_at === null;
     }
 
     public function effectiveStartsAt(): CarbonImmutable

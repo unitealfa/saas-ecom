@@ -64,8 +64,8 @@ class SubscriptionPurchaseService
                         throw ValidationException::withMessages(['expected_state' => 'L’abonnement a changé. Rechargez la page.']);
                     }
                     if ($source->status !== StatusEnum::ACTIVE || $source->effectiveStartsAt()->isFuture()
-                        || $source->isFree() || $source->effectiveEndsAt()?->isFuture() !== true) {
-                        $this->fail('Seul un abonnement payant en cours peut être remplacé.');
+                        || $source->ended_at !== null || (! $source->isFree() && $source->effectiveEndsAt()?->isFuture() !== true)) {
+                        $this->fail('Seul un abonnement en cours peut être remplacé.');
                     }
                 }
                 Gate::forUser($actor)->authorize('purchaseFor', [Subscription::class, $owner, $source]);
@@ -94,12 +94,12 @@ class SubscriptionPurchaseService
                     $this->fail('Une période est déjà prévue ou en attente de paiement. Consultez cet abonnement avant d’en choisir un autre.');
                 }
                 $plan = Plan::where('uuid', strtolower($values['plan_uuid']))->active()->lockForUpdate()->first();
-                if ($plan === null || $plan->code === 'free' || $plan->is_default) {
-                    $this->fail('Choisissez une offre payante actuellement disponible. L’offre gratuite ne nécessite aucun paiement.');
+                if ($plan === null || $plan->is_default) {
+                    $this->fail('Choisissez une offre actuellement disponible. Le plan par défaut dispose de sa propre action.');
                 }
                 $period = PeriodEnum::from((int) $values['period']);
                 $amount = $period === PeriodEnum::MONTHLY ? $plan->monthly_price : $plan->annual_price;
-                if ($amount !== $values['expected_amount'] || BigDecimal::of($amount)->isLessThanOrEqualTo(0)
+                if ($amount !== $values['expected_amount'] || BigDecimal::of($amount)->isNegative()
                     || BigDecimal::of($amount)->isGreaterThan('999999.99')) {
                     $this->fail('Le prix a changé ou n’est pas payable pour cette période. Rechargez l’offre.');
                 }

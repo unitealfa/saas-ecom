@@ -18,8 +18,11 @@ class SaasInvoicePolicy
 
         return $request !== null && $request->current_invoice_id === $invoice->id
             && $request->current_subscription_id === $invoice->subscription_id
-            && $request->payment?->getAttribute('transfer_status') === TransferStatusEnum::VERIFIED
-            && Gate::forUser($actor)->allows('verify', $request->payment);
+            && ($invoice->total_amount === '0.00' && $invoice->subscription->agreed_amount === '0.00'
+                && $request->current_payment_id === null
+                ? Gate::forUser($actor)->allows('accept', $request)
+                : $request->payment?->getAttribute('transfer_status') === TransferStatusEnum::VERIFIED
+                    && Gate::forUser($actor)->allows('verify', $request->payment));
     }
 
     public function reserveForRequest(User $actor, SaasInvoice $invoice): bool
@@ -97,6 +100,8 @@ class SaasInvoicePolicy
     public function issue(User $actor, SaasInvoice $invoice): bool
     {
         return $this->has($actor, 'issue')
+            && ($invoice->total_amount !== '0.00' || $invoice->subscription->request === null
+                || $invoice->status === DocumentStatusEnum::ISSUED)
             && in_array($invoice->status, [DocumentStatusEnum::DRAFT, DocumentStatusEnum::PREPARING, DocumentStatusEnum::ISSUED], true);
     }
 
@@ -113,6 +118,10 @@ class SaasInvoicePolicy
 
     private function payable(SaasInvoice $invoice): bool
     {
+        if ($invoice->total_amount === '0.00') {
+            return false;
+        }
+
         $request = $invoice->subscription->request;
 
         return $invoice->status === DocumentStatusEnum::ISSUED

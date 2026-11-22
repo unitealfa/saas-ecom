@@ -98,7 +98,7 @@ class SubscriptionController extends Controller
 
         return view('central.pages.admin.subscriptions.change', [
             'subscription' => $subscription,
-            'plans' => Plan::active()->whereNull('is_default')->where('code', '!=', 'free')->whereKeyNot($subscription->plan_id)->orderBy('name')->get(),
+            'plans' => Plan::active()->whereNull('is_default')->whereKeyNot($subscription->plan_id)->orderBy('name')->get(),
             'operationKey' => (string) Str::uuid(),
         ]);
     }
@@ -107,7 +107,11 @@ class SubscriptionController extends Controller
     {
         $next = $this->transitions->change($this->centralActor(), $subscription, $request->validated(), $request->file('proof'));
 
-        return $this->redirectAfterTransition($next, 'Paiement confirmé ; changement appliqué ou programmé selon le mode choisi.');
+        $message = $next->agreed_amount === '0.00'
+            ? 'Offre à 0,00 DZD approuvée. La facture est disponible.'
+            : 'Paiement confirmé. Le changement est appliqué ou programmé selon le mode choisi.';
+
+        return $this->redirectAfterTransition($next, $message);
     }
 
     private function redirectAfterTransition(Subscription $subscription, string $message): RedirectResponse

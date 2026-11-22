@@ -18,6 +18,9 @@
             <div><dt>Commerçant au moment de la préparation</dt><dd>{{ $invoice->customer_identity_snapshot['name'] ?? trim(($invoice->customer_identity_snapshot['first_name'] ?? '').' '.($invoice->customer_identity_snapshot['last_name'] ?? '')) }}</dd></div>
             <div><dt>Échéance</dt><dd>{{ $invoice->installment->installment_number }}</dd></div>
             <div><dt>État du paiement</dt><dd>{{ $paymentState->label() }}</dd></div>
+            @if (isset($invoice->billing_rule_snapshot['approval_actor_name']))
+                <div><dt>Offre approuvée par</dt><dd>{{ $invoice->billing_rule_snapshot['approval_actor_name'] }}</dd></div>
+            @endif
             <div><dt>Règle appliquée</dt><dd>{{ $invoice->billing_rule_snapshot['code'] }} — version {{ $invoice->billing_rule_snapshot['version'] }}</dd></div>
             <div><dt>Émetteur déclaré</dt><dd>{{ $invoice->saas_identity_snapshot['name'] }}</dd></div>
             <div><dt>Période</dt><dd>{{ $invoice->period_starts_at->format('d/m/Y') }} — {{ $invoice->period_ends_at->format('d/m/Y') }}</dd></div>
@@ -56,7 +59,7 @@
             @can('view', $invoice->subscription->request)
                 <flux:button :href="route(($ownerMode ? 'owner' : 'central').'.subscription-requests.show', $invoice->subscription->request)">Demande, justificatifs et décision</flux:button>
             @endcan
-        @elseif (! in_array($paymentState, [\App\Enums\Central\Billing\PaymentStateEnum::PAID, \App\Enums\Central\Billing\PaymentStateEnum::CREDITED], true))
+        @elseif (! in_array($paymentState, [\App\Enums\Central\Billing\PaymentStateEnum::PAID, \App\Enums\Central\Billing\PaymentStateEnum::CREDITED, \App\Enums\Central\Billing\PaymentStateEnum::NO_PAYMENT_REQUIRED], true))
             @if ($ownerMode)
                 @can('declarePayment', $invoice)@include('central.pages.admin.billing.invoices.payment-form', ['cash' => false])@endcan
             @else

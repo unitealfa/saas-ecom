@@ -28,7 +28,6 @@ Route::controller(PlanPageController::class)->prefix('offres')->name('plan-pages
     Route::post('/', 'store')->name('store');
     Route::get('{plan}/edit', 'edit')->name('edit');
     Route::get('{plan}', 'show')->withTrashed()->name('show');
-    Route::put('{plan}', 'update')->name('update');
     Route::put('{plan}/features', 'updateFeatures')->name('features.update');
     Route::post('{plan}/versions', 'storeVersion')->name('versions.store');
     Route::patch('{plan}/activation', 'activate')->name('activate');

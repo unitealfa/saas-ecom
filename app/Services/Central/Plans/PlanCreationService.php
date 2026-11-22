@@ -2,7 +2,10 @@
 
 namespace App\Services\Central\Plans;
 
+use App\Enums\Central\Features\ValueTypeEnum;
+use App\Models\Central\Features\Feature;
 use App\Models\Central\Plans\Plan;
+use App\Models\Central\Plans\PlanFeature;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -28,7 +31,11 @@ class PlanCreationService
             'description' => ['nullable', 'string', 'max:65535'],
             'monthly_price' => self::PRICE,
             'annual_price' => self::PRICE,
-            ...array_fill_keys(['id', 'uuid', 'version', 'is_active', 'deleted_at', 'features'], ['prohibited']),
+            'features' => ['required', 'array', 'min:1', 'list'],
+            'features.*.uuid' => ['required', 'uuid:4', 'distinct'],
+            'features.*.limit' => ['nullable', 'integer', 'min:0'],
+            'features.*.unlimited' => ['required', 'boolean'],
+            ...array_fill_keys(['id', 'uuid', 'version', 'is_active', 'deleted_at'], ['prohibited']),
         ];
     }
 
@@ -38,6 +45,9 @@ class PlanCreationService
      */
     public static function normalize(array $data): array
     {
+        if (isset($data['features']) && is_array($data['features'])) {
+            $data['features'] = array_values($data['features']);
+        }
         foreach (['code', 'name', 'description'] as $field) {
             if (is_string($data[$field] ?? null)) {
                 $data[$field] = trim($data[$field]);
@@ -66,13 +76,32 @@ class PlanCreationService
                     $this->codeReserved();
                 }
 
-                $plan = new Plan($values);
+                $features = Feature::whereIn('uuid', array_column($values['features'], 'uuid'))->active()
+                    ->orderBy('id')->lockForUpdate()->get()->keyBy('uuid');
+                if ($features->count() !== count($values['features'])) {
+                    throw ValidationException::withMessages(['features' => 'Une fonctionnalité sélectionnée est indisponible.']);
+                }
+                foreach ($values['features'] as $item) {
+                    $feature = $features->get($item['uuid']);
+                    $limit = $item['limit'] ?? null;
+                    if ($feature->value_type === ValueTypeEnum::QUANTITY
+                        && ((bool) $item['unlimited'] === ($limit !== null))) {
+                        throw ValidationException::withMessages(['features' => 'Choisissez une limite ou sélectionnez explicitement « Sans limite ».']);
+                    }
+                }
+                $plan = new Plan(collect($values)->except('features')->all());
                 $plan->forceFill(['version' => 1, 'is_active' => false]);
 
                 try {
                     $plan->save();
                 } catch (UniqueConstraintViolationException) {
                     $this->codeReserved();
+                }
+
+                foreach ($values['features'] as $item) {
+                    $feature = $features->get($item['uuid']);
+                    PlanFeature::create(['plan_id' => $plan->id, 'feature_id' => $feature->id,
+                        'is_active' => true, 'limit' => $feature->value_type === ValueTypeEnum::QUANTITY ? ($item['limit'] ?? null) : null]);
                 }
 
                 activity()->causedBy($actor)->performedOn($plan)->event('plan_created')

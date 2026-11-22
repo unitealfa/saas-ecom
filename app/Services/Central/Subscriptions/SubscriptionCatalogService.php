@@ -66,7 +66,7 @@ class SubscriptionCatalogService
     {
         Gate::forUser($actor)->authorize('view', $subscription);
 
-        return $subscription->load(['owner', 'plan', 'assignedBy']);
+        return $subscription->load(['owner', 'plan', 'assignedBy', 'request.invoice']);
     }
 
     /** @return LengthAwarePaginator<int, Subscription> */

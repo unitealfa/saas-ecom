@@ -11,10 +11,13 @@ final class LoginController extends Controller
 {
     public function __invoke(Request $request, LoginService $login): RedirectResponse
     {
-        $data = $request->validate(['email' => ['required', 'email:rfc', 'max:255'],
-            'password' => ['required', 'string']]);
-        $login->login($data['email'], $data['password']);
-        $request->session()->regenerate(true);
+        $data = $request->validate([
+            'email' => ['required', 'email:rfc', 'max:255'],
+            'password' => ['required', 'string'],
+            'remember' => ['sometimes', 'boolean'],
+        ]);
+        $login->login($data['email'], $data['password'], $request->boolean('remember'));
+
         return to_route('tenant.dashboard');
     }
 }

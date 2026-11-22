@@ -3,11 +3,13 @@
 use App\Enums\Central\Billing\DocumentTypeEnum;
 use App\Enums\Central\Billing\TransferStatusEnum;
 use App\Enums\Central\Billing\TriggerEventEnum;
+use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Models\Central\Audit\Activity;
 use App\Models\Central\Billing\SaasCreditNote;
 use App\Models\Central\Billing\SaasInvoice;
 use App\Models\Central\Billing\SaasPayment;
 use App\Models\Central\Roles\Role;
+use App\Models\Central\Subscriptions\Subscription;
 use App\Models\User;
 use App\Services\Central\Billing\BillingRuleService;
 use App\Services\Central\Billing\OwnerPaymentCorrectionService;
@@ -17,6 +19,20 @@ use App\Services\Central\Billing\SaasPaymentService;
 use Illuminate\Support\Str;
 
 require_once dirname(__DIR__, 3).'/Support/ManualBillingFixtures.php';
+
+test('the owner sees the expiry notice from seven days until the end date', function (): void {
+    $owner = User::factory()->create();
+    $subscription = Subscription::factory()->create([
+        'user_id' => $owner->id, 'status' => StatusEnum::ACTIVE, 'agreed_amount' => '100.00',
+        'period_starts_at' => now()->subDays(20), 'period_ends_at' => now()->addDays(8),
+    ]);
+    $this->actingAs($owner, 'central')->get(route('owner.billing.index'))->assertOk()
+        ->assertDontSee('Votre plan se termine dans');
+    $subscription->forceFill(['period_ends_at' => now()->addDays(7)])->save();
+    $this->get(route('owner.billing.index'))->assertOk()->assertSee('Votre plan se termine dans 7 jours.');
+    $subscription->forceFill(['period_ends_at' => now()->endOfDay()])->save();
+    $this->get(route('owner.billing.index'))->assertOk()->assertSee('Votre plan se termine dans 0 jours.');
+});
 
 function ownerBillingCreditNote(User $actor, SaasInvoice $invoice, bool $issue = true): SaasCreditNote
 {

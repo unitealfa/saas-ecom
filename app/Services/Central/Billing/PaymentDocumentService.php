@@ -148,6 +148,14 @@ class PaymentDocumentService
         }
         $this->assertFile($media);
 
+        // Preserve the original image, rather than hashing a newly rendered PDF.
+        $source = Media::where('model_type', $request->getMorphClass())->where('model_id', $request->id)
+            ->where('collection_name', self::SOURCE)->first();
+        if ($source !== null) {
+            $this->assertFile($source);
+            $media = $source;
+        }
+
         return new UploadedFile(Storage::disk($media->disk)->path($media->storage_key), $media->original_name, $media->mime_type, null, true);
     }
 

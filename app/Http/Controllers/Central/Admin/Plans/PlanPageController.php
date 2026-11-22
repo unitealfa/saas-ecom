@@ -10,7 +10,6 @@ use App\Http\Requests\Central\Plans\StorePlanRequest;
 use App\Http\Requests\Central\Plans\StorePlanVersionRequest;
 use App\Http\Requests\Central\Plans\UpdatePlanActivationRequest;
 use App\Http\Requests\Central\Plans\UpdatePlanPageFeaturesRequest;
-use App\Http\Requests\Central\Plans\UpdatePlanRequest;
 use App\Models\Central\Features\Feature;
 use App\Models\Central\Plans\Plan;
 use App\Services\Central\Plans\PlanActivationService;
@@ -18,7 +17,6 @@ use App\Services\Central\Plans\PlanArchiveService;
 use App\Services\Central\Plans\PlanCatalogService;
 use App\Services\Central\Plans\PlanCompositionService;
 use App\Services\Central\Plans\PlanCreationService;
-use App\Services\Central\Plans\PlanUpdateService;
 use App\Services\Central\Plans\PlanVersionService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -30,7 +28,6 @@ class PlanPageController extends Controller
     public function __construct(
         private readonly PlanCatalogService $plans,
         private readonly PlanCreationService $creation,
-        private readonly PlanUpdateService $update,
         private readonly PlanCompositionService $composition,
         private readonly PlanVersionService $versions,
         private readonly PlanActivationService $activation,
@@ -40,99 +37,201 @@ class PlanPageController extends Controller
     public function index(SearchPlansRequest $request): View
     {
         $sort = $request->validate([
-            'sort' => ['nullable', Rule::in(['name', 'version', 'monthly_price', 'annual_price', 'is_active'])],
-            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
+            'sort' => [
+                'nullable',
+                Rule::in([
+                    'name',
+                    'version',
+                    'monthly_price',
+                    'annual_price',
+                    'is_active',
+                ]),
+            ],
+            'direction' => [
+                'nullable',
+                Rule::in(['asc', 'desc']),
+            ],
         ]);
 
         return view('central.pages.admin.plans.index', [
-            'plans' => $this->plans->paginate($this->centralActor(), $request->validated('search'), $sort['sort'] ?? null, $sort['direction'] ?? null),
+            'plans' => $this->plans->paginate(
+                $this->centralActor(),
+                $request->validated('search'),
+                $sort['sort'] ?? null,
+                $sort['direction'] ?? null,
+            ),
         ]);
     }
 
     public function create(): View
     {
-        Gate::forUser($this->centralActor())->authorize('create', Plan::class);
+        Gate::forUser($this->centralActor())
+            ->authorize('create', Plan::class);
 
-        return view('central.pages.admin.plans.create');
+        return view('central.pages.admin.plans.create', [
+            'availableFeatures' => Feature::query()
+                ->active()
+                ->orderBy('name')
+                ->get(),
+        ]);
     }
 
     public function store(StorePlanRequest $request): RedirectResponse
     {
-        $plan = $this->creation->create($this->centralActor(), $request->validated());
+        $plan = $this->creation->create(
+            $this->centralActor(),
+            $request->validated(),
+        );
 
-        return $this->redirectWithStatus($plan, 'Plan créé en version inactive.');
+        return $this->redirectWithStatus(
+            $plan,
+            'Plan créé en version inactive.',
+        );
     }
 
     public function show(Plan $plan): View
     {
         $actor = $this->centralActor();
+
         $plan = $this->plans->details($actor, $plan);
+
+        $availableFeatures = Gate::forUser($actor)
+            ->any(['updateFeatures', 'updateVersionFeatures'], $plan)
+                ? Feature::query()
+                    ->active()
+                    ->orderBy('name')
+                    ->get()
+                : collect();
+
+        $latestVersion = $this->plans->latestVersion(
+            $actor,
+            $plan,
+        );
+
         return view('central.pages.admin.plans.show', [
             'plan' => $plan,
-            'latestVersion' => $this->plans->latestVersion($actor, $plan),
+            'latestVersion' => $latestVersion,
+            'suggestedVersionName' => PlanVersionService::suggestedName(
+                $plan,
+                $latestVersion + 1,
+            ),
+            'availableFeatures' => $availableFeatures,
         ]);
     }
 
     public function edit(Plan $plan): View
     {
         $actor = $this->centralActor();
+
         $plan = $this->plans->details($actor, $plan);
-        abort_unless(Gate::forUser($actor)->any(['update', 'updateFeatures'], $plan), 403);
+
+        abort_unless(
+            Gate::forUser($actor)
+                ->any(['update', 'updateFeatures'], $plan),
+            403,
+        );
 
         return view('central.pages.admin.plans.edit', [
             'plan' => $plan,
-            'availableFeatures' => Gate::forUser($actor)->allows('updateFeatures', $plan)
-                ? Feature::query()->active()->orderBy('name')->get()
-                : collect(),
+            'availableFeatures' => Gate::forUser($actor)
+                ->allows('updateFeatures', $plan)
+                    ? Feature::query()
+                        ->active()
+                        ->orderBy('name')
+                        ->get()
+                    : collect(),
         ]);
     }
 
-    public function update(UpdatePlanRequest $request, Plan $plan): RedirectResponse
-    {
-        $this->update->update($this->centralActor(), $plan, $request->validated());
+    public function updateFeatures(
+        UpdatePlanPageFeaturesRequest $request,
+        Plan $plan,
+    ): RedirectResponse {
+        $this->composition->update(
+            $this->centralActor(),
+            $plan,
+            $request->composition(),
+        );
 
-        return $this->redirectWithStatus($plan, 'Informations enregistrées.');
+        return $this->redirectWithStatus(
+            $plan,
+            'Fonctionnalités et quotas enregistrés.',
+        );
     }
 
-    public function updateFeatures(UpdatePlanPageFeaturesRequest $request, Plan $plan): RedirectResponse
-    {
-        $this->composition->update($this->centralActor(), $plan, $request->composition());
+    public function storeVersion(
+        StorePlanVersionRequest $request,
+        Plan $plan,
+    ): RedirectResponse {
+        $version = $this->versions->create(
+            $this->centralActor(),
+            $plan,
+            $request->validated(),
+            $request->draft(),
+        );
 
-        return $this->redirectWithStatus($plan, 'Fonctionnalités et quotas enregistrés.');
+        return $this->redirectWithStatus(
+            $version,
+            'Nouvelle version inactive créée.',
+        );
     }
 
-    public function storeVersion(StorePlanVersionRequest $request, Plan $plan): RedirectResponse
-    {
-        $version = $this->versions->create($this->centralActor(), $plan, $request->validated());
+    public function activate(
+        UpdatePlanActivationRequest $request,
+        Plan $plan,
+    ): RedirectResponse {
+        $this->activation->setActive(
+            $this->centralActor(),
+            $plan,
+            $request->validated(),
+        );
 
-        return $this->redirectWithStatus($version, 'Nouvelle version inactive créée.');
+        return $this->redirectWithStatus(
+            $plan,
+            'Commercialisation mise à jour.',
+        );
     }
 
-    public function activate(UpdatePlanActivationRequest $request, Plan $plan): RedirectResponse
-    {
-        $this->activation->setActive($this->centralActor(), $plan, $request->validated());
+    public function setDefault(
+        SetDefaultPlanRequest $request,
+        Plan $plan,
+    ): RedirectResponse {
+        $this->activation->setDefault(
+            $this->centralActor(),
+            $plan,
+            $request->validated('expected_state'),
+        );
 
-        return $this->redirectWithStatus($plan, 'Commercialisation mise à jour.');
+        return $this->redirectWithStatus(
+            $plan,
+            'Plan par défaut enregistré. Son attribution automatique est gratuite.',
+        );
     }
 
-    public function setDefault(SetDefaultPlanRequest $request, Plan $plan): RedirectResponse
-    {
-        $this->activation->setDefault($this->centralActor(), $plan, $request->validated('expected_state'));
+    public function archive(
+        ArchivePlanRequest $request,
+        Plan $plan,
+    ): RedirectResponse {
+        $this->archive->archive(
+            $this->centralActor(),
+            $plan,
+            $request->validated(),
+        );
 
-        return $this->redirectWithStatus($plan, 'Plan par défaut enregistré. Son attribution automatique est gratuite.');
+        return $this->redirectWithStatus(
+            $plan,
+            'Version archivée.',
+        );
     }
 
-    public function archive(ArchivePlanRequest $request, Plan $plan): RedirectResponse
-    {
-        $this->archive->archive($this->centralActor(), $plan, $request->validated());
-
-        return $this->redirectWithStatus($plan, 'Version archivée.');
-    }
-
-    private function redirectWithStatus(Plan $plan, string $message): RedirectResponse
-    {
-        return (Gate::forUser($this->centralActor())->allows('view', $plan)
-            ? to_route('central.plan-pages.show', $plan)
-            : to_route('dashboard'))->with('status', $message);
+    private function redirectWithStatus(
+        Plan $plan,
+        string $message,
+    ): RedirectResponse {
+        return (
+            Gate::forUser($this->centralActor())->allows('view', $plan)
+                ? to_route('central.plan-pages.show', $plan)
+                : to_route('dashboard')
+        )->with('status', $message);
     }
 }

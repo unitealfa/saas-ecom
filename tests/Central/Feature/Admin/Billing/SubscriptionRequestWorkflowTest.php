@@ -81,6 +81,62 @@ function issueHistoricalRequest(array $f, SubscriptionRequest $request): Subscri
     return $request->refresh();
 }
 
+test('a zero price offer requires administrative approval and issues a zero invoice without a payment', function (): void {
+    Notification::fake();
+    $fixture = requestFixture();
+    $fixture['plan']->forceFill(['monthly_price' => '0.00', 'annual_price' => '0.00'])->save();
+    $payload = subscriptionRequestInput($fixture);
+    $payload['expected_amount'] = '0.00';
+    unset($payload['payment_choice']);
+
+    $this->actingAs($fixture['owner'], 'central')->post(route('owner.subscriptions.store'), $payload)
+        ->assertSessionHasNoErrors()->assertRedirect();
+    $request = SubscriptionRequest::where('user_id', $fixture['owner']->id)->sole();
+    expect($request->payment_choice)->toBe(PaymentChoiceEnum::CASH)
+        ->and($request->subscription->status)->toBe(StatusEnum::SCHEDULED)
+        ->and($request->statusLabel())->toBe('En attente de validation');
+
+    $approval = route('central.subscription-requests.accept', $request);
+    $decision = ['expected_state' => $request->managementState()];
+    $this->post($approval, $decision)->assertForbidden();
+    $this->actingAs($fixture['actor'], 'central')->post($approval, $decision)
+        ->assertSessionHasNoErrors()->assertRedirect();
+    $request->refresh();
+    $invoice = $request->invoice;
+
+    expect($request->status)->toBe(RequestStatusEnum::ACCEPTED)
+        ->and($request->subscription->status)->toBe(StatusEnum::ACTIVE)
+        ->and($invoice->status)->toBe(DocumentStatusEnum::ISSUED)
+        ->and($invoice->total_amount)->toBe('0.00')
+        ->and($invoice->tax_amount)->toBe('0.00')
+        ->and($invoice->billing_rule_snapshot['approval_actor_name'])->toBe($fixture['actor']->name)
+        ->and($invoice->payments()->exists())->toBeFalse()
+        ->and($invoice->document_media_id)->not->toBeNull();
+});
+
+test('the owner confirms the comparison before immediately returning to the designated default', function (): void {
+    $fixture = requestFixture();
+    $this->seed(FreePlanSeeder::class);
+    $default = Plan::where('code', 'free')->sole();
+    $default->forceFill(['is_default' => true])->save();
+    $source = Subscription::factory()->create(['user_id' => $fixture['owner']->id,
+        'plan_id' => $fixture['plan']->id, 'status' => StatusEnum::ACTIVE, 'agreed_amount' => '3000.00',
+        'period_starts_at' => now()->subDay(), 'period_ends_at' => now()->addMonth()]);
+    $url = route('owner.subscriptions.switch-to-default', $source);
+    $payload = ['expected_state' => $source->transitionState(), 'plan_uuid' => $default->uuid,
+        'expected_plan_state' => $default->compositionState($default->features)];
+
+    $this->actingAs($fixture['owner'], 'central')->get(route('owner.subscriptions.index'))
+        ->assertOk()->assertSee('Passer au plan par défaut')->assertSee($source->plan->name);
+    $this->post($url, $payload)->assertSessionHasErrors('confirmed');
+    $this->post($url, [...$payload, 'confirmed' => '1'])->assertRedirect()->assertSessionHasNoErrors();
+
+    $current = Subscription::where('user_id', $fixture['owner']->id)->where('status', StatusEnum::ACTIVE)->sole();
+    expect($source->refresh()->status)->toBe(StatusEnum::CANCELLED)
+        ->and($current->plan_id)->toBe($default->id)
+        ->and($current->period_ends_at)->toBeNull();
+});
+
 test('invoice and receipt open as protected printable PDFs without changing normal downloads', function (): void {
     $f = requestFixture();
     $service = app(SubscriptionRequestService::class);
@@ -840,3 +896,61 @@ test('planned activation cannot bypass full payment for a pending request', func
     ])->assertForbidden();
     expect($request->subscription->refresh()->status)->toBe(StatusEnum::SCHEDULED);
 });
+
+test('external request accepts only after proof review and without bank fields', function (): void {
+    Notification::fake();
+    $f = requestFixture();
+    $request = requestWithInitialProof($f);
+    $this->actingAs($f['actor'], 'central')->get(route('central.subscription-requests.show', $request))
+        ->assertOk()->assertSee('name="proof_reviewed"', false)
+        ->assertDontSee('name="account"', false)->assertDontSee('name="reference"', false)
+        ->assertDontSee('name="received"', false);
+    $decision = ['expected_state' => $request->managementState(),
+        'expected_payment_state' => $request->payment->managementState()];
+    $url = route('central.subscription-requests.accept', $request);
+    $this->post($url, $decision)->assertSessionHasErrors('proof_reviewed');
+    expect($request->refresh()->status)->toBe(RequestStatusEnum::REVIEW);
+    $this->post($url, [...$decision, 'proof_reviewed' => '1'])->assertSessionHasNoErrors()->assertRedirect();
+    $request->refresh();
+    expect($request->status)->toBe(RequestStatusEnum::ACCEPTED)
+        ->and($request->payment->getAttribute('transfer_status'))->toBe(TransferStatusEnum::VERIFIED)
+        ->and($request->payment->getAttribute('amount'))->toBe('3000.00')
+        ->and($request->payment->getAttribute('transfer_reference'))->toBeNull()
+        ->and($request->payment->getAttribute('financial_account_key'))->toBeNull()
+        ->and($request->payment->documents()->where('collection_name', PaymentDocumentService::RECEIPT)->exists())->toBeTrue();
+    expect(DB::table('saas_payment_proof_claims')->where('payment_id', $request->payment->id)->exists())->toBeTrue();
+});
+
+test('identical original external proof cannot settle two owners requests', function (): void {
+    Notification::fake();
+    $f = requestFixture();
+    $first = requestWithInitialProof($f);
+    $proof = app(PaymentDocumentService::class)->retainedProof($first);
+    $bytes = $proof->getContent();
+    $approve = fn ($request) => $this->post(route('central.subscription-requests.accept', $request), [
+        'expected_state' => $request->managementState(),
+        'expected_payment_state' => $request->payment->managementState(), 'proof_reviewed' => '1',
+    ]);
+    $this->actingAs($f['actor'], 'central');
+    $approve($first)->assertSessionHasNoErrors();
+    $first->refresh();
+    expect($first->status)->toBe(RequestStatusEnum::ACCEPTED);
+
+    $owner = User::factory()->create();
+    $owner->forceFill(['legal_address' => 'Adresse fictive de test', 'nif' => '223456789012345',
+        'legal_verification_status' => $f['owner']->legal_verification_status, 'legal_verified_at' => now()->subDay(),
+        'legal_verified_by_id' => $f['actor']->id, 'legal_profile_version' => 1])->save();
+    $customers = config('central.billing.customers', []);
+    $customers[$owner->uuid] = [...$customers[$f['owner']->uuid], 'name' => trim($owner->first_name.' '.$owner->last_name),
+        'nif' => $owner->getAttribute('nif')];
+    config(['central.billing.customers' => $customers]);
+    $data = manualExternalPayload();
+    unset($data['operation_id'], $data['currency']);
+    $second = app(SubscriptionRequestService::class)->create($owner, [
+        ...subscriptionRequestInput($f), 'payment_choice' => PaymentChoiceEnum::EXTERNAL->value, 'payment' => $data,
+    ], UploadedFile::fake()->createWithContent('duplicate.png', $bytes));
+    $approve($second)->assertSessionHasErrors();
+    expect($second->refresh()->status)->not->toBe(RequestStatusEnum::ACCEPTED)
+        ->and($second->payment->getAttribute('transfer_status'))->not->toBe(TransferStatusEnum::VERIFIED);
+});
+
