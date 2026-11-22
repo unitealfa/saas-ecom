@@ -35,8 +35,18 @@
                             </td>
                             <td class="p-3">
                                 @if ($report->subject instanceof \App\Models\Central\Billing\SaasPayment)
-                                    <a class="underline" href="{{ route('central.invoices.show', $report->subject->invoice).'#payment-'.$report->subject->uuid }}">Examiner le paiement</a>
+                                    <flux:dropdown position="bottom" align="end">
+                                        <flux:button type="button" variant="ghost" size="sm" icon="bars-3" aria-label="Actions" title="Actions" />
+                                        <flux:menu>
+                                            <flux:menu.item :href="route('central.invoices.show', $report->subject->invoice).'#payment-'.$report->subject->uuid">Examiner le paiement</flux:menu.item>
+                                            @if ($decision === null && $canReview)
+                                                <flux:modal.trigger :name="'review-correction-'.$report->uuid"><flux:menu.item>Enregistrer une décision</flux:menu.item></flux:modal.trigger>
+                                            @endif
+                                        </flux:menu>
+                                    </flux:dropdown>
                                     @if ($decision === null && $canReview)
+                                        <flux:modal :name="'review-correction-'.$report->uuid" class="w-full md:max-w-xl">
+                                        <flux:heading size="lg">Enregistrer une décision</flux:heading>
                                         <div class="mt-3 flex flex-col gap-3">
                                             <form method="POST" action="{{ route('central.payments.corrections.review', $report) }}">
                                                 @csrf
@@ -59,6 +69,7 @@
                                                 </form>
                                             @endif
                                         </div>
+                                        </flux:modal>
                                     @endif
                                 @else
                                     <span>Référence historique à rapprocher</span>

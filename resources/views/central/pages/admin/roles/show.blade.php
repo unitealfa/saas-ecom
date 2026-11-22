@@ -36,7 +36,7 @@
                                 <flux:table.cell>{{ $user->name }}<br>{{ $user->email }}</flux:table.cell>
                                 <flux:table.cell>{{ $user->trashed() ? 'Archivé' : $user->status->label() }}</flux:table.cell>
                                 <flux:table.cell>{{ $user->roles->first()->pivot->assigned_at }}</flux:table.cell>
-                                <flux:table.cell>@can('viewStaff', $user)<flux:button :href="route('central.staff.show', $user)">Informations</flux:button>@endcan</flux:table.cell>
+                                <flux:table.cell>@can('viewStaff', $user)<flux:dropdown position="bottom" align="end"><flux:button type="button" variant="ghost" size="sm" icon="bars-3" aria-label="Actions" title="Actions" /><flux:menu><flux:menu.item :href="route('central.staff.show', $user)">Informations</flux:menu.item></flux:menu></flux:dropdown>@endcan</flux:table.cell>
                             </flux:table.row>
                         @empty
                             <flux:table.row><flux:table.cell colspan="4">Aucun administrateur ne possède ce rôle.</flux:table.cell></flux:table.row>

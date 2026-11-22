@@ -75,7 +75,7 @@
                                 <flux:table.cell variant="strong" class="whitespace-nowrap">{{ $activity->created_at?->utc()->format('d/m/Y H:i:s') }}</flux:table.cell>
                                 <flux:table.cell>{{ $activity->log_name ?? '—' }}</flux:table.cell><flux:table.cell>{{ $activity->event ?? '—' }}</flux:table.cell>
                                 <flux:table.cell>{{ $activity->actor_uuid ?? 'Système / indisponible' }}</flux:table.cell><flux:table.cell>{{ $activity->subject_uuid ?? '—' }}</flux:table.cell>
-                                <flux:table.cell><flux:button :href="route('central.activity.show', $activity)">Détails</flux:button></flux:table.cell>
+                                <flux:table.cell><flux:dropdown position="bottom" align="end"><flux:button type="button" variant="ghost" size="sm" icon="bars-3" aria-label="Actions" title="Actions" /><flux:menu><flux:menu.item :href="route('central.activity.show', $activity)">Détails</flux:menu.item></flux:menu></flux:dropdown></flux:table.cell>
                             </flux:table.row>
                         @empty
                             <flux:table.row><flux:table.cell colspan="6"><div class="aydra-users-empty"><p class="aydra-heading font-medium">Aucune activité trouvée.</p><p class="aydra-muted mt-1 text-sm">Essayez d’autres critères de recherche.</p></div></flux:table.cell></flux:table.row>

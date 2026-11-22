@@ -19,13 +19,13 @@
         <section class="aydra-users-panel"><div class="aydra-users-toolbar"><div><h2 class="aydra-heading text-lg font-semibold">Correspondances</h2><p class="aydra-muted mt-1 text-sm">{{ $mappings->total() }} {{ $mappings->total() === 1 ? 'correspondance trouvée' : 'correspondances trouvées' }}</p></div></div><div class="aydra-users-table"><flux:table class="whitespace-normal"><flux:table.columns>@foreach (['carrier' => 'Transporteur', 'area' => 'Zone Aydra', 'external_code' => 'Code externe', 'external_name' => 'Nom externe', 'external_province_code' => 'Code wilaya externe', 'mapping_version' => 'Source / version', 'is_active' => 'État', 'actions' => 'Actions'] as $column => $heading) @if(in_array($column, ['external_code', 'external_name', 'external_province_code', 'mapping_version', 'is_active'], true))<flux:table.column sortable :sorted="$sortBy === $column" :direction="$sortDirection" :aria-sort="$sortBy === $column ? ($sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'" :data-sort-url="route('central.carrier-mappings.index', [...request()->only(['search', 'carrier_uuid', 'is_active']), 'sort' => $column, 'direction' => $sortBy === $column && $sortDirection === 'asc' ? 'desc' : 'asc'])" onclick="window.location.assign(this.dataset.sortUrl)">{{ $heading }}</flux:table.column>@else<flux:table.column>{{ $heading }}</flux:table.column>@endif @endforeach</flux:table.columns><flux:table.rows>
                     @forelse ($mappings as $mapping)
                         <flux:table.row :key="$mapping->uuid">
-                            <flux:table.cell variant="strong">{{ $mapping->carrier->name }}</flux:table.cell><flux:table.cell>{{ $mapping->area->name_fr }}<div class="aydra-muted mt-1 text-xs">{{ $mapping->zone_type->label() }} — {{ $mapping->area->code }}</div></flux:table.cell><flux:table.cell>{{ $mapping->external_code }}</flux:table.cell><flux:table.cell>{{ $mapping->external_name }}</flux:table.cell><flux:table.cell>{{ $mapping->external_province_code }}</flux:table.cell><flux:table.cell>{{ $mapping->verification_source }}<div class="aydra-muted mt-1 text-xs">Version {{ $mapping->mapping_version }} — {{ $mapping->verified_at?->format('d/m/Y H:i') ?? 'Non vérifiée' }}</div></flux:table.cell><flux:table.cell><flux:badge size="sm" :color="$mapping->is_active ? 'green' : 'zinc'">{{ $mapping->is_active ? 'Active' : 'Inactive / archivée' }}</flux:badge></flux:table.cell><flux:table.cell><div class="flex flex-wrap gap-2">
+                            <flux:table.cell variant="strong">{{ $mapping->carrier->name }}</flux:table.cell><flux:table.cell>{{ $mapping->area->name_fr }}<div class="aydra-muted mt-1 text-xs">{{ $mapping->zone_type->label() }} — {{ $mapping->area->code }}</div></flux:table.cell><flux:table.cell>{{ $mapping->external_code }}</flux:table.cell><flux:table.cell>{{ $mapping->external_name }}</flux:table.cell><flux:table.cell>{{ $mapping->external_province_code }}</flux:table.cell><flux:table.cell>{{ $mapping->verification_source }}<div class="aydra-muted mt-1 text-xs">Version {{ $mapping->mapping_version }} — {{ $mapping->verified_at?->format('d/m/Y H:i') ?? 'Non vérifiée' }}</div></flux:table.cell><flux:table.cell><flux:badge size="sm" :color="$mapping->is_active ? 'green' : 'zinc'">{{ $mapping->is_active ? 'Active' : 'Inactive / archivée' }}</flux:badge></flux:table.cell><flux:table.cell><flux:dropdown position="bottom" align="end"><flux:button type="button" variant="ghost" size="sm" icon="bars-3" aria-label="Actions" title="Actions" /><flux:menu>
                                 @can('update', $mapping)
-                                    <flux:button :href="route('central.carrier-mappings.edit', $mapping)">Modifier une correspondance</flux:button>
+                                    <flux:menu.item :href="route('central.carrier-mappings.edit', $mapping)">Modifier une correspondance</flux:menu.item>
                                 @endcan
                                 @can('archive', $mapping)
-                                    <flux:modal.trigger :name="'archive-mapping-'.$mapping->uuid"><flux:button variant="danger">Archiver une correspondance</flux:button></flux:modal.trigger>
-                                    <flux:modal :name="'archive-mapping-'.$mapping->uuid">
+                                    <flux:modal.trigger :name="'archive-mapping-'.$mapping->uuid"><flux:menu.item variant="danger">Archiver une correspondance</flux:menu.item></flux:modal.trigger>
+                                    <template x-teleport="body"><flux:modal :name="'archive-mapping-'.$mapping->uuid">
                                         <form method="POST" action="{{ route('central.carrier-mappings.archive', $mapping) }}" class="space-y-4">
                                             @csrf @method('DELETE')
                                             <input type="hidden" name="expected_state" value="{{ $mapping->managementState() }}">
@@ -33,17 +33,17 @@
                                             <flux:text>Elle ne sera plus disponible pour les nouvelles requêtes. Les liens et les anciens envois sont conservés.</flux:text>
                                             <flux:button type="submit" variant="danger">Confirmer l’archivage</flux:button>
                                         </form>
-                                    </flux:modal>
+                                    </flux:modal></template>
                                 @endcan
                                 @if (! $mapping->is_active)
                                     @can('saas.carrier-mappings.update')
-                                        <flux:button disabled>Modifier une correspondance</flux:button>
+                                        <flux:menu.item disabled>Modifier une correspondance</flux:menu.item>
                                     @endcan
                                     @can('saas.carrier-mappings.archive')
-                                        <flux:button disabled>Archiver une correspondance</flux:button>
+                                        <flux:menu.item disabled>Archiver une correspondance</flux:menu.item>
                                     @endcan
                                 @endif
-                            </div></flux:table.cell>
+                            </flux:menu></flux:dropdown></flux:table.cell>
                         </flux:table.row>
                     @empty
                         <flux:table.row><flux:table.cell colspan="8"><div class="aydra-users-empty">Aucune correspondance trouvée.</div></flux:table.cell></flux:table.row>

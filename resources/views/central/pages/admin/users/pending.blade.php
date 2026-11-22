@@ -34,12 +34,12 @@
                             <flux:table.cell>{{ $user->phone ?? 'Non renseigné' }}</flux:table.cell>
                             <flux:table.cell>{{ $user->country?->name_fr }}</flux:table.cell>
                             <flux:table.cell>{{ $user->created_at?->format('d/m/Y H:i') }}</flux:table.cell>
-                            <flux:table.cell><div class="flex min-w-56 flex-wrap items-center gap-2">
+                            <flux:table.cell><flux:dropdown position="bottom" align="end"><flux:button type="button" variant="ghost" size="sm" icon="bars-3" aria-label="Actions" title="Actions" /><flux:menu>
                                 @can('view', $user)
-                                    <flux:button :href="route('central.users.show', $user)">Informations</flux:button>
+                                    <flux:menu.item :href="route('central.users.show', $user)">Informations</flux:menu.item>
                                 @endcan
-                                @include('central.pages.admin.users.lifecycle-actions')
-                            </div></flux:table.cell>
+                                @include('central.pages.admin.users.lifecycle-actions', ['inActionMenu' => true])
+                            </flux:menu></flux:dropdown></flux:table.cell>
                         </flux:table.row>
                     @empty
                         <flux:table.row><flux:table.cell colspan="6"><div class="aydra-users-empty"><p class="aydra-heading font-medium">Aucune inscription en attente.</p><p class="aydra-muted mt-1 text-sm">Les nouvelles inscriptions à examiner apparaîtront ici.</p></div></flux:table.cell></flux:table.row>

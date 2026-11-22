@@ -46,16 +46,16 @@
                             } }}</flux:badge></flux:table.cell>
                             <flux:table.cell>
                                 @if (! $domain->trashed() && $domain->tenant !== null && ! $domain->tenant->trashed())
-                                    <div class="flex flex-wrap gap-2">
+                                    <flux:dropdown position="bottom" align="end"><flux:button type="button" variant="ghost" size="sm" icon="bars-3" aria-label="Actions" title="Actions" /><flux:menu>
                                         @can('update', $domain)
-                                            <flux:button :href="route('central.domains.edit', $domain)">Modifier</flux:button>
+                                            <flux:menu.item :href="route('central.domains.edit', $domain)">Modifier</flux:menu.item>
                                         @endcan
                                         @can('verify', $domain)
                                             @if ($domain->verification_status !== \App\Enums\VerificationStatusEnum::VERIFIED)
                                             <form method="POST" action="{{ route('central.domains.verify', $domain) }}">
                                                 @csrf
                                                 <input type="hidden" name="expected_state" value="{{ $domain->managementState() }}">
-                                                <flux:button type="submit">Accepter</flux:button>
+                                                <flux:menu.item as="button" type="submit">Accepter</flux:menu.item>
                                             </form>
                                             @endif
                                         @endcan
@@ -65,18 +65,18 @@
                                                     @csrf @method('PATCH')
                                                     <input type="hidden" name="expected_state" value="{{ $domain->managementState() }}">
                                                     <input type="hidden" name="expected_primary_uuid" value="{{ $primaryDomains[$domain->tenant_id] ?? '' }}">
-                                                    <flux:button type="submit">Définir comme principal</flux:button>
+                                                    <flux:menu.item as="button" type="submit">Définir comme principal</flux:menu.item>
                                                 </form>
                                             @endcan
                                             @can('archive', $domain)
                                                 <form method="POST" action="{{ route('central.domains.destroy', $domain) }}" x-data x-on:submit="if (! window.confirm('Archiver ce domaine ? Il ne donnera plus accès à la boutique.')) $event.preventDefault()">
                                                     @csrf @method('DELETE')
                                                     <input type="hidden" name="expected_state" value="{{ $domain->managementState() }}">
-                                                    <flux:button type="submit" variant="danger">Archiver</flux:button>
+                                                    <flux:menu.item as="button" type="submit" variant="danger">Archiver</flux:menu.item>
                                                 </form>
                                             @endcan
                                         @endif
-                                    </div>
+                                    </flux:menu></flux:dropdown>
                                     @can('verify', $domain)
                                         @if ($domain->type === \App\Enums\Central\Domains\TypeEnum::CUSTOM)
                                             <details class="aydra-animated-details mt-3">
@@ -87,11 +87,11 @@
                                     @endcan
                                 @elseif ($domain->trashed())
                                     @can('restore', $domain)
-                                        <form method="POST" action="{{ route('central.domains.restore', $domain) }}">
+                                        <flux:dropdown position="bottom" align="end"><flux:button type="button" variant="ghost" size="sm" icon="bars-3" aria-label="Actions" title="Actions" /><flux:menu><form method="POST" action="{{ route('central.domains.restore', $domain) }}">
                                             @csrf
                                             <input type="hidden" name="expected_state" value="{{ $domain->managementState() }}">
-                                            <flux:button type="submit">Restaurer et vérifier à nouveau</flux:button>
-                                        </form>
+                                            <flux:menu.item as="button" type="submit">Restaurer et vérifier à nouveau</flux:menu.item>
+                                        </form></flux:menu></flux:dropdown>
                                     @endcan
                                 @endif
                             </flux:table.cell>

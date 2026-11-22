@@ -28,19 +28,17 @@
                                     Consultation non autorisée
                                 @endif
                             </flux:table.cell>
-                            <flux:table.cell>
-                                <div class="flex flex-wrap gap-2">
-                                    <flux:button :href="route('central.roles.show', $role)">Informations</flux:button>
-                                    @can('edit', $role)<flux:button :href="route('central.roles.edit', $role)">Modifier</flux:button>@endcan
+                            <flux:table.cell><flux:dropdown position="bottom" align="end"><flux:button type="button" variant="ghost" size="sm" icon="bars-3" aria-label="Actions" title="Actions" /><flux:menu>
+                                    <flux:menu.item :href="route('central.roles.show', $role)">Informations</flux:menu.item>
+                                    @can('edit', $role)<flux:menu.item :href="route('central.roles.edit', $role)">Modifier</flux:menu.item>@endcan
                                     @can('delete', $role)
                                         <form method="POST" action="{{ route('central.roles.destroy', $role) }}" x-data x-on:submit="if (!confirm('Supprimer ce rôle inutilisé ?')) $event.preventDefault()">
                                             @csrf @method('DELETE')
-                                            <flux:button type="submit" variant="danger">Supprimer</flux:button>
+                                            <flux:menu.item as="button" type="submit" variant="danger">Supprimer</flux:menu.item>
                                         </form>
                                     @endcan
-                                </div>
-                                @if ($role->is_system || $role->is_protected)<span class="aydra-muted mt-2 block text-xs">Rôle système protégé</span>@endif
-                            </flux:table.cell>
+                                </flux:menu></flux:dropdown>
+                                @if ($role->is_system || $role->is_protected)<span class="aydra-muted mt-2 block text-xs">Rôle système protégé</span>@endif</flux:table.cell>
                         </flux:table.row>
                     @empty
                         <flux:table.row><flux:table.cell colspan="3"><div class="aydra-users-empty">Aucun rôle SaaS.</div></flux:table.cell></flux:table.row>

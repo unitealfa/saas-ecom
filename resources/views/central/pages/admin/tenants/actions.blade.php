@@ -1,7 +1,7 @@
-<div class="flex flex-wrap gap-3">
-    @if (! ($detail ?? false))<flux:button :href="route('central.tenants.show', $tenant)">Informations</flux:button>@endif
-    @can('update', $tenant)<flux:button :href="route('central.tenants.edit', $tenant)">Modifier</flux:button>@endcan
-    @can('viewHistory', $tenant)<flux:button :href="route('central.tenants.history', $tenant)">Historique</flux:button>@endcan
+@unless ($inActionMenu ?? false)<div class="flex flex-wrap gap-2">@endunless
+    @if (! ($detail ?? false))@if ($inActionMenu ?? false)<flux:menu.item :href="route('central.tenants.show', $tenant)">Informations</flux:menu.item>@else<flux:button :href="route('central.tenants.show', $tenant)">Informations</flux:button>@endif@endif
+    @can('update', $tenant)@if ($inActionMenu ?? false)<flux:menu.item :href="route('central.tenants.edit', $tenant)">Modifier</flux:menu.item>@else<flux:button :href="route('central.tenants.edit', $tenant)">Modifier</flux:button>@endif@endcan
+    @can('viewHistory', $tenant)@if ($inActionMenu ?? false)<flux:menu.item :href="route('central.tenants.history', $tenant)">Historique</flux:menu.item>@else<flux:button :href="route('central.tenants.history', $tenant)">Historique</flux:button>@endif@endcan
     @if ($detail ?? false)
         @foreach (['suspend' => 'Suspendre', 'activate' => 'Réactiver', 'archive' => 'Archiver'] as $action => $label)
             @can($action, $tenant)
@@ -16,10 +16,10 @@
                         @csrf
                         <input type="hidden" name="expected_status" value="{{ $tenant->status->value }}">
                         <flux:input name="reason" label="Motif facultatif" />
-                        <flux:button type="submit" class="self-start" :variant="$action === 'archive' ? 'danger' : 'outline'">{{ $label }}</flux:button>
+                        @if ($inActionMenu ?? false)<flux:menu.item as="button" type="submit" class="self-start" :variant="$action === 'archive' ? 'danger' : 'outline'">{{ $label }}</flux:menu.item>@else<flux:button type="submit" class="self-start" :variant="$action === 'archive' ? 'danger' : 'outline'">{{ $label }}</flux:button>@endif
                     </form>
                 @endif
             @endcan
         @endforeach
     @endif
-</div>
+@unless ($inActionMenu ?? false)</div>@endunless

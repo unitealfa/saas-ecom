@@ -13,8 +13,8 @@
     @can('accept', $item)
         @if ($cash || $initialProof || $paymentProof)
             <div x-data="{ open: false }">
-                <flux:modal.trigger :name="'accept-request-'.$item->uuid"><flux:button type="button" x-on:click="open = true">Accepter la demande</flux:button></flux:modal.trigger>
-                <flux:modal :name="'accept-request-'.$item->uuid" class="w-full md:max-w-2xl">
+                <flux:modal.trigger :name="'accept-request-'.$item->uuid">@if ($inActionMenu ?? false)<flux:menu.item as="button" type="button" x-on:click="open = true">Accepter la demande</flux:menu.item>@else<flux:button type="button" x-on:click="open = true">Accepter la demande</flux:button>@endif</flux:modal.trigger>
+                @if ($inActionMenu ?? false)<template x-teleport="body">@endif<flux:modal :name="'accept-request-'.$item->uuid" class="w-full md:max-w-2xl">
                     <form method="POST" action="{{ route('central.subscription-requests.accept', $item) }}" class="flex flex-col gap-4">
                         @csrf
                         <flux:heading size="lg">Accepter la demande</flux:heading>
@@ -45,14 +45,14 @@
                             <flux:modal.close><flux:button type="button" x-on:click="open = false">Annuler</flux:button></flux:modal.close>
                         </div>
                     </form>
-                </flux:modal>
+                </flux:modal>@if ($inActionMenu ?? false)</template>@endif
             </div>
         @endif
     @endcan
 @endif
 @can('reject', $item)
-    <flux:modal.trigger :name="'reject-request-'.$item->uuid"><flux:button type="button" variant="danger">Refuser</flux:button></flux:modal.trigger>
-    <flux:modal :name="'reject-request-'.$item->uuid" class="md:w-96">
+    <flux:modal.trigger :name="'reject-request-'.$item->uuid">@if ($inActionMenu ?? false)<flux:menu.item as="button" type="button" variant="danger">Refuser</flux:menu.item>@else<flux:button type="button" variant="danger">Refuser</flux:button>@endif</flux:modal.trigger>
+    @if ($inActionMenu ?? false)<template x-teleport="body">@endif<flux:modal :name="'reject-request-'.$item->uuid" class="md:w-96">
         <form method="POST" action="{{ route('central.subscription-requests.reject', $item) }}" class="flex flex-col gap-4">
             @csrf
             <flux:heading size="lg">Refuser la demande</flux:heading>
@@ -61,5 +61,5 @@
             <flux:textarea name="reason" label="Motif du refus, visible par le commerçant" required maxlength="2000" />
             <div class="flex gap-2"><flux:button type="submit" variant="danger">Refuser avec motif</flux:button><flux:modal.close><flux:button type="button">Annuler</flux:button></flux:modal.close></div>
         </form>
-    </flux:modal>
+    </flux:modal>@if ($inActionMenu ?? false)</template>@endif
 @endcan

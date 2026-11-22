@@ -67,7 +67,7 @@
                                 <flux:table.cell>{{ $credit->owner?->name ?? 'Compte indisponible' }}</flux:table.cell>
                                 <flux:table.cell class="whitespace-nowrap tabular-nums">{{ $credit->total_amount }} {{ $credit->currency }}</flux:table.cell>
                                 <flux:table.cell><flux:badge size="sm">{{ $credit->status->label() }}</flux:badge></flux:table.cell>
-                                <flux:table.cell><flux:button size="sm" :href="route($ownerMode ? 'owner.credit-notes.show' : 'central.credit-notes.show', $credit)">Informations</flux:button></flux:table.cell>
+                                <flux:table.cell><flux:dropdown position="bottom" align="end"><flux:button type="button" variant="ghost" size="sm" icon="bars-3" aria-label="Actions" title="Actions" /><flux:menu><flux:menu.item :href="route($ownerMode ? 'owner.credit-notes.show' : 'central.credit-notes.show', $credit)">Informations</flux:menu.item></flux:menu></flux:dropdown></flux:table.cell>
                             </flux:table.row>
                         @empty
                             <flux:table.row><flux:table.cell colspan="6"><div class="aydra-users-empty"><p class="aydra-heading font-medium">Aucun avoir disponible.</p><p class="aydra-muted mt-1 text-sm">Essayez d’autres critères de recherche.</p></div></flux:table.cell></flux:table.row>
