@@ -32,7 +32,7 @@
                             <flux:table.cell>{{ $domain->tenant?->shop_name ?? 'Boutique indisponible' }}</flux:table.cell>
                             <flux:table.cell>{{ $domain->type === \App\Enums\Central\Domains\TypeEnum::SUBDOMAIN ? 'Sous-domaine Aydra' : 'Personnalisé' }}</flux:table.cell>
                             <flux:table.cell><flux:badge size="sm">{{ match ($domain->verification_status) {
-                                \App\Enums\VerificationStatusEnum::VERIFIED => 'Vérifié',
+                                \App\Enums\VerificationStatusEnum::VERIFIED => 'Accepté',
                                 \App\Enums\VerificationStatusEnum::FAILED => 'Échec',
                                 \App\Enums\VerificationStatusEnum::EXPIRED => 'Expiré',
                                 default => 'En attente',
@@ -54,7 +54,7 @@
                                             <form method="POST" action="{{ route('central.domains.verify', $domain) }}">
                                                 @csrf
                                                 <input type="hidden" name="expected_state" value="{{ $domain->managementState() }}">
-                                                <flux:button type="submit">Vérifier</flux:button>
+                                                <flux:button type="submit">Accepter</flux:button>
                                             </form>
                                         @endcan
                                         @if (! $domain->is_primary)

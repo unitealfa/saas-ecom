@@ -2,13 +2,18 @@
 
 use App\Enums\Central\Domains\CertificateStatusEnum;
 use App\Enums\Central\Domains\TypeEnum;
+use App\Enums\Central\Tenants\StatusEnum;
 use App\Enums\VerificationStatusEnum;
 use App\Http\Controllers\Storefront\StorefrontController;
+use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
 use App\Http\Middleware\EnsureLocalDiagnostics;
 use App\Models\Central\Audit\Activity;
 use App\Models\Central\Domains\Domain;
+use App\Models\Central\Features\Feature;
 use App\Models\Central\Permissions\Permission;
+use App\Models\Central\Plans\PlanFeature;
 use App\Models\Central\Roles\Role;
+use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Tenants\Tenant;
 use App\Models\User;
 use App\Services\Central\Domains\DomainDnsInspector;
@@ -16,6 +21,7 @@ use App\Services\Central\Domains\DomainService;
 use App\Services\Central\Roles\CentralRoleCatalog;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Database\Seeders\Central\DomainPermissionSeeder;
+use Database\Seeders\Central\DomainQuotaFeatureSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
@@ -60,6 +66,29 @@ function domainAddress(Tenant $shop, string $host, bool $primary = false): Domai
     return $domain->refresh();
 }
 
+test('a merchant can add domains only to their own shop within its plan quota', function (): void {
+    $this->withoutMiddleware(EnsureActiveCentralAccount::class);
+    $this->seed(DomainQuotaFeatureSeeder::class);
+    $owner = User::factory()->create();
+    Event::fake([TenantCreated::class]);
+    $shop = Tenant::factory()->create(['user_id' => $owner->id]);
+    $shop->forceFill(['status' => StatusEnum::ACTIVE])->save();
+    domainAddress($shop, 'primary.example.com', true);
+    $subscription = Subscription::factory()->create(['user_id' => $owner->id]);
+    PlanFeature::factory()->create([
+        'plan_id' => $subscription->plan_id,
+        'feature_id' => Feature::where('code', Feature::DOMAINS_CODE)->sole()->id,
+        'is_active' => true, 'limit' => 1,
+    ]);
+    $this->actingAs($owner, 'central')->post(route('owner.shops.domains.store', $shop), ['domain' => 'first'])->assertSessionHasErrors('confirmed');
+    $this->post(route('owner.shops.domains.store', $shop), ['domain' => 'first', 'confirmed' => 1])->assertSessionHasNoErrors();
+    $this->post(route('owner.shops.domains.store', $shop), ['domain' => 'second', 'confirmed' => 1])->assertSessionHasErrors('domain');
+    expect(Domain::where('domain', 'first.'.config('tenancy.saas_base_domain'))->exists())->toBeTrue();
+    $other = User::factory()->create();
+    $this->actingAs($other, 'central')->get(route('owner.shops.domains.index', $shop))->assertForbidden();
+    expect(Domain::where('tenant_id', $shop->id)->count())->toBe(2);
+});
+
 test('domain permissions remain independent and protect all HTTP entry points', function (): void {
     domainAdmin();
     $domain = domainAddress(domainShop(), 'permissions.example.com', true);
@@ -103,9 +132,9 @@ test('a creator adds a normalized IDNA address pending verification without muta
     $shop = domainShop();
     $otherShop = domainShop();
     $this->actingAs($creator, 'central')->get(route('central.domains.create'))->assertOk()->assertSee($shop->uuid);
-    $this->post(route('central.domains.store'), ['tenant_uuid' => $shop->uuid, 'domain' => '  CAFÉ.Example.com  '])
+    $this->post(route('central.domains.store'), ['tenant_uuid' => $shop->uuid, 'domain' => '  CAFÉ  ', 'confirmed' => 1])
         ->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
-    $domain = Domain::where('domain', 'xn--caf-dma.example.com')->firstOrFail();
+    $domain = Domain::where('domain', 'xn--caf-dma.'.config('tenancy.saas_base_domain'))->firstOrFail();
     expect($domain->tenant_id)->toBe($shop->id)
         ->and($domain->verification_status)->toBe(VerificationStatusEnum::PENDING)
         ->and($domain->verified_at)->toBeNull()->and($domain->is_primary)->toBeFalse();
@@ -119,7 +148,7 @@ test('domains reject invalid reserved and foreign platform names', function (str
     if ($host === 'another-shop.aydra.localhost') {
         Tenant::factory()->create(['slug' => 'another-shop']);
     }
-    $this->actingAs($admin, 'central')->post(route('central.domains.store'), ['tenant_uuid' => $shop->uuid, 'domain' => $host])
+    $this->actingAs($admin, 'central')->post(route('central.domains.store'), ['tenant_uuid' => $shop->uuid, 'domain' => 'review-local', 'confirmed' => 1])
         ->assertSessionHasErrors('domain');
     expect($shop->domains()->exists())->toBeFalse();
 })->with(['https://shop.example.com/path', 'shop.example.com:443', '*.example.com', '127.0.0.1',

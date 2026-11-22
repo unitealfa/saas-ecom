@@ -37,7 +37,6 @@
                 @endforeach
             </flux:callout>
         @endif
-
         <section class="aydra-users-panel p-5 sm:p-6" aria-labelledby="plan-search">
             <h2 id="plan-search" class="aydra-heading text-lg font-semibold">Rechercher un plan</h2>
             <p class="aydra-muted mt-1 text-sm">Les suggestions proviennent des plans affichés sur cette page.</p>
@@ -45,8 +44,7 @@
                 <flux:input name="search" label="Nom ou code" :value="request('search')" type="search" icon="magnifying-glass" placeholder="Nom ou code" list="plan-suggestions" class="min-w-0 flex-1 sm:min-w-72" />
                 <datalist id="plan-suggestions">@foreach ($plans as $plan)<option value="{{ $plan->name }}"></option><option value="{{ $plan->code }}"></option>@endforeach</datalist>
                 @if(request()->filled('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}"><input type="hidden" name="direction" value="{{ request('direction', 'asc') }}">@endif
-                <flux:button type="submit" variant="primary">Rechercher</flux:button>
-                <flux:button :href="route('central.plan-pages.index')">Effacer</flux:button>
+                <flux:button type="submit" variant="primary">Rechercher</flux:button><flux:button :href="route('central.plan-pages.index')">Effacer</flux:button>
             </form>
         </section>
         @php($sortBy = request('sort')) @php($sortDirection = request('direction', 'asc'))

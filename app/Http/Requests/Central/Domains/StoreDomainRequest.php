@@ -33,12 +33,13 @@ class StoreDomainRequest extends FormRequest
         $updating = $domain instanceof Domain;
 
         return [
-            'domain' => [
+            'domain' => $updating ? [
                 'bail', 'required', 'string', 'max:253',
                 'regex:'.self::HOST_PATTERN,
                 $this->validateHost(...),
                 Rule::unique(Domain::class, 'domain')->ignore($domain),
-            ],
+            ] : ['required', 'string', 'max:63', 'regex:'.Tenant::SLUG_PATTERN],
+            'confirmed' => $updating ? ['prohibited'] : ['required', 'accepted'],
             'tenant_uuid' => $updating
                 ? ['prohibited']
                 : ['required', 'uuid', Rule::exists(Tenant::class, 'uuid')->whereNull('deleted_at')],
