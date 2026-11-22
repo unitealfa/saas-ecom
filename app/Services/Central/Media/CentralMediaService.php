@@ -56,10 +56,14 @@ class CentralMediaService
         $this->authorize($actor, 'viewAny');
         $search = trim((string) ($filters['search'] ?? ''));
         $pattern = '%'.addcslashes($search, '\\%_').'%';
+        $sort = $filters['sort'] ?? null;
+        $sort = in_array($sort, ['original_name', 'mime_type', 'size_bytes', 'visibility', 'created_at'], true) ? $sort : null;
+        $direction = ($filters['direction'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
 
         return Media::with('creator')
             ->when($filters['archived'] ?? false, fn (Builder $query) => $query->onlyTrashed())
             ->when($search !== '', fn (Builder $query) => $query->where('original_name', 'like', $pattern))
+            ->when($sort !== null, fn (Builder $query) => $query->orderBy($sort, $direction))
             ->orderByDesc('id')->paginate(self::PER_PAGE)->withQueryString();
     }
 

@@ -59,6 +59,8 @@ class PickupPointService
 
         $search = trim((string) ($filters['search'] ?? ''));
         $pattern = '%'.addcslashes($search, '\\%_').'%';
+        $sort = in_array($filters['sort'] ?? null, ['external_code', 'name', 'is_carrier_active'], true) ? $filters['sort'] : 'name';
+        $direction = ($filters['direction'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
 
         return PickupPoint::with(['carrier', 'province', 'municipality'])
             ->when($filters['archived'] ?? false, fn (Builder $query) => $query->onlyTrashed())
@@ -67,7 +69,7 @@ class PickupPointService
             ->when($search !== '', fn (Builder $query) => $query->where(
                 fn (Builder $query) => $query->where('name', 'like', $pattern)->orWhere('external_code', 'like', $pattern),
             ))
-            ->orderBy('name')->orderBy('id')
+            ->orderBy($sort, $direction)->orderBy('id')
             ->paginate(self::PER_PAGE)
             ->withQueryString();
     }

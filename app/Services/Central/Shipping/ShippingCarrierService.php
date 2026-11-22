@@ -42,6 +42,8 @@ class ShippingCarrierService
 
         $search = trim((string) ($filters['search'] ?? ''));
         $pattern = '%'.addcslashes($search, '\\%_').'%';
+        $sort = in_array($filters['sort'] ?? null, ['name', 'code', 'is_active'], true) ? $filters['sort'] : 'name';
+        $direction = ($filters['direction'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
 
         return ShippingCarrier::query()
             ->when($filters['archived'] ?? false, fn (Builder $query) => $query->onlyTrashed())
@@ -49,7 +51,7 @@ class ShippingCarrierService
             ->when($search !== '', fn (Builder $query) => $query->where(
                 fn (Builder $query) => $query->where('name', 'like', $pattern)->orWhere('code', 'like', $pattern),
             ))
-            ->orderBy('name')->orderBy('id')
+            ->orderBy($sort, $direction)->orderBy('id')
             ->paginate(self::PER_PAGE)
             ->withQueryString();
     }

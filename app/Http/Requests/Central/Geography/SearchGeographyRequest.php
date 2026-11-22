@@ -27,6 +27,8 @@ class SearchGeographyRequest extends FormRequest
             'parent_uuid' => ['nullable', 'uuid'],
             'type' => ['nullable', Rule::enum(GeoZoneTypeEnum::class)],
             'state' => ['nullable', Rule::in(['all', 'active', 'inactive', 'archived'])],
+            'sort' => ['nullable', Rule::in(['code', 'name_fr', 'type', 'is_active', 'effective_at'])],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
             'page' => ['nullable', 'integer', 'min:1'],
         ];
     }

@@ -44,6 +44,9 @@ class FeatureCatalogService
 
         $search = trim((string) ($filters['search'] ?? ''));
         $pattern = '%'.addcslashes($search, '\\%_').'%';
+        $sort = $filters['sort'] ?? null;
+        $sort = in_array($sort, ['name', 'value_type', 'quota_scope', 'period', 'is_active'], true) ? $sort : 'name';
+        $direction = ($filters['direction'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
 
         return Feature::withCount('planFeatures')
             ->when($filters['archived'] ?? false, fn (Builder $query) => $query->onlyTrashed())
@@ -51,7 +54,7 @@ class FeatureCatalogService
             ->when($search !== '', fn (Builder $query) => $query->where(
                 fn (Builder $query) => $query->where('name', 'like', $pattern)->orWhere('code', 'like', $pattern),
             ))
-            ->orderBy('name')->orderBy('id')
+            ->orderBy($sort, $direction)->orderBy('id')
             ->paginate(self::PER_PAGE)
             ->withQueryString();
     }

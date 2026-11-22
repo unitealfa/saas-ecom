@@ -1,58 +1,35 @@
 <x-layouts::app :title="__('Pays')">
-    <section class="flex flex-col gap-6">
-        <flux:heading size="xl" level="1">Pays disponibles</flux:heading>
-        <flux:text>Les pays actifs peuvent être choisis lors de l’inscription. Désactiver un pays conserve les comptes et les zones existants.</flux:text>
-        @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
-        @if ($errors->any())
-            <flux:callout variant="danger" role="alert">
-                @foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach
-            </flux:callout>
-        @endif
-        @can('create', \App\Models\Central\Countries\Country::class)
-            <flux:button :href="route('central.countries.create')" variant="primary">Créer un pays</flux:button>
-        @endcan
-        <div class="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
-            <table class="w-full text-left text-sm">
-                <thead><tr>
-                    @foreach (['Code', 'Français', 'Anglais', 'Arabe', 'Disponibilité', 'Actions'] as $heading)
-                        <th class="p-4">{{ $heading }}</th>
-                    @endforeach
-                </tr></thead>
-                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
-                    @forelse ($countries as $country)
-                        <tr>
-                            <td class="p-4">{{ $country->code }}</td>
-                            <td class="p-4">{{ $country->name_fr }}</td>
-                            <td class="p-4">{{ $country->name_en }}</td>
-                            <td class="p-4" dir="rtl">{{ $country->name_ar ?? '—' }}</td>
-                            <td class="p-4">{{ $country->is_active ? 'Actif' : 'Désactivé' }}</td>
-                            <td class="p-4">
-                                <div class="flex flex-wrap gap-2">
-                                    @can('update', $country)
-                                        <flux:button :href="route('central.countries.edit', $country)">Modifier</flux:button>
-                                    @endcan
-                                    @can('activate', $country)
-                                        <form method="POST" action="{{ route('central.countries.activate', $country) }}">
-                                            @csrf @method('PATCH')
-                                            <input type="hidden" name="is_active" value="{{ $country->is_active ? '0' : '1' }}">
-                                            <flux:button type="submit">{{ $country->is_active ? 'Désactiver' : 'Activer' }}</flux:button>
-                                        </form>
-                                    @endcan
-                                    @can('delete', $country)
-                                        <form method="POST" action="{{ route('central.countries.destroy', $country) }}" x-data x-on:submit="if (! window.confirm('Retirer ce pays du catalogue ?')) $event.preventDefault()">
-                                            @csrf @method('DELETE')
-                                            <flux:button type="submit" variant="danger">Retirer</flux:button>
-                                        </form>
-                                    @endcan
-                                </div>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr><td colspan="6" class="p-4">Aucun pays enregistré.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        {{ $countries->links() }}
+    <section class="mx-auto flex w-full max-w-screen-2xl flex-col gap-6">
+        <header class="flex flex-wrap items-start justify-between gap-5"><div class="space-y-2"><h1 class="aydra-heading text-3xl font-semibold tracking-tight sm:text-4xl">Pays disponibles</h1><p class="aydra-muted max-w-2xl text-sm sm:text-base">Les pays actifs peuvent être choisis lors de l’inscription. Désactiver un pays conserve les comptes et les zones existants.</p></div>@can('create', \App\Models\Central\Countries\Country::class)<flux:button :href="route('central.countries.create')" variant="primary" icon="plus">Créer un pays</flux:button>@endcan</header>
+        @if (session('status'))<flux:callout role="status">{{ session('status') }}</flux:callout>@endif
+        @if ($errors->any())<flux:callout variant="danger" role="alert">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</flux:callout>@endif
+        <section class="aydra-users-panel p-5 sm:p-6" aria-labelledby="country-search"><h2 id="country-search" class="aydra-heading text-lg font-semibold">Rechercher un pays</h2><p class="aydra-muted mt-1 text-sm">Les suggestions proviennent des pays affichés sur cette page.</p>
+            <form method="GET" action="{{ route('central.countries.index') }}" class="mt-5 flex flex-wrap items-end gap-3">
+                <flux:input name="search" label="Nom ou code" :value="request('search')" type="search" icon="magnifying-glass" placeholder="Nom ou code ISO" list="country-suggestions" class="min-w-0 flex-1 sm:min-w-72" />
+                <datalist id="country-suggestions">@foreach ($countries as $country)<option value="{{ $country->name_fr }}"></option><option value="{{ $country->name_en }}"></option><option value="{{ $country->code }}"></option>@if ($country->name_ar)<option value="{{ $country->name_ar }}"></option>@endif @endforeach</datalist>
+                <div class="w-full sm:w-48" x-data="{ value: '', label: '' }" data-value="{{ request('state', 'all') }}" data-label="{{ match (request('state', 'all')) { 'active' => 'Actifs', 'inactive' => 'Inactifs', default => 'Tous les états' } }}" x-init="value = $el.dataset.value; label = $el.dataset.label"><label id="country-state-label" class="mb-2 block text-sm font-medium">Disponibilité</label><input type="hidden" name="state" :value="value" value="{{ request('state', 'all') }}"><flux:dropdown><flux:button type="button" icon:trailing="chevron-down" class="w-full justify-between" aria-labelledby="country-state-label country-state-value"><span id="country-state-value" x-text="label">Tous les états</span></flux:button><flux:menu>@foreach (['all' => 'Tous les états', 'active' => 'Actifs', 'inactive' => 'Inactifs'] as $value => $label)<flux:menu.item type="button" data-value="{{ $value }}" @click="value = $el.dataset.value; label = $el.textContent.trim()">{{ $label }}</flux:menu.item>@endforeach</flux:menu></flux:dropdown></div>
+                @if (request()->filled('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}"><input type="hidden" name="direction" value="{{ request('direction', 'asc') }}">@endif
+                <flux:button type="submit" variant="primary">Rechercher</flux:button><flux:button :href="route('central.countries.index')">Effacer</flux:button>
+            </form>
+        </section>
+        @php($sortBy = request('sort', 'name_fr')) @php($sortDirection = request('direction', 'asc'))
+        <section class="aydra-users-panel"><div class="aydra-users-toolbar"><div><h2 class="aydra-heading text-lg font-semibold">Pays</h2><p class="aydra-muted mt-1 text-sm">{{ $countries->total() }} {{ $countries->total() === 1 ? 'pays trouvé' : 'pays trouvés' }}</p></div></div>
+            <div class="aydra-users-table"><flux:table class="whitespace-normal"><flux:table.columns>
+                @foreach (['code' => 'Code', 'name_fr' => 'Français', 'name_en' => 'Anglais', 'name_ar' => 'Arabe', 'is_active' => 'Disponibilité', 'actions' => 'Actions'] as $column => $heading)
+                    @if ($column !== 'actions')<flux:table.column sortable :sorted="$sortBy === $column" :direction="$sortDirection" :aria-sort="$sortBy === $column ? ($sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'" :data-sort-url="route('central.countries.index', [...request()->only(['search', 'state']), 'sort' => $column, 'direction' => $sortBy === $column && $sortDirection === 'asc' ? 'desc' : 'asc'])" onclick="window.location.assign(this.dataset.sortUrl)">{{ $heading }}</flux:table.column>@else <flux:table.column>{{ $heading }}</flux:table.column> @endif
+                @endforeach
+            </flux:table.columns><flux:table.rows>
+                @forelse ($countries as $country)
+                    <flux:table.row :key="$country->uuid"><flux:table.cell variant="strong">{{ $country->code }}</flux:table.cell><flux:table.cell>{{ $country->name_fr }}</flux:table.cell><flux:table.cell>{{ $country->name_en }}</flux:table.cell><flux:table.cell><span dir="rtl" lang="ar">{{ $country->name_ar ?? '—' }}</span></flux:table.cell><flux:table.cell><flux:badge size="sm" :color="$country->is_active ? 'green' : 'zinc'">{{ $country->is_active ? 'Actif' : 'Désactivé' }}</flux:badge></flux:table.cell>
+                        <flux:table.cell><div class="flex flex-wrap gap-2">
+                            @can('update', $country)<flux:button :href="route('central.countries.edit', $country)">Modifier</flux:button>@endcan
+                            @can('activate', $country)<form method="POST" action="{{ route('central.countries.activate', $country) }}">@csrf @method('PATCH')<input type="hidden" name="is_active" value="{{ $country->is_active ? '0' : '1' }}"><flux:button type="submit">{{ $country->is_active ? 'Désactiver' : 'Activer' }}</flux:button></form>@endcan
+                            @can('delete', $country)<form method="POST" action="{{ route('central.countries.destroy', $country) }}" x-data x-on:submit="if (! window.confirm('Retirer ce pays du catalogue ?')) $event.preventDefault()">@csrf @method('DELETE')<flux:button type="submit" variant="danger">Retirer</flux:button></form>@endcan
+                        </div></flux:table.cell></flux:table.row>
+                @empty <flux:table.row><flux:table.cell colspan="6"><div class="aydra-users-empty"><p class="aydra-heading font-medium">Aucun pays trouvé.</p><p class="aydra-muted mt-1 text-sm">Essayez un autre nom, code ou état.</p></div></flux:table.cell></flux:table.row> @endforelse
+            </flux:table.rows></flux:table>
+            @if ($countries->hasPages())<nav aria-label="Pagination des pays" class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 pt-4 dark:border-zinc-700"><span class="aydra-muted text-sm">Page {{ $countries->currentPage() }} sur {{ $countries->lastPage() }}</span><div class="flex gap-2">@if ($countries->onFirstPage())<flux:button disabled icon="chevron-left">Précédent</flux:button>@else<flux:button :href="$countries->previousPageUrl()" icon="chevron-left">Précédent</flux:button>@endif @if ($countries->hasMorePages())<flux:button :href="$countries->nextPageUrl()" icon:trailing="chevron-right">Suivant</flux:button>@else<flux:button disabled icon:trailing="chevron-right">Suivant</flux:button>@endif</div></nav>@endif
+            </div>
+        </section>
     </section>
 </x-layouts::app>

@@ -1,5 +1,6 @@
-@foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
-<form method="POST" action="{{ $mapping === null ? route('central.carrier-mappings.store') : route('central.carrier-mappings.update', $mapping) }}" class="flex flex-col gap-5">
+@if ($errors->any())<flux:callout variant="danger" role="alert">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</flux:callout>@endif
+<form method="POST" action="{{ $mapping === null ? route('central.carrier-mappings.store') : route('central.carrier-mappings.update', $mapping) }}" class="aydra-users-panel flex flex-col gap-5 p-5 sm:p-6">
+    <h2 class="aydra-heading text-lg font-semibold">Informations de la correspondance</h2>
     @csrf
     @if ($mapping !== null)
         @method('PUT')
@@ -57,7 +58,7 @@
     <flux:input name="external_province_code" label="Code de la wilaya chez le transporteur" :value="old('external_province_code', $mapping?->external_province_code)" required />
     <flux:input name="verification_source" label="Source vérifiée" :value="old('verification_source', $mapping?->verification_source)" placeholder="Document ou export du transporteur utilisé pour contrôler les codes" required />
     <flux:text>En enregistrant, vous confirmez avoir contrôlé ces codes dans la source renseignée. Utilisez uniquement les codes communs du réseau, jamais les exceptions privées d’un compte. Ils seront publiés comme correspondance vérifiée ; aucun contrôle API automatique n’est effectué.</flux:text>
-    <div class="flex gap-3">
+    <div class="flex flex-wrap gap-3">
         <flux:button type="submit" variant="primary">Enregistrer</flux:button>
         @can('viewAny', \App\Models\Central\Shipping\CarrierGeoMapping::class)<flux:button :href="route('central.carrier-mappings.index')">Retour aux correspondances</flux:button>@endcan
     </div>
