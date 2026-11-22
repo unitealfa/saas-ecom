@@ -62,6 +62,6 @@ class SubscriptionRequestActionRequest extends FormRequest
         }
 
         return [...$rules, ...array_fill_keys(['user_id', 'current_subscription_id', 'current_invoice_id', 'current_payment_id',
-            'status', 'reference_version', 'decided_by_id', 'decided_at', 'decision_reason', 'invoice_error'], ['missing'])];
+            'status', 'reference_version', 'decided_by_id', 'decided_at', 'decision_reason', 'invoice_error', 'accepted_without_payment'], ['missing'])];
     }
 }

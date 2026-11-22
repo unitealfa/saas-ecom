@@ -63,6 +63,7 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
             Route::post('/', 'store')->middleware('throttle:6,1')->name('store');
             Route::get('{subscription}', 'show')->name('show');
             Route::post('{subscription}/demarrer', 'startNow')->name('start-now');
+            Route::post('{subscription}/plan-par-defaut', 'switchToDefault')->name('switch-to-default');
         });
         Route::controller(PaymentController::class)->prefix('paiements')->name('payments.')->whereUuid('payment')->group(function (): void {
             Route::get('/', 'index')->name('index');

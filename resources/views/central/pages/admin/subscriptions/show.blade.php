@@ -35,6 +35,12 @@
             <flux:callout>Cette période est réservée. La facture définitive et le reçu sont produits après contrôle des fonds ; les droits attendent la finalisation et la date de début.</flux:callout>
         @endif
         <section class="aydra-users-panel p-5 sm:p-6"><h2 class="aydra-heading mb-4 text-lg font-semibold">Actions</h2><div class="flex flex-wrap gap-3">
+            @php($invoice = $subscription->request?->invoice)
+            @if ($invoice?->subscription_id === $subscription->id && $invoice->status === \App\Enums\Central\Billing\DocumentStatusEnum::ISSUED)
+                @can('viewBillingDossier', $invoice)
+                    <flux:button :href="route('central.invoices.show', $invoice)">Consulter la facture</flux:button>
+                @endcan
+            @endif
             @if ($subscription->request)
                 @can('view', $subscription->request)<flux:button :href="route('central.subscription-requests.show', $subscription->request)">Demande et facturation</flux:button>@endcan
             @endif
@@ -50,12 +56,14 @@
                     </form>
                 @endcan
             @endif
-            @if ($subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::ACTIVE && $subscription->effectiveEndsAt()?->isFuture() && $subscription->ended_at === null && ! $subscription->isFree())
+            @if ($subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::ACTIVE && ! $subscription->effectiveStartsAt()->isFuture() && $subscription->ended_at === null && ($subscription->isFree() || $subscription->effectiveEndsAt()?->isFuture()))
                 @can('change', $subscription)
                     @can('saas.payments.validate')
                     <flux:button :href="route('central.subscriptions.change.form', $subscription)">Changer l’offre</flux:button>
                     @endcan
                 @endcan
+            @endif
+            @if ($subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::ACTIVE && $subscription->effectiveEndsAt()?->isFuture() && $subscription->ended_at === null)
                 @can('close', $subscription)
                     <form method="POST" action="{{ route('central.subscriptions.close', $subscription) }}" x-data x-on:submit="if (! window.confirm('Mettre fin à cet abonnement à la fin de sa période ?')) $event.preventDefault()">
                         @csrf

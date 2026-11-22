@@ -51,7 +51,8 @@ class SubscriptionRequest extends Model
     {
         return ['submitted_payment' => 'encrypted:array', 'status' => RequestStatusEnum::class, 'payment_choice' => PaymentChoiceEnum::class,
             'user_id' => 'integer', 'current_subscription_id' => 'integer', 'current_invoice_id' => 'integer', 'current_payment_id' => 'integer',
-            'reference_version' => 'integer', 'submitted_at' => 'immutable_datetime', 'decided_at' => 'immutable_datetime'];
+            'reference_version' => 'integer', 'submitted_at' => 'immutable_datetime', 'decided_at' => 'immutable_datetime',
+            'accepted_without_payment' => 'boolean'];
     }
 
     /** @return BelongsTo<User, $this> */
@@ -93,6 +94,16 @@ class SubscriptionRequest extends Model
     public function managementState(): string
     {
         return hash('sha256', json_encode($this->getAttributes(), JSON_THROW_ON_ERROR));
+    }
+
+    public function statusLabel(): string
+    {
+        if ($this->subscription?->agreed_amount === '0.00'
+            && in_array($this->status, [RequestStatusEnum::INVOICE_PENDING, RequestStatusEnum::AWAITING_PAYMENT], true)) {
+            return 'En attente de validation';
+        }
+
+        return $this->status->label();
     }
 
     public function getMorphClass(): string

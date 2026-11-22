@@ -26,7 +26,12 @@ class TenantAccessController extends Controller
         abort_unless($domain->isReadyAsPrimary(), 403);
         $nonce = $request->query('nonce');
         if ($nonce === null) {
-            return redirect()->away($domain->publicUrl().'login');
+            $path = URL::temporarySignedRoute('tenant.owner-login.start', now()->addMinute(), [
+                'tenant_uuid' => $tenant->uuid,
+            ], absolute: false);
+
+            return redirect()->away(rtrim($domain->publicUrl(), '/').$path)
+                ->withHeaders(['Referrer-Policy' => 'no-referrer', 'Cache-Control' => 'no-store']);
         }
         $request->validate(['nonce' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/D']]);
         $path = URL::temporarySignedRoute('tenant.owner-login', now()->addMinute(), [

@@ -22,6 +22,9 @@
 @if (empty($invoice->getAttribute('taxes')) && filled($invoice->billing_rule_snapshot['fiscal_policy']['no_tax_reason'] ?? null))<p>{{ $invoice->billing_rule_snapshot['fiscal_policy']['no_tax_reason'] }}</p>@endif
 <p>Taxes : {{ $invoice->tax_amount }} {{ $invoice->currency }}</p>
 <p class="total"><strong>Total TTC : {{ $invoice->total_amount }} {{ $invoice->currency }}</strong></p>
+@if (isset($invoice->billing_rule_snapshot['approval_actor_name']))
+    <p>Offre approuvée par {{ $invoice->billing_rule_snapshot['approval_actor_name'] }}. Aucun paiement requis.</p>
+@endif
 <p>Règle : {{ $invoice->billing_rule_snapshot['code'] }}, version {{ $invoice->billing_rule_snapshot['version'] }}.</p>
 @if (filled($invoice->billing_rule_snapshot['fiscal_policy']['validation_reference'] ?? null))
 <p>Référence fiscale : {{ $invoice->billing_rule_snapshot['fiscal_policy']['validation_reference'] }}.</p>

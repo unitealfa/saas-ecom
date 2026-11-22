@@ -10,6 +10,8 @@ enum PaymentStateEnum: string
     case ANOMALY = 'anomaly';
     case CREDITED = 'credited';
 
+    case NO_PAYMENT_REQUIRED = 'no_payment_required';
+
     public function label(): string
     {
         return match ($this) {
@@ -18,6 +20,7 @@ enum PaymentStateEnum: string
             self::PAID => 'Paiement intégral confirmé',
             self::ANOMALY => 'Paiement refusé ou anomalie',
             self::CREDITED => 'Dette intégralement corrigée par avoir',
+            self::NO_PAYMENT_REQUIRED => 'Aucun paiement requis',
         };
     }
 }

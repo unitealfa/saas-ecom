@@ -81,6 +81,62 @@ function issueHistoricalRequest(array $f, SubscriptionRequest $request): Subscri
     return $request->refresh();
 }
 
+test('a zero price offer requires administrative approval and issues a zero invoice without a payment', function (): void {
+    Notification::fake();
+    $fixture = requestFixture();
+    $fixture['plan']->forceFill(['monthly_price' => '0.00', 'annual_price' => '0.00'])->save();
+    $payload = subscriptionRequestInput($fixture);
+    $payload['expected_amount'] = '0.00';
+    unset($payload['payment_choice']);
+
+    $this->actingAs($fixture['owner'], 'central')->post(route('owner.subscriptions.store'), $payload)
+        ->assertSessionHasNoErrors()->assertRedirect();
+    $request = SubscriptionRequest::where('user_id', $fixture['owner']->id)->sole();
+    expect($request->payment_choice)->toBe(PaymentChoiceEnum::CASH)
+        ->and($request->subscription->status)->toBe(StatusEnum::SCHEDULED)
+        ->and($request->statusLabel())->toBe('En attente de validation');
+
+    $approval = route('central.subscription-requests.accept', $request);
+    $decision = ['expected_state' => $request->managementState()];
+    $this->post($approval, $decision)->assertForbidden();
+    $this->actingAs($fixture['actor'], 'central')->post($approval, $decision)
+        ->assertSessionHasNoErrors()->assertRedirect();
+    $request->refresh();
+    $invoice = $request->invoice;
+
+    expect($request->status)->toBe(RequestStatusEnum::ACCEPTED)
+        ->and($request->subscription->status)->toBe(StatusEnum::ACTIVE)
+        ->and($invoice->status)->toBe(DocumentStatusEnum::ISSUED)
+        ->and($invoice->total_amount)->toBe('0.00')
+        ->and($invoice->tax_amount)->toBe('0.00')
+        ->and($invoice->billing_rule_snapshot['approval_actor_name'])->toBe($fixture['actor']->name)
+        ->and($invoice->payments()->exists())->toBeFalse()
+        ->and($invoice->document_media_id)->not->toBeNull();
+});
+
+test('the owner confirms the comparison before immediately returning to the designated default', function (): void {
+    $fixture = requestFixture();
+    $this->seed(FreePlanSeeder::class);
+    $default = Plan::where('code', 'free')->sole();
+    $default->forceFill(['is_default' => true])->save();
+    $source = Subscription::factory()->create(['user_id' => $fixture['owner']->id,
+        'plan_id' => $fixture['plan']->id, 'status' => StatusEnum::ACTIVE, 'agreed_amount' => '3000.00',
+        'period_starts_at' => now()->subDay(), 'period_ends_at' => now()->addMonth()]);
+    $url = route('owner.subscriptions.switch-to-default', $source);
+    $payload = ['expected_state' => $source->transitionState(), 'plan_uuid' => $default->uuid,
+        'expected_plan_state' => $default->compositionState($default->features)];
+
+    $this->actingAs($fixture['owner'], 'central')->get(route('owner.subscriptions.index'))
+        ->assertOk()->assertSee('Passer au plan par défaut')->assertSee($source->plan->name);
+    $this->post($url, $payload)->assertSessionHasErrors('confirmed');
+    $this->post($url, [...$payload, 'confirmed' => '1'])->assertRedirect()->assertSessionHasNoErrors();
+
+    $current = Subscription::where('user_id', $fixture['owner']->id)->where('status', StatusEnum::ACTIVE)->sole();
+    expect($source->refresh()->status)->toBe(StatusEnum::CANCELLED)
+        ->and($current->plan_id)->toBe($default->id)
+        ->and($current->period_ends_at)->toBeNull();
+});
+
 test('invoice and receipt open as protected printable PDFs without changing normal downloads', function (): void {
     $f = requestFixture();
     $service = app(SubscriptionRequestService::class);

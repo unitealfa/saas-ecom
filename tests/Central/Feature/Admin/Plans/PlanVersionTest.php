@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Central\Features\ValueTypeEnum;
 use App\Models\Central\Audit\Activity;
 use App\Models\Central\Features\Feature;
 use App\Models\Central\Plans\Plan;
@@ -28,6 +29,45 @@ function planVersionPayload(Plan $plan, int $latestVersion): array
         'expected_latest_version' => $latestVersion,
     ];
 }
+
+test('the version dialog creates nothing until an unchanged draft is explicitly confirmed', function (): void {
+    $actor = planVersionActor(['saas.plans.view', 'saas.plans.versions.create']);
+    $source = Plan::factory()->create();
+    $url = route('central.plan-pages.show', $source);
+    $endpoint = route('central.plan-pages.versions.store', $source);
+    $data = [...planVersionPayload($source, 1), 'draft' => ['preview' => '1']];
+
+    $this->actingAs($actor, 'central')->get($url)->assertOk()->assertSee('Créer une nouvelle version');
+    expect(Plan::where('code', $source->code)->count())->toBe(1);
+    $this->from($url)->post($endpoint, $data)->assertRedirect($url)->assertSessionHasErrors('copy_confirmation');
+    expect(Plan::where('code', $source->code)->count())->toBe(1);
+    $data['draft']['confirmed_copy'] = '1';
+    $this->post($endpoint, $data)->assertSessionHasNoErrors()->assertRedirect();
+    $created = Plan::where('code', $source->code)->where('version', 2)->sole();
+    expect($created->name)->toBe(PlanVersionService::suggestedName($source, 2))
+        ->and($created->is_active)->toBeFalse();
+});
+
+test('the version dialog edits quotas when creating a version from the designated default', function (): void {
+    $actor = planVersionActor(['saas.plans.view', 'saas.plans.versions.create', 'saas.plans.update', 'saas.plans.features.update']);
+    $source = Plan::factory()->create(['name' => 'Offre originale']);
+    $source->forceFill(['is_default' => true])->save();
+    $feature = Feature::factory()->create(['value_type' => ValueTypeEnum::QUANTITY]);
+    PlanFeature::factory()->create(['plan_id' => $source->id, 'feature_id' => $feature->id, 'limit' => 3]);
+    $draft = ['preview' => '1', 'information' => ['name' => PlanVersionService::suggestedName($source, 2),
+        'description' => $source->description, 'monthly_price' => $source->monthly_price, 'annual_price' => $source->annual_price],
+        'edit_features' => '1', 'selected' => [$feature->uuid], 'enabled' => [$feature->uuid => '1'], 'limits' => [$feature->uuid => '5']];
+    $this->actingAs($actor, 'central')->get(route('central.plan-pages.show', $source))
+        ->assertOk()->assertSee('name="draft[edit_features]"', false);
+    $this->post(route('central.plan-pages.versions.store', $source), [
+        ...planVersionPayload($source, 1), 'draft' => $draft,
+    ])->assertSessionHasNoErrors()->assertRedirect();
+    $created = Plan::where('code', $source->code)->where('version', 2)->sole();
+    expect($created->features()->sole()->limit)->toBe(5)
+        ->and($created->is_default)->toBeFalsy()
+        ->and($source->refresh()->is_default)->toBeTrue()
+        ->and($source->features()->sole()->limit)->toBe(3);
+});
 
 test('a newly copied version can change its information and feature limits', function (): void {
     $actor = planVersionActor(['saas.plans.versions.create', 'saas.plans.update', 'saas.plans.features.update']);

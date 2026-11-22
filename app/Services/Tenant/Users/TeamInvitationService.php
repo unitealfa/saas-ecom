@@ -15,8 +15,10 @@ use App\Services\Tenant\Authorization\TenantQuotaService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 final class TeamInvitationService
 {
@@ -158,8 +160,14 @@ final class TeamInvitationService
             $member = User::withTrashed()->where('email', $invite->email)->lockForUpdate()->first();
             $sessionUser = Auth::guard('tenant')->user();
             if ($member === null) {
-                if ($sessionUser !== null || $password === null) {
-                    throw ValidationException::withMessages(['invitation' => 'Activez le compte depuis une session déconnectée.']);
+                if ($sessionUser !== null) {
+                    throw ValidationException::withMessages(['invitation' => 'Déconnectez-vous avant de créer votre compte.']);
+                }
+                if (blank($lastName) || $password === null) {
+                    throw ValidationException::withMessages(array_filter([
+                        'last_name' => blank($lastName) ? 'Indiquez votre nom.' : null,
+                        'password' => $password === null ? 'Choisissez un mot de passe.' : null,
+                    ]));
                 }
                 $member = new User(['email' => $invite->email, 'last_name' => $lastName, 'first_name' => $firstName,
                     'password' => $password]);
@@ -178,7 +186,14 @@ final class TeamInvitationService
         }, 3);
         $url = $this->urls->make('tenant.login');
         $shopName = Shop::where('singleton', 1)->value('shop_name');
-        $member->notify(new WelcomeEmployeeNotification($shopName, $url));
+        try {
+            $member->notify(new WelcomeEmployeeNotification($shopName, $url));
+        } catch (TransportExceptionInterface $exception) {
+            Log::warning('Tenant welcome email delivery failed.', [
+                'invitation_uuid' => $invite->uuid,
+                'exception_class' => $exception::class,
+            ]);
+        }
 
         return $member;
     }

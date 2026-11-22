@@ -5,6 +5,7 @@ namespace App\Tenancy\Bootstrappers;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Cookie\CookieJar;
 use Illuminate\Session\SessionManager;
 use Stancl\Tenancy\Contracts\TenancyBootstrapper;
 use Stancl\Tenancy\Contracts\Tenant;
@@ -29,17 +30,29 @@ class AccountContextBootstrapper implements TenancyBootstrapper
             'session.domain' => null,
             'session.connection' => 'tenant',
         ]);
+        $this->setCookieDomain(null);
         $this->auth->forgetGuards();
         $this->sessions->forgetDrivers();
         $this->app->forgetInstance('session.store');
+        $this->app->forgetInstance('redirect');
     }
 
     public function revert(): void
     {
         $this->config->set($this->original);
+        $this->setCookieDomain($this->config->get('session.domain'));
         $this->auth->forgetGuards();
         $this->sessions->forgetDrivers();
         $this->app->forgetInstance('session.store');
+        $this->app->forgetInstance('redirect');
         $this->original = [];
+    }
+
+    private function setCookieDomain(?string $domain): void
+    {
+        $this->app->make(CookieJar::class)->setDefaultPathAndDomain(
+            $this->config->get('session.path'), $domain,
+            $this->config->get('session.secure'), $this->config->get('session.same_site'),
+        );
     }
 }

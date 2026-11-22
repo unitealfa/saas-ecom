@@ -23,6 +23,7 @@ use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use App\Services\Central\Billing\InvoicePaymentService;
 use App\Services\Central\Billing\PaymentDocumentService;
+use App\Services\Central\Billing\SaasInvoiceIssuanceService;
 use App\Services\Central\Billing\SaasInvoiceService;
 use App\Services\Central\Billing\SaasPaymentService;
 use Brick\Math\BigDecimal;
@@ -60,6 +61,7 @@ class SubscriptionRequestService
         private readonly SubscriptionWorkflowNotifier $notifications,
         private readonly PaymentDocumentService $documents,
         private readonly SubscriptionRequestPaymentState $paymentState,
+        private readonly SaasInvoiceIssuanceService $issuance,
     ) {}
 
     /** @param array<string, mixed> $filters
@@ -98,7 +100,7 @@ class SubscriptionRequestService
     /** @return array<string, mixed> */
     public static function rules(): array
     {
-        return [...SubscriptionPurchaseService::rules(), 'payment_choice' => ['required', 'integer', Rule::enum(PaymentChoiceEnum::class)],
+        return [...SubscriptionPurchaseService::rules(), 'payment_choice' => ['required_unless:expected_amount,0.00', 'integer', Rule::enum(PaymentChoiceEnum::class)],
             ...array_fill_keys(['current_subscription_id', 'current_invoice_id', 'current_payment_id', 'reference_version',
                 'decided_by_id', 'decided_at', 'decision_reason', 'invoice_error', 'currency', 'amount', 'submitted_payment'], ['missing'])];
     }
@@ -124,6 +126,9 @@ class SubscriptionRequestService
     public function createFor(User $actor, User $owner, array $data, ?UploadedFile $proof = null): SubscriptionRequest
     {
         abort_if(tenancy()->initialized, 403);
+        if (($data['expected_amount'] ?? null) === '0.00') {
+            $data['payment_choice'] = PaymentChoiceEnum::CASH->value;
+        }
         Validator::make([...$data, 'proof' => $proof], self::initialPaymentRules())->validate();
         $source = isset($data['source_uuid']) ? Subscription::where('uuid', $data['source_uuid'])->where('user_id', $owner->id)->firstOrFail() : null;
         $request = $this->mutations->run($actor, 'createFor', fn () => [SubscriptionRequest::class, $owner, $source], function () use ($actor, $owner, $data, $proof): SubscriptionRequest {
@@ -292,6 +297,11 @@ class SubscriptionRequestService
                 $this->fail('La configuration de facturation doit être complétée avant la confirmation des fonds.');
             }
         }
+        if ($current->subscription->agreed_amount === '0.00') {
+            $this->issuance->issueForRequest($actor, $current->invoice, $current->invoice->managementState());
+
+            return $current->refresh();
+        }
         if ($current->payment_choice === PaymentChoiceEnum::EXTERNAL && $current->current_payment_id === null) {
             $this->declareRetainedProof($actor, $current);
             $current->refresh();
@@ -365,6 +375,9 @@ class SubscriptionRequestService
 
         return $this->mutations->run($owner, 'update', fn () => $this->lock($request), function (SubscriptionRequest $current) use ($owner, $expected, $choice): SubscriptionRequest {
             $this->assertState($current, $expected);
+            if ($current->subscription->agreed_amount === '0.00' && $choice !== PaymentChoiceEnum::CASH) {
+                $this->fail('Cette offre ne nécessite aucun paiement.');
+            }
             if ($current->status->isFinal()) {
                 $this->fail('Une demande terminée est immuable.');
             }
@@ -390,6 +403,9 @@ class SubscriptionRequestService
     public function revise(User $owner, SubscriptionRequest $request, string $expected, array $data): SubscriptionRequest
     {
         abort_if(tenancy()->initialized, 403);
+        if (($data['expected_amount'] ?? null) === '0.00') {
+            $data['payment_choice'] = PaymentChoiceEnum::CASH->value;
+        }
         $current = $this->mutations->run($owner, 'update', fn () => $this->lock($request), function (SubscriptionRequest $current) use ($owner, $expected, $data): SubscriptionRequest {
             $this->assertState($current, $expected);
             $values = Validator::make($data, self::rules())->validate();

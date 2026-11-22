@@ -24,7 +24,7 @@
                         @endif
                     @endforeach
                 </ul>
-                <flux:text>Cette période est déjà payée : aucun nouveau paiement ni remboursement. Les factures existantes sont conservées.</flux:text>
+                <flux:text>{{ $subscription->agreed_amount === '0.00' ? 'Cette période à 0,00 DZD a déjà été approuvée.' : 'Cette période est déjà payée. Aucun nouveau paiement ni remboursement.' }}</flux:text>
                 <form method="POST" action="{{ route('owner.subscriptions.start-now', $subscription) }}" class="flex flex-col gap-3">
                     @csrf
                     <input type="hidden" name="expected_state" value="{{ $subscription->transitionState() }}">
@@ -36,11 +36,11 @@
             </section>
         @endcan
         @forelse ($installments as $installment)
-            <flux:heading>Règlement intégral : {{ $installment->installment_amount }} DZD — {{ $installment->installment_status->label() }}</flux:heading>
+            <flux:heading>{{ $installment->installment_amount === '0.00' ? 'Période à 0,00 DZD' : 'Règlement intégral : '.$installment->installment_amount.' DZD — '.$installment->installment_status->label() }}</flux:heading>
             @forelse ($installment->invoices as $invoice)
                 <flux:button :href="route('owner.invoices.show', $invoice)">Facture {{ $invoice->number ?? 'en préparation' }}</flux:button>
             @empty
-                <flux:callout>La préparation interne précède le paiement. La facture définitive et le reçu sont produits après confirmation intégrale des fonds, avant l’activation des droits.</flux:callout>
+                <flux:callout>{{ $installment->installment_amount === '0.00' ? 'La facture sera disponible après validation administrative.' : 'La facture définitive et le reçu sont produits après confirmation intégrale des fonds, avant l’activation des droits.' }}</flux:callout>
             @endforelse
         @empty<flux:text>Aucune échéance payante : l’offre gratuite n’exige pas de paiement.</flux:text>@endforelse
         <flux:button :href="route('owner.subscriptions.index')">Retour aux offres</flux:button>

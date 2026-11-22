@@ -5,6 +5,7 @@ namespace App\Services\Central\Billing;
 use App\Enums\Central\Billing\DeliveryChannelEnum;
 use App\Enums\Central\Billing\DeliveryStatusEnum;
 use App\Enums\Central\Billing\DocumentStatusEnum;
+use App\Enums\Central\Subscriptions\RequestStatusEnum;
 use App\Enums\MediaVisibilityEnum;
 use App\Models\Central\Audit\Activity;
 use App\Models\Central\Billing\BillingRule;
@@ -19,6 +20,8 @@ use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use App\Services\Central\Media\CentralMediaService;
 use App\Services\Central\Media\PrivateMediaAccessService;
+use App\Services\Central\Subscriptions\PaidSubscriptionActivation;
+use App\Services\Central\Subscriptions\SubscriptionWorkflowNotifier;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -50,6 +53,8 @@ class SaasInvoiceIssuanceService
         private readonly InvoiceCalculator $calculator,
         private readonly SaasCreditNoteService $credits,
         private readonly InvoicePaymentService $payments,
+        private readonly PaidSubscriptionActivation $activation,
+        private readonly SubscriptionWorkflowNotifier $notifications,
     ) {}
 
     public function issue(User $actor, SaasInvoice $invoice, string $expected): SaasInvoice
@@ -83,9 +88,19 @@ class SaasInvoiceIssuanceService
                 $this->fail('Cette préparation de démonstration ne peut pas être émise : elle ne contient pas les identités et paramètres fiscaux validés nécessaires.');
             }
             $current = $ability === 'issueForRequest'
-                ? $this->numbering->reserveRequestNumber($actor, $current, $expected, $this->assertIssuable(...))
+                ? $this->numbering->reserveRequestNumber($actor, $current, $expected, function (SaasInvoice $document) use ($actor): void {
+                    $this->assertIssuable($document);
+                    if ($document->total_amount === '0.00') {
+                        $document->forceFill(['billing_rule_snapshot' => [...$document->billing_rule_snapshot,
+                            'approval_actor_id' => $actor->id, 'approval_actor_name' => $actor->name]])->save();
+                    }
+                })
                 : $this->numbering->reserveNextNumber($actor, $current, $expected, $this->assertIssuable(...));
             $this->assertIssuable($current);
+            if ($ability === 'issueForRequest' && $current->total_amount === '0.00'
+                && ($current->billing_rule_snapshot['approval_actor_id'] ?? null) !== $actor->id) {
+                $this->fail('La reprise de cette émission doit être effectuée par l’administrateur qui a réservé son numéro.');
+            }
             $file = $this->pdf->generate($current);
 
             return $this->finalize($actor, $current, $file, $ability);
@@ -114,7 +129,7 @@ class SaasInvoiceIssuanceService
             SubscriptionInstallment::whereKey($invoice->installment_id)->lockForUpdate()->firstOrFail();
 
             return $invoice->newQuery()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
-        }, function (SaasInvoice $current) use ($actor, $file): SaasInvoice {
+        }, function (SaasInvoice $current) use ($actor, $file, $ability): SaasInvoice {
             if ($current->status === DocumentStatusEnum::ISSUED) {
                 $this->assertMedia($current);
 
@@ -134,6 +149,18 @@ class SaasInvoiceIssuanceService
                 'disk' => CentralMediaService::DISK, 'original_name' => $current->number.'.pdf',
                 'mime_type' => 'application/pdf', 'visibility' => MediaVisibilityEnum::PRIVATE, 'is_primary' => true, 'position' => 1])->save();
             $current->forceFill(['document_media_id' => $media->id, 'status' => DocumentStatusEnum::ISSUED, 'issued_at' => now()])->save();
+            if ($ability === 'issueForRequest' && $current->total_amount === '0.00') {
+                $request = $current->subscription->request()->lockForUpdate()->firstOrFail();
+                $this->activation->activatePaidSubscription($actor, $current->subscription, $current->installment);
+                $request->forceFill([
+                    'status' => RequestStatusEnum::ACCEPTED, 'accepted_without_payment' => true,
+                    'decided_by_id' => $actor->id, 'decided_at' => now(), 'decision_reason' => null,
+                    'reference_version' => $request->reference_version + 1,
+                ])->save();
+                activity('central')->causedBy($actor)->performedOn($request)->event(SubscriptionWorkflowNotifier::ZERO_PRICE_ACCEPTED)
+                    ->withProperties(['invoice_uuid' => $current->uuid])->log('Demande à 0,00 DZD approuvée.');
+                $this->notifications->request($request, SubscriptionWorkflowNotifier::ZERO_PRICE_ACCEPTED);
+            }
             if ($current instanceof SaasCreditNote) {
                 $this->payments->synchronizeInstallment($actor, $current->originalInvoice);
             }

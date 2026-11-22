@@ -66,9 +66,12 @@ class SubscriptionTransitionService
             $transfers = SaasPayment::withoutGlobalScope('payment')->where('document_id', $invoice->id)->orderBy('id')->lockForUpdate()->get();
             SaasCreditNote::where('original_invoice_id', $invoice->id)->orderBy('id')->lockForUpdate()->get();
             $balance = $this->payments->balance($actor, $invoice);
+            $settled = $next->agreed_amount === '0.00'
+                ? $next->request->getAttribute('accepted_without_payment') && $transfers->isEmpty()
+                : $this->payments->confirmedPayment($actor, $invoice) !== null;
             if ($invoice->subscription_id !== $next->id || ! $due->matchesFullPeriod($next)
                 || $due->installment_status !== InstallmentStatusEnum::PAID
-                || $this->payments->confirmedPayment($actor, $invoice) === null
+                || ! $settled
                 || ! BigDecimal::of($balance['credits_total'])->isZero()
                 || ! BigDecimal::of($balance['refunds'])->isZero()
                 || ! BigDecimal::of($balance['refunds_reserved'])->isZero()

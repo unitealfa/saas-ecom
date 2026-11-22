@@ -5,6 +5,10 @@
             <flux:text>{{ $dashboard->shopName }}</flux:text>
         </div>
 
+        @if (session('status'))
+            <flux:callout variant="success" role="status">{{ session('status') }}</flux:callout>
+        @endif
+
         @php($tenantActor = auth('tenant')->user())
         @if ($tenantActor instanceof \App\Models\Tenant\Users\User
             && \App\Services\Tenant\Authorization\TenantAccess::isOwner($tenantActor))

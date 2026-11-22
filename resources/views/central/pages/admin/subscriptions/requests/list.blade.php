@@ -27,9 +27,9 @@
                 <flux:table.cell>{{ $item->owner?->name ?? 'Compte indisponible' }}<div class="aydra-muted mt-1 text-xs">{{ $item->owner?->email }}</div></flux:table.cell>
                 <flux:table.cell>{{ $item->subscription?->plan?->name ?? 'Offre indisponible' }}</flux:table.cell>
                 <flux:table.cell class="whitespace-nowrap tabular-nums">{{ $item->subscription?->agreed_amount !== null ? $item->subscription->agreed_amount.' DZD' : 'Non renseigné' }}</flux:table.cell>
-                <flux:table.cell>{{ $item->payment_choice->label() }}</flux:table.cell>
+                <flux:table.cell>{{ $item->subscription?->agreed_amount === '0.00' ? 'Aucun paiement requis' : $item->payment_choice->label() }}</flux:table.cell>
                 <flux:table.cell class="whitespace-nowrap">{{ $item->submitted_at?->format('d/m/Y H:i') ?? '—' }}</flux:table.cell>
-                <flux:table.cell><flux:badge size="sm" :color="match ($item->status) { \App\Enums\Central\Subscriptions\RequestStatusEnum::ACCEPTED => 'green', \App\Enums\Central\Subscriptions\RequestStatusEnum::REJECTED, \App\Enums\Central\Subscriptions\RequestStatusEnum::CANCELLED => 'red', \App\Enums\Central\Subscriptions\RequestStatusEnum::REVIEW => 'amber', default => 'zinc' }">{{ $item->status->label() }}</flux:badge></flux:table.cell>
+                <flux:table.cell><flux:badge size="sm" :color="match ($item->status) { \App\Enums\Central\Subscriptions\RequestStatusEnum::ACCEPTED => 'green', \App\Enums\Central\Subscriptions\RequestStatusEnum::REJECTED, \App\Enums\Central\Subscriptions\RequestStatusEnum::CANCELLED => 'red', \App\Enums\Central\Subscriptions\RequestStatusEnum::REVIEW => 'amber', default => 'zinc' }">{{ $item->statusLabel() }}</flux:badge></flux:table.cell>
                 <flux:table.cell><flux:button :href="route($ownerMode ? 'owner.subscription-requests.show' : 'central.subscription-requests.show', $item)">Informations</flux:button></flux:table.cell>
             </flux:table.row>
         @empty <flux:table.row><flux:table.cell colspan="8"><div class="aydra-users-empty"><p class="aydra-heading font-medium">Aucune demande trouvée.</p><p class="aydra-muted mt-1 text-sm">Essayez d’autres critères de recherche.</p></div></flux:table.cell></flux:table.row> @endforelse

@@ -46,6 +46,6 @@ class PaidSubscriptionActivation
         $this->tenants->applySubscriptionQuota($subscription->owner, $subscription, $actor);
         activity('central')->causedBy($actor)->performedOn($subscription)->event(self::ACTIVATED)
             ->withProperties(['subscription_uuid' => $subscription->uuid, 'installment_uuid' => $due->uuid])
-            ->log('Période intégralement payée activée une seule fois.');
+            ->log($subscription->agreed_amount === '0.00' ? 'Période à 0,00 DZD approuvée et activée.' : 'Période intégralement payée activée une seule fois.');
     }
 }

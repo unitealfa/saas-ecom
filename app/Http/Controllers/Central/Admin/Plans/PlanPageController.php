@@ -10,7 +10,6 @@ use App\Http\Requests\Central\Plans\StorePlanRequest;
 use App\Http\Requests\Central\Plans\StorePlanVersionRequest;
 use App\Http\Requests\Central\Plans\UpdatePlanActivationRequest;
 use App\Http\Requests\Central\Plans\UpdatePlanPageFeaturesRequest;
-use App\Http\Requests\Central\Plans\UpdatePlanRequest;
 use App\Models\Central\Features\Feature;
 use App\Models\Central\Plans\Plan;
 use App\Services\Central\Plans\PlanActivationService;
@@ -18,7 +17,6 @@ use App\Services\Central\Plans\PlanArchiveService;
 use App\Services\Central\Plans\PlanCatalogService;
 use App\Services\Central\Plans\PlanCompositionService;
 use App\Services\Central\Plans\PlanCreationService;
-use App\Services\Central\Plans\PlanUpdateService;
 use App\Services\Central\Plans\PlanVersionService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -29,7 +27,6 @@ class PlanPageController extends Controller
     public function __construct(
         private readonly PlanCatalogService $plans,
         private readonly PlanCreationService $creation,
-        private readonly PlanUpdateService $update,
         private readonly PlanCompositionService $composition,
         private readonly PlanVersionService $versions,
         private readonly PlanActivationService $activation,
@@ -61,22 +58,17 @@ class PlanPageController extends Controller
     {
         $actor = $this->centralActor();
         $plan = $this->plans->details($actor, $plan);
-        $availableFeatures = Gate::forUser($actor)->allows('updateFeatures', $plan)
+        $availableFeatures = Gate::forUser($actor)->any(['updateFeatures', 'updateVersionFeatures'], $plan)
             ? Feature::query()->active()->orderBy('name')->get()
             : collect();
+        $latestVersion = $this->plans->latestVersion($actor, $plan);
 
         return view('central.pages.admin.plans.show', [
             'plan' => $plan,
-            'latestVersion' => $this->plans->latestVersion($actor, $plan),
+            'latestVersion' => $latestVersion,
+            'suggestedVersionName' => PlanVersionService::suggestedName($plan, $latestVersion + 1),
             'availableFeatures' => $availableFeatures,
         ]);
-    }
-
-    public function update(UpdatePlanRequest $request, Plan $plan): RedirectResponse
-    {
-        $this->update->update($this->centralActor(), $plan, $request->validated());
-
-        return $this->redirectWithStatus($plan, 'Informations enregistrées.');
     }
 
     public function updateFeatures(UpdatePlanPageFeaturesRequest $request, Plan $plan): RedirectResponse
@@ -88,7 +80,7 @@ class PlanPageController extends Controller
 
     public function storeVersion(StorePlanVersionRequest $request, Plan $plan): RedirectResponse
     {
-        $version = $this->versions->create($this->centralActor(), $plan, $request->validated());
+        $version = $this->versions->create($this->centralActor(), $plan, $request->validated(), $request->draft());
 
         return $this->redirectWithStatus($version, 'Nouvelle version inactive créée.');
     }

@@ -33,10 +33,10 @@ class SubscriptionAssignmentService
             'source_uuid' => ['sometimes', 'uuid:4'],
             'expected_source_state' => ['required_with:source_uuid', 'string', 'size:64'],
             ...SubscriptionRequestService::initialPaymentRules(),
-            'received' => ['required', 'accepted'],
-            'account' => ['required_if:payment_choice,2', 'nullable', 'string', 'max:255'],
-            'reference' => ['required', 'string', 'max:255'],
-            'occurred_at' => ['required', 'date', 'before_or_equal:now'],
+            'received' => ['exclude_if:expected_amount,0.00', 'required', 'accepted'],
+            'account' => ['exclude_if:expected_amount,0.00', 'required_if:payment_choice,2', 'nullable', 'string', 'max:255'],
+            'reference' => ['exclude_if:expected_amount,0.00', 'required', 'string', 'max:255'],
+            'occurred_at' => ['exclude_if:expected_amount,0.00', 'required', 'date', 'before_or_equal:now'],
             ...array_fill_keys(['id', 'uuid', 'status', 'agreed_amount', 'period_starts_at', 'period_ends_at', 'auto_renew', 'assigned_by_id', 'tenant_id'], ['prohibited']),
         ];
     }
@@ -66,9 +66,9 @@ class SubscriptionAssignmentService
         if (! $request->status->isFinal()) {
             $request = $this->requests->accept($actor, $request, $request->managementState(), [
                 'amount' => $request->subscription->agreed_amount, 'operation_id' => $values['operation_key'],
-                'received' => $values['received'], 'occurred_at' => $values['occurred_at'],
+                'received' => $values['received'] ?? null, 'occurred_at' => $values['occurred_at'] ?? null,
                 'account' => $values['account'] ?? '',
-                'reference' => $values['reference'], 'expected_payment_state' => $request->payment?->managementState(),
+                'reference' => $values['reference'] ?? null, 'expected_payment_state' => $request->payment?->managementState(),
             ]);
         }
         if ($request->status !== RequestStatusEnum::ACCEPTED) {

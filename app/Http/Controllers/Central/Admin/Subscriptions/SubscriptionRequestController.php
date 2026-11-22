@@ -40,7 +40,9 @@ class SubscriptionRequestController extends Controller
     {
         $current = $this->requests->accept($this->centralActor(), $subscriptionRequest, $request->validated('expected_state'), $request->safe()->except('expected_state'));
         $message = 'Réception conservée comme anomalie ; demande non acceptée, sans droit supplémentaire.';
-        if ($current->status === RequestStatusEnum::ACCEPTED) {
+        if ($current->getAttribute('accepted_without_payment')) {
+            $message = 'Demande acceptée. La facture à 0,00 DZD est disponible.';
+        } elseif ($current->status === RequestStatusEnum::ACCEPTED) {
             $message = $current->payment->documents()->where('collection_name', PaymentDocumentService::RECEIPT)->exists()
                 ? 'Demande d’abonnement acceptée. Le paiement intégral est confirmé et le reçu est disponible.'
                 : 'Demande d’abonnement acceptée. Le paiement intégral est confirmé ; la génération du reçu doit être reprise sans nouvel encaissement.';

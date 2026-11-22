@@ -7,24 +7,64 @@
         <flux:button :href="route('owner.subscription-requests.index')">Mes demandes d’abonnement</flux:button>
         @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
         @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
-        <flux:text>Une période se paie intégralement. Les droits actuels sont conservés jusqu’à leur fin ; une nouvelle période n’est activée qu’après réception et vérification du paiement.</flux:text>
+        <flux:text>Les offres à 0,00 DZD attendent une validation administrative. Pour les offres payantes, le montant est réglé en une fois.</flux:text>
         @php($pending = $subscriptions->contains(fn ($subscription) => $subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::SCHEDULED && ($subscription->period_ends_at === null || $subscription->period_ends_at->isFuture())))
         @if ($pending)<flux:callout>Une période est déjà prévue ou en attente. Vous pouvez modifier ou annuler une demande non payée ci-dessous, puis choisir une autre offre.</flux:callout>@endif
         <div class="grid gap-4 md:grid-cols-2">
             @foreach ($plans as $plan)<article class="rounded-lg border border-zinc-200 p-5 dark:border-zinc-700">
                 <flux:heading>{{ $plan['name'] }}</flux:heading><flux:text>{{ $plan['description'] }}</flux:text>
-                @if ($plan['is_default'])<flux:text>Plan par défaut — attribution automatique gratuite.</flux:text>@else<flux:text>{{ $plan['monthly_price'] }} DZD/mois — {{ $plan['annual_price'] }} DZD/an</flux:text>@endif
+                @if ($plan['is_default'])<flux:text>Par défaut — attribution gratuite</flux:text>@else<flux:text>{{ $plan['monthly_price'] }} DZD/mois — {{ $plan['annual_price'] }} DZD/an</flux:text>@endif
                 @foreach ($plan['features'] as $feature)<flux:text>{{ $feature['name'] }} : {{ $feature['value'] }}</flux:text>@endforeach
-                @if ($plan['code'] === 'free' || $plan['is_default'])<flux:text>Offre gratuite : aucun paiement à effectuer.</flux:text>
+                @if ($plan['is_default'])
+                    @if ($currentSubscription && $defaultPlan?->uuid === $plan['uuid'] && (! $currentSubscription->isFree() || $currentSubscription->plan_id !== $defaultPlan->id))
+                        <details class="mt-4 space-y-3">
+                            <summary>Passer au plan par défaut</summary>
+                            <flux:callout variant="warning">Vous mettrez définitivement fin à votre abonnement actuel et perdrez ses avantages. Le plan par défaut sera activé immédiatement, sans remboursement.</flux:callout>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <flux:heading>Offre actuelle · {{ $currentSubscription->plan->name }}</flux:heading>
+                                    <flux:text>Fin prévue {{ $currentSubscription->effectiveEndsAt()?->format('d/m/Y') ?? 'sans échéance' }}</flux:text>
+                                    @foreach ($currentSubscription->plan->features->where('is_active', true) as $benefit)
+                                        <flux:text>{{ $benefit->feature->name }}@if ($benefit->limit !== null) — {{ $benefit->limit }} {{ $benefit->feature->unit }}@endif</flux:text>
+                                    @endforeach
+                                </div>
+                                <div>
+                                    <flux:heading>Plan par défaut · {{ $plan['name'] }}</flux:heading>
+                                    @foreach ($defaultPlan->features->where('is_active', true) as $benefit)
+                                        <flux:text>{{ $benefit->feature->name }}@if ($benefit->limit !== null) — {{ $benefit->limit }} {{ $benefit->feature->unit }}@endif</flux:text>
+                                    @endforeach
+                                </div>
+                            </div>
+                            <form method="POST" action="{{ route('owner.subscriptions.switch-to-default', $currentSubscription) }}" class="flex flex-col gap-3">
+                                @csrf
+                                <input type="hidden" name="expected_state" value="{{ $currentSubscription->transitionState() }}">
+                                <input type="hidden" name="plan_uuid" value="{{ $defaultPlan->uuid }}">
+                                <input type="hidden" name="expected_plan_state" value="{{ $defaultPlan->compositionState($defaultPlan->features) }}">
+                                <flux:checkbox name="confirmed" value="1" required label="J’accepte de perdre les avantages de mon offre actuelle." />
+                                <flux:button type="submit" :disabled="$pending">Confirmer le passage au plan par défaut</flux:button>
+                            </form>
+                        </details>
+                    @endif
                 @else
                     <form method="POST" enctype="multipart/form-data" action="{{ route('owner.subscriptions.store') }}" class="mt-4 flex flex-col gap-3" x-data="{ period: @js($oldText('plan_uuid') === $plan['uuid'] ? $oldText('period', '1') : '1') }">
                         @csrf<input type="hidden" name="plan_uuid" value="{{ $plan['uuid'] }}">
                         <input type="hidden" name="operation_id" value="{{ $oldText('plan_uuid') === $plan['uuid'] ? $oldText('operation_id', (string) \Illuminate\Support\Str::uuid()) : (string) \Illuminate\Support\Str::uuid() }}">
                         <input type="hidden" name="expected_amount" value="{{ $plan['monthly_price'] }}" x-bind:value="period === '1' ? '{{ $plan['monthly_price'] }}' : '{{ $plan['annual_price'] }}'">
-                        <flux:select name="period" label="Période à régler en une fois" x-model="period">
+                        <flux:select name="period" label="Période" x-model="period">
                             <option value="1">Un mois — {{ $plan['monthly_price'] }} DZD</option><option value="2">Un an — {{ $plan['annual_price'] }} DZD</option>
                         </flux:select>
-                        @include('central.pages.owner.billing.subscriptions.payment-fields')
+                        <flux:select name="transition_mode" label="Début de la nouvelle période">
+                            @foreach (\App\Enums\Central\Subscriptions\TransitionModeEnum::cases() as $mode)
+                                <option value="{{ $mode->value }}" @selected(($oldText('plan_uuid') === $plan['uuid'] ? $oldText('transition_mode', 2) : '2') === (string) $mode->value)>{{ $mode->label() }}</option>
+                            @endforeach
+                        </flux:select>
+                        @if ($plan['monthly_price'] !== '0.00' || $plan['annual_price'] !== '0.00')
+                            <template x-if="(period === '1' ? @js($plan['monthly_price']) : @js($plan['annual_price'])) !== '0.00'">
+                                <div class="flex flex-col gap-3">
+                                    @include('central.pages.owner.billing.subscriptions.payment-fields', ['hideTransition' => true])
+                                </div>
+                            </template>
+                        @endif
                         <flux:button type="submit" :disabled="$pending">Créer ma demande</flux:button>
                     </form>
                 @endif

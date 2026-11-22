@@ -25,15 +25,16 @@ test('plan pages require consultation permission and show versions', function ()
     $this->get(route('central.plan-pages.create'))->assertForbidden();
 });
 
-test('plan information updates require permission and reject stale state', function (): void {
+test('the plan details page edits information only in the new version dialog', function (): void {
     $plan = Plan::factory()->create(['code' => 'example', 'name' => 'Avant']);
-    $actor = planInterfaceActor(['saas.plans.view', 'saas.plans.update']);
-    $data = ['name' => 'Après', 'description' => null, 'monthly_price' => '20.00', 'annual_price' => '200.00', 'expected_state' => $plan->compositionState($plan->features)];
-    $this->actingAs($actor, 'central')->put(route('central.plan-pages.update', $plan), $data)->assertRedirect();
-    expect($plan->fresh()->name)->toBe('Après');
-    $this->put(route('central.plan-pages.update', $plan), $data)->assertSessionHasErrors('expected_state');
-    $reader = planInterfaceActor(['saas.plans.view']);
-    $this->actingAs($reader, 'central')->put(route('central.plan-pages.update', $plan), $data)->assertForbidden();
+    $actor = planInterfaceActor(['saas.plans.view', 'saas.plans.update', 'saas.plans.versions.create']);
+    $url = route('central.plan-pages.show', $plan);
+
+    $this->actingAs($actor, 'central')->get($url)->assertOk()
+        ->assertDontSee('name="monthly_price"', false)
+        ->assertSee('name="draft[information][monthly_price]"', false);
+    $this->put($url, ['name' => 'Après'])->assertStatus(405);
+    expect($plan->refresh()->name)->toBe('Avant');
 });
 
 test('used and free plan versions cannot be edited', function (): void {
