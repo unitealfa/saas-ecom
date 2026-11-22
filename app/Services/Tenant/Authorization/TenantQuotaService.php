@@ -35,7 +35,7 @@ final class TenantQuotaService
         }
         // Ces deux quotas commerciaux comptent une occupation par base boutique,
         // et jamais des permissions Spatie individuelles.
-        if (in_array($featureCode, [Feature::TEAM_CUSTOM_ROLES_CODE, Feature::TEAM_MEMBERS_CODE], true)
+        if (in_array($featureCode, [Feature::TEAM_CUSTOM_ROLES_CODE, Feature::TEAM_MEMBERS_CODE, Feature::CART_LIFETIME_CODE], true)
             && ($feature->value_type !== ValueTypeEnum::QUANTITY
                 || $feature->quota_scope !== QuotaScopeEnum::TENANT
                 || $feature->period !== PeriodEnum::LIFETIME)) {

@@ -74,7 +74,7 @@ class TenantCreator
                 }
 
                 $this->assertPosition($owner, $first, $owned);
-                $this->assertQuota($owner, $actor);
+                $this->assertQuota($owner, $actor, $data);
 
                 $domain = $this->domainFor($data);
                 $targetVersion = $this->targetSchemaVersion($owner);
@@ -122,7 +122,7 @@ class TenantCreator
         }
     }
 
-    private function assertQuota(User $owner, User $actor): void
+    private function assertQuota(User $owner, User $actor, TenantData $data): void
     {
         $subscription = $this->subscriptions->ensure($owner, $actor);
         $feature = Feature::where('code', Feature::SHOPS_CODE)->active()->firstOrFail();
@@ -131,6 +131,13 @@ class TenantCreator
 
         if ($quota === null || ! $quota->is_active) {
             throw ValidationException::withMessages(['shop_name' => 'L’offre actuelle ne permet pas de créer de boutique.']);
+        }
+
+        $cartLimit = PlanFeature::where('plan_id', $subscription->plan_id)
+            ->whereHas('feature', fn ($query) => $query->where('code', Feature::CART_LIFETIME_CODE)->where('is_active', true))
+            ->where('is_active', true)->lockForUpdate()->first();
+        if ($cartLimit?->limit !== null && $data->settings->cartLifetimeDays > $cartLimit->limit) {
+            throw ValidationException::withMessages(['settings.cart_lifetime_days' => "Votre offre autorise une durée maximale de {$cartLimit->limit} jour(s)."]);
         }
 
         // get() et non count() SQL : le verrou doit porter sur les lignes.

@@ -4,9 +4,11 @@ namespace App\Services\Tenant\Shop;
 
 use App\DTOs\Tenant\Shop\ShopSettings;
 use App\Enums\MediaVisibilityEnum;
+use App\Models\Central\Features\Feature;
 use App\Models\Tenant\Media\Media;
 use App\Models\Tenant\Shop\Shop;
 use App\Models\Tenant\Users\User;
+use App\Services\Tenant\Authorization\TenantQuotaService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -23,7 +25,7 @@ class ShopProfileService
         'contact_whatsapp', 'locale', 'timezone', 'theme_code', 'colors', 'cart_lifetime_days',
     ];
 
-    public function __construct(private ShopProfileCatalog $catalog) {}
+    public function __construct(private ShopProfileCatalog $catalog, private TenantQuotaService $quotas) {}
 
     public function shop(): Shop
     {
@@ -63,6 +65,12 @@ class ShopProfileService
                 $settings = ShopSettings::fromArray(array_intersect_key($data, array_flip([
                     'business_type', 'theme_code', 'colors', 'cart_lifetime_days',
                 ])))->toArray();
+                if ($settings['cart_lifetime_days'] !== $shop->cart_lifetime_days) {
+                    $limit = $this->quotas->limit(Feature::CART_LIFETIME_CODE);
+                    if ($limit !== null && $settings['cart_lifetime_days'] > $limit) {
+                        throw ValidationException::withMessages(['cart_lifetime_days' => "Votre offre autorise une durée maximale de {$limit} jour(s)."]);
+                    }
+                }
                 $values = array_intersect_key($data, array_flip(self::EDITABLE));
                 $values = array_replace($values, $settings);
 

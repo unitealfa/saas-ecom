@@ -131,7 +131,8 @@ test('default plan selection migrates unlimited subscriptions and preserves paid
     $defaults = app(DefaultSubscription::class);
     expect($plan->refresh()->is_default)->toBeTrue()->and($plan->monthly_price)->toBe('3000.00')
         ->and($plan->is_active)->toBeTrue()->and($previous->refresh()->is_active)->toBeFalse()
-        ->and($unlimited->refresh()->plan_id)->toBe($plan->id)
+        ->and($unlimited->refresh()->status)->toBe(StatusEnum::EXPIRED)
+        ->and(Subscription::where('user_id', $freeOwner->id)->where('status', StatusEnum::ACTIVE)->sole()->plan_id)->toBe($plan->id)
         ->and($defaults->ensure($owner)->id)->toBe($paid->id);
     $this->travel(2)->days();
     $fallback = $defaults->ensure($owner);

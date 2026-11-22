@@ -38,6 +38,8 @@ class Feature extends Model
 
     public const string TEAM_MEMBERS_CODE = 'team.members';
 
+    public const string CART_LIFETIME_CODE = 'shop.cart_lifetime_days';
+
     /** Format du jeton `expected_state` (empreinte SHA-256 en hexadécimal). */
     public const string STATE_PATTERN = '/^[a-f0-9]{64}$/D';
 
@@ -81,7 +83,7 @@ class Feature extends Model
     public function isSystem(): bool
     {
         return in_array($this->code, [
-            self::SHOPS_CODE, self::TEAM_CUSTOM_ROLES_CODE, self::TEAM_MEMBERS_CODE,
+            self::SHOPS_CODE, self::TEAM_CUSTOM_ROLES_CODE, self::TEAM_MEMBERS_CODE, self::CART_LIFETIME_CODE,
         ], true);
     }
 

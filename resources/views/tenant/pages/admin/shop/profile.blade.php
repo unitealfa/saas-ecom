@@ -26,9 +26,6 @@
                     <label class="block text-sm">Type d'activité
                         <input name="business_type" required maxlength="255" value="{{ old('business_type', $shop->business_type) }}" class="mt-1 w-full rounded border p-2 text-zinc-900">
                     </label>
-                    <label class="block text-sm">Langue
-                        <input name="locale" required maxlength="10" value="{{ old('locale', $shop->locale) }}" class="mt-1 w-full rounded border p-2 text-zinc-900">
-                    </label>
                     <label class="block text-sm">Courriel public
                         <input name="contact_email" type="email" maxlength="255" value="{{ old('contact_email', $shop->contact_email) }}" class="mt-1 w-full rounded border p-2 text-zinc-900">
                     </label>
@@ -38,9 +35,6 @@
                     <label class="block text-sm">WhatsApp public
                         <input name="contact_whatsapp" maxlength="255" value="{{ old('contact_whatsapp', $shop->contact_whatsapp) }}" class="mt-1 w-full rounded border p-2 text-zinc-900">
                     </label>
-                    <label class="block text-sm">Fuseau horaire
-                        <input name="timezone" required value="{{ old('timezone', $shop->timezone) }}" class="mt-1 w-full rounded border p-2 text-zinc-900">
-                    </label>
                 </div>
                 <label class="block text-sm">Description courte
                     <textarea name="description" rows="2" maxlength="2000" class="mt-1 w-full rounded border p-2 text-zinc-900">{{ old('description', $shop->description) }}</textarea>
@@ -48,12 +42,10 @@
                 <label class="block text-sm">À propos
                     <textarea name="about" rows="5" maxlength="10000" class="mt-1 w-full rounded border p-2 text-zinc-900">{{ old('about', $shop->about) }}</textarea>
                 </label>
+                <flux:heading size="lg">Apparence</flux:heading>
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <label class="block text-sm">Code du thème (existant : default)
                         <input name="theme_code" required maxlength="255" value="{{ old('theme_code', $shop->theme_code) }}" class="mt-1 w-full rounded border p-2 text-zinc-900">
-                    </label>
-                    <label class="block text-sm">Durée du panier invité (jours)
-                        <input type="number" name="cart_lifetime_days" required min="1" value="{{ old('cart_lifetime_days', $shop->cart_lifetime_days) }}" class="mt-1 w-full rounded border p-2 text-zinc-900">
                     </label>
                 </div>
                 <fieldset class="rounded border p-4">
@@ -78,6 +70,18 @@
                         </label>
                     </div>
                 @endcan
+                <flux:heading size="lg">Paramètres avancés</flux:heading>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <label class="block text-sm">Langue
+                        <input name="locale" required maxlength="10" value="{{ old('locale', $shop->locale) }}" class="mt-1 w-full rounded border p-2 text-zinc-900">
+                    </label>
+                    <label class="block text-sm">Fuseau horaire
+                        <input name="timezone" required value="{{ old('timezone', $shop->timezone) }}" class="mt-1 w-full rounded border p-2 text-zinc-900">
+                    </label>
+                    <label class="block text-sm">Durée du panier invité (jours)
+                        <input type="number" name="cart_lifetime_days" required min="1" value="{{ old('cart_lifetime_days', $shop->cart_lifetime_days) }}" class="mt-1 w-full rounded border p-2 text-zinc-900">
+                    </label>
+                </div>
                 <button class="rounded bg-zinc-900 px-5 py-2 text-white dark:bg-white dark:text-zinc-900">Enregistrer le profil</button>
             </form>
         @else
