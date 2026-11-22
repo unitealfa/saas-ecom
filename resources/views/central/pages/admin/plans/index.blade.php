@@ -35,6 +35,26 @@
                 @foreach ($errors->all() as $error)
                     <p>{{ $error }}</p>
                 @endforeach
+            </flux:callout>
+        @endif
+
+        <section class="aydra-users-panel p-5 sm:p-6" aria-labelledby="plan-search">
+            <h2 id="plan-search" class="aydra-heading text-lg font-semibold">Rechercher un plan</h2>
+            <p class="aydra-muted mt-1 text-sm">Les suggestions proviennent des plans affichés sur cette page.</p>
+            <form method="GET" action="{{ route('central.plan-pages.index') }}" class="mt-5 flex flex-wrap items-end gap-3">
+                <flux:input name="search" label="Nom ou code" :value="request('search')" type="search" icon="magnifying-glass" placeholder="Nom ou code" list="plan-suggestions" class="min-w-0 flex-1 sm:min-w-72" />
+                <datalist id="plan-suggestions">@foreach ($plans as $plan)<option value="{{ $plan->name }}"></option><option value="{{ $plan->code }}"></option>@endforeach</datalist>
+                @if(request()->filled('sort'))<input type="hidden" name="sort" value="{{ request('sort') }}"><input type="hidden" name="direction" value="{{ request('direction', 'asc') }}">@endif
+                <flux:button type="submit" variant="primary">Rechercher</flux:button>
+                <flux:button :href="route('central.plan-pages.index')">Effacer</flux:button>
+            </form>
+        </section>
+        @php($sortBy = request('sort')) @php($sortDirection = request('direction', 'asc'))
+        <section class="aydra-users-panel"><div class="aydra-users-toolbar"><div><h2 class="aydra-heading text-lg font-semibold">Plans</h2><p class="aydra-muted mt-1 text-sm">{{ $plans->total() }} {{ $plans->total() === 1 ? 'plan trouvé' : 'plans trouvés' }}</p></div></div>
+            <div class="aydra-users-table"><flux:table class="whitespace-normal"><flux:table.columns>
+                @foreach (['name' => 'Plan', 'version' => 'Version', 'monthly_price' => 'Prix mensuel', 'annual_price' => 'Prix annuel', 'is_active' => 'Commercialisation', 'actions' => 'Actions'] as $column => $heading)
+                    @if ($column !== 'actions')<flux:table.column sortable :sorted="$sortBy === $column" :direction="$sortDirection" :aria-sort="$sortBy === $column ? ($sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'" :data-sort-url="route('central.plan-pages.index', [...request()->only(['search']), 'sort' => $column, 'direction' => $sortBy === $column && $sortDirection === 'asc' ? 'desc' : 'asc'])" onclick="window.location.assign(this.dataset.sortUrl)">{{ $heading }}</flux:table.column>@else <flux:table.column>{{ $heading }}</flux:table.column> @endif
+                @endforeach
             </flux:table.columns><flux:table.rows>
                 @forelse ($plans as $plan)
                     <flux:table.row :key="$plan->uuid"><flux:table.cell variant="strong">{{ $plan->name }} @if ($plan->is_default)<flux:badge size="sm">Par défaut — attribution gratuite</flux:badge>@endif<div class="aydra-muted mt-1 text-xs">{{ $plan->code }}</div></flux:table.cell><flux:table.cell>{{ $plan->version }}</flux:table.cell><flux:table.cell class="whitespace-nowrap tabular-nums">{{ $plan->monthly_price }} DZD</flux:table.cell><flux:table.cell class="whitespace-nowrap tabular-nums">{{ $plan->annual_price }} DZD</flux:table.cell><flux:table.cell><flux:badge size="sm" :color="$plan->trashed() ? 'zinc' : ($plan->is_active ? 'green' : 'amber')">{{ $plan->trashed() ? 'Archivée' : ($plan->is_active ? 'Active' : 'Inactive') }}</flux:badge></flux:table.cell>
