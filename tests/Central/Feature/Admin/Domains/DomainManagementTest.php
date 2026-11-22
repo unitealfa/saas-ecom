@@ -18,6 +18,7 @@ use App\Models\Central\Tenants\Tenant;
 use App\Models\User;
 use App\Services\Central\Domains\DomainDnsInspector;
 use App\Services\Central\Domains\DomainService;
+use App\Services\Central\Domains\DomainVerificationService;
 use App\Services\Central\Roles\CentralRoleCatalog;
 use Database\Seeders\Central\AuthorizationSeeder;
 use Database\Seeders\Central\DomainPermissionSeeder;
@@ -87,6 +88,28 @@ test('a merchant can add domains only to their own shop within its plan quota', 
     $other = User::factory()->create();
     $this->actingAs($other, 'central')->get(route('owner.shops.domains.index', $shop))->assertForbidden();
     expect(Domain::where('tenant_id', $shop->id)->count())->toBe(2);
+});
+
+test('only authorized central staff can verify a merchant domain', function (): void {
+    $this->withoutMiddleware(EnsureActiveCentralAccount::class);
+    domainAdmin();
+    $owner = User::factory()->create();
+    Event::fake([TenantCreated::class]);
+    $shop = Tenant::factory()->create(['user_id' => $owner->id]);
+    $shop->forceFill(['status' => StatusEnum::ACTIVE])->save();
+    $domain = domainAddress($shop, 'owner-permission.example.com');
+    $reader = domainActor('saas.domains.view');
+    $verifier = domainActor('saas.domains.verify');
+
+    expect(Gate::forUser($owner)->allows('verify', $domain))->toBeFalse()
+        ->and(Gate::forUser($reader)->allows('verify', $domain))->toBeFalse()
+        ->and(Gate::forUser($verifier)->allows('verify', $domain))->toBeTrue();
+    expect(fn () => app(DomainVerificationService::class)->verify($owner, $domain, $domain->managementState()))
+        ->toThrow(AuthorizationException::class);
+    $this->actingAs($owner, 'central')->post(route('central.domains.verify', $domain), ['expected_state' => $domain->managementState()])->assertForbidden();
+    $this->actingAs($reader, 'central')->post(route('central.domains.verify', $domain), ['expected_state' => $domain->managementState()])->assertForbidden();
+    $this->actingAs($owner, 'central')->get(route('owner.shops.domains.index', $shop))->assertOk()->assertDontSee('>Accepter<', false);
+    expect(Domain::findOrFail($domain->id)->verification_status)->toBe(VerificationStatusEnum::VERIFIED);
 });
 
 test('domain permissions remain independent and protect all HTTP entry points', function (): void {

@@ -34,7 +34,8 @@ class DomainPolicy
 
     public function verify(User $actor, Domain $domain): bool
     {
-        return $this->isEditable($domain) && ($this->access->allows($actor, 'saas.domains.verify') || $this->createOwned($actor, $domain->tenant));
+        return $this->isEditable($domain) && $this->access->isStaff($actor)
+            && $this->access->allows($actor, 'saas.domains.verify');
     }
 
     public function setPrimary(User $actor, Domain $domain): bool

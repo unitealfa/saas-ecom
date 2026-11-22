@@ -55,6 +55,7 @@ class SubscriptionRequestActionRequest extends FormRequest
             $rules['reason'] = ['required', 'string', 'max:2000'];
             $rules['expected_payment_state'] = [$request instanceof SubscriptionRequest && $request->current_payment_id !== null ? 'required' : 'nullable', 'string', 'regex:'.SubscriptionRequest::STATE_PATTERN];
         } elseif ($action === 'accept') {
+            $rules['decision_confirmed'] = ['required', 'accepted'];
             $hasPayment = $request instanceof SubscriptionRequest
                 && $request->current_payment_id !== null;
 

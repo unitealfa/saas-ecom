@@ -97,7 +97,6 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
             ->whereUuid(['tenant', 'domain'])->group(function (): void {
                 Route::get('/', 'index')->name('index');
                 Route::post('/', 'store')->name('store');
-                Route::post('{domain}/verification', 'verify')->name('verify');
                 Route::patch('{domain}/principal', 'primary')->name('primary');
                 Route::delete('{domain}', 'destroy')->name('destroy');
             });

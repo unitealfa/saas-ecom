@@ -173,7 +173,7 @@
             <div><h2 id="request-decision" class="aydra-heading text-lg font-semibold">Décision administrative</h2><p class="aydra-muted mt-1 text-sm">Examinez les éléments de la demande avant de prendre une décision.</p></div>
             @if ($item->payment === null || $item->payment->getAttribute('transfer_status') !== \App\Enums\Central\Billing\TransferStatusEnum::UNCERTAIN)
                 @can('accept', $item)
-                    @if ($cash || $item->payment || $item->getAttribute('submitted_payment') !== null)
+                    @if ($cash || $item->getAttribute('submitted_payment') !== null || $item->payment?->getAttribute('proof_media_id') !== null)
                         <form method="POST" action="{{ route('central.subscription-requests.accept', $item) }}" class="flex flex-col gap-3">@csrf
                             <input type="hidden" name="expected_state" value="{{ $item->managementState() }}">
                             <input type="hidden" name="expected_payment_state" value="{{ $item->payment?->managementState() }}">
@@ -188,6 +188,7 @@
                             @if (! $cash && ! $zeroPrice)
                                 <flux:checkbox name="proof_reviewed" value="1" label="J’ai consulté et vérifié le justificatif." required />
                             @endif
+                            <flux:checkbox name="decision_confirmed" value="1" label="J’ai lu et j’approuve cette décision." required />
                             <flux:button type="submit" variant="primary" class="self-start">Accepter la demande</flux:button>
                         </form>
                     @else

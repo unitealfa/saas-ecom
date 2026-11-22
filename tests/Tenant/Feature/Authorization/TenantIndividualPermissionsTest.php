@@ -2,12 +2,22 @@
 
 use App\Enums\Tenant\Users\MembershipStatusEnum;
 use App\Enums\Tenant\Users\StatusEnum;
+use App\Http\Controllers\Tenant\Admin\Users\UserPermissionController;
+use App\Http\Controllers\Tenant\Admin\Users\UserRoleController;
+use App\Models\Central\Features\Feature;
+use App\Models\Central\Plans\Plan;
+use App\Models\Central\Plans\PlanFeature;
+use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Tenants\Tenant;
 use App\Models\Tenant\Permissions\Permission;
 use App\Models\Tenant\Roles\Role;
 use App\Models\Tenant\Users\User as TenantUser;
 use App\Models\User as CentralUser;
 use App\Services\Tenant\Authorization\TenantAuthorizationMode;
+use App\Services\Tenant\Authorization\TenantPermissionCatalog;
+use Database\Seeders\Central\TenantTeamQuotaFeatureSeeder;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\Request;
 use Tests\TestCase;
 
 beforeEach(function (): void {
@@ -53,6 +63,36 @@ test('same role name and email remain independent in distinct tenant databases',
             Role::createWithPermissions('manager-test', ['shop.example.view' => 7]);
         });
     }
-    $first->run(function (): void { Role::where('name', 'manager-test')->firstOrFail()->update(['label' => 'Différent']); });
-    $second->run(function (): void { expect(Role::where('name', 'manager-test')->firstOrFail()->label)->not->toBe('Différent'); });
+    $first->run(function (): void {
+        Role::where('name', 'manager-test')->firstOrFail()->update(['label' => 'Différent']);
+    });
+    $second->run(function (): void {
+        expect(Role::where('name', 'manager-test')->firstOrFail()->label)->not->toBe('Différent');
+    });
+});
+
+test('viewing a team member does not grant access to role or permission catalogues', function (): void {
+    $this->seed(TenantTeamQuotaFeatureSeeder::class);
+    $owner = CentralUser::factory()->create();
+    $plan = Plan::factory()->create();
+    foreach ([Feature::TEAM_CUSTOM_ROLES_CODE, Feature::TEAM_MEMBERS_CODE] as $code) {
+        PlanFeature::factory()->create(['plan_id' => $plan->id,
+            'feature_id' => Feature::where('code', $code)->sole()->id, 'is_active' => true, 'limit' => 5]);
+    }
+    Subscription::factory()->create(['user_id' => $owner->id, 'plan_id' => $plan->id]);
+    $shop = Tenant::factory()->create(['user_id' => $owner->id]);
+    $shop->run(function (): void {
+        TenantPermissionCatalog::seed();
+        $actor = TenantUser::factory()->create();
+        $actor->forceFill(['status' => StatusEnum::ACTIVE, 'membership_status' => MembershipStatusEnum::ACTIVE,
+            'joined_at' => now(), 'email_verified_at' => now()])->save();
+        $actor->assignRole(Role::createWithPermissions('team-reader', ['shop.users.view' => 7]));
+        $member = TenantUser::factory()->create();
+        $request = Request::create('/');
+        $request->setUserResolver(fn () => $actor);
+        expect(fn () => app(UserRoleController::class)->show($request, $member))
+            ->toThrow(AuthorizationException::class);
+        expect(fn () => app(UserPermissionController::class)->show($request, $member))
+            ->toThrow(AuthorizationException::class);
+    });
 });

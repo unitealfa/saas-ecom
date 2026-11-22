@@ -97,8 +97,13 @@ test('a zero price offer requires administrative approval and issues a zero invo
         ->and($request->statusLabel())->toBe('En attente de validation');
 
     $approval = route('central.subscription-requests.accept', $request);
-    $decision = ['expected_state' => $request->managementState()];
+    $decision = ['expected_state' => $request->managementState(), 'decision_confirmed' => '1'];
     $this->post($approval, $decision)->assertForbidden();
+    $this->actingAs($fixture['actor'], 'central')->get(route('central.subscription-requests.index'))
+        ->assertOk()->assertSee('Accepter la demande')->assertSee('Refuser')
+        ->assertSee('name="decision_confirmed"', false);
+    $this->post($approval, ['expected_state' => $request->managementState()])->assertSessionHasErrors('decision_confirmed');
+    expect($request->refresh()->status)->not->toBe(RequestStatusEnum::ACCEPTED);
     $this->actingAs($fixture['actor'], 'central')->post($approval, $decision)
         ->assertSessionHasNoErrors()->assertRedirect();
     $request->refresh();
@@ -275,7 +280,7 @@ test('the owner and administrative request pages are connected and isolated', fu
     $this->actingAs($f['actor'], 'central')->get(route('central.subscription-requests.index'))->assertOk()->assertSee('Demandes');
     $this->get(route('central.subscription-requests.show', $request))->assertOk()->assertSee('Confirmer les fonds');
     $this->post(route('central.subscription-requests.accept', $request), [
-        'expected_state' => $request->managementState(), 'amount' => '3000.00', 'currency' => 'DZD', 'received' => true,
+        'expected_state' => $request->managementState(), 'decision_confirmed' => '1', 'amount' => '3000.00', 'currency' => 'DZD', 'received' => true,
         'occurred_at' => now()->toDateTimeString(), 'operation_id' => (string) Str::uuid(),
     ])->assertSessionHasNoErrors()->assertRedirect(route('central.subscription-requests.show', $request));
     expect($request->refresh()->status)->toBe(RequestStatusEnum::ACCEPTED);
@@ -710,7 +715,7 @@ test('administrators accept cash requests without entering financial fields', fu
         ->assertDontSee('name="amount"', false)->assertDontSee('name="occurred_at"', false)
         ->assertDontSee('name="received"', false);
     $this->post(route('central.subscription-requests.accept', $request), [
-        'expected_state' => $request->managementState(),
+        'expected_state' => $request->managementState(), 'decision_confirmed' => '1',
         'amount' => '0.01', 'occurred_at' => '2099-01-01', 'received' => false,
     ])->assertSessionHasNoErrors()->assertRedirect();
     $request->refresh();
@@ -905,7 +910,7 @@ test('external request accepts only after proof review and without bank fields',
         ->assertOk()->assertSee('name="proof_reviewed"', false)
         ->assertDontSee('name="account"', false)->assertDontSee('name="reference"', false)
         ->assertDontSee('name="received"', false);
-    $decision = ['expected_state' => $request->managementState(),
+    $decision = ['expected_state' => $request->managementState(), 'decision_confirmed' => '1',
         'expected_payment_state' => $request->payment->managementState()];
     $url = route('central.subscription-requests.accept', $request);
     $this->post($url, $decision)->assertSessionHasErrors('proof_reviewed');
@@ -929,7 +934,7 @@ test('identical original external proof cannot settle two owners requests', func
     $bytes = $proof->getContent();
     $approve = fn ($request) => $this->post(route('central.subscription-requests.accept', $request), [
         'expected_state' => $request->managementState(),
-        'expected_payment_state' => $request->payment->managementState(), 'proof_reviewed' => '1',
+        'expected_payment_state' => $request->payment->managementState(), 'proof_reviewed' => '1', 'decision_confirmed' => '1',
     ]);
     $this->actingAs($f['actor'], 'central');
     $approve($first)->assertSessionHasNoErrors();
@@ -953,4 +958,3 @@ test('identical original external proof cannot settle two owners requests', func
     expect($second->refresh()->status)->not->toBe(RequestStatusEnum::ACCEPTED)
         ->and($second->payment->getAttribute('transfer_status'))->not->toBe(TransferStatusEnum::VERIFIED);
 });
-
