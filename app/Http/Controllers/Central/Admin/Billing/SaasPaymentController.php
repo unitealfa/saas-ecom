@@ -85,7 +85,7 @@ class SaasPaymentController extends Controller
     {
         Gate::forUser($this->centralActor())->authorize('viewAny', SaasPayment::class);
 
-        return $this->documents->download($this->centralActor(), $payment, false);
+        return $this->documents->download($this->centralActor(), $payment, false, inline: request()->boolean('inline'));
     }
 
     public function receipt(SaasPayment $payment): StreamedResponse

@@ -51,11 +51,13 @@
                                             <flux:button :href="route('central.domains.edit', $domain)">Modifier</flux:button>
                                         @endcan
                                         @can('verify', $domain)
+                                            @if ($domain->verification_status !== \App\Enums\VerificationStatusEnum::VERIFIED)
                                             <form method="POST" action="{{ route('central.domains.verify', $domain) }}">
                                                 @csrf
                                                 <input type="hidden" name="expected_state" value="{{ $domain->managementState() }}">
                                                 <flux:button type="submit">Accepter</flux:button>
                                             </form>
+                                            @endif
                                         @endcan
                                         @if (! $domain->is_primary)
                                             @can('setPrimary', $domain)

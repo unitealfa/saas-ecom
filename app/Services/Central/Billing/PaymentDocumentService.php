@@ -263,9 +263,9 @@ class PaymentDocumentService
         $media = $receipt ? $this->generatePaymentReceipt($actor, $payment) : $this->assertProof($payment);
 
         $response = $this->files->download($actor, $media);
-        if ($receipt && $inline) {
+        if ($inline) {
             $response->headers->set('Content-Type', 'application/pdf');
-            $response->headers->set('Content-Disposition', $response->headers->makeDisposition('inline', 'recu-'.$payment->getAttribute('uuid').'.pdf'));
+            $response->headers->set('Content-Disposition', $response->headers->makeDisposition('inline', ($receipt ? 'recu-' : 'justificatif-').$payment->getAttribute('uuid').'.pdf'));
         }
 
         return $response;

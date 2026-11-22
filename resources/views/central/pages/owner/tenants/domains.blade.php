@@ -30,13 +30,12 @@
                 <flux:heading>{{ $domain->domain }} @if ($domain->is_primary) — Principal @endif</flux:heading>
                 <flux:text>Vérification : {{ match ($domain->verification_status) { \App\Enums\VerificationStatusEnum::VERIFIED => 'Accepté', \App\Enums\VerificationStatusEnum::FAILED => 'Échec', default => 'En attente' } }}</flux:text>
                 @if ($domain->type === \App\Enums\Central\Domains\TypeEnum::CUSTOM)
-                    @include('central.pages.admin.domains.dns', ['verificationToken' => $inspector->token($domain)])
+                    @include('central.pages.admin.domains.dns', ['verificationToken' => $inspector->token($domain), 'ownerMode' => true])
                 @endif
                 <div class="flex flex-wrap gap-2">
-                    <form method="POST" action="{{ route('owner.shops.domains.verify', [$tenant, $domain]) }}">@csrf
-                        <input type="hidden" name="expected_state" value="{{ $domain->managementState() }}">
-                        <flux:button type="submit">Accepter</flux:button>
-                    </form>
+                    @if ($domain->verification_status !== \App\Enums\VerificationStatusEnum::VERIFIED)
+                        <flux:text>En attente de vérification par un administrateur autorisé.</flux:text>
+                    @endif
                     @if (! $domain->is_primary && $domain->isReadyAsPrimary())
                         <form method="POST" action="{{ route('owner.shops.domains.primary', [$tenant, $domain]) }}">@csrf @method('PATCH')
                             <input type="hidden" name="expected_state" value="{{ $domain->managementState() }}">

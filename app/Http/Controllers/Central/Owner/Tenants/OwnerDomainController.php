@@ -8,7 +8,6 @@ use App\Models\Central\Domains\Domain;
 use App\Models\Central\Tenants\Tenant;
 use App\Services\Central\Domains\DomainDnsInspector;
 use App\Services\Central\Domains\DomainService;
-use App\Services\Central\Domains\DomainVerificationService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,7 +15,7 @@ use Illuminate\Support\Facades\Gate;
 
 class OwnerDomainController extends Controller
 {
-    public function __construct(private DomainService $domains, private DomainVerificationService $verification) {}
+    public function __construct(private DomainService $domains) {}
 
     public function index(Tenant $tenant, DomainDnsInspector $inspector): View
     {
@@ -36,16 +35,7 @@ class OwnerDomainController extends Controller
         abort_if($base === '', 503);
         $this->domains->createOwned($this->centralActor(), $tenant, $data['domain'].'.'.$base);
 
-        return to_route('owner.shops.domains.index', $tenant)->with('status', 'Domaine ajouté. Lancez sa vérification avant de le définir comme principal.');
-    }
-
-    public function verify(DomainActionRequest $request, Tenant $tenant, Domain $domain): RedirectResponse
-    {
-        abort_unless($domain->tenant_id === $tenant->id, 404);
-        $result = $this->verification->verify($this->centralActor(), $domain, $request->validated('expected_state'));
-        $redirect = to_route('owner.shops.domains.index', $tenant);
-
-        return $result['successful'] ? $redirect->with('status', $result['message']) : $redirect->withErrors(['domain' => $result['message']]);
+        return to_route('owner.shops.domains.index', $tenant)->with('status', 'Domaine ajouté. Sa vérification doit être effectuée par un administrateur.');
     }
 
     public function primary(DomainActionRequest $request, Tenant $tenant, Domain $domain): RedirectResponse

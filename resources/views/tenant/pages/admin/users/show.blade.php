@@ -4,7 +4,10 @@
         <flux:heading size="xl">{{ $member->last_name }} {{ $member->first_name }}</flux:heading>
         <p>{{ $member->email }} — {{ $member->membership_status->name }}</p>
         @if(session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
-        <nav class="flex gap-3 underline"><a href="{{ route('tenant.admin.users.roles', $member, false) }}">Profils</a><a href="{{ route('tenant.admin.users.permissions', $member, false) }}">Droits individuels</a></nav>
+        <nav class="flex gap-3 underline">
+            @can('viewAny', \App\Models\Tenant\Roles\Role::class)<a href="{{ route('tenant.admin.users.roles', $member, false) }}">Profils</a>@endcan
+            @can('viewAny', \App\Models\Tenant\Permissions\Permission::class)<a href="{{ route('tenant.admin.users.permissions', $member, false) }}">Droits individuels</a>@endcan
+        </nav>
         @can('manageMembership', $member)
             <form method="POST" action="{{ route('tenant.admin.users.update', $member, false) }}" class="space-y-3 rounded border p-4">
                 @csrf @method('PATCH') <input type="hidden" name="expected_state" value="{{ $state }}">
