@@ -184,6 +184,30 @@
                             @else
                                 <flux:text>En acceptant, vous confirmez avoir reçu et contrôlé le montant intégral de {{ $item->subscription->agreed_amount }} DZD. Le montant et la date de confirmation sont renseignés automatiquement.</flux:text>
                             @endif
+                            @if (! $cash && ! $zeroPrice)
+                                <flux:input
+                                    name="account"
+                                    label="Compte destinataire contrôlé (IBAN ou CCP)"
+                                    :value="old('account', $item->payment?->getAttribute('encrypted_transfer_details')['account'] ?? '')"
+                                    maxlength="255"
+                                    required
+                                />
+
+                                <flux:input
+                                    name="reference"
+                                    label="Référence du versement"
+                                    :value="old('reference', $item->payment?->getAttribute('transfer_reference') ?? '')"
+                                    maxlength="255"
+                                    required
+                                />
+
+                                <flux:checkbox
+                                    name="received"
+                                    value="1"
+                                    label="J’ai consulté et vérifié le justificatif et confirmé la réception intégrale des fonds."
+                                    required
+                                />
+                            @endif
                             @if (filled($item->getAttribute('invoice_error')))
                                 <flux:checkbox name="acknowledged" value="1" label="J’ai lu et approuvé ce message." description="Cette confirmation ne remplace pas les vérifications fiscales et techniques nécessaires à la facture." required />
                             @endif

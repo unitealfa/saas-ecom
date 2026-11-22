@@ -55,13 +55,28 @@ class SubscriptionRequestActionRequest extends FormRequest
             $rules['reason'] = ['required', 'string', 'max:2000'];
             $rules['expected_payment_state'] = [$request instanceof SubscriptionRequest && $request->current_payment_id !== null ? 'required' : 'nullable', 'string', 'regex:'.SubscriptionRequest::STATE_PATTERN];
         } elseif ($action === 'accept') {
-            $hasPayment = $request instanceof SubscriptionRequest && $request->current_payment_id !== null;
-            $rules['expected_payment_state'] = [$hasPayment ? 'required' : 'nullable', 'string', 'regex:'.SubscriptionRequest::STATE_PATTERN];
-            if ($request instanceof SubscriptionRequest && (filled($request->getAttribute('submitted_payment')['proof_uuid'] ?? null) || $request->payment?->getAttribute('proof_media_id') !== null)) {
-                $rules['proof_reviewed'] = ['required', 'accepted'];
-            }
-            if ($request instanceof SubscriptionRequest && filled($request->getAttribute('invoice_error'))) {
-                $rules['acknowledged'] = ['required', 'accepted'];
+            $hasPayment = $request instanceof SubscriptionRequest
+                && $request->current_payment_id !== null;
+
+            $rules['expected_payment_state'] = [
+                $hasPayment ? 'required' : 'nullable',
+                'string',
+                'regex:'.SubscriptionRequest::STATE_PATTERN,
+            ];
+
+            if ($request instanceof SubscriptionRequest) {
+                if (
+                    $request->payment_choice === PaymentChoiceEnum::EXTERNAL
+                    && $request->subscription?->agreed_amount !== '0.00'
+                ) {
+                    $rules['account'] = ['required', 'string', 'max:255'];
+                    $rules['reference'] = ['required', 'string', 'max:255'];
+                    $rules['received'] = ['required', 'accepted'];
+                }
+
+                if (filled($request->getAttribute('invoice_error'))) {
+                    $rules['acknowledged'] = ['required', 'accepted'];
+                }
             }
         }
 
