@@ -119,28 +119,12 @@ class PlanPageController extends Controller
         ]);
     }
 
-    public function edit(Plan $plan): View
+    public function edit(Plan $plan): RedirectResponse
     {
-        $actor = $this->centralActor();
+        Gate::forUser($this->centralActor())
+            ->authorize('view', $plan);
 
-        $plan = $this->plans->details($actor, $plan);
-
-        abort_unless(
-            Gate::forUser($actor)
-                ->any(['update', 'updateFeatures'], $plan),
-            403,
-        );
-
-        return view('central.pages.admin.plans.edit', [
-            'plan' => $plan,
-            'availableFeatures' => Gate::forUser($actor)
-                ->allows('updateFeatures', $plan)
-                    ? Feature::query()
-                        ->active()
-                        ->orderBy('name')
-                        ->get()
-                    : collect(),
-        ]);
+        return to_route('central.plan-pages.show', $plan);
     }
 
     public function updateFeatures(
