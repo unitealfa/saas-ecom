@@ -50,7 +50,7 @@
                         @csrf<input type="hidden" name="plan_uuid" value="{{ $plan['uuid'] }}">
                         <input type="hidden" name="operation_id" value="{{ $oldText('plan_uuid') === $plan['uuid'] ? $oldText('operation_id', (string) \Illuminate\Support\Str::uuid()) : (string) \Illuminate\Support\Str::uuid() }}">
                         <input type="hidden" name="expected_amount" value="{{ $plan['monthly_price'] }}" x-bind:value="period === '1' ? '{{ $plan['monthly_price'] }}' : '{{ $plan['annual_price'] }}'">
-                        <flux:select name="period" label="Période" x-model="period">
+                        <flux:select name="period" label="Période" x-model="period" required>
                             <option value="1">Un mois — {{ $plan['monthly_price'] }} DZD</option><option value="2">Un an — {{ $plan['annual_price'] }} DZD</option>
                         </flux:select>
                         <flux:select name="transition_mode" label="Début de la nouvelle période">

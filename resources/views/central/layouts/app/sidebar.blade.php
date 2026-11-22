@@ -79,7 +79,7 @@
             @endif
             <div class="hidden min-w-0 flex-1 lg:block"><x-central::components.admin-navigation /></div>
             <flux:spacer class="lg:hidden" />
-            <div class="flex shrink-0 items-center gap-1 rounded-xl border border-zinc-200 bg-zinc-50/70 p-1 dark:border-zinc-700 dark:bg-zinc-800/60">
+            <div class="flex shrink-0 items-center gap-1 bg-transparent p-1">
                 <flux:button type="button" variant="ghost" square x-data="{ themeTimer: null }" x-on:click="clearTimeout(themeTimer); document.documentElement.classList.add('aydra-theme-transition'); $flux.appearance = $flux.dark ? 'light' : 'dark'; themeTimer = setTimeout(() => document.documentElement.classList.remove('aydra-theme-transition'), 240)" x-bind:aria-label="$flux.dark ? 'Activer le thème clair' : 'Activer le thème sombre'" x-bind:title="$flux.dark ? 'Activer le thème clair' : 'Activer le thème sombre'" aria-label="Changer le thème">
                     <flux:icon.sun x-show="$flux.dark" x-cloak class="size-5" />
                     <flux:icon.moon x-show="! $flux.dark" x-cloak class="size-5" />
@@ -124,6 +124,7 @@
                 <flux:toast />
             </flux:toast.group>
         @endpersist
+        @include('partials.flash-toasts')
         @fluxScripts
     </body>
 </html>

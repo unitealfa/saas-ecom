@@ -8,31 +8,143 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@media (prefers-reduced-motion: reduce) {
+    [data-loading-skeleton] [data-flux-skeleton],
+    [data-loading-skeleton] [data-flux-skeleton-line] { animation: none; }
+}
+
+/* L'astérisque suit l'état réel du champ, y compris les champs conditionnels. */
+form [data-flux-field]:not(:has([data-flux-field])):has(input:required:not(:disabled):not([readonly]), select:required:not(:disabled), textarea:required:not(:disabled), [data-flux-checkbox][required]:not([disabled]), [data-flux-otp][aria-required="true"]) > [data-flux-label]::after,
+form label:not([data-flux-label]):has(> :is(input:not([type="radio"]):not([type="checkbox"]), select, textarea):required:not(:disabled):not([readonly]))::before,
+form label:not([data-flux-label]):has(> input[type="checkbox"]:required:not(:disabled))::after {
+    color: #b42318;
+    font-weight: 700;
+}
+
+form [data-flux-field]:not(:has([data-flux-field])):has(input:required:not(:disabled):not([readonly]), select:required:not(:disabled), textarea:required:not(:disabled), [data-flux-checkbox][required]:not([disabled]), [data-flux-otp][aria-required="true"]) > [data-flux-label]::after,
+form label:not([data-flux-label]):has(> input[type="checkbox"]:required:not(:disabled))::after { content: ' *'; }
+
+form label:not([data-flux-label]):has(> :is(input:not([type="radio"]):not([type="checkbox"]), select, textarea):required:not(:disabled):not([readonly]))::before { content: '* '; }
+
+html.dark form [data-flux-field]:not(:has([data-flux-field])):has(input:required:not(:disabled):not([readonly]), select:required:not(:disabled), textarea:required:not(:disabled), [data-flux-checkbox][required]:not([disabled]), [data-flux-otp][aria-required="true"]) > [data-flux-label]::after,
+html.dark form label:not([data-flux-label]):has(> :is(input:not([type="radio"]), select, textarea):required:not(:disabled):not([readonly]))::before,
+html.dark form label:not([data-flux-label]):has(> input[type="checkbox"]:required:not(:disabled))::after,
+html.dark .aydra-required-mark { color: #fda29b; }
+
+.aydra-required-mark { color: #b42318; font-weight: 700; }
+
+/* La page de connexion reprend la palette centrale sans modifier les autres parcours d'authentification. */
+.aydra-login {
+    --color-accent: #3459da;
+    --color-accent-content: #2748bd;
+    --color-accent-foreground: #fff;
+    background: #fff;
+}
+
+html.dark .aydra-login {
+    --color-accent: #7eafff;
+    --color-accent-content: #a8c9ff;
+    --color-accent-foreground: #101a3b;
+    background: #151f3a;
+}
+
+.aydra-login-layout { min-height: 100svh; display: grid; }
+.aydra-login-main { position: relative; display: flex; align-items: center; justify-content: center; padding: 5rem 1.5rem; }
+.aydra-login-content { width: 100%; max-width: 24rem; }
+.aydra-login-logo { display: inline-flex; margin-bottom: 3rem; }
+.aydra-login-heading { color: #151e63; }
+html.dark .aydra-login-heading { color: #f4f8ff; }
+.aydra-login-footer { position: absolute; bottom: 1.5rem; color: #718096; font-size: .75rem; }
+.aydra-login-aside { display: none; }
+.aydra-login .aydra-passkey-separator { background: #fff; }
+html.dark .aydra-login .aydra-passkey-separator { background: #151f3a; }
+
+@media (min-width: 64rem) {
+    .aydra-login-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .aydra-login-aside { display: flex; padding: 1rem; }
+    .aydra-login-aside-content { position: relative; display: flex; width: 100%; flex-direction: column; justify-content: space-between; overflow: hidden; padding: clamp(3rem, 5vw, 5rem); border-radius: 1.25rem; background: #151e63; color: #fff; }
+    .aydra-login-aside-content::after { position: absolute; right: -8rem; bottom: -13rem; width: 32rem; height: 32rem; border: 1px solid rgb(168 201 255 / 16%); border-radius: 50%; content: ''; pointer-events: none; }
+    .aydra-login-mark { width: 3.5rem; height: 3.5rem; object-fit: contain; }
+    .aydra-login-aside-content > div { position: relative; z-index: 1; max-width: 30rem; }
+    .aydra-login-aside-name { margin-bottom: 1rem; color: #a8c9ff; font-size: .875rem; font-weight: 600; }
+    .aydra-login-aside h2 { max-width: 12ch; font-size: clamp(2.25rem, 3.5vw, 3.75rem); font-weight: 600; line-height: 1.08; letter-spacing: -.035em; }
+    .aydra-login-aside h2 + p { max-width: 26rem; margin-top: 1.25rem; color: #c5d7f4; font-size: 1rem; line-height: 1.6; }
+}
+
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 
-    --color-zinc-50: #fafafa;
-    --color-zinc-100: #f5f5f5;
-    --color-zinc-200: #e5e5e5;
-    --color-zinc-300: #d4d4d4;
-    --color-zinc-400: #a3a3a3;
-    --color-zinc-500: #737373;
-    --color-zinc-600: #525252;
-    --color-zinc-700: #404040;
-    --color-zinc-800: #262626;
-    --color-zinc-900: #171717;
-    --color-zinc-950: #0a0a0a;
+    /* Les neutres Flux partagent la palette bleue Aydra. */
+    --color-zinc-50: #f5f8ff;
+    --color-zinc-100: #eaf1ff;
+    --color-zinc-200: #d6e2f7;
+    --color-zinc-300: #b8cae8;
+    --color-zinc-400: #91a9cd;
+    --color-zinc-500: #526c95;
+    --color-zinc-600: #3c5682;
+    --color-zinc-700: #2b4169;
+    --color-zinc-800: #192b4d;
+    --color-zinc-900: #101d38;
+    --color-zinc-950: #0b1429;
 
-    --color-accent: var(--color-neutral-800);
-    --color-accent-content: var(--color-neutral-800);
+    --color-neutral-50: #f5f8ff;
+    --color-neutral-100: #eaf1ff;
+    --color-neutral-200: #d6e2f7;
+    --color-neutral-300: #b8cae8;
+    --color-neutral-400: #91a9cd;
+    --color-neutral-500: #526c95;
+    --color-neutral-600: #3c5682;
+    --color-neutral-700: #2b4169;
+    --color-neutral-800: #192b4d;
+    --color-neutral-900: #101d38;
+    --color-neutral-950: #0b1429;
+
+    --color-gray-50: #f5f8ff;
+    --color-gray-100: #eaf1ff;
+    --color-gray-200: #d6e2f7;
+    --color-gray-300: #b8cae8;
+    --color-gray-400: #91a9cd;
+    --color-gray-500: #526c95;
+    --color-gray-600: #3c5682;
+    --color-gray-700: #2b4169;
+    --color-gray-800: #192b4d;
+    --color-gray-900: #101d38;
+    --color-gray-950: #0b1429;
+
+    --color-stone-50: #f5f8ff;
+    --color-stone-100: #eaf1ff;
+    --color-stone-200: #d6e2f7;
+    --color-stone-300: #b8cae8;
+    --color-stone-400: #91a9cd;
+    --color-stone-500: #526c95;
+    --color-stone-600: #3c5682;
+    --color-stone-700: #2b4169;
+    --color-stone-800: #192b4d;
+    --color-stone-900: #101d38;
+    --color-stone-950: #0b1429;
+
+    --color-slate-50: #f5f8ff;
+    --color-slate-100: #eaf1ff;
+    --color-slate-200: #d6e2f7;
+    --color-slate-300: #b8cae8;
+    --color-slate-400: #91a9cd;
+    --color-slate-500: #526c95;
+    --color-slate-600: #3c5682;
+    --color-slate-700: #2b4169;
+    --color-slate-800: #192b4d;
+    --color-slate-900: #101d38;
+    --color-slate-950: #0b1429;
+
+    --color-accent: #3459da;
+    --color-accent-content: #2748bd;
     --color-accent-foreground: var(--color-white);
 }
 
 @layer theme {
     .dark {
-        --color-accent: var(--color-white);
-        --color-accent-content: var(--color-white);
-        --color-accent-foreground: var(--color-neutral-800);
+        --color-accent: #7eafff;
+        --color-accent-content: #a8c9ff;
+        --color-accent-foreground: #101a3b;
     }
 }
 
@@ -101,11 +213,11 @@ html.dark body.aydra-admin {
     --color-accent: #7eafff;
     --color-accent-content: #a8c9ff;
     --color-accent-foreground: #101a3b;
-    --aydra-surface: #151f3a;
+    --aydra-surface: #0b1429;
     --aydra-border: #2b3b5c;
     --aydra-heading: #f4f8ff;
     --aydra-muted: #a7b5cf;
-    background: #0b1429;
+    background: #151f3a;
 }
 
 body.aydra-admin .aydra-admin-sidebar {
@@ -129,7 +241,7 @@ body.aydra-admin [data-flux-main-inset] {
 }
 
 html.dark body.aydra-admin [data-flux-main-inset] {
-    background: #0b1429;
+    background: #151f3a;
 }
 
 body.aydra-admin .aydra-admin-brand {
@@ -155,7 +267,7 @@ body.aydra-admin .aydra-admin-sidebar [data-flux-sidebar-item][data-current] {
     background: #eaf1ff;
     border-color: transparent;
     color: #2748bd;
-    box-shadow: inset 3px 0 #3459da;
+    box-shadow: none;
 }
 
 body.aydra-admin .aydra-admin-sidebar [data-flux-sidebar-item]:focus-visible,
@@ -171,7 +283,6 @@ html.dark body.aydra-admin .aydra-admin-sidebar [data-flux-sidebar-group] > div:
 html.dark body.aydra-admin .aydra-admin-sidebar [data-flux-sidebar-item][data-current] {
     background: #263c62;
     color: #c5dcff;
-    box-shadow: inset 3px 0 #7eafff;
 }
 
 /* Une seule surface réunit les indicateurs qui décrivent la plateforme. */
@@ -264,14 +375,6 @@ body.aydra-admin .aydra-overview-note {
     border-top: 1px solid var(--aydra-border);
     color: var(--aydra-muted);
     font-size: .75rem;
-}
-
-body.aydra-admin .aydra-financial {
-    border-left: 4px solid #3459da;
-}
-
-html.dark body.aydra-admin .aydra-financial {
-    border-left-color: #7eafff;
 }
 
 @media (max-width: 1100px) {

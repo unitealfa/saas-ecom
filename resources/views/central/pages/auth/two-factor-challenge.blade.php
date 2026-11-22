@@ -53,8 +53,8 @@
                                 x-model="code"
                                 length="6"
                                 name="code"
-                                label="OTP Code"
-                                label:sr-only
+                                label="Code d’authentification"
+                                x-bind:aria-required="!showRecoveryInput"
                                 class="mx-auto"
                              />
                         </div>
@@ -65,6 +65,7 @@
                             <flux:input
                                 type="text"
                                 name="recovery_code"
+                                label="Code de récupération"
                                 x-ref="recovery_code"
                                 x-bind:required="showRecoveryInput"
                                 autocomplete="one-time-code"

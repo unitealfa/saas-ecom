@@ -17,7 +17,7 @@
                 <h2 id="create-identity" class="aydra-heading text-lg font-semibold">Identité et coordonnées</h2>
                 <p class="aydra-muted mt-1 text-sm">Choisissez le type de compte, puis indiquez les coordonnées de son titulaire.</p>
                 <div class="mt-6 grid gap-5 sm:grid-cols-2">
-                    <flux:select name="account_kind" label="Type de compte" x-model="kind">
+                    <flux:select name="account_kind" label="Type de compte" x-model="kind" required>
                 @if ($canCreateMerchant)<option value="merchant">Commerçant</option>@endif
                 @if ($canCreateStaff)<option value="staff">Personnel SaaS</option>@endif
                     </flux:select>
@@ -53,8 +53,8 @@
             @if ($canCreateStaff)
                 <div x-show="kind === 'staff'" class="aydra-users-panel p-5 sm:p-6">
                 <fieldset class="flex flex-col gap-3">
-                    <legend class="mb-3 font-medium">Rôles du personnel</legend>
-                    <flux:text>Seuls les rôles contenant des droits que vous possédez encore sont proposés. Les rôles sélectionnés ne doivent partager aucune permission.</flux:text>
+                    <legend class="mb-3 font-medium">Rôles du personnel <span class="aydra-required-mark" aria-label="obligatoire">*</span></legend>
+                    <flux:text>Sélectionnez au moins un rôle. Seuls les rôles contenant des droits que vous possédez encore sont proposés. Les rôles sélectionnés ne doivent partager aucune permission.</flux:text>
                     @forelse ($roles as $role)
                         <flux:checkbox name="roles[]" :value="$role->uuid" :label="$role->label"
                             :checked="in_array($role->uuid, old('roles', []), true)" x-bind:disabled="kind !== 'staff'" />

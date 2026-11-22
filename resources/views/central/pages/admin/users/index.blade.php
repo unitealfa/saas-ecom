@@ -98,6 +98,10 @@ new #[Title('Utilisateurs')] class extends Component {
             </div>
         </div>
         <div class="aydra-users-table">
+        <div class="w-full" wire:loading.delay wire:target="search,status,sort,setPage,gotoPage,previousPage,nextPage" style="display: none;">
+            @include('partials.loading-skeleton', ['variant' => 'table'])
+        </div>
+        <div wire:loading.remove.delay wire:target="search,status,sort,setPage,gotoPage,previousPage,nextPage">
         <flux:table :paginate="$this->users">
             <flux:table.columns>
                 <flux:table.column sortable :sorted="$sortBy === 'name'" :direction="$sortDirection" :aria-sort="$sortBy === 'name' ? ($sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'" wire:click="sort('name')">{{ __('Nom') }}</flux:table.column>
@@ -120,31 +124,30 @@ new #[Title('Utilisateurs')] class extends Component {
                                 default => 'zinc',
                             }">{{ $user->status->label() }}</flux:badge>
                         </flux:table.cell>
-                        <flux:table.cell>
-                            <div class="flex min-w-56 flex-wrap items-center gap-2">
+                        <flux:table.cell><flux:dropdown position="bottom" align="end"><flux:button type="button" variant="ghost" size="sm" icon="bars-3" aria-label="Actions" title="Actions" /><flux:menu>
                             @can('view', $user)
-                                <flux:button :href="route('central.users.show', $user)">Informations</flux:button>
+                                <flux:menu.item :href="route('central.users.show', $user)">Informations</flux:menu.item>
                             @endcan
                             @can('update', $user)
-                                <flux:button :href="route('central.users.edit', $user)">Modifier</flux:button>
+                                <flux:menu.item :href="route('central.users.edit', $user)">Modifier</flux:menu.item>
                             @endcan
                             @can('updateStaffPermissions', $user)
-                                <flux:button :href="route('central.staff.permissions.index', $user)">Modifier les permissions</flux:button>
+                                <flux:menu.item :href="route('central.staff.permissions.index', $user)">Modifier les permissions</flux:menu.item>
                             @elsecan('viewStaffPermissions', $user)
-                                <flux:button :href="route('central.staff.permissions.index', $user)">Permissions effectives</flux:button>
+                                <flux:menu.item :href="route('central.staff.permissions.index', $user)">Permissions effectives</flux:menu.item>
                             @endcan
                             @can('create', [\App\Models\Central\Tenants\Tenant::class, $user])
-                                <flux:button :href="route('central.users.tenants.create', $user)">Boutiques</flux:button>
+                                <flux:menu.item :href="route('central.users.tenants.create', $user)">Boutiques</flux:menu.item>
                             @endcan
-                            @include('central.pages.admin.users.lifecycle-actions')
-                            </div>
-                        </flux:table.cell>
+                            @include('central.pages.admin.users.lifecycle-actions', ['inActionMenu' => true])
+                            </flux:menu></flux:dropdown></flux:table.cell>
                     </flux:table.row>
                 @empty
                     <flux:table.row><flux:table.cell colspan="5"><div class="aydra-users-empty"><p class="aydra-heading font-medium">Aucun utilisateur trouvé.</p><p class="aydra-muted mt-1 text-sm">Essayez un autre nom, e-mail ou état de compte.</p></div></flux:table.cell></flux:table.row>
                 @endforelse
             </flux:table.rows>
         </flux:table>
+        </div>
         </div>
     </div>
 </section>

@@ -31,14 +31,12 @@
                 <flux:table.cell>{{ $item->subscription?->agreed_amount === '0.00' ? 'Aucun paiement requis' : $item->payment_choice->label() }}</flux:table.cell>
                 <flux:table.cell class="whitespace-nowrap">{{ $item->submitted_at?->format('d/m/Y H:i') ?? '—' }}</flux:table.cell>
                 <flux:table.cell><flux:badge size="sm" :color="match ($item->status) { \App\Enums\Central\Subscriptions\RequestStatusEnum::ACCEPTED => 'green', \App\Enums\Central\Subscriptions\RequestStatusEnum::REJECTED, \App\Enums\Central\Subscriptions\RequestStatusEnum::CANCELLED => 'red', \App\Enums\Central\Subscriptions\RequestStatusEnum::REVIEW => 'amber', default => 'zinc' }">{{ $item->statusLabel() }}</flux:badge></flux:table.cell>
-                <flux:table.cell>
-                    <div class="flex flex-wrap gap-2">
-                        <flux:button :href="route($ownerMode ? 'owner.subscription-requests.show' : 'central.subscription-requests.show', $item)">Informations</flux:button>
+                <flux:table.cell><flux:dropdown position="bottom" align="end"><flux:button type="button" variant="ghost" size="sm" icon="bars-3" aria-label="Actions" title="Actions" /><flux:menu>
+                        <flux:menu.item :href="route($ownerMode ? 'owner.subscription-requests.show' : 'central.subscription-requests.show', $item)">Informations</flux:menu.item>
                         @unless ($ownerMode)
-                            @include('central.pages.admin.subscriptions.requests.table-actions', ['item' => $item])
+                            @include('central.pages.admin.subscriptions.requests.table-actions', ['item' => $item, 'inActionMenu' => true])
                         @endunless
-                    </div>
-                </flux:table.cell>
+                    </flux:menu></flux:dropdown></flux:table.cell>
             </flux:table.row>
         @empty <flux:table.row><flux:table.cell colspan="8"><div class="aydra-users-empty"><p class="aydra-heading font-medium">Aucune demande trouvée.</p><p class="aydra-muted mt-1 text-sm">Essayez d’autres critères de recherche.</p></div></flux:table.cell></flux:table.row> @endforelse
     </flux:table.rows></flux:table>

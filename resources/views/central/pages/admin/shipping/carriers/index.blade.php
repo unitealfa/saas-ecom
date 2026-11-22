@@ -24,10 +24,10 @@
                     @forelse ($carriers as $carrier)
                         <flux:table.row :key="$carrier->uuid">
                             <flux:table.cell variant="strong">{{ $carrier->name }}</flux:table.cell><flux:table.cell>{{ $carrier->code }}</flux:table.cell><flux:table.cell><flux:badge size="sm" :color="$carrier->trashed() ? 'zinc' : ($carrier->is_active ? 'green' : 'amber')">{{ $carrier->trashed() ? 'Archivé' : ($carrier->is_active ? 'Actif' : 'Inactif') }}</flux:badge></flux:table.cell>
-                            <flux:table.cell><div class="flex flex-wrap gap-2">
-                                <flux:button :href="route('central.carriers.show', $carrier)">Informations</flux:button>
-                                @can('update', $carrier)<flux:button :href="route('central.carriers.edit', $carrier)">Modifier</flux:button>@endcan
-                            </div></flux:table.cell>
+                            <flux:table.cell><flux:dropdown position="bottom" align="end"><flux:button type="button" variant="ghost" size="sm" icon="bars-3" aria-label="Actions" title="Actions" /><flux:menu>
+                                <flux:menu.item :href="route('central.carriers.show', $carrier)">Informations</flux:menu.item>
+                                @can('update', $carrier)<flux:menu.item :href="route('central.carriers.edit', $carrier)">Modifier</flux:menu.item>@endcan
+                            </flux:menu></flux:dropdown></flux:table.cell>
                         </flux:table.row>
                     @empty
                         <flux:table.row><flux:table.cell colspan="4"><div class="aydra-users-empty">Aucun transporteur trouvé.</div></flux:table.cell></flux:table.row>

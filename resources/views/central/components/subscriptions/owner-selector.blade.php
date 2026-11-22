@@ -38,9 +38,12 @@ new class extends Component
     @php(['owners' => $owners, 'selectedOwner' => $selectedOwner] = $this->candidates)
     <flux:input wire:model.live.debounce.350ms="search" x-on:keydown.enter.prevent label="Rechercher un commerçant" placeholder="Nom ou adresse e-mail" maxlength="255" />
     <flux:error name="search" />
-    <p role="status" wire:loading>Recherche en cours…</p>
+    <div class="w-full" wire:loading.delay wire:target="search,setPage,previousPage,nextPage" style="display: none;">
+        @include('partials.loading-skeleton', ['variant' => 'table'])
+    </div>
+    <div wire:loading.remove.delay wire:target="search,setPage,previousPage,nextPage">
     <fieldset class="min-w-0 space-y-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700" wire:loading.attr="disabled">
-        <legend>Choisir le commerçant — {{ $owners->total() }} résultat(s), 10 par page</legend>
+        <legend>Choisir le commerçant <span class="aydra-required-mark" aria-label="obligatoire">*</span> — {{ $owners->total() }} résultat(s), 10 par page</legend>
         <div class="max-h-48 space-y-3 overflow-y-auto overscroll-contain" tabindex="0" aria-label="Liste des commerçants">
             @if ($selectedOwner)
                 <label class="flex items-center gap-3" wire:key="selected-{{ $selectedOwner->uuid }}">
@@ -60,4 +63,5 @@ new class extends Component
         </div>
         {{ $owners->links('livewire::simple-tailwind', data: ['scrollTo' => false]) }}
     </fieldset>
+    </div>
 </div>

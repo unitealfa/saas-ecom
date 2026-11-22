@@ -50,6 +50,7 @@
                 this.name = '';
                 this.showForm = false;
                 await $wire.loadPasskeys();
+                this.$dispatch('toast-show', { slots: { text: 'Clé d’accès ajoutée.' }, dataset: { variant: 'success' }, duration: 7000 });
             } catch (e) {
                 if (e.constructor?.name !== 'UserCancelledError') {
                     this.error = e.message;

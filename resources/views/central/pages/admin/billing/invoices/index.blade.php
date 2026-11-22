@@ -98,7 +98,7 @@
                                 <flux:table.cell class="whitespace-nowrap tabular-nums">{{ $invoice->total_amount }} {{ $invoice->currency }}</flux:table.cell>
                                 <flux:table.cell><flux:badge size="sm">{{ $invoice->status->label() }}</flux:badge></flux:table.cell>
                                 <flux:table.cell>{{ $paymentStates[$invoice->id]->label() }}</flux:table.cell>
-                                <flux:table.cell><flux:button size="sm" :href="route($ownerMode ? 'owner.invoices.show' : 'central.invoices.show', $invoice)">Consulter</flux:button></flux:table.cell>
+                                <flux:table.cell><flux:dropdown position="bottom" align="end"><flux:button type="button" variant="ghost" size="sm" icon="bars-3" aria-label="Actions" title="Actions" /><flux:menu><flux:menu.item :href="route($ownerMode ? 'owner.invoices.show' : 'central.invoices.show', $invoice)">Consulter</flux:menu.item></flux:menu></flux:dropdown></flux:table.cell>
                             </flux:table.row>
                         @empty
                             <flux:table.row><flux:table.cell colspan="7"><div class="aydra-users-empty"><p class="aydra-heading font-medium">Aucune facture ne correspond à votre recherche.</p><p class="aydra-muted mt-1 text-sm">Essayez d’autres critères de recherche.</p></div></flux:table.cell></flux:table.row>

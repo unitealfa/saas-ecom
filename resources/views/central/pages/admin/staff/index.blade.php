@@ -91,6 +91,10 @@ new #[Layout('layouts::app'), Title('Personnel SaaS')] class extends Component
             </div>
         </div>
         <div class="aydra-users-table">
+        <div class="w-full" wire:loading.delay wire:target="search,status,sort,setPage,gotoPage,previousPage,nextPage" style="display: none;">
+            @include('partials.loading-skeleton', ['variant' => 'table'])
+        </div>
+        <div wire:loading.remove.delay wire:target="search,status,sort,setPage,gotoPage,previousPage,nextPage">
         <flux:table :paginate="$this->staff">
             <flux:table.columns>
                 <flux:table.column sortable :sorted="$sortBy === 'name'" :direction="$sortDirection" :aria-sort="$sortBy === 'name' ? ($sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'" wire:click="sort('name')">Nom</flux:table.column>
@@ -109,18 +113,17 @@ new #[Layout('layouts::app'), Title('Personnel SaaS')] class extends Component
                             StatusEnum::ACTIVE => 'green', StatusEnum::PENDING => 'amber',
                             StatusEnum::SUSPENDED, StatusEnum::REJECTED => 'red', default => 'zinc',
                         }">{{ $user->status->label() }}</flux:badge></flux:table.cell>
-                        <flux:table.cell>
-                            <div class="flex min-w-56 flex-wrap items-center gap-2">
-                            <flux:button :href="route('central.staff.show', $user)">Informations</flux:button>
-                            @include('central.pages.admin.staff.actions')
-                            </div>
-                        </flux:table.cell>
+                        <flux:table.cell><flux:dropdown position="bottom" align="end"><flux:button type="button" variant="ghost" size="sm" icon="bars-3" aria-label="Actions" title="Actions" /><flux:menu>
+                            <flux:menu.item :href="route('central.staff.show', $user)">Informations</flux:menu.item>
+                            @include('central.pages.admin.staff.actions', ['inActionMenu' => true])
+                            </flux:menu></flux:dropdown></flux:table.cell>
                     </flux:table.row>
                 @empty
                     <flux:table.row><flux:table.cell colspan="5"><div class="aydra-users-empty"><p class="aydra-heading font-medium">Aucun administrateur trouvé.</p><p class="aydra-muted mt-1 text-sm">Essayez un autre nom, e-mail ou état de compte.</p></div></flux:table.cell></flux:table.row>
                 @endforelse
             </flux:table.rows>
         </flux:table>
+        </div>
         </div>
     </div>
 </section>

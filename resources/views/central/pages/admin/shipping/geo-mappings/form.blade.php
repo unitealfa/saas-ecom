@@ -40,11 +40,12 @@
             </flux:select>
             <flux:input label="Chercher une zone" x-model="search" x-on:keydown.enter.prevent="load(1)" placeholder="Nom ou code Aydra" />
             <flux:button type="button" x-on:click="load(1)" x-bind:disabled="loading">Rechercher la zone</flux:button>
-            <select name="geographic_area_uuid" x-model="selected" required aria-label="Zone géographique" class="w-full rounded-lg border border-zinc-300 bg-white p-2 text-zinc-900 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
+            <label class="block">Zone géographique
+            <select name="geographic_area_uuid" x-model="selected" required class="w-full rounded-lg border border-zinc-300 bg-white p-2 text-zinc-900 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
                 <option value="">Sélectionner une zone</option>
                 @if (old('geographic_area_uuid'))<option value="{{ old('geographic_area_uuid') }}">Zone précédemment sélectionnée</option>@endif
                 <template x-for="row in rows" :key="row.uuid"><option :value="row.uuid" x-text="row.name_fr + ' — ' + row.code"></option></template>
-            </select>
+            </select></label>
             <div class="flex gap-2">
                 <flux:button type="button" x-on:click="load(page - 1)" x-bind:disabled="loading || page <= 1">Précédent</flux:button>
                 <flux:button type="button" x-on:click="load(page + 1)" x-bind:disabled="loading || page >= lastPage">Suivant</flux:button>
