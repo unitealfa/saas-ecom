@@ -74,6 +74,13 @@ class SubscriptionRequestActionRequest extends FormRequest
                     $rules['received'] = ['required', 'accepted'];
                 }
 
+                if (
+                    filled($request->getAttribute('submitted_payment')['proof_uuid'] ?? null)
+                    || $request->payment?->getAttribute('proof_media_id') !== null
+                ) {
+                    $rules['proof_reviewed'] = ['required', 'accepted'];
+                }
+
                 if (filled($request->getAttribute('invoice_error'))) {
                     $rules['acknowledged'] = ['required', 'accepted'];
                 }
