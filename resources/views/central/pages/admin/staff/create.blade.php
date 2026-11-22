@@ -10,8 +10,8 @@
                 <div class="mt-6 grid gap-5 sm:grid-cols-2">@include('central.pages.admin.staff.form', ['user' => null])</div>
             </section>
             <section class="aydra-users-panel flex flex-col gap-3 p-5 sm:p-6" aria-labelledby="staff-create-roles">
-            <h2 id="staff-create-roles" class="aydra-heading text-lg font-semibold">Rôles du personnel</h2>
-            <flux:text>Seuls les rôles que vous pouvez déléguer sont proposés. Ils ne doivent partager aucune permission.</flux:text>
+            <h2 id="staff-create-roles" class="aydra-heading text-lg font-semibold">Rôles du personnel <span class="aydra-required-mark" aria-label="obligatoire">*</span></h2>
+            <flux:text>Sélectionnez au moins un rôle. Seuls les rôles que vous pouvez déléguer sont proposés. Ils ne doivent partager aucune permission.</flux:text>
             @forelse ($roles as $role)
                 <flux:checkbox name="roles[]" :value="$role->uuid" :label="$role->label" :checked="in_array($role->uuid, old('roles', []), true)" />
             @empty

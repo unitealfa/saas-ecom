@@ -40,7 +40,7 @@ new class extends Component
     <flux:error name="search" />
     <p role="status" wire:loading>Recherche en cours…</p>
     <fieldset class="min-w-0 space-y-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700" wire:loading.attr="disabled">
-        <legend>Choisir le commerçant — {{ $owners->total() }} résultat(s), 10 par page</legend>
+        <legend>Choisir le commerçant <span class="aydra-required-mark" aria-label="obligatoire">*</span> — {{ $owners->total() }} résultat(s), 10 par page</legend>
         <div class="max-h-48 space-y-3 overflow-y-auto overscroll-contain" tabindex="0" aria-label="Liste des commerçants">
             @if ($selectedOwner)
                 <label class="flex items-center gap-3" wire:key="selected-{{ $selectedOwner->uuid }}">

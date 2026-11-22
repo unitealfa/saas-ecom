@@ -8,6 +8,26 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* L'astérisque suit l'état réel du champ, y compris les champs conditionnels. */
+form [data-flux-field]:not(:has([data-flux-field])):has(input:required:not(:disabled):not([readonly]), select:required:not(:disabled), textarea:required:not(:disabled), [data-flux-checkbox][required]:not([disabled]), [data-flux-otp][aria-required="true"]) > [data-flux-label]::after,
+form label:not([data-flux-label]):has(> :is(input:not([type="radio"]):not([type="checkbox"]), select, textarea):required:not(:disabled):not([readonly]))::before,
+form label:not([data-flux-label]):has(> input[type="checkbox"]:required:not(:disabled))::after {
+    color: #b42318;
+    font-weight: 700;
+}
+
+form [data-flux-field]:not(:has([data-flux-field])):has(input:required:not(:disabled):not([readonly]), select:required:not(:disabled), textarea:required:not(:disabled), [data-flux-checkbox][required]:not([disabled]), [data-flux-otp][aria-required="true"]) > [data-flux-label]::after,
+form label:not([data-flux-label]):has(> input[type="checkbox"]:required:not(:disabled))::after { content: ' *'; }
+
+form label:not([data-flux-label]):has(> :is(input:not([type="radio"]):not([type="checkbox"]), select, textarea):required:not(:disabled):not([readonly]))::before { content: '* '; }
+
+html.dark form [data-flux-field]:not(:has([data-flux-field])):has(input:required:not(:disabled):not([readonly]), select:required:not(:disabled), textarea:required:not(:disabled), [data-flux-checkbox][required]:not([disabled]), [data-flux-otp][aria-required="true"]) > [data-flux-label]::after,
+html.dark form label:not([data-flux-label]):has(> :is(input:not([type="radio"]), select, textarea):required:not(:disabled):not([readonly]))::before,
+html.dark form label:not([data-flux-label]):has(> input[type="checkbox"]:required:not(:disabled))::after,
+html.dark .aydra-required-mark { color: #fda29b; }
+
+.aydra-required-mark { color: #b42318; font-weight: 700; }
+
 /* La page de connexion reprend la palette centrale sans modifier les autres parcours d'authentification. */
 .aydra-login {
     --color-accent: #3459da;
