@@ -58,13 +58,6 @@
         <section class="aydra-users-panel p-5 sm:p-6">
             <h2 class="aydra-heading mb-4 text-lg font-semibold">Actions du plan</h2>
             <div class="flex flex-wrap gap-3">
-                @canany(['update', 'updateFeatures'], $plan)
-                    @if (\Illuminate\Support\Facades\Route::has('central.plan-pages.edit'))
-                        <flux:button :href="route('central.plan-pages.edit', $plan)" icon="pencil-square">
-                            Modifier le plan
-                        </flux:button>
-                    @endif
-                @endcanany
             @can('createVersion', $plan)
                 @php($restoreDraft = old('draft.preview') === '1' && ! $errors->hasAny(['expected_state', 'expected_latest_version']))
                 @php($confirmCopy = $restoreDraft && $errors->has('copy_confirmation'))
