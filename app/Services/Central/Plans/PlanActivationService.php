@@ -8,7 +8,6 @@ use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use App\Services\Central\Subscriptions\DefaultSubscription;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -23,6 +22,7 @@ class PlanActivationService
     public function __construct(
         private readonly AuthorizationMutation $mutations,
         private readonly FreePlanCatalog $defaults,
+        private readonly DefaultSubscription $subscriptions,
     ) {}
 
     /** @return array<string, array<int, string>> */
@@ -97,11 +97,12 @@ class PlanActivationService
                 $subscriptions = Subscription::where('plan_id', $previous->id)
                     ->whereIn('status', [StatusEnum::ACTIVE, StatusEnum::TRIAL])
                     ->whereNull('period_ends_at')->whereNull('effective_ends_at')->whereNull('ended_at')
+                    ->whereHas('owner', fn ($query) => $query->whereNull('users.deleted_at'))
                     ->orderBy('user_id')->lockForUpdate()->get();
                 foreach ($subscriptions as $subscription) {
                     $owner = User::whereKey($subscription->user_id)->lockForUpdate()->firstOrFail();
-                    $subscription->forceFill(['plan_id' => $target->id])->save();
-                    Event::dispatch(DefaultSubscription::EFFECTIVE_CHANGED, [$owner, $subscription, $actor]);
+                    $subscription->forceFill(['status' => StatusEnum::EXPIRED, 'ended_at' => now()])->save();
+                    $this->subscriptions->ensure($owner, $actor);
                 }
                 $this->change($actor, $previous, false, $target->uuid);
             }
