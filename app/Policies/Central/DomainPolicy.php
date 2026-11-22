@@ -2,7 +2,9 @@
 
 namespace App\Policies\Central;
 
+use App\Enums\Central\Tenants\StatusEnum;
 use App\Models\Central\Domains\Domain;
+use App\Models\Central\Tenants\Tenant;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\CentralUserAccess;
 
@@ -20,6 +22,11 @@ class DomainPolicy
         return $this->access->allows($actor, 'saas.domains.create');
     }
 
+    public function createOwned(User $actor, Tenant $tenant): bool
+    {
+        return ! tenancy()->initialized && ! $tenant->trashed() && $tenant->user_id === $actor->id && $tenant->status === StatusEnum::ACTIVE;
+    }
+
     public function update(User $actor, Domain $domain): bool
     {
         return $this->isEditable($domain) && $this->access->allows($actor, 'saas.domains.update');
@@ -27,17 +34,17 @@ class DomainPolicy
 
     public function verify(User $actor, Domain $domain): bool
     {
-        return $this->isEditable($domain) && $this->access->allows($actor, 'saas.domains.verify');
+        return $this->isEditable($domain) && ($this->access->allows($actor, 'saas.domains.verify') || $this->createOwned($actor, $domain->tenant));
     }
 
     public function setPrimary(User $actor, Domain $domain): bool
     {
-        return $this->isEditable($domain) && $this->access->allows($actor, 'saas.domains.primary.update');
+        return $this->isEditable($domain) && ($this->access->allows($actor, 'saas.domains.primary.update') || $this->createOwned($actor, $domain->tenant));
     }
 
     public function archive(User $actor, Domain $domain): bool
     {
-        return $this->isEditable($domain) && $this->access->allows($actor, 'saas.domains.archive');
+        return $this->isEditable($domain) && ($this->access->allows($actor, 'saas.domains.archive') || $this->createOwned($actor, $domain->tenant));
     }
 
     /** Restaurer un domaine archivé revient à le réserver à nouveau : même permission que la création. */

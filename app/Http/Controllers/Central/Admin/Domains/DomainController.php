@@ -62,7 +62,9 @@ class DomainController extends Controller
 
     public function store(StoreDomainRequest $request): RedirectResponse
     {
-        $this->domains->create($this->centralActor(), $request->validated('tenant_uuid'), $request->validated('domain'));
+        $base = trim((string) config('tenancy.saas_base_domain'), '.');
+        abort_if($base === '', 503);
+        $this->domains->create($this->centralActor(), $request->validated('tenant_uuid'), $request->validated('domain').'.'.$base);
 
         return $this->result('Domaine ajouté. Configurez ses enregistrements DNS puis lancez la vérification.');
     }

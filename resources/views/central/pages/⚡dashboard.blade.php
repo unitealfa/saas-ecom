@@ -48,6 +48,7 @@ new class extends Component {
                             <flux:text>{{ $shop['name'] }} — {{ $shop['status'] }}</flux:text>
                             @if ($shop['ready'])
                                 <flux:button :href="route('owner.shops.access', $shop['uuid'])">Administrer</flux:button>
+                                <flux:button :href="route('owner.shops.domains.index', $shop['uuid'])">Domaines</flux:button>
                             @else
                                 <flux:text>Accès indisponible tant que la boutique n’est pas prête et active.</flux:text>
                             @endif

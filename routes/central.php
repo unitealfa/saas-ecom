@@ -11,6 +11,7 @@ use App\Http\Controllers\Central\Owner\Billing\PaymentController;
 use App\Http\Controllers\Central\Owner\Billing\SubscriptionPurchaseController;
 use App\Http\Controllers\Central\Owner\Subscriptions\SubscriptionRequestController;
 use App\Http\Controllers\Central\Owner\Tenants\FirstTenantController;
+use App\Http\Controllers\Central\Owner\Tenants\OwnerDomainController;
 use App\Http\Controllers\Central\Owner\Tenants\TenantAccessController;
 use App\Http\Controllers\Central\Owner\Tenants\TenantController as OwnerTenantController;
 use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
@@ -92,6 +93,14 @@ Route::middleware(['auth:central', 'verified', EnsureActiveCentralAccount::class
         });
         Route::get('boutiques/{tenant}/administrer', TenantAccessController::class)
             ->whereUuid('tenant')->name('shops.access');
+        Route::controller(OwnerDomainController::class)->prefix('boutiques/{tenant}/domaines')->name('shops.domains.')
+            ->whereUuid(['tenant', 'domain'])->group(function (): void {
+                Route::get('/', 'index')->name('index');
+                Route::post('/', 'store')->name('store');
+                Route::post('{domain}/verification', 'verify')->name('verify');
+                Route::patch('{domain}/principal', 'primary')->name('primary');
+                Route::delete('{domain}', 'destroy')->name('destroy');
+            });
     });
 });
 

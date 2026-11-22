@@ -5,8 +5,15 @@ declare(strict_types=1);
 namespace App\Services\Central\Domains;
 
 use App\Enums\Central\Domains\TypeEnum;
+use App\Enums\Central\Features\PeriodEnum;
+use App\Enums\Central\Features\QuotaScopeEnum;
+use App\Enums\Central\Features\ValueTypeEnum;
+use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Domains\Domain;
+use App\Models\Central\Features\Feature;
+use App\Models\Central\Plans\PlanFeature;
+use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Tenants\Tenant;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
@@ -91,6 +98,38 @@ class DomainService
 
             return $domain;
         });
+    }
+
+    public function createOwned(User $actor, Tenant $tenant, string $host): Domain
+    {
+        return $this->mutations->run($actor, 'createOwned',
+            fn (): array => [Domain::class, Tenant::whereKey($tenant->id)->lockForUpdate()->firstOrFail()],
+            function (array $target) use ($actor, $host): Domain {
+                [, $tenant] = $target;
+                User::whereKey($actor->id)->lockForUpdate()->firstOrFail();
+                $subscription = Subscription::where('user_id', $actor->id)->whereIn('status', [StatusEnum::ACTIVE, StatusEnum::TRIAL])
+                    ->currentlyEffective()->lockForUpdate()->orderByDesc('id')->first();
+                $feature = Feature::where('code', Feature::DOMAINS_CODE)->active()->first();
+                $grant = $subscription && $feature && $feature->value_type === ValueTypeEnum::QUANTITY
+                    && $feature->quota_scope === QuotaScopeEnum::TENANT && $feature->period === PeriodEnum::LIFETIME
+                    ? PlanFeature::where('plan_id', $subscription->plan_id)->where('feature_id', $feature->id)->where('is_active', true)->lockForUpdate()->first()
+                    : null;
+                if ($grant === null) {
+                    throw ValidationException::withMessages(['domain' => 'Votre offre ne comprend pas de domaine supplémentaire.']);
+                }
+                $count = Domain::where('tenant_id', $tenant->id)->lockForUpdate()->get()->count();
+                if ($grant->limit !== null && max(0, $count - 1) >= $grant->limit) {
+                    throw ValidationException::withMessages(['domain' => "Votre offre autorise {$grant->limit} domaine(s) supplémentaire(s) par boutique."]);
+                }
+                $host = $this->normalize($host);
+                $domain = new Domain(['domain' => $host, 'type' => $this->typeFor($tenant, $host), 'is_primary' => false]);
+                $domain->tenant()->associate($tenant);
+                $domain->forceFill(['verification_status' => VerificationStatusEnum::PENDING]);
+                $this->save($domain);
+                $this->audit($actor, $domain, self::EVENT_CREATED, null);
+
+                return $domain;
+            });
     }
 
     public function update(User $actor, Domain $domain, string $host, string $expectedState): void
