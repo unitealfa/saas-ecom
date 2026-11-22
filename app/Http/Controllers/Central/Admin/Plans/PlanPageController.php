@@ -44,7 +44,9 @@ class PlanPageController extends Controller
     {
         Gate::forUser($this->centralActor())->authorize('create', Plan::class);
 
-        return view('central.pages.admin.plans.create');
+        return view('central.pages.admin.plans.create', [
+            'availableFeatures' => Feature::query()->active()->orderBy('name')->get(),
+        ]);
     }
 
     public function store(StorePlanRequest $request): RedirectResponse

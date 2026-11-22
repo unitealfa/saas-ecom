@@ -82,7 +82,7 @@
                                 @foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach
                             </flux:callout>
                         @endif
-                        <div class="max-h-[60vh] space-y-4 overflow-y-auto p-1">
+                        <div x-show="! confirmed" class="max-h-[60vh] space-y-4 overflow-y-auto p-1">
                             <details open class="rounded-lg border border-zinc-300 p-4 dark:border-zinc-700">
                                 <summary>Modifier les informations</summary>
                                 <div class="mt-3 flex flex-col gap-3">
@@ -129,8 +129,8 @@
                             </details>
                         </div>
                         <div class="flex justify-end gap-2">
-                            <flux:modal.close><flux:button type="button" x-on:click="confirmed = false; $refs.versionForm.reset()">Annuler</flux:button></flux:modal.close>
-                            <flux:button type="submit" variant="primary"><span x-text="confirmed ? 'Créer la copie' : 'Créer'">Créer</span></flux:button>
+                            <flux:modal.close><flux:button type="button" x-on:click="confirmed = false; $refs.versionForm.reset()"><span x-text="confirmed ? 'Non' : 'Annuler'">Annuler</span></flux:button></flux:modal.close>
+                            <flux:button type="submit" variant="primary"><span x-text="confirmed ? 'Oui' : 'Créer'">Créer</span></flux:button>
                         </div>
                     </form>
                 </flux:modal>
@@ -152,6 +152,6 @@
             @endcan
             <flux:button :href="route('central.plan-pages.index')">Retour aux plans</flux:button>
         </div>
-        <flux:text>Activer une version désactive les autres versions commercialisées du même plan. Les abonnements existants ne changent pas.</flux:text>
+        <flux:text>Activer une version désactive les autres versions commercialisées du même plan, sauf le plan par défaut. Les abonnements existants ne changent pas.</flux:text>
     </section>
 </x-layouts::app>

@@ -27,7 +27,7 @@ function planCompositionState(Plan $plan): string
     return $plan->compositionState($plan->features()->orderBy('feature_id')->get());
 }
 
-test('a permitted actor replaces a plan composition without replacing preserved association identities', function (): void {
+test('a permitted actor cannot directly modify an existing plan composition', function (): void {
     $actor = planCompositionActor(['saas.plans.view', 'saas.plans.features.update']);
     $plan = Plan::factory()->create(['is_active' => false]);
     $oldFeature = Feature::factory()->create();
@@ -43,14 +43,14 @@ test('a permitted actor replaces a plan composition without replacing preserved 
             ['uuid' => $oldFeature->uuid, 'is_active' => true, 'limit' => 8],
             ['uuid' => $boolean->uuid, 'is_active' => true, 'limit' => null],
         ],
-    ])->assertNoContent();
+    ])->assertUnprocessable();
 
-    expect($old->refresh()->limit)->toBe(8)->and($plan->features()->count())->toBe(2);
-    expect(Activity::forSubject($plan)->where('event', 'plan_features_updated')->count())->toBe(1);
+    expect($old->refresh()->limit)->toBe(2)->and($plan->features()->count())->toBe(1);
+    expect(Activity::forSubject($plan)->where('event', 'plan_features_updated')->count())->toBe(0);
     $this->putJson(route('central.plans.features.update', $plan->uuid), [
         'expected_state' => $state, 'features' => [],
     ])->assertUnprocessable();
-    expect($plan->features()->count())->toBe(2);
+    expect($plan->features()->count())->toBe(1);
 });
 
 test('composition requires its dedicated permission and rejects invalid feature data', function (): void {
@@ -64,16 +64,16 @@ test('composition requires its dedicated permission and rejects invalid feature 
     ]))->toThrow(AuthorizationException::class);
 });
 
-test('an empty composition removes existing grants from an unused plan', function (): void {
+test('an empty composition cannot remove grants from an existing plan', function (): void {
     $actor = planCompositionActor(['saas.plans.features.update']);
     $plan = Plan::factory()->create();
     PlanFeature::factory()->create(['plan_id' => $plan->id]);
 
     $this->actingAs($actor, 'central')->putJson(route('central.plans.features.update', $plan->uuid), [
         'expected_state' => planCompositionState($plan), 'features' => [],
-    ])->assertNoContent();
-    expect($plan->features()->count())->toBe(0);
-    expect(Activity::forSubject($plan)->where('event', 'plan_features_updated')->count())->toBe(1);
+    ])->assertUnprocessable();
+    expect($plan->features()->count())->toBe(1);
+    expect(Activity::forSubject($plan)->where('event', 'plan_features_updated')->count())->toBe(0);
 });
 
 test('composition rejects unavailable or duplicate features and numeric limits on boolean features', function (): void {

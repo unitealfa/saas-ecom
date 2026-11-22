@@ -55,7 +55,7 @@
                         </flux:select>
                         <flux:select name="transition_mode" label="Début de la nouvelle période">
                             @foreach (\App\Enums\Central\Subscriptions\TransitionModeEnum::cases() as $mode)
-                                <option value="{{ $mode->value }}" @selected(($oldText('plan_uuid') === $plan['uuid'] ? $oldText('transition_mode', 2) : '2') === (string) $mode->value)>{{ $mode->label() }}</option>
+                                <option value="{{ $mode->value }}" @selected(($oldText('plan_uuid') === $plan['uuid'] ? $oldText('transition_mode', 2) : '2') === (string) $mode->value)>{{ $mode === \App\Enums\Central\Subscriptions\TransitionModeEnum::IMMEDIATE ? 'Dès confirmation' : $mode->label() }}</option>
                             @endforeach
                         </flux:select>
                         @if ($plan['monthly_price'] !== '0.00' || $plan['annual_price'] !== '0.00')

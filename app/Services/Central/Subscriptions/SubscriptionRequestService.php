@@ -282,6 +282,9 @@ class SubscriptionRequestService
             if ($current->status->isFinal()) {
                 $this->fail('Cette demande est déjà terminée.');
             }
+            if (filled($current->getAttribute('submitted_payment')['proof_uuid'] ?? null) || $current->payment?->getAttribute('proof_media_id') !== null) {
+                Validator::make($data, ['proof_reviewed' => ['required', 'accepted']])->validate();
+            }
             if ($current->payment_choice === PaymentChoiceEnum::EXTERNAL && $current->payment === null && $current->getAttribute('submitted_payment') === null) {
                 $this->fail('Le commerçant doit fournir son justificatif avant la confirmation du versement externe.');
             }
@@ -369,11 +372,19 @@ class SubscriptionRequestService
         });
     }
 
-    public function changePaymentChoice(User $owner, SubscriptionRequest $request, string $expected, PaymentChoiceEnum $choice): SubscriptionRequest
+    public function changePaymentChoice(User $owner, SubscriptionRequest $request, string $expected, PaymentChoiceEnum $choice, array $data = [], ?UploadedFile $proof = null): SubscriptionRequest
     {
         abort_if(tenancy()->initialized, 403);
+        $submitted = null;
+        if ($choice === PaymentChoiceEnum::EXTERNAL) {
+            Validator::make([...$data, 'payment_choice' => $choice->value, 'proof' => $proof], self::initialPaymentRules())->validate();
+            $media = $this->documents->retainRequestProof($owner, $request, $proof);
+            $submitted = [...$data['payment'], 'occurred_at' => now()->toDateTimeString(),
+                'amount' => (string) BigDecimal::of($data['payment']['amount'])->toScale(2), 'currency' => $request->currency,
+                'operation_id' => (string) Str::uuid(), 'proof_uuid' => $media->uuid];
+        }
 
-        return $this->mutations->run($owner, 'update', fn () => $this->lock($request), function (SubscriptionRequest $current) use ($owner, $expected, $choice): SubscriptionRequest {
+        return $this->mutations->run($owner, 'update', fn () => $this->lock($request), function (SubscriptionRequest $current) use ($owner, $expected, $choice, $submitted): SubscriptionRequest {
             $this->assertState($current, $expected);
             if ($current->subscription->agreed_amount === '0.00' && $choice !== PaymentChoiceEnum::CASH) {
                 $this->fail('Cette offre ne nécessite aucun paiement.');
@@ -381,14 +392,14 @@ class SubscriptionRequestService
             if ($current->status->isFinal()) {
                 $this->fail('Une demande terminée est immuable.');
             }
-            if ($current->payment_choice === $choice && $current->status !== RequestStatusEnum::REJECTED) {
+            if ($current->payment_choice === $choice && $current->status !== RequestStatusEnum::REJECTED && $submitted === null) {
                 return $current;
             }
             $previous = $current->payment_choice;
             $this->retireDeclaration($owner, $current);
-            $current->forceFill(['payment_choice' => $choice, 'status' => $current->invoice !== null
-                ? RequestStatusEnum::AWAITING_PAYMENT : RequestStatusEnum::INVOICE_PENDING,
-                'decision_reason' => null, 'decided_by_id' => null, 'decided_at' => null, 'submitted_payment' => null,
+            $current->forceFill(['payment_choice' => $choice, 'status' => $submitted !== null ? RequestStatusEnum::REVIEW : ($current->invoice !== null
+                ? RequestStatusEnum::AWAITING_PAYMENT : RequestStatusEnum::INVOICE_PENDING),
+                'decision_reason' => null, 'decided_by_id' => null, 'decided_at' => null, 'submitted_payment' => $submitted,
                 'reference_version' => $current->reference_version + 1])->save();
             activity('central')->causedBy($owner)->performedOn($current)->event(self::UPDATED)
                 ->withProperties(['request_uuid' => $current->uuid, 'previous_payment_choice' => $previous->value,
@@ -424,6 +435,9 @@ class SubscriptionRequestService
                 }
 
                 return $this->changePaymentChoice($owner, $current, $expected, PaymentChoiceEnum::from((int) $values['payment_choice']));
+            }
+            if ((int) $values['payment_choice'] === PaymentChoiceEnum::EXTERNAL->value) {
+                $this->fail('Choisissez d’abord le paiement au bureau, modifiez l’offre, puis transmettez un nouveau justificatif pour le versement externe.');
             }
             $this->assertReplaceable($owner, $current);
             $before = ['subscription_uuid' => $subscription->uuid, 'plan_uuid' => $subscription->plan->uuid,

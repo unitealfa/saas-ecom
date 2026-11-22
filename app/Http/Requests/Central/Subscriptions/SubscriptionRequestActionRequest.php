@@ -47,6 +47,7 @@ class SubscriptionRequestActionRequest extends FormRequest
             }
         } elseif ($action === 'choice') {
             $rules['payment_choice'] = ['required', 'integer', Rule::enum(PaymentChoiceEnum::class)];
+            $rules = [...$rules, ...SubscriptionRequestService::initialPaymentRules()];
         } elseif ($action === 'proof') {
             $rules = [...SaasPaymentService::declarationRules(false), ...$rules,
                 'proof' => ['required', 'file', 'mimetypes:application/pdf,image/jpeg,image/png', 'max:'.PaymentDocumentService::MAX_KB]];
@@ -56,6 +57,9 @@ class SubscriptionRequestActionRequest extends FormRequest
         } elseif ($action === 'accept') {
             $hasPayment = $request instanceof SubscriptionRequest && $request->current_payment_id !== null;
             $rules['expected_payment_state'] = [$hasPayment ? 'required' : 'nullable', 'string', 'regex:'.SubscriptionRequest::STATE_PATTERN];
+            if ($request instanceof SubscriptionRequest && (filled($request->getAttribute('submitted_payment')['proof_uuid'] ?? null) || $request->payment?->getAttribute('proof_media_id') !== null)) {
+                $rules['proof_reviewed'] = ['required', 'accepted'];
+            }
             if ($request instanceof SubscriptionRequest && filled($request->getAttribute('invoice_error'))) {
                 $rules['acknowledged'] = ['required', 'accepted'];
             }

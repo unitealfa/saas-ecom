@@ -69,7 +69,7 @@ test('the version dialog edits quotas when creating a version from the designate
         ->and($source->features()->sole()->limit)->toBe(3);
 });
 
-test('a newly copied version can change its information and feature limits', function (): void {
+test('a newly copied version cannot be edited after creation', function (): void {
     $actor = planVersionActor(['saas.plans.versions.create', 'saas.plans.update', 'saas.plans.features.update']);
     $source = Plan::factory()->create();
     $feature = Feature::factory()->create();
@@ -80,14 +80,14 @@ test('a newly copied version can change its information and feature limits', fun
         'expected_state' => $copy->compositionState($copy->features),
         'name' => 'Version modifiée', 'description' => 'Nouvelle offre',
         'monthly_price' => '100.00', 'annual_price' => '1000.00',
-    ])->assertNoContent();
+    ])->assertUnprocessable();
     $copy->refresh()->load('features');
     $this->putJson(route('central.plans.features.update', $copy->uuid), [
         'expected_state' => $copy->compositionState($copy->features),
         'features' => [['uuid' => $feature->uuid, 'is_active' => true, 'limit' => 3]],
-    ])->assertNoContent();
-    expect($copy->refresh()->name)->toBe('Version modifiée')
-        ->and($copy->features()->firstOrFail()->limit)->toBe(3);
+    ])->assertUnprocessable();
+    expect($copy->refresh()->name)->toBe($source->name)
+        ->and($copy->features()->firstOrFail()->limit)->toBe(2);
 });
 
 test('a new inactive version copies the source without changing its historical subscriptions', function (): void {

@@ -52,7 +52,7 @@ class SubscriptionRequestController extends Controller
 
     public function choice(SubscriptionRequestActionRequest $request, SubscriptionRequest $subscriptionRequest): RedirectResponse
     {
-        $this->requests->changePaymentChoice($this->centralActor(), $subscriptionRequest, $request->validated('expected_state'), PaymentChoiceEnum::from((int) $request->validated('payment_choice')));
+        $this->requests->changePaymentChoice($this->centralActor(), $subscriptionRequest, $request->validated('expected_state'), PaymentChoiceEnum::from((int) $request->validated('payment_choice')), $request->validated(), $request->file('proof'));
 
         return to_route('owner.subscription-requests.show', $subscriptionRequest)->with('status', 'Choix mis à jour, sans confirmation de paiement.');
     }

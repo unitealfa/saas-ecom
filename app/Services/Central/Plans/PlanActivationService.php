@@ -2,9 +2,13 @@
 
 namespace App\Services\Central\Plans;
 
+use App\Enums\Central\Subscriptions\StatusEnum;
 use App\Models\Central\Plans\Plan;
+use App\Models\Central\Subscriptions\Subscription;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
+use App\Services\Central\Subscriptions\DefaultSubscription;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -19,7 +23,6 @@ class PlanActivationService
     public function __construct(
         private readonly AuthorizationMutation $mutations,
         private readonly FreePlanCatalog $defaults,
-        private readonly PlanVersionService $versions,
     ) {}
 
     /** @return array<string, array<int, string>> */
@@ -52,6 +55,9 @@ class PlanActivationService
                         ->filter(fn (Plan $other): bool => $other->id !== $plan->id && $other->is_active);
 
                     foreach ($others as $other) {
+                        if ($other->is_default) {
+                            continue;
+                        }
                         Gate::forUser($actor)->authorize('activate', $other);
                         $this->change($actor, $other, false, $plan->uuid);
                     }
@@ -76,27 +82,28 @@ class PlanActivationService
             if ($target->is_default) {
                 return;
             }
-            $source = $target;
-            if ($source->monthly_price !== '0.00' || $source->annual_price !== '0.00') {
-                $target = $this->versions->create($actor, $source, [
-                    'expected_state' => $expected,
-                    'expected_latest_version' => (int) Plan::withTrashed()->where('code', $source->code)->max('version'),
-                ]);
-                $target->forceFill([
-                    'name' => mb_substr($source->name, 0, 250).' Free',
-                    'monthly_price' => '0.00',
-                    'annual_price' => '0.00',
-                ])->save();
-                $this->change($actor, $source, false, $target->uuid);
-                $this->change($actor, $target, true, null);
+            $previous = Plan::where('is_default', true)->first()
+                ?? Plan::where('code', 'free')->active()->orderByDesc('version')->first();
+            if ($previous !== null && $previous->id !== $target->id) {
+                $previous->forceFill(['is_default' => null])->save();
             }
-            $previous = Plan::where('is_default', true)->first();
-            $previous?->forceFill(['is_default' => null])->save();
             $target->forceFill(['is_default' => true])->save();
             try {
                 $this->defaults->current();
             } catch (\LogicException) {
                 throw ValidationException::withMessages(['plan' => 'Le plan par défaut doit être actif et inclure un quota de boutiques valide.']);
+            }
+            if ($previous !== null && $previous->id !== $target->id) {
+                $subscriptions = Subscription::where('plan_id', $previous->id)
+                    ->whereIn('status', [StatusEnum::ACTIVE, StatusEnum::TRIAL])
+                    ->whereNull('period_ends_at')->whereNull('effective_ends_at')->whereNull('ended_at')
+                    ->orderBy('user_id')->lockForUpdate()->get();
+                foreach ($subscriptions as $subscription) {
+                    $owner = User::whereKey($subscription->user_id)->lockForUpdate()->firstOrFail();
+                    $subscription->forceFill(['plan_id' => $target->id])->save();
+                    Event::dispatch(DefaultSubscription::EFFECTIVE_CHANGED, [$owner, $subscription, $actor]);
+                }
+                $this->change($actor, $previous, false, $target->uuid);
             }
             activity()->causedBy($actor)->performedOn($target)->event('plan_default_selected')
                 ->withProperties(['previous_plan_uuid' => $previous?->uuid, 'plan_uuid' => $target->uuid])

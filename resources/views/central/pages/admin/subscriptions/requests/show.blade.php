@@ -137,11 +137,19 @@
                     <flux:button type="submit">Annuler la demande non payée</flux:button>
                 </form>
                 @unless ($zeroPrice)
-                <form method="POST" action="{{ route('owner.subscription-requests.choice', $item) }}" class="flex flex-col gap-3">@csrf @method('PATCH')
+                <form method="POST" enctype="multipart/form-data" action="{{ route('owner.subscription-requests.choice', $item) }}" class="flex flex-col gap-3" x-data="{ choice: @js((string) $item->payment_choice->value) }">@csrf @method('PATCH')
                     <input type="hidden" name="expected_state" value="{{ $item->managementState() }}">
-                    <flux:select name="payment_choice" label="Modifier mon moyen de paiement">
+                    <flux:select name="payment_choice" label="Modifier mon moyen de paiement" x-model="choice">
                         @foreach (\App\Enums\Central\Subscriptions\PaymentChoiceEnum::cases() as $choice)<option value="{{ $choice->value }}" @selected($item->payment_choice === $choice)>{{ $choice->label() }}</option>@endforeach
                     </flux:select>
+                    <fieldset x-show="choice === '2'" x-bind:disabled="choice !== '2'" x-cloak class="flex flex-col gap-3">
+                        <flux:select name="payment[method]" label="Réseau du versement" required>
+                            @foreach ([\App\Enums\Central\Billing\TransferMethodEnum::BANK_TRANSFER, \App\Enums\Central\Billing\TransferMethodEnum::CCP_TRANSFER, \App\Enums\Central\Billing\TransferMethodEnum::BARIDIMOB] as $method)<option value="{{ $method->value }}">{{ $method->label() }}</option>@endforeach
+                        </flux:select>
+                        <flux:input name="payment[amount]" label="Montant versé (DZD)" :value="$item->subscription->agreed_amount" required />
+                        <flux:input name="payment[reference]" label="Référence du versement" maxlength="255" />
+                        <flux:input type="file" name="proof" label="Justificatif PDF/JPG/PNG" accept="application/pdf,image/jpeg,image/png" required />
+                    </fieldset>
                     <flux:button type="submit" class="self-start">Enregistrer mon choix</flux:button>
                 </form>
                 @if ($cash)<flux:callout>Présentez votre référence de demande au bureau Aydra. Seul l’administrateur peut constater les espèces réellement reçues. Aucun droit ne sera activé avant ce contrôle. {{ config('central.billing.cash_instructions') }}</flux:callout>
@@ -178,6 +186,9 @@
                             @endif
                             @if (filled($item->getAttribute('invoice_error')))
                                 <flux:checkbox name="acknowledged" value="1" label="J’ai lu et approuvé ce message." description="Cette confirmation ne remplace pas les vérifications fiscales et techniques nécessaires à la facture." required />
+                            @endif
+                            @if (filled($item->getAttribute('submitted_payment')['proof_uuid'] ?? null) || $item->payment?->getAttribute('proof_media_id') !== null)
+                                <flux:checkbox name="proof_reviewed" value="1" label="J’ai consulté et vérifié le justificatif." required />
                             @endif
                             <flux:button type="submit" variant="primary" class="self-start">Accepter la demande</flux:button>
                         </form>

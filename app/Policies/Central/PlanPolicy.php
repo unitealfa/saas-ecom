@@ -23,14 +23,13 @@ class PlanPolicy
     public function setDefault(User $actor, Plan $plan): bool
     {
         return ! tenancy()->initialized && ! $plan->trashed() && $plan->is_active
-            && $this->access->allows($actor, 'saas.plans.activate')
-            && (($plan->monthly_price === '0.00' && $plan->annual_price === '0.00')
-                || $this->access->allows($actor, 'saas.plans.versions.create'));
+            && $this->access->allows($actor, 'saas.plans.activate');
     }
 
     public function create(User $actor): bool
     {
-        return $this->access->allows($actor, 'saas.plans.create');
+        return $this->access->allows($actor, 'saas.plans.create')
+            && $this->access->allows($actor, 'saas.plans.features.update');
     }
 
     /** Seuls les quotas équipe du plan gratuit peuvent être versionnés séparément. */
