@@ -24,7 +24,8 @@ final class ScheduleTenantMigrations extends Command
 
     public function handle(TenantDeploymentService $deployments, TenantSchemaVersions $versions, CentralUserAccess $access): int
     {
-        if (tenancy()->initialized || ! Schema::hasTable('tenant_migration_schedules')) {
+        if (tenancy()->initialized || ! Schema::hasTable('tenant_migration_schedules')
+            || ! Schema::hasColumn('tenant_migration_schedules', 'start_date')) {
             return self::SUCCESS;
         }
         $schedule = DB::table('tenant_migration_schedules')->where('id', 1)->first();
@@ -33,7 +34,8 @@ final class ScheduleTenantMigrations extends Command
         }
         $now = now($schedule->timezone);
         $date = $now->toDateString();
-        if ($now->format('H:i') !== $schedule->run_time || $schedule->last_run_on === $date) {
+        if (($schedule->start_date !== null && $date < $schedule->start_date)
+            || $now->format('H:i') !== $schedule->run_time || $schedule->last_run_on === $date) {
             return self::SUCCESS;
         }
         $actor = User::find($schedule->updated_by_id);

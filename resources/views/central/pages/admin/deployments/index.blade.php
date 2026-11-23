@@ -9,7 +9,7 @@
                 @if ($migrationSchedule === null)
                     <p class="aydra-muted mt-2">Appliquez la migration de la base centrale pour configurer la programmation.</p>
                 @else
-                    <p class="aydra-muted mt-2">À l’heure choisie, les boutiques admissibles seront mises en file vers la dernière version. La migration manuelle reste disponible.</p>
+                    <p class="aydra-muted mt-2">À partir de la date choisie, les boutiques admissibles seront mises en file chaque jour à l’heure indiquée. La migration manuelle reste disponible.</p>
                     <form method="POST" action="{{ route('central.deployments.schedule') }}" class="mt-4 flex flex-wrap items-end gap-3">
                         @csrf
                         <input type="hidden" name="version" value="{{ $migrationSchedule->version }}">
@@ -17,6 +17,7 @@
                             <option value="0" @selected(! $migrationSchedule->enabled)>Désactivée</option>
                             <option value="1" @selected($migrationSchedule->enabled)>Activée</option>
                         </flux:select>
+                        <flux:input type="date" name="start_date" label="Date de début" :value="old('start_date', $migrationSchedule->start_date)" />
                         <flux:input type="time" name="run_time" label="Heure quotidienne" :value="old('run_time', $migrationSchedule->run_time)" />
                         <flux:select name="timezone" label="Fuseau horaire">
                             @foreach (timezone_identifiers_list() as $timezone)
