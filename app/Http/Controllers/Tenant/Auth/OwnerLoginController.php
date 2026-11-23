@@ -15,14 +15,13 @@ use Illuminate\Support\Facades\Auth;
 
 class OwnerLoginController extends Controller
 {
-    public function show(Request $request, ShopProfileService $profiles): View|RedirectResponse
+    public function show(ShopProfileService $profiles): View|RedirectResponse
     {
         if (Auth::guard('tenant')->check()) {
             return to_route('tenant.dashboard');
         }
 
-        return view('tenant.pages.auth.login', ['shopName' => $profiles->shop()->shop_name,
-            'ownerAccessUrl' => $this->ownerAccessUrl($request)]);
+        return view('tenant.pages.auth.login', ['shopName' => $profiles->shop()->shop_name]);
     }
 
     public function start(Request $request): RedirectResponse

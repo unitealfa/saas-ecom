@@ -1,4 +1,4 @@
-﻿@props(['shopName' => null, 'ownerAccessUrl' => null])
+@props(['shopName' => null])
 
 <x-tenant::layouts.auth title="Connexion à la boutique" :shop-name="$shopName">
     <x-auth-header title="Administration de la boutique" description="Connectez-vous avec votre compte employé de cette boutique." />
@@ -12,8 +12,4 @@
         <button class="w-full rounded border p-2">Se connecter à cette boutique</button>
     </form>
     <a class="underline text-sm" href="{{ route('tenant.password.request', absolute: false) }}">Mot de passe oublié ?</a>
-    <p class="text-sm">Propriétaire de la boutique :</p>
-    @if ($ownerAccessUrl !== null)
-        <flux:button :href="$ownerAccessUrl" variant="primary">Continuer avec mon compte Aydra</flux:button>
-    @endif
 </x-tenant::layouts.auth>
