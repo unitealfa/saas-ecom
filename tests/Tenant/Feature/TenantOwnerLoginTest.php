@@ -54,6 +54,8 @@ test('verified owners enter their shop once through a browser-bound signed grant
     app()->forgetInstance('session.store');
     $base = rtrim($domain->publicUrl(), '/');
     $this->get($base)->assertOk()->assertSee($tenant->shop_name);
+    $this->get($base.'/login')->assertOk()->assertSee('E-mail employé')
+        ->assertDontSee('Continuer avec mon compte Aydra')->assertDontSee('Propriétaire de la boutique');
     $cookieName = 'aydra_tenant_'.$tenant->id;
     $this->get($base.'/auth/owner/start')->assertForbidden();
     $entry = route('owner.shops.access', $tenant);
