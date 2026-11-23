@@ -9,7 +9,7 @@ class LocalProvisioningWorker extends Command
 {
     protected $signature = 'aydra:local-queue {action=status : install, start, stop or status}';
 
-    protected $description = 'Gérer les deux workers locaux Aydra avec le Planificateur de tâches Windows.';
+    protected $description = 'Gérer les workers et le planificateur locaux Aydra avec le Planificateur de tâches Windows.';
 
     public function handle(): int
     {
@@ -30,6 +30,7 @@ class LocalProvisioningWorker extends Command
         $workers = [
             ['name' => 'Aydra-Provisioning-'.$suffix, 'description' => 'Aydra provisioning: '.$root, 'script' => $this->workerScript()],
             ['name' => 'Aydra-Documents-'.$suffix, 'description' => 'Aydra documents: '.$root, 'script' => $this->documentWorkerScript()],
+            ['name' => 'Aydra-Scheduler-'.$suffix, 'description' => 'Aydra scheduler: '.$root, 'script' => $this->schedulerScript()],
         ];
         $powershell = getenv('SystemRoot').'\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
 
@@ -109,6 +110,18 @@ class LocalProvisioningWorker extends Command
             .' -Value ((Get-Date -Format o) + " Documents worker stopped; exit code: " + $LASTEXITCODE)'
             .'; } catch { Add-Content -LiteralPath '.$log
             .' -Value ((Get-Date -Format o) + " Documents wrapper failed: " + $_.Exception.GetType().Name)'
+            .'; }; Start-Sleep -Seconds 60; }';
+    }
+
+    private function schedulerScript(): string
+    {
+        $log = $this->literal(storage_path('logs/local-scheduler.log'));
+
+        return '$ErrorActionPreference = \'Continue\'; while ($true) { try { & '
+            .$this->literal(PHP_BINARY).' '.$this->literal(base_path('artisan'))
+            .' schedule:work --no-interaction *>> '.$log
+            .'; } catch { Add-Content -LiteralPath '.$log
+            .' -Value ((Get-Date -Format o) + " Scheduler failed: " + $_.Exception.GetType().Name)'
             .'; }; Start-Sleep -Seconds 60; }';
     }
 }

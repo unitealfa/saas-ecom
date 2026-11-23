@@ -4,15 +4,18 @@ namespace App\Services\Tenant\Users;
 
 use App\Enums\Tenant\Users\MembershipStatusEnum;
 use App\Enums\Tenant\Users\StatusEnum;
-use App\Models\Tenant\Users\User;
-use Illuminate\Support\Facades\DB;
 use App\Models\Tenant\Shop\Shop;
+use App\Models\Tenant\Users\User;
+use App\Services\Tenant\Authorization\TenantAccess;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 final class TeamMemberService
 {
+    public function __construct(private readonly TenantEmailChangeService $emails) {}
+
     public function state(User $member): string
     {
         return hash('sha256', json_encode([$member->status->value, $member->membership_status->value,
@@ -57,5 +60,29 @@ final class TeamMemberService
     private function invalidateSessions(User $member): void
     {
         DB::connection('tenant')->table('sessions')->where('user_id', $member->id)->delete();
+    }
+
+    public function requestEmailChange(User $actor, User $member, string $email, string $expectedState): void
+    {
+        abort_unless(tenancy()->initialized, 403);
+        $member = DB::connection('tenant')->transaction(function () use ($actor, $member, $email, $expectedState): User {
+            Shop::where('singleton', 1)->lockForUpdate()->firstOrFail();
+            $actor = User::whereKey($actor->id)->where('uuid', $actor->uuid)->lockForUpdate()->firstOrFail();
+            $member = User::whereKey($member->id)->where('uuid', $member->uuid)->lockForUpdate()->firstOrFail();
+            Gate::forUser($actor)->authorize('manageMembership', $member);
+            abort_unless(TenantAccess::active($member), 409);
+            if (! hash_equals($this->state($member), $expectedState)) {
+                throw ValidationException::withMessages(['expected_state' => 'Le membre a changé. Rechargez.']);
+            }
+            if (User::withTrashed()->where('email', $email)->exists()) {
+                throw ValidationException::withMessages(['email' => 'Cette adresse est déjà utilisée dans la boutique.']);
+            }
+            activity()->causedBy($actor)->performedOn($member)->event('tenant_member_email_change_requested')
+                ->log('Changement d’adresse du membre demandé.');
+
+            return $member;
+        }, 3);
+
+        $this->emails->send($member, $email);
     }
 }

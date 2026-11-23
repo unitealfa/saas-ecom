@@ -6,20 +6,25 @@ use App\Concerns\HasProfilePhoto;
 use App\Concerns\HasPublicUuid;
 use App\Concerns\HasTimedPermissions;
 use App\Concerns\LogsSafeActivity;
-use App\Services\Tenant\Authorization\TenantAuthorizationMode;
 use App\Enums\Tenant\Users\MembershipStatusEnum;
 use App\Enums\Tenant\Users\StatusEnum;
 use App\Models\Tenant\Media\Media;
 use App\Models\Tenant\Permissions\Permission;
 use App\Models\Tenant\Roles\Role;
+use App\Services\Tenant\Authorization\TenantAuthorizationMode;
 use Database\Factories\Tenant\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
+use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Passkeys\Contracts\PasskeyUser;
+use Laravel\Passkeys\PasskeyAuthenticatable;
 use LogicException;
 use Stancl\Tenancy\Database\Concerns\TenantConnection;
 
@@ -28,12 +33,12 @@ use Stancl\Tenancy\Database\Concerns\TenantConnection;
  * @property MembershipStatusEnum $membership_status
  */
 #[Fillable(['last_name', 'first_name', 'email', 'phone', 'password', 'locale'])]
-#[Hidden(['id', 'password', 'remember_token', 'central_user_uuid'])]
+#[Hidden(['id', 'password', 'remember_token', 'central_user_uuid', 'two_factor_secret', 'two_factor_recovery_codes'])]
 #[UseFactory(UserFactory::class)]
-class User extends Authenticatable
+class User extends Authenticatable implements PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasPublicUuid, Notifiable, SoftDeletes, TenantConnection;
+    use HasFactory, HasPublicUuid, Notifiable, SoftDeletes, TenantConnection, TwoFactorAuthenticatable;
 
     /** @use HasProfilePhoto<Media> */
     use HasProfilePhoto;
@@ -46,6 +51,18 @@ class User extends Authenticatable
     }
 
     use LogsSafeActivity;
+    use PasskeyAuthenticatable;
+
+    public function passkeys(): HasMany
+    {
+        return $this->hasMany(Passkey::class);
+    }
+
+    public function getPasskeyUserHandle(): string
+    {
+        return hash_hmac('sha256', (string) tenant()->getTenantKey().'|'.$this->uuid,
+            config('passkeys.user_handle_secret'), true);
+    }
 
     protected string $guard_name = 'tenant';
 
@@ -62,13 +79,14 @@ class User extends Authenticatable
         }
         $item = $this->filterPermission($permission, $guardName);
         $now = now();
+
         return $this->permissions()->whereKey($item->getKey())
             ->wherePivot('assigned_at', '<=', $now)
             ->wherePivot('expires_at', '>', $now)->exists();
     }
 
     /** Spatie's checkPermissionTo/can delegate to the overridden hasPermissionTo. */
-    public function getPermissionsViaRoles(): \Illuminate\Support\Collection
+    public function getPermissionsViaRoles(): Collection
     {
         return TenantAuthorizationMode::individualOnly() ? collect() : $this->legacyPermissionsViaRoles();
     }
@@ -79,17 +97,18 @@ class User extends Authenticatable
             && $this->legacyHasPermissionViaRole($permission);
     }
 
-    public function getDirectPermissions(): \Illuminate\Support\Collection
+    public function getDirectPermissions(): Collection
     {
         if (! TenantAuthorizationMode::individualOnly()) {
             return $this->permissions;
         }
         $now = now();
+
         return $this->permissions()->wherePivot('assigned_at', '<=', $now)
             ->wherePivot('expires_at', '>', $now)->get();
     }
 
-    public function getAllPermissions(): \Illuminate\Support\Collection
+    public function getAllPermissions(): Collection
     {
         return TenantAuthorizationMode::individualOnly()
             ? $this->getDirectPermissions() : $this->getDirectPermissions()->merge($this->getPermissionsViaRoles())->unique('id');

@@ -33,6 +33,8 @@ Schedule::command('aydra:retry-tenant-provisioning --scheduled')
     ->withoutOverlapping()
     ->onOneServer();
 
+Schedule::command('aydra:schedule-tenant-migrations')->everyMinute()->withoutOverlapping()->onOneServer();
+
 Schedule::command('aydra:reconcile-saas-deliveries')
     ->everyFiveMinutes()
     ->withoutOverlapping()

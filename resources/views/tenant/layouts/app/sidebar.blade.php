@@ -4,6 +4,7 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
     <head>
         @include('partials.head')
+        <meta name="csrf-token" content="{{ csrf_token() }}">
     </head>
     <body class="min-h-screen bg-white dark:bg-zinc-800">
         <flux:sidebar sticky collapsible="mobile" class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
@@ -61,8 +62,8 @@
 
             <flux:spacer />
 
-            @if ($userName !== null)
-                <x-tenant::components.account-summary :name="$userName" />
+            @if (auth('tenant')->check())
+                <x-tenant::components.account-summary :name="$userName ?? trim(auth('tenant')->user()->first_name.' '.auth('tenant')->user()->last_name)" />
             @endif
         </flux:sidebar>
 

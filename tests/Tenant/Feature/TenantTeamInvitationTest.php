@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Central\Tenants\StatusEnum;
+use App\Enums\Tenant\Users\MembershipStatusEnum;
 use App\Enums\VerificationStatusEnum;
 use App\Models\Central\Features\Feature;
 use App\Models\Central\Plans\Plan;
@@ -10,15 +11,19 @@ use App\Models\Tenant\Roles\Role;
 use App\Models\Tenant\Users\TeamInvitation;
 use App\Models\Tenant\Users\User as Member;
 use App\Models\User;
+use App\Notifications\Tenant\ConfirmEmployeeEmailNotification;
 use App\Notifications\Tenant\TeamInvitationNotification;
 use App\Services\Central\Subscriptions\DefaultSubscription;
 use App\Services\Tenant\Auth\OwnerLoginService;
 use App\Services\Tenant\Users\TeamInvitationService;
+use App\Services\Tenant\Users\TeamMemberService;
 use Database\Factories\Central\DomainFactory;
 use Database\Seeders\Central\FreePlanSeeder;
 use Database\Seeders\Central\TenantTeamQuotaFeatureSeeder;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Cookie\CookieJar;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 afterEach(function (): void {
@@ -26,6 +31,41 @@ afterEach(function (): void {
     foreach (Tenant::withTrashed()->get() as $tenant) {
         TestCase::dropIsolatedMysqlDatabase($tenant->database()->getName());
     }
+});
+
+test('changing a team member email requires authorization and confirmation by the member', function (): void {
+    $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
+    $this->seed([FreePlanSeeder::class, TenantTeamQuotaFeatureSeeder::class]);
+    Notification::fake();
+    config(['mail.default' => 'smtp']);
+    $offer = Plan::factory()->create(['is_active' => true, 'monthly_price' => '0.00', 'annual_price' => '0.00']);
+    foreach ([Feature::SHOPS_CODE, Feature::TEAM_CUSTOM_ROLES_CODE, Feature::TEAM_MEMBERS_CODE] as $code) {
+        PlanFeature::factory()->create(['plan_id' => $offer->id, 'feature_id' => Feature::where('code', $code)->sole()->id, 'limit' => 2]);
+    }
+    $offer->forceFill(['is_default' => true])->save();
+    $owner = User::factory()->create(['legal_verified_by_id' => User::factory()->create()->id,
+        'legal_verification_status' => VerificationStatusEnum::VERIFIED, 'legal_verified_at' => now(), 'legal_profile_version' => 1]);
+    app(DefaultSubscription::class)->ensure($owner);
+    $shop = Tenant::factory()->create(['user_id' => $owner->id]);
+    $shop->forceFill(['status' => StatusEnum::ACTIVE])->save();
+    DomainFactory::new()->create(['tenant_id' => $shop->id, 'domain' => $shop->slug.'.aydra.localhost',
+        'is_primary' => true, 'verification_status' => VerificationStatusEnum::VERIFIED, 'verified_at' => now()]);
+
+    $shop->run(function () use ($owner, $shop): void {
+        $actor = app(OwnerLoginService::class)->accept($owner->uuid, $shop->uuid, hash('sha256', $owner->email));
+        $member = Member::factory()->create(['email' => 'old@example.test']);
+        $member->forceFill(['status' => App\Enums\Tenant\Users\StatusEnum::ACTIVE,
+            'membership_status' => MembershipStatusEnum::ACTIVE,
+            'joined_at' => now(), 'email_verified_at' => now()])->save();
+        $service = app(TeamMemberService::class);
+        expect(fn () => $service->requestEmailChange($actor, $member, 'new@example.test', str_repeat('0', 64)))
+            ->toThrow(ValidationException::class);
+        expect(fn () => $service->requestEmailChange($member, $member, 'new@example.test', $service->state($member)))
+            ->toThrow(AuthorizationException::class);
+        $service->requestEmailChange($actor, $member, 'new@example.test', $service->state($member));
+        expect($member->refresh()->email)->toBe('old@example.test');
+        Notification::assertSentOnDemand(ConfirmEmployeeEmailNotification::class);
+    });
 });
 
 test('a new invitee completes the account form and enters the shop with the invited role', function (): void {
