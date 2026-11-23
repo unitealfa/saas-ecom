@@ -16,7 +16,19 @@ final class LoginController extends Controller
             'password' => ['required', 'string'],
             'remember' => ['sometimes', 'boolean'],
         ]);
-        $login->login($data['email'], $data['password'], $request->boolean('remember'));
+        $user = $login->login($data['email'], $data['password'], $request->boolean('remember'));
+
+        $request->session()->regenerate();
+        if ($user->hasEnabledTwoFactorAuthentication()) {
+            $request->session()->put('tenant_two_factor', [
+                'uuid' => $user->uuid,
+                'tenant' => (string) tenant()->getTenantKey(),
+                'expires' => now()->addMinutes(5)->timestamp,
+                'remember' => $request->boolean('remember'),
+            ]);
+
+            return to_route('tenant.two-factor.challenge');
+        }
 
         return to_route('tenant.dashboard');
     }

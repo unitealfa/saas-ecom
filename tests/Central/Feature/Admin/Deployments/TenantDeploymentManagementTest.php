@@ -53,6 +53,34 @@ function deploymentRecord(StatusEnum $status = StatusEnum::PENDING): TenantSchem
     ]);
 }
 
+test('daily migration scheduling requires the migration permission and rejects stale changes', function (): void {
+    $admin = deploymentAdmin();
+    $actor = deploymentActor('saas.users.view');
+    $data = ['enabled' => '1', 'run_time' => '02:30', 'timezone' => 'Africa/Algiers', 'version' => 1];
+    $this->actingAs($actor, 'central')->post(route('central.deployments.schedule'), $data)->assertForbidden();
+    $this->actingAs($admin, 'central')->post(route('central.deployments.schedule'), $data)->assertRedirect();
+    expect(DB::table('tenant_migration_schedules')->where('id', 1)->value('run_time'))->toBe('02:30');
+    $this->post(route('central.deployments.schedule'), $data)->assertSessionHasErrors('version');
+});
+
+test('automatic migrations are requested only once at the configured time', function (): void {
+    $admin = deploymentAdmin();
+    $deployment = deploymentRecord(StatusEnum::SUCCEEDED);
+    $firstVersion = pathinfo(app(TenantSchemaVersions::class)->files()[0], PATHINFO_FILENAME);
+    $deployment->tenant->forceFill(['status' => TenantStatus::ACTIVE, 'schema_version' => $firstVersion, 'provisioned_at' => now()])->save();
+    DB::table('tenant_migration_schedules')->where('id', 1)->update([
+        'enabled' => true, 'run_time' => '02:30', 'timezone' => 'UTC', 'updated_by_id' => $admin->id,
+    ]);
+    $this->travelTo(now('UTC')->setTime(2, 29));
+    $service = Mockery::mock(TenantDeploymentService::class);
+    $service->shouldReceive('migrate')->once()->andReturn($deployment);
+    $this->app->instance(TenantDeploymentService::class, $service);
+    $this->artisan('aydra:schedule-tenant-migrations')->assertSuccessful();
+    $this->travelTo(now('UTC')->setTime(2, 30));
+    $this->artisan('aydra:schedule-tenant-migrations')->assertSuccessful();
+    $this->artisan('aydra:schedule-tenant-migrations')->assertSuccessful();
+});
+
 test('deployment readers see the paginated history and UUID pages without private diagnostics', function (): void {
     deploymentAdmin();
     $deployment = deploymentRecord(StatusEnum::FAILED);

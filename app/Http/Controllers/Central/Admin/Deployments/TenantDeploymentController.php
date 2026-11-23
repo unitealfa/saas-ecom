@@ -9,14 +9,18 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Central\Deployments\DeploymentActionRequest;
 use App\Models\Central\Deployments\TenantSchemaDeployment;
 use App\Models\Central\Users\User;
+use App\Services\Central\Authorization\CentralUserAccess;
 use App\Services\Central\Tenants\TenantDeploymentService;
 use App\Services\Central\Tenants\TenantSchemaVersions;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class TenantDeploymentController extends Controller
 {
@@ -37,7 +41,42 @@ class TenantDeploymentController extends Controller
 
         return view('central.pages.admin.deployments.index', [
             'deployments' => $this->deployments->search($actor, $filters),
+            'migrationSchedule' => Schema::hasTable('tenant_migration_schedules') && Schema::hasColumn('tenant_migration_schedules', 'start_date')
+                ? DB::table('tenant_migration_schedules')->where('id', 1)->first() : null,
+            'canScheduleMigration' => app(CentralUserAccess::class)->allows($actor, 'saas.deployments.migrate'),
         ]);
+    }
+
+    public function schedule(Request $request): RedirectResponse
+    {
+        $actor = $this->centralActor();
+        abort_unless(app(CentralUserAccess::class)->allows($actor, 'saas.deployments.migrate'), 403);
+        abort_unless(Schema::hasTable('tenant_migration_schedules') && Schema::hasColumn('tenant_migration_schedules', 'start_date'), 503);
+        $data = $request->validate([
+            'enabled' => ['required', 'boolean'],
+            'run_time' => ['required_if:enabled,1', 'nullable', 'date_format:H:i'],
+            'timezone' => ['required_if:enabled,1', 'nullable', 'timezone'],
+            'version' => ['required', 'integer', 'min:1'],
+        ]);
+        DB::transaction(function () use ($actor, $data): void {
+            $schedule = DB::table('tenant_migration_schedules')->where('id', 1)->lockForUpdate()->first();
+            $currentActor = User::whereKey($actor->id)->first();
+            abort_unless($schedule !== null && $currentActor instanceof User
+                && app(CentralUserAccess::class)->allows($currentActor, 'saas.deployments.migrate'), 403);
+            if ((int) $schedule->version !== (int) $data['version']) {
+                throw ValidationException::withMessages(['version' => 'La programmation a changé. Rechargez la page.']);
+            }
+            DB::table('tenant_migration_schedules')->where('id', 1)->update([
+                'enabled' => (bool) $data['enabled'], 'run_time' => $data['run_time'] ?? null,
+                'timezone' => $data['timezone'] ?? null, 'updated_by_id' => $actor->id,
+                'version' => $schedule->version + 1, 'last_run_on' => null, 'updated_at' => now(),
+            ]);
+            activity()->causedBy($actor)->event('tenant_migration_schedule_updated')
+                ->withProperties(['enabled' => (bool) $data['enabled'], 'time' => $data['run_time'] ?? null, 'timezone' => $data['timezone'] ?? null])
+                ->log('Programmation des migrations modifiée.');
+        }, 3);
+
+        return redirect()->route('central.deployments.index')->with('status', 'Programmation des migrations enregistrée.');
     }
 
     public function show(TenantSchemaDeployment $deployment): View

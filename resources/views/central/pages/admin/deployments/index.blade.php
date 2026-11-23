@@ -3,6 +3,31 @@
         <header class="space-y-2"><h1 class="aydra-heading text-3xl font-semibold tracking-tight sm:text-4xl">Déploiements des bases boutiques</h1><p class="aydra-muted max-w-2xl text-sm sm:text-base">Suivez la création et les mises à jour techniques. Les opérations sont exécutées par le worker central, sans créer de nouvelle boutique.</p></header>
         @if (session('status'))<flux:callout role="status">{{ session('status') }}</flux:callout>@endif
         @if ($errors->any())<flux:callout variant="danger" role="alert">@foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach</flux:callout>@endif
+        @if ($canScheduleMigration)
+            <section class="aydra-users-panel p-5 sm:p-6">
+                <h2 class="aydra-heading text-lg font-semibold">Migrations automatiques</h2>
+                @if ($migrationSchedule === null)
+                    <p class="aydra-muted mt-2">Appliquez la migration de la base centrale pour configurer la programmation.</p>
+                @else
+                    <p class="aydra-muted mt-2">À l’heure choisie, les boutiques admissibles seront mises en file vers la dernière version. La migration manuelle reste disponible.</p>
+                    <form method="POST" action="{{ route('central.deployments.schedule') }}" class="mt-4 flex flex-wrap items-end gap-3">
+                        @csrf
+                        <input type="hidden" name="version" value="{{ $migrationSchedule->version }}">
+                        <flux:select name="enabled" label="Programmation">
+                            <option value="0" @selected(! $migrationSchedule->enabled)>Désactivée</option>
+                            <option value="1" @selected($migrationSchedule->enabled)>Activée</option>
+                        </flux:select>
+                        <flux:input type="time" name="run_time" label="Heure quotidienne" :value="old('run_time', $migrationSchedule->run_time)" />
+                        <flux:select name="timezone" label="Fuseau horaire">
+                            @foreach (timezone_identifiers_list() as $timezone)
+                                <option value="{{ $timezone }}" @selected(old('timezone', $migrationSchedule->timezone ?? config('app.timezone')) === $timezone)>{{ $timezone }}</option>
+                            @endforeach
+                        </flux:select>
+                        <flux:button type="submit" variant="primary">Enregistrer</flux:button>
+                    </form>
+                @endif
+            </section>
+        @endif
         <section class="aydra-users-panel p-5 sm:p-6" aria-labelledby="deployment-search"><h2 id="deployment-search" class="aydra-heading text-lg font-semibold">Rechercher un déploiement</h2><p class="aydra-muted mt-1 text-sm">Les suggestions proviennent des boutiques affichées sur cette page.</p>
             <form method="GET" action="{{ route('central.deployments.index') }}" class="mt-5 flex flex-wrap items-end gap-3">
                 <flux:input name="search" :value="request('search')" label="Boutique" type="search" icon="magnifying-glass" placeholder="Nom de la boutique" list="deployment-suggestions" class="min-w-0 flex-1 sm:min-w-72" />
