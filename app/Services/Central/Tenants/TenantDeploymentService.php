@@ -11,6 +11,9 @@ use App\Models\Central\Deployments\TenantSchemaDeployment;
 use App\Models\Central\Tenants\Tenant;
 use App\Models\Central\Users\User;
 use App\Services\Central\Authorization\AuthorizationMutation;
+use App\Services\Central\Authorization\CentralUserAccess;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -112,6 +115,39 @@ class TenantDeploymentService
 
             return $deployment;
         });
+    }
+
+    /** @return Collection<int, TenantSchemaDeployment> */
+    public function availableMigrations(User $actor): Collection
+    {
+        abort_unless(app(CentralUserAccess::class)->allows($actor, 'saas.deployments.migrate'), 403);
+        $target = $this->versions->latest();
+
+        return TenantSchemaDeployment::query()->with('tenant')
+            ->whereNotIn('status', [StatusEnum::PENDING->value, StatusEnum::RUNNING->value, StatusEnum::FAILED->value])
+            ->whereNotExists(fn (QueryBuilder $query) => $query->selectRaw('1')
+                ->from('tenant_schema_deployments as newer')
+                ->whereColumn('newer.tenant_id', 'tenant_schema_deployments.tenant_id')
+                ->whereColumn('newer.id', '>', 'tenant_schema_deployments.id'))
+            ->whereHas('tenant', fn ($query) => $query->whereNull('tenants.deleted_at')->whereNotNull('provisioned_at')->whereNotNull('schema_version')
+                ->where('schema_version', '<', $target)->whereIn('status', [
+                    TenantStatus::ACTIVE->value, TenantStatus::INACTIVE->value,
+                    TenantStatus::SUSPENDED->value, TenantStatus::OVER_QUOTA->value,
+                ]))
+            ->orderBy('tenant_id')->get();
+    }
+
+    /** @param Collection<int, TenantSchemaDeployment> $deployments */
+    public function migrationListState(Collection $deployments): string
+    {
+        return hash('sha256', json_encode([
+            $this->versions->latest(),
+            $deployments->map(fn (TenantSchemaDeployment $deployment) => [
+                $deployment->tenant?->uuid, $deployment->tenant?->shop_name,
+                $deployment->tenant?->schema_version, $deployment->tenant?->status?->value,
+                $deployment->managementState(),
+            ])->all(),
+        ], JSON_THROW_ON_ERROR));
     }
 
     public function retry(User $actor, TenantSchemaDeployment $deployment, string $expected): TenantSchemaDeployment

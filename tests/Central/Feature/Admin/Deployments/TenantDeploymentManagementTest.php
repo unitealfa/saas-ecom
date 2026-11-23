@@ -53,10 +53,28 @@ function deploymentRecord(StatusEnum $status = StatusEnum::PENDING): TenantSchem
     ]);
 }
 
+test('bulk migration confirmation requires permission and rejects a changed list', function (): void {
+    $admin = deploymentAdmin();
+    $actor = deploymentActor('saas.users.view');
+    $deployment = deploymentRecord(StatusEnum::SUCCEEDED);
+    $oldVersion = pathinfo(app(TenantSchemaVersions::class)->files()[0], PATHINFO_FILENAME);
+    $deployment->tenant->forceFill(['status' => TenantStatus::ACTIVE, 'schema_version' => $oldVersion, 'provisioned_at' => now()])->save();
+    $service = app(TenantDeploymentService::class);
+    $state = $service->migrationListState($service->availableMigrations($admin));
+    Queue::fake();
+
+    $this->actingAs($actor, 'central')->post(route('central.deployments.migrate-available'), ['expected_state' => $state])->assertForbidden();
+    $this->actingAs($admin, 'central')->get(route('central.deployments.index'))
+        ->assertOk()->assertSee('Confirmer les migrations')->assertSee($deployment->tenant->shop_name);
+    $deployment->tenant->forceFill(['shop_name' => 'Boutique renommée'])->save();
+    $this->post(route('central.deployments.migrate-available'), ['expected_state' => $state])->assertSessionHasErrors('migration');
+    Queue::assertNothingPushed();
+});
+
 test('daily migration scheduling requires the migration permission and rejects stale changes', function (): void {
     $admin = deploymentAdmin();
     $actor = deploymentActor('saas.users.view');
-    $data = ['enabled' => '1', 'start_date' => now()->toDateString(), 'run_time' => '02:30', 'timezone' => 'Africa/Algiers', 'version' => 1];
+    $data = ['enabled' => '1', 'run_time' => '02:30', 'timezone' => 'Africa/Algiers', 'version' => 1];
     $this->actingAs($actor, 'central')->post(route('central.deployments.schedule'), $data)->assertForbidden();
     $this->actingAs($admin, 'central')->post(route('central.deployments.schedule'), $data)->assertRedirect();
     expect(DB::table('tenant_migration_schedules')->where('id', 1)->value('run_time'))->toBe('02:30');
@@ -71,12 +89,13 @@ test('automatic migrations are requested only once at the configured time', func
     DB::table('tenant_migration_schedules')->where('id', 1)->update([
         'enabled' => true, 'start_date' => now('UTC')->toDateString(), 'run_time' => '02:30', 'timezone' => 'UTC', 'updated_by_id' => $admin->id,
     ]);
-    $this->travelTo(now('UTC')->setTime(2, 29));
+    $testDay = now('UTC')->addDay()->startOfDay();
+    $this->travelTo($testDay->copy()->setTime(2, 29));
     $service = Mockery::mock(TenantDeploymentService::class);
     $service->shouldReceive('migrate')->once()->andReturn($deployment);
     $this->app->instance(TenantDeploymentService::class, $service);
     $this->artisan('aydra:schedule-tenant-migrations')->assertSuccessful();
-    $this->travelTo(now('UTC')->setTime(2, 30));
+    $this->travelTo($testDay->copy()->setTime(2, 30));
     DB::table('tenant_migration_schedules')->where('id', 1)->update(['start_date' => now('UTC')->addDay()->toDateString()]);
     $this->artisan('aydra:schedule-tenant-migrations')->assertSuccessful();
     DB::table('tenant_migration_schedules')->where('id', 1)->update(['start_date' => now('UTC')->toDateString()]);

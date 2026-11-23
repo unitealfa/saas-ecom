@@ -4,22 +4,19 @@ namespace App\Http\Controllers\Tenant\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tenant\Users\User;
-use App\Notifications\Tenant\ConfirmEmployeeEmailNotification;
 use App\Services\Tenant\Authorization\TenantAccess;
-use App\Services\Tenant\Users\TenantInvitationUrl;
+use App\Services\Tenant\Users\TenantEmailChangeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 final class EmailSettingsController extends Controller
 {
-    public function requestChange(Request $request, TenantInvitationUrl $urls): RedirectResponse
+    public function requestChange(Request $request, TenantEmailChangeService $emails): RedirectResponse
     {
         $actor = $this->employee();
         if (is_string($request->input('email'))) {
@@ -32,18 +29,7 @@ final class EmailSettingsController extends Controller
         if (! Hash::check($data['current_password'], $actor->password)) {
             throw ValidationException::withMessages(['current_password' => 'Le mot de passe actuel est incorrect.']);
         }
-        abort_if(in_array(config('mail.default'), ['log', 'array'], true), 503, 'L’envoi des e-mails est indisponible.');
-        $email = $data['email'];
-        $path = URL::temporarySignedRoute('tenant.settings.email.confirm', now()->addMinutes(30), [
-            'user' => $actor->uuid,
-            'tenant' => (string) tenant()->getTenantKey(),
-            'email' => Crypt::encryptString($email),
-            'previous' => hash('sha256', $actor->email),
-        ], absolute: false);
-        $settingsPath = route('tenant.settings.show', absolute: false);
-        $settingsUrl = $urls->make('tenant.settings.show');
-        $url = substr($settingsUrl, 0, -strlen($settingsPath)).$path;
-        Notification::route('mail', $email)->notify(new ConfirmEmployeeEmailNotification($url));
+        $emails->send($actor, $data['email']);
 
         return redirect()->route('tenant.settings.show')->with('status', 'Un lien de confirmation a été envoyé à la nouvelle adresse.');
     }
@@ -58,7 +44,7 @@ final class EmailSettingsController extends Controller
             $user = User::whereKey($actor->getKey())->where('uuid', $actor->uuid)->lockForUpdate()->firstOrFail();
             abort_unless(TenantAccess::active($user) && TenantAccess::editableEmployee($user), 403);
             abort_unless(hash_equals(hash('sha256', $user->email), (string) $request->query('previous')), 403);
-            if (User::where('email', $email)->whereKeyNot($user->getKey())->exists()) {
+            if (User::withTrashed()->where('email', $email)->whereKeyNot($user->getKey())->exists()) {
                 throw ValidationException::withMessages(['email' => 'Cette adresse est déjà utilisée dans la boutique.']);
             }
             $user->forceFill(['email' => $email, 'email_verified_at' => now()])->save();

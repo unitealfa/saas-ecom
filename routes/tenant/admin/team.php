@@ -2,8 +2,8 @@
 
 use App\Http\Controllers\Tenant\Admin\Users\TeamInvitationController;
 use App\Http\Controllers\Tenant\Admin\Users\TeamMemberController;
-use App\Http\Controllers\Tenant\Admin\Users\UserRoleController;
 use App\Http\Controllers\Tenant\Admin\Users\UserPermissionController;
+use App\Http\Controllers\Tenant\Admin\Users\UserRoleController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin/team')->name('admin.')->group(function (): void {
@@ -17,6 +17,7 @@ Route::prefix('admin/team')->name('admin.')->group(function (): void {
         Route::get('/', 'index')->name('index');
         Route::get('{member}', 'show')->withTrashed()->name('show');
         Route::patch('{member}', 'change')->name('update');
+        Route::post('{member}/email', 'changeEmail')->name('email');
     });
     Route::controller(UserRoleController::class)->prefix('users/{member}/roles')->name('users.')->whereUuid('member')->group(function (): void {
         Route::get('/', 'show')->name('roles');

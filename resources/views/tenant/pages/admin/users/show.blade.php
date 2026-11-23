@@ -15,6 +15,13 @@
                 <label class="block">Prénom <input name="first_name" value="{{ $member->first_name }}" class="rounded border p-2 text-zinc-900"></label>
                 <div class="flex gap-3"><button name="action" value="update" class="rounded border p-2">Modifier</button><button name="action" value="suspend" class="rounded border p-2">Suspendre</button><button name="action" value="archive" class="rounded border border-red-500 p-2">Archiver</button></div>
             </form>
+            <form method="POST" action="{{ route('tenant.admin.users.email', $member, false) }}" class="space-y-3 rounded border p-4">
+                @csrf
+                <input type="hidden" name="expected_state" value="{{ $state }}">
+                <label class="block">Nouvel e-mail <input type="email" name="email" required value="{{ old('email') }}" class="rounded border p-2 text-zinc-900"></label>
+                <p>Le membre devra se connecter puis confirmer sa nouvelle adresse depuis le lien reçu.</p>
+                <button type="submit" class="rounded border p-2">Modifier l’e-mail</button>
+            </form>
         @endcan
         @if($errors->any()) @foreach($errors->all() as $error)<p class="text-red-500">{{ $error }}</p>@endforeach @endif
     </div>

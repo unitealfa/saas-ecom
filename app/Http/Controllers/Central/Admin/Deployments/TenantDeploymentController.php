@@ -18,9 +18,11 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class TenantDeploymentController extends Controller
 {
@@ -39,12 +41,52 @@ class TenantDeploymentController extends Controller
             'direction' => ['nullable', Rule::in(['asc', 'desc'])],
         ]);
 
+        $canMigrate = app(CentralUserAccess::class)->allows($actor, 'saas.deployments.migrate');
+        $available = $canMigrate ? $this->deployments->availableMigrations($actor) : null;
+
         return view('central.pages.admin.deployments.index', [
             'deployments' => $this->deployments->search($actor, $filters),
             'migrationSchedule' => Schema::hasTable('tenant_migration_schedules') && Schema::hasColumn('tenant_migration_schedules', 'start_date')
                 ? DB::table('tenant_migration_schedules')->where('id', 1)->first() : null,
-            'canScheduleMigration' => app(CentralUserAccess::class)->allows($actor, 'saas.deployments.migrate'),
+            'canScheduleMigration' => $canMigrate,
+            'availableMigrations' => $available,
+            'migrationListState' => $available === null ? null : $this->deployments->migrationListState($available),
         ]);
+    }
+
+    public function migrateAvailable(Request $request): RedirectResponse
+    {
+        $actor = $this->centralActor();
+        $target = $this->versions->latest();
+        $available = $this->deployments->availableMigrations($actor);
+        $data = $request->validate(['expected_state' => ['required', 'string', 'size:64']]);
+        if (! hash_equals($this->deployments->migrationListState($available), $data['expected_state'])) {
+            throw ValidationException::withMessages(['migration' => 'La liste des boutiques a changé. Consultez-la avant de confirmer.']);
+        }
+
+        $started = 0;
+        $failed = 0;
+        foreach ($available as $deployment) {
+            try {
+                $tenant = $deployment->tenant;
+                if ($tenant === null) {
+                    $failed++;
+
+                    continue;
+                }
+                $this->deployments->migrate($actor, $tenant, $target, $deployment->managementState());
+                $started++;
+            } catch (Throwable $exception) {
+                $failed++;
+                Log::warning('Migration groupée non lancée.', ['deployment_uuid' => $deployment->uuid, 'exception_class' => $exception::class]);
+            }
+        }
+
+        $message = $failed === 0
+            ? $started.' migration(s) mise(s) en file.'
+            : $started.' migration(s) mise(s) en file ; '.$failed.' n’ont pas pu être lancées. Consultez les déploiements.';
+
+        return redirect()->route('central.deployments.index')->with('status', $message);
     }
 
     public function schedule(Request $request): RedirectResponse
@@ -54,7 +96,7 @@ class TenantDeploymentController extends Controller
         abort_unless(Schema::hasTable('tenant_migration_schedules') && Schema::hasColumn('tenant_migration_schedules', 'start_date'), 503);
         $data = $request->validate([
             'enabled' => ['required', 'boolean'],
-            'start_date' => ['required_if:enabled,1', 'nullable', 'date_format:Y-m-d'],
+            'start_date' => ['nullable', 'date_format:Y-m-d'],
             'run_time' => ['required_if:enabled,1', 'nullable', 'date_format:H:i'],
             'timezone' => ['required_if:enabled,1', 'nullable', 'timezone'],
             'version' => ['required', 'integer', 'min:1'],
