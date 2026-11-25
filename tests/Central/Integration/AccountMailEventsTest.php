@@ -17,7 +17,6 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
-pest()->extend(TestCase::class);
 
 beforeEach(function (): void {
     $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
