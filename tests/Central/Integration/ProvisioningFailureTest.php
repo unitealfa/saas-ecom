@@ -36,6 +36,17 @@ test('provisioning failures retain the reservation and expose only a sanitized e
     Queue::assertPushed(ProvisionTenantDatabase::class, 1);
 });
 
+test('a missing deployment is a no-op for the provisioning job', function (): void {
+    $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
+    $provisioner = Mockery::mock(TenantProvisioner::class);
+    $provisioner->shouldNotReceive('provision');
+
+    app()->call([new ProvisionTenantDatabase(0), 'handle'], ['provisioner' => $provisioner]);
+
+    expect(TenantSchemaDeployment::count())->toBe(0);
+    expect(tenancy()->initialized)->toBeFalse();
+});
+
 test('an abandoned running attempt keeps its original history when another worker resumes it', function (): void {
     $this->artisan('migrate', ['--no-interaction' => true])->assertSuccessful();
     $this->seed(CountrySeeder::class);

@@ -125,7 +125,9 @@ npm.cmd run build
 
 ### 7. Installer et démarrer le worker Windows
 
-Cette commande gère deux tâches du Planificateur Windows, chacune identifiée par le chemin du projet :
+> Mise à jour du 25 novembre 2026 : voir la [documentation asynchrone](<documentation et recherche/asynchrone.md>). `aydra:local-queue` gère désormais trois workers (provisionnement, documents, mails de comptes) et le planificateur. Le worker supplémentaire `Aydra-Account-Mail-<suffixe>` écoute `database/default` ; journal `storage/logs/local-account-mail-worker.log`. Les nouveaux mails restent immédiats par défaut (`QUEUE_ACCOUNT_MAIL_CONNECTION=sync`). Ne pas démarrer de worker supplémentaire en production sans infrastructure adaptée.
+
+Les deux workers historiques sont identifiés par le chemin du projet :
 
 - `Aydra-Provisioning-<suffixe>` : connexion `central-provisioning`, file `tenant-provisioning`.
 - `Aydra-Documents-<suffixe>` : connexion `database`, file `saas-documents`.
@@ -138,7 +140,7 @@ Avant le démarrage, vérifier que `DB_CONNECTION` et `DB_QUEUE_CONNECTION` cibl
 & $aydraPhp artisan aydra:local-queue status --no-interaction
 ```
 
-`install` enregistre les tâches ; `start` les active et les démarre. Vérifier que les deux tâches apparaissent Enabled et Running. `stop` arrête et désactive les deux tâches. Journaux :
+`install` enregistre les tâches ; `start` les active et les démarre. Vérifier les tâches attendues avec `status`. `stop` arrête et désactive les tâches gérées. Journaux des deux workers historiques :
 
 - `storage/logs/local-provisioning-worker.log`
 - `storage/logs/local-documents-worker.log`

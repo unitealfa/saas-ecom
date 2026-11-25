@@ -49,7 +49,7 @@ class UserController extends Controller
         );
 
         return $result->emailSent === true
-            ? $redirect->with('status', 'Compte créé pour '.$name.'. L’invitation a été envoyée.')
+            ? $redirect->with('status', 'Compte créé pour '.$name.'. '.(config('queue.account_mail_connection') === 'sync' ? 'L’invitation a été envoyée.' : 'L’invitation a été mise en file d’envoi.'))
             : $redirect->with('warning', 'Le compte de '.$name.' est créé, mais l’invitation n’a pas pu être envoyée. Vérifiez le SMTP puis renvoyez l’invitation depuis la fiche du compte.');
     }
 
@@ -113,7 +113,7 @@ class UserController extends Controller
         $redirect = $this->afterAction($user);
 
         return $result->emailSent === true
-            ? $redirect->with('status', 'L’invitation a été envoyée.')
+            ? $redirect->with('status', config('queue.account_mail_connection') === 'sync' ? 'L’invitation a été envoyée.' : 'L’invitation a été mise en file d’envoi.')
             : $redirect->with('warning', 'L’invitation n’a pas pu être envoyée. Vérifiez la configuration SMTP.');
     }
 

@@ -8,17 +8,16 @@ use App\Models\Tenant\Roles\Role;
 use App\Models\Tenant\Shop\Shop;
 use App\Models\Tenant\Users\TeamInvitation;
 use App\Models\Tenant\Users\User;
-use App\Notifications\Tenant\TeamInvitationNotification;
-use App\Notifications\Tenant\WelcomeEmployeeNotification;
+use App\Events\Tenant\Users\TeamInvitationMailRequested;
+use App\Events\Tenant\Users\TeamInvitationMailResent;
+use App\Events\Tenant\Users\WelcomeEmployeeMailRequested;
+use App\Services\AccountMailEvents;
 use App\Services\Tenant\Authorization\TenantAccess;
 use App\Services\Tenant\Authorization\TenantQuotaService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
-use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 final class TeamInvitationService
 {
@@ -70,9 +69,12 @@ final class TeamInvitationService
 
             return $invite;
         }, 3);
-        $url = $this->urls->make('tenant.invitations.show', ['invitation' => $invitation->uuid, 'token' => $secret]);
-        $shopName = Shop::where('singleton', 1)->value('shop_name');
-        Notification::route('mail', $email)->notify(new TeamInvitationNotification($url, $shopName));
+        AccountMailEvents::dispatch('tenant_invitation', fn () => new TeamInvitationMailRequested(
+            (string) tenant()->uuid, $invitation->uuid, $email,
+            $this->urls->make('tenant.invitations.show', ['invitation' => $invitation->uuid, 'token' => $secret]),
+            (string) Shop::where('singleton', 1)->value('shop_name'), $invitation->expires_at->getTimestamp(),
+            $actor->central_user_uuid, AccountMailEvents::tenantOwnerUuid(),
+        ), tenant: true);
 
         return $invitation;
     }
@@ -124,9 +126,12 @@ final class TeamInvitationService
 
             return $replacement;
         }, 3);
-        $url = $this->urls->make('tenant.invitations.show', ['invitation' => $new->uuid, 'token' => $secret]);
-        Notification::route('mail', $new->email)->notify(new TeamInvitationNotification($url,
-            Shop::where('singleton', 1)->value('shop_name')));
+        AccountMailEvents::dispatch('tenant_invitation_resend', fn () => new TeamInvitationMailResent(
+            (string) tenant()->uuid, $new->uuid, $new->email,
+            $this->urls->make('tenant.invitations.show', ['invitation' => $new->uuid, 'token' => $secret]),
+            (string) Shop::where('singleton', 1)->value('shop_name'), $new->expires_at->getTimestamp(),
+            $actor->central_user_uuid, AccountMailEvents::tenantOwnerUuid(),
+        ), tenant: true);
 
         return $new;
     }
@@ -184,16 +189,10 @@ final class TeamInvitationService
 
             return $member;
         }, 3);
-        $url = $this->urls->make('tenant.login');
-        $shopName = Shop::where('singleton', 1)->value('shop_name');
-        try {
-            $member->notify(new WelcomeEmployeeNotification($shopName, $url));
-        } catch (TransportExceptionInterface $exception) {
-            Log::warning('Tenant welcome email delivery failed.', [
-                'invitation_uuid' => $invite->uuid,
-                'exception_class' => $exception::class,
-            ]);
-        }
+        AccountMailEvents::dispatch('tenant_welcome', fn () => new WelcomeEmployeeMailRequested(
+            (string) tenant()->uuid, $member->uuid, $member->email,
+            (string) Shop::where('singleton', 1)->value('shop_name'), $this->urls->make('tenant.login'),
+        ), tenant: true);
 
         return $member;
     }

@@ -1,5 +1,9 @@
 # Suivi de développement et audit Aydra
 
+## 25 novembre 2026 — Mails de comptes et corrections de provisionnement
+
+Patch local appliqué sur dev (référence `00258872acea3002f9197454a7cc963c285d7dda`) : invitations centrales et mails tenant via listeners, mode sync par défaut ; vérification et récupération centrales inchangées. Voir [asynchrone.md](asynchrone.md). Journal utilisateur : 18 modifications, 19 créations, 33 lint PHP réussis, seconde application sans écriture (37 cibles). Tests Laravel bloqués à la découverte par la double déclaration Pest du nouveau test tenant ; validation métier à reprendre après correction. Aucune migration, installation de worker de production ni modification de configuration réelle par cette intervention documentaire.
+
 ## 15 novembre 2026 — identité frontend du personnel central
 
 Premier lot validé : présentation Aydra sobre en modes clair et sombre, logo adapté, navigation du personnel regroupée et tableau de bord administratif redessiné avec les indicateurs existants. Les contrôles des liens et les droits généraux/financiers restent distincts ; le menu commerçant et le layout Tenant sont conservés. Les nouvelles couleurs sont limitées au layout du personnel central.

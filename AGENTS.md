@@ -22,6 +22,7 @@
 
 | Référence | Quand la consulter |
 |---|---|
+| [Mails de comptes et asynchrone](<documentation et recherche/asynchrone.md>) | Avant toute modification des événements, des listeners et de la queue des mails de comptes. |
 | [Architecture](<documentation et recherche/architecture a suivre pour faire le code.txt>) | Avant un nouveau fichier, déplacement ou changement de structure/responsabilités. §25 : classement courant par module et correspondance des déplacements ; §18–22 : contextes, cadre durable et commandes. |
 | [Schéma principal](<documentation et recherche/Schema-BDD-SaaS-Ecommerce-UUID.md>) | Avant un changement fonctionnel, de données ou de migration : référence métier, identifiants et cohérence. |
 | [Diagramme central](<documentation et recherche/Diagramme-BDD-Centrale-Complet.md>) | Avant de modifier les tables, champs ou relations centrales. |

@@ -1869,6 +1869,10 @@ La réservation et l’insertion du job restent atomiques dans la même transact
 
 ## Workers locaux Windows / Herd
 
+### Complément du 25 novembre 2026 — mails de comptes
+
+Les indications historiques ci-dessous sur deux tâches ou deux files ne décrivent plus la totalité de la commande locale. Elle gère trois workers et le planificateur. Le nouveau worker écoute `database/default`, avec trois tentatives, timeout 60 secondes, et un journal dédié. Les invitations centrales et quatre catégories de mails tenant utilisent Events + Listeners, avec `sync` par défaut. Déclencher hors transaction, préparer les URL en requête, conserver des payloads scalaires chiffrés et une connexion non marquée centrale pour les mails tenant. Les erreurs de transport ne doivent pas annuler une écriture métier. Le provisionnement ignore un déploiement disparu et enregistre l’échec dans une transaction centrale ; conserver le `beforeCommit` historique. La vérification et le mot de passe oublié centraux restent inchangés. Aucun changement des quotas, de la facturation ni des files historiques. Le modèle `deployment/supervisor/aydra-default.conf` est facultatif et non installé. Voir [asynchrone.md](asynchrone.md) pour les conditions de déploiement et les limites de validation.
+
 Commande app/Console/Commands/Central/LocalProvisioningWorker.php : `aydra:local-queue install|start|stop|status`. Elle gère deux tâches propres au chemin du projet (suffixe SHA-256), sous l’utilisateur courant, droits Limited et session interactive, sans stocker de mot de passe :
 
 - `Aydra-Provisioning-<suffixe>` : connexion `central-provisioning`, file `tenant-provisioning`. Exécute `queue:listen` avec trois tentatives et timeout 300 secondes ; recharge Laravel pour chaque job.

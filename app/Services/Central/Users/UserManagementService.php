@@ -110,13 +110,13 @@ class UserManagementService
 
     public function create(User $actor, UserData $data): UserSaveResult
     {
-        $emailSent = null;
+        $token = null;
 
         $user = $this->mutations->run(
             actor: $actor,
             ability: $data->staff ? 'createStaff' : 'create',
             loadTarget: fn (): string => User::class,
-            mutation: function () use ($actor, $data, &$emailSent): User {
+            mutation: function () use ($actor, $data, &$token): User {
                 $roles = $this->rolesForCreation($actor, $data);
                 $user = $this->newUser($data);
 
@@ -134,10 +134,6 @@ class UserManagementService
 
                 $token = $this->broker()->createToken($user);
 
-                DB::afterCommit(function () use ($user, $token, &$emailSent): void {
-                    $emailSent = $this->mail->invitation($user, $token);
-                });
-
                 activity()->causedBy($actor)->performedOn($user)->event('account_invited')
                     ->withProperties(['staff' => $data->staff, 'role_uuids' => $roles->pluck('uuid')->all()])
                     ->log('Compte central créé et invité à choisir son mot de passe.');
@@ -145,6 +141,8 @@ class UserManagementService
                 return $user;
             },
         );
+
+        $emailSent = $this->mail->invitation($user, $token, $actor->uuid);
 
         return new UserSaveResult($user, $emailSent);
     }
@@ -159,9 +157,11 @@ class UserManagementService
         abort_unless(in_array($ability, self::UPDATE_ABILITIES, true), 403);
 
         $emailSent = null;
+        $invitationToken = null;
         $loadTarget = fn (): User => $this->lock($target);
 
-        $mutation = function (User $target) use ($actor, $data, $notifyEmailChange, &$emailSent): User {
+        $mutation = function (User $target) use ($actor, $data, $notifyEmailChange, &$emailSent, &$invitationToken): User {
+            $invitationToken = null;
             $emailChanged = $target->email !== strtolower(trim($data->email));
             $wasVerified = $target->hasVerifiedEmail();
 
@@ -186,11 +186,13 @@ class UserManagementService
             if ($emailChanged && $notifyEmailChange) {
                 $token = $wasVerified ? null : $this->broker()->createToken($target);
 
-                DB::afterCommit(function () use ($target, $token, &$emailSent): void {
-                    $emailSent = $token === null
-                        ? $this->mail->verification($target)
-                        : $this->mail->invitation($target, $token);
-                });
+                if ($token === null) {
+                    DB::afterCommit(function () use ($target, &$emailSent): void {
+                        $emailSent = $this->mail->verification($target);
+                    });
+                } else {
+                    $invitationToken = $token;
+                }
             }
 
             activity()->causedBy($actor)->performedOn($target)->event('central_profile_updated')
@@ -206,18 +208,22 @@ class UserManagementService
 
         $target->setRawAttributes($user->getAttributes(), true)->unsetRelations();
 
+        if ($invitationToken !== null) {
+            $emailSent = $this->mail->invitation($user, $invitationToken, $actor->uuid);
+        }
+
         return new UserSaveResult($user, $emailSent);
     }
 
     public function resendInvitation(User $actor, User $target): UserSaveResult
     {
-        $emailSent = null;
+        $token = null;
 
         $user = $this->mutations->run(
             actor: $actor,
             ability: 'resendInvitation',
             loadTarget: fn (): User => $this->lock($target),
-            mutation: function (User $target) use ($actor, &$emailSent): User {
+            mutation: function (User $target) use ($actor, &$token): User {
                 if ($target->hasVerifiedEmail()) {
                     throw ValidationException::withMessages([
                         'invitation' => 'Ce compte a déjà vérifié son adresse e-mail.',
@@ -226,16 +232,14 @@ class UserManagementService
 
                 $token = $this->broker()->createToken($target);
 
-                DB::afterCommit(function () use ($target, $token, &$emailSent): void {
-                    $emailSent = $this->mail->invitation($target, $token);
-                });
-
                 activity()->causedBy($actor)->performedOn($target)->event('account_invitation_requested')
                     ->log('Renvoi de l’invitation centrale demandé.');
 
                 return $target;
             },
         );
+
+        $emailSent = $this->mail->invitation($user, $token, $actor->uuid);
 
         return new UserSaveResult($user, $emailSent);
     }

@@ -63,7 +63,11 @@ class ProvisionTenantDatabase implements ShouldQueue
             throw new LogicException('Deployment requires the committed central context.');
         }
 
-        $original = TenantSchemaDeployment::findOrFail($this->deploymentId);
+        $original = TenantSchemaDeployment::find($this->deploymentId);
+
+        if ($original === null) {
+            return;
+        }
 
         if ($original->operation !== $this->operation()) {
             throw new LogicException('The job does not match the deployment operation.');
@@ -205,16 +209,18 @@ class ProvisionTenantDatabase implements ShouldQueue
 
     private function recordFailure(TenantSchemaDeployment $deployment): void
     {
-        TenantSchemaDeployment::whereKey($deployment->id)->whereNotIn('status', self::FINISHED)->update([
-            'status' => StatusEnum::FAILED,
-            'ended_at' => now(),
-            'error_code' => ($this->operation() === OperationEnum::PROVISIONING
-                ? ErrorCodeEnum::PROVISIONING_FAILED
-                : ErrorCodeEnum::MIGRATION_FAILED)->value,
-            'sanitized_error' => self::MESSAGE_FAILED,
-        ]);
+        $this->centralConnection()->transaction(function () use ($deployment): void {
+            TenantSchemaDeployment::whereKey($deployment->id)->whereNotIn('status', self::FINISHED)->update([
+                'status' => StatusEnum::FAILED,
+                'ended_at' => now(),
+                'error_code' => ($this->operation() === OperationEnum::PROVISIONING
+                    ? ErrorCodeEnum::PROVISIONING_FAILED
+                    : ErrorCodeEnum::MIGRATION_FAILED)->value,
+                'sanitized_error' => self::MESSAGE_FAILED,
+            ]);
 
-        $this->markTenantProvisioningFailed($deployment->tenant_id);
+            $this->markTenantProvisioningFailed($deployment->tenant_id);
+        }, self::TRANSACTION_ATTEMPTS);
     }
 
     private function markTenantProvisioningFailed(int $tenantId): void

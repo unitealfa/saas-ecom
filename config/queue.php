@@ -15,6 +15,9 @@ return [
 
     'default' => env('QUEUE_CONNECTION', 'database'),
 
+    // Account mail is immediate unless a dedicated worker is available.
+    'account_mail_connection' => env('QUEUE_ACCOUNT_MAIL_CONNECTION', 'sync'),
+
     /*
     |--------------------------------------------------------------------------
     | Queue Connections

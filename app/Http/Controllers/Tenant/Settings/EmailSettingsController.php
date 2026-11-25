@@ -29,9 +29,13 @@ final class EmailSettingsController extends Controller
         if (! Hash::check($data['current_password'], $actor->password)) {
             throw ValidationException::withMessages(['current_password' => 'Le mot de passe actuel est incorrect.']);
         }
-        $emails->send($actor, $data['email']);
+        if (! $emails->send($actor, $data['email'])) {
+            return back()->withErrors(['email' => 'Impossible d’envoyer le lien de confirmation. Réessayez.']);
+        }
 
-        return redirect()->route('tenant.settings.show')->with('status', 'Un lien de confirmation a été envoyé à la nouvelle adresse.');
+        return redirect()->route('tenant.settings.show')->with('status', config('queue.account_mail_connection') === 'sync'
+            ? 'Un lien de confirmation a été envoyé à la nouvelle adresse.'
+            : 'Un lien de confirmation a été mis en file d’envoi pour la nouvelle adresse.');
     }
 
     public function confirm(Request $request): RedirectResponse
