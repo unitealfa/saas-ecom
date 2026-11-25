@@ -13,7 +13,7 @@ class AccountInvitation extends Notification implements ShouldBeEncrypted, Shoul
 {
     use Queueable;
 
-    public function __construct(public readonly string $token)
+    public function __construct(public readonly string $token, public readonly ?string $preparedUrl = null)
     {
         $this->onConnection('database')->afterCommit();
     }
@@ -27,7 +27,7 @@ class AccountInvitation extends Notification implements ShouldBeEncrypted, Shoul
     /** @param User $notifiable */
     public function toMail(object $notifiable): MailMessage
     {
-        $url = rtrim(config('app.url'), '/').route('password.reset', [
+        $url = $this->preparedUrl ?? rtrim(config('app.url'), '/').route('password.reset', [
             'token' => $this->token, 'email' => $notifiable->email,
         ], absolute: false);
 

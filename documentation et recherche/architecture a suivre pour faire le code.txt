@@ -1867,7 +1867,15 @@ Queue : central-provisioning est la CONNEXION Laravel, driver database, connexio
 
 La réservation et l’insertion du job restent atomiques dans la même transaction MySQL : dispatch beforeCommit est intentionnel, après contrôle que la connexion de queue est bien la centrale. Le worker séparé ne voit pas la ligne non validée, et le provisionneur refuse toute DDL dans une transaction centrale ouverte. Ne pas remplacer ce mécanisme durable par un traitement HTTP synchrone ou par un dispatch après commit susceptible de perdre le job si l’insertion échoue. Le callback historique TenantCreated de TenancyServiceProvider ne sert pas aux routes normales : il reste l’exception synchrone des anciennes créations directes de modèles, notamment fixtures/tests existants. Les nouvelles créations fonctionnelles doivent toujours passer par TenantCreator et sa queue.
 
+## Workers locaux Docker / Herd
+
+Mode local optionnel `AYDRA_LOCAL_WORKERS=docker` : voir [Workers-Docker-Locaux.md](Workers-Docker-Locaux.md). Une image de runtime PHP 8.5 construite localement depuis Git, trois conteneurs workers et un scheduler, code et stockage montés, vendor Linux dédié par version du lock. La commande `serve` explicite démarre Docker après contrôles ; aucune action HTTP ni production. Les connexions et files existantes ne changent pas. Les tâches Windows ci-dessous sont le mode historique, à arrêter avant Docker. Aucune base n’est créée ou migrée par l’installateur.
+
 ## Workers locaux Windows / Herd
+
+### Complément du 25 novembre 2026 — mails de comptes
+
+Les indications historiques ci-dessous sur deux tâches ou deux files ne décrivent plus la totalité de la commande locale. Elle gère trois workers et le planificateur. Le nouveau worker écoute `database/default`, avec trois tentatives, timeout 60 secondes, et un journal dédié. Les invitations centrales et quatre catégories de mails tenant utilisent Events + Listeners, avec `sync` par défaut. Déclencher hors transaction, préparer les URL en requête, conserver des payloads scalaires chiffrés et une connexion non marquée centrale pour les mails tenant. Les erreurs de transport ne doivent pas annuler une écriture métier. Le provisionnement ignore un déploiement disparu et enregistre l’échec dans une transaction centrale ; conserver le `beforeCommit` historique. La vérification et le mot de passe oublié centraux restent inchangés. Aucun changement des quotas, de la facturation ni des files historiques. Le modèle `deployment/supervisor/aydra-default.conf` est facultatif et non installé. Voir [asynchrone.md](asynchrone.md) pour les conditions de déploiement et les limites de validation.
 
 Commande app/Console/Commands/Central/LocalProvisioningWorker.php : `aydra:local-queue install|start|stop|status`. Elle gère deux tâches propres au chemin du projet (suffixe SHA-256), sous l’utilisateur courant, droits Limited et session interactive, sans stocker de mot de passe :
 

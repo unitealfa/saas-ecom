@@ -59,7 +59,7 @@
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "@php artisan aydra:local-queue start --no-interaction",
+            "@php artisan aydra:docker-workers dev-start --no-interaction",
             "npm run dev"
         ],
         "lint": [

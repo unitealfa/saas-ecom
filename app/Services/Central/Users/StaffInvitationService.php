@@ -7,7 +7,6 @@ use App\Models\Central\Users\User;
 use App\Services\Central\Auth\AccountMailDelivery;
 use App\Services\Central\Authorization\AuthorizationMutation;
 use Illuminate\Auth\Passwords\PasswordBroker;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 
 class StaffInvitationService
@@ -25,18 +24,14 @@ class StaffInvitationService
 
     public function resend(User $actor, User $target): UserSaveResult
     {
-        $emailSent = null;
+        $token = null;
 
         $user = $this->mutations->run(
             actor: $actor,
             ability: self::ABILITY_RESEND,
             loadTarget: fn (): User => User::whereKey($target->id)->lockForUpdate()->firstOrFail(),
-            mutation: function (User $target) use ($actor, &$emailSent): User {
+            mutation: function (User $target) use ($actor, &$token): User {
                 $token = $this->broker()->createToken($target);
-
-                DB::afterCommit(function () use ($target, $token, &$emailSent): void {
-                    $emailSent = $this->mail->invitation($target, $token);
-                });
 
                 activity()->causedBy($actor)->performedOn($target)->event(self::EVENT_REQUESTED)
                     ->log('Renvoi de l’invitation du personnel SaaS demandé.');
@@ -44,6 +39,8 @@ class StaffInvitationService
                 return $target;
             },
         );
+
+        $emailSent = $this->mail->invitation($user, $token, $actor->uuid, staffResend: true);
 
         return new UserSaveResult($user, $emailSent);
     }

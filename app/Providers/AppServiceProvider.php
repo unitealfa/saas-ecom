@@ -2,6 +2,18 @@
 
 namespace App\Providers;
 
+use App\Events\Central\Auth\AccountInvitationRequested;
+use App\Events\Central\Auth\StaffInvitationResent;
+use App\Events\Tenant\Users\TeamInvitationMailRequested;
+use App\Events\Tenant\Users\TeamInvitationMailResent;
+use App\Events\Tenant\Users\WelcomeEmployeeMailRequested;
+use App\Events\Tenant\Users\EmployeeEmailConfirmationRequested;
+use App\Events\Tenant\Auth\EmployeePasswordResetRequested;
+use App\Listeners\Central\Auth\SendAccountInvitation;
+use App\Listeners\Tenant\Users\SendTeamInvitation;
+use App\Listeners\Tenant\Users\SendWelcomeEmployee;
+use App\Listeners\Tenant\Users\SendEmployeeEmailConfirmation;
+use App\Listeners\Tenant\Auth\SendEmployeePasswordReset;
 use App\Http\Middleware\Central\Auth\EnsureActiveCentralAccount;
 use App\Models\Central\Audit\Activity;
 use App\Models\Central\Billing\BillingRule;
@@ -136,6 +148,13 @@ class AppServiceProvider extends ServiceProvider
         $this->registerMorphMap();
         $this->registerPolicies();
         Event::listen(DefaultSubscription::EFFECTIVE_CHANGED, [TenantStatusService::class, 'applySubscriptionQuota']);
+        Event::listen(AccountInvitationRequested::class, [SendAccountInvitation::class, 'send']);
+        Event::listen(StaffInvitationResent::class, [SendAccountInvitation::class, 'send']);
+        Event::listen(TeamInvitationMailRequested::class, [SendTeamInvitation::class, 'send']);
+        Event::listen(TeamInvitationMailResent::class, [SendTeamInvitation::class, 'send']);
+        Event::listen(WelcomeEmployeeMailRequested::class, [SendWelcomeEmployee::class, 'send']);
+        Event::listen(EmployeeEmailConfirmationRequested::class, [SendEmployeeEmailConfirmation::class, 'send']);
+        Event::listen(EmployeePasswordResetRequested::class, [SendEmployeePasswordReset::class, 'send']);
 
         $this->loadMigrationsFrom(database_path('migrations/central'));
         Livewire::addPersistentMiddleware([EnsureActiveCentralAccount::class]);

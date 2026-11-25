@@ -3,7 +3,8 @@
 namespace App\Services\Tenant\Auth;
 
 use App\Models\Tenant\Users\User;
-use App\Notifications\Tenant\ResetEmployeePasswordNotification;
+use App\Events\Tenant\Auth\EmployeePasswordResetRequested;
+use App\Services\AccountMailEvents;
 use App\Services\Tenant\Users\TenantInvitationUrl;
 use App\Services\Tenant\Authorization\TenantAccess;
 use Illuminate\Support\Facades\DB;
@@ -22,11 +23,19 @@ final class PasswordResetService
         if (! $user || ! TenantAccess::editableEmployee($user) || ! TenantAccess::active($user)) {
             return; // Identical public response for unknown and blocked accounts.
         }
-        Password::broker('tenant')->sendResetLink(['email' => $user->email], function (User $recipient, string $token): void {
-            $recipient->notify(new ResetEmployeePasswordNotification($this->urls->make('tenant.password.reset', [
-                'token' => $token, 'email' => $recipient->email,
-            ])));
+        $mail = null;
+        Password::broker('tenant')->sendResetLink(['email' => $user->email], function (User $recipient, string $token) use (&$mail): void {
+            $uuid = $recipient->uuid;
+            $email = $recipient->email;
+            $mail = fn () => new EmployeePasswordResetRequested(
+                (string) tenant()->uuid, $uuid, $email,
+                $this->urls->make('tenant.password.reset', ['token' => $token, 'email' => $email]),
+                now()->addMinutes((int) config('auth.passwords.tenant.expire'))->getTimestamp(),
+            );
         });
+        if ($mail !== null) {
+            AccountMailEvents::dispatch('tenant_password_reset', $mail, tenant: true);
+        }
     }
 
     public function reset(string $email, string $token, string $password): bool

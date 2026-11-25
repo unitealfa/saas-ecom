@@ -37,7 +37,7 @@ class StaffController extends Controller
         $redirect = redirect()->route(Gate::allows('viewAnyStaff', User::class) ? 'central.staff.index' : 'dashboard');
 
         return $result->emailSent === true
-            ? $redirect->with('status', 'Compte personnel créé pour '.$result->user->name.'. L’invitation a été envoyée.')
+            ? $redirect->with('status', 'Compte personnel créé pour '.$result->user->name.'. '.(config('queue.account_mail_connection') === 'sync' ? 'L’invitation a été envoyée.' : 'L’invitation a été mise en file d’envoi.'))
             : $redirect->with('warning', 'Le compte de '.$result->user->name.' est créé, mais l’invitation n’a pas pu être envoyée. Vérifiez le SMTP puis renvoyez l’invitation.');
     }
 
@@ -75,7 +75,7 @@ class StaffController extends Controller
         $redirect = $this->afterAction($user);
 
         return $result->emailSent === true
-            ? $redirect->with('status', 'L’invitation a été envoyée.')
+            ? $redirect->with('status', config('queue.account_mail_connection') === 'sync' ? 'L’invitation a été envoyée.' : 'L’invitation a été mise en file d’envoi.')
             : $redirect->with('warning', 'L’invitation n’a pas pu être envoyée. Vérifiez le SMTP.');
     }
 

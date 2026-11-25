@@ -25,11 +25,17 @@ class LocalProvisioningWorker extends Command
 
             return self::FAILURE;
         }
+        if (config('aydra-workers.driver') === 'docker' && in_array($action, ['install', 'start'], true)) {
+            $this->error('Mode Docker actif : utilisez aydra:docker-workers start. Les anciennes tâches Windows peuvent être arrêtées avec aydra:local-queue stop.');
+
+            return self::FAILURE;
+        }
         $root = base_path();
         $suffix = substr(hash('sha256', strtolower($root)), 0, 12);
         $workers = [
             ['name' => 'Aydra-Provisioning-'.$suffix, 'description' => 'Aydra provisioning: '.$root, 'script' => $this->workerScript()],
             ['name' => 'Aydra-Documents-'.$suffix, 'description' => 'Aydra documents: '.$root, 'script' => $this->documentWorkerScript()],
+            ['name' => 'Aydra-Account-Mail-'.$suffix, 'description' => 'Aydra account mail: '.$root, 'script' => $this->accountMailWorkerScript()],
             ['name' => 'Aydra-Scheduler-'.$suffix, 'description' => 'Aydra scheduler: '.$root, 'script' => $this->schedulerScript()],
         ];
         $powershell = getenv('SystemRoot').'\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
@@ -110,6 +116,20 @@ class LocalProvisioningWorker extends Command
             .' -Value ((Get-Date -Format o) + " Documents worker stopped; exit code: " + $LASTEXITCODE)'
             .'; } catch { Add-Content -LiteralPath '.$log
             .' -Value ((Get-Date -Format o) + " Documents wrapper failed: " + $_.Exception.GetType().Name)'
+            .'; }; Start-Sleep -Seconds 60; }';
+    }
+
+    private function accountMailWorkerScript(): string
+    {
+        $log = $this->literal(storage_path('logs/local-account-mail-worker.log'));
+
+        return '$ErrorActionPreference = \'Continue\'; while ($true) { try { & '
+            .$this->literal(PHP_BINARY).' '.$this->literal(base_path('artisan'))
+            .' queue:work database --queue=default --sleep=2 --tries=3 --timeout=60 --max-time=3600 --no-interaction -v'
+            .' *>> '.$log.'; Add-Content -LiteralPath '.$log
+            .' -Value ((Get-Date -Format o) + " Account mail worker stopped; exit code: " + $LASTEXITCODE)'
+            .'; } catch { Add-Content -LiteralPath '.$log
+            .' -Value ((Get-Date -Format o) + " Account mail wrapper failed: " + $_.Exception.GetType().Name)'
             .'; }; Start-Sleep -Seconds 60; }';
     }
 
