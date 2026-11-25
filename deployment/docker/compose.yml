@@ -1,0 +1,401 @@
+{
+  "services": {
+    "provisioning": {
+      "image": "${AYDRA_WORKER_IMAGE:?Use php artisan aydra:docker-workers start}",
+      "pull_policy": "never",
+      "working_dir": "/app",
+      "init": true,
+      "environment": {
+        "AYDRA_LOCAL_WORKERS": "off",
+        "AYDRA_DOCKER_WORKER": "1",
+        "DB_HOST": "host.docker.internal",
+        "MAIL_HOST": "${AYDRA_CONTAINER_MAIL_HOST:-host.docker.internal}",
+        "AYDRA_CONFIG_SIGNATURE": "${AYDRA_CONFIG_SIGNATURE:-}",
+        "DB_URL": "",
+        "DB_SOCKET": ""
+      },
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "../..",
+          "target": "/app",
+          "read_only": true
+        },
+        {
+          "type": "bind",
+          "source": "../../storage",
+          "target": "/app/storage"
+        },
+        {
+          "type": "volume",
+          "source": "vendor",
+          "target": "/app/vendor",
+          "read_only": true,
+          "volume": {
+            "nocopy": true
+          }
+        }
+      ],
+      "tmpfs": [
+        "/app/bootstrap/cache"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "restart": "unless-stopped",
+      "stop_grace_period": "330s",
+      "labels": {
+        "aydra.local.revision": "${AYDRA_WORKER_REVISION:-unknown}"
+      },
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "command": [
+        "php",
+        "artisan",
+        "queue:work",
+        "central-provisioning",
+        "--queue=tenant-provisioning",
+        "--sleep=2",
+        "--tries=3",
+        "--timeout=300",
+        "--max-time=3600",
+        "--no-interaction",
+        "-v"
+      ],
+      "entrypoint": [
+        "sh",
+        "-c",
+        "set -eu; rm -f /tmp/aydra-ready; php artisan aydra:docker-workers probe --no-interaction; touch /tmp/aydra-ready; exec \"$@\"",
+        "aydra-worker"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "test -f /tmp/aydra-ready"
+        ],
+        "interval": "5s",
+        "timeout": "3s",
+        "retries": 3,
+        "start_period": "30s"
+      }
+    },
+    "documents": {
+      "image": "${AYDRA_WORKER_IMAGE:?Use php artisan aydra:docker-workers start}",
+      "pull_policy": "never",
+      "working_dir": "/app",
+      "init": true,
+      "environment": {
+        "AYDRA_LOCAL_WORKERS": "off",
+        "AYDRA_DOCKER_WORKER": "1",
+        "DB_HOST": "host.docker.internal",
+        "MAIL_HOST": "${AYDRA_CONTAINER_MAIL_HOST:-host.docker.internal}",
+        "AYDRA_CONFIG_SIGNATURE": "${AYDRA_CONFIG_SIGNATURE:-}",
+        "DB_URL": "",
+        "DB_SOCKET": ""
+      },
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "../..",
+          "target": "/app",
+          "read_only": true
+        },
+        {
+          "type": "bind",
+          "source": "../../storage",
+          "target": "/app/storage"
+        },
+        {
+          "type": "volume",
+          "source": "vendor",
+          "target": "/app/vendor",
+          "read_only": true,
+          "volume": {
+            "nocopy": true
+          }
+        }
+      ],
+      "tmpfs": [
+        "/app/bootstrap/cache"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "restart": "unless-stopped",
+      "stop_grace_period": "330s",
+      "labels": {
+        "aydra.local.revision": "${AYDRA_WORKER_REVISION:-unknown}"
+      },
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "command": [
+        "php",
+        "artisan",
+        "queue:work",
+        "database",
+        "--queue=saas-documents",
+        "--sleep=2",
+        "--tries=1",
+        "--timeout=60",
+        "--max-time=3600",
+        "--no-interaction",
+        "-v"
+      ],
+      "entrypoint": [
+        "sh",
+        "-c",
+        "set -eu; rm -f /tmp/aydra-ready; php artisan aydra:docker-workers probe --no-interaction; touch /tmp/aydra-ready; exec \"$@\"",
+        "aydra-worker"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "test -f /tmp/aydra-ready"
+        ],
+        "interval": "5s",
+        "timeout": "3s",
+        "retries": 3,
+        "start_period": "30s"
+      }
+    },
+    "account-mail": {
+      "image": "${AYDRA_WORKER_IMAGE:?Use php artisan aydra:docker-workers start}",
+      "pull_policy": "never",
+      "working_dir": "/app",
+      "init": true,
+      "environment": {
+        "AYDRA_LOCAL_WORKERS": "off",
+        "AYDRA_DOCKER_WORKER": "1",
+        "DB_HOST": "host.docker.internal",
+        "MAIL_HOST": "${AYDRA_CONTAINER_MAIL_HOST:-host.docker.internal}",
+        "AYDRA_CONFIG_SIGNATURE": "${AYDRA_CONFIG_SIGNATURE:-}",
+        "DB_URL": "",
+        "DB_SOCKET": ""
+      },
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "../..",
+          "target": "/app",
+          "read_only": true
+        },
+        {
+          "type": "bind",
+          "source": "../../storage",
+          "target": "/app/storage"
+        },
+        {
+          "type": "volume",
+          "source": "vendor",
+          "target": "/app/vendor",
+          "read_only": true,
+          "volume": {
+            "nocopy": true
+          }
+        }
+      ],
+      "tmpfs": [
+        "/app/bootstrap/cache"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "restart": "unless-stopped",
+      "stop_grace_period": "330s",
+      "labels": {
+        "aydra.local.revision": "${AYDRA_WORKER_REVISION:-unknown}"
+      },
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "command": [
+        "php",
+        "artisan",
+        "queue:work",
+        "database",
+        "--queue=default",
+        "--sleep=2",
+        "--tries=3",
+        "--timeout=60",
+        "--max-time=3600",
+        "--no-interaction",
+        "-v"
+      ],
+      "entrypoint": [
+        "sh",
+        "-c",
+        "set -eu; rm -f /tmp/aydra-ready; php artisan aydra:docker-workers probe --no-interaction; touch /tmp/aydra-ready; exec \"$@\"",
+        "aydra-worker"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "test -f /tmp/aydra-ready"
+        ],
+        "interval": "5s",
+        "timeout": "3s",
+        "retries": 3,
+        "start_period": "30s"
+      }
+    },
+    "scheduler": {
+      "image": "${AYDRA_WORKER_IMAGE:?Use php artisan aydra:docker-workers start}",
+      "pull_policy": "never",
+      "working_dir": "/app",
+      "init": true,
+      "environment": {
+        "AYDRA_LOCAL_WORKERS": "off",
+        "AYDRA_DOCKER_WORKER": "1",
+        "DB_HOST": "host.docker.internal",
+        "MAIL_HOST": "${AYDRA_CONTAINER_MAIL_HOST:-host.docker.internal}",
+        "AYDRA_CONFIG_SIGNATURE": "${AYDRA_CONFIG_SIGNATURE:-}",
+        "DB_URL": "",
+        "DB_SOCKET": ""
+      },
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "../..",
+          "target": "/app",
+          "read_only": true
+        },
+        {
+          "type": "bind",
+          "source": "../../storage",
+          "target": "/app/storage"
+        },
+        {
+          "type": "volume",
+          "source": "vendor",
+          "target": "/app/vendor",
+          "read_only": true,
+          "volume": {
+            "nocopy": true
+          }
+        }
+      ],
+      "tmpfs": [
+        "/app/bootstrap/cache"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "restart": "unless-stopped",
+      "stop_grace_period": "330s",
+      "labels": {
+        "aydra.local.revision": "${AYDRA_WORKER_REVISION:-unknown}"
+      },
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "command": [
+        "php",
+        "artisan",
+        "schedule:work",
+        "--no-interaction"
+      ],
+      "entrypoint": [
+        "sh",
+        "-c",
+        "set -eu; rm -f /tmp/aydra-ready; php artisan aydra:docker-workers probe --no-interaction; touch /tmp/aydra-ready; exec \"$@\"",
+        "aydra-worker"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "test -f /tmp/aydra-ready"
+        ],
+        "interval": "5s",
+        "timeout": "3s",
+        "retries": 3,
+        "start_period": "30s"
+      }
+    },
+    "dependencies": {
+      "image": "${AYDRA_WORKER_IMAGE:?Use php artisan aydra:docker-workers start}",
+      "pull_policy": "never",
+      "working_dir": "/app",
+      "init": true,
+      "environment": {
+        "AYDRA_LOCAL_WORKERS": "off",
+        "AYDRA_DOCKER_WORKER": "1",
+        "DB_HOST": "host.docker.internal",
+        "MAIL_HOST": "${AYDRA_CONTAINER_MAIL_HOST:-host.docker.internal}",
+        "AYDRA_CONFIG_SIGNATURE": "${AYDRA_CONFIG_SIGNATURE:-}",
+        "DB_URL": "",
+        "DB_SOCKET": ""
+      },
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "../..",
+          "target": "/app",
+          "read_only": true
+        },
+        {
+          "type": "bind",
+          "source": "../../storage",
+          "target": "/app/storage"
+        },
+        {
+          "type": "volume",
+          "source": "vendor",
+          "target": "/app/vendor",
+          "read_only": false,
+          "volume": {
+            "nocopy": true
+          }
+        }
+      ],
+      "tmpfs": [
+        "/app/bootstrap/cache"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "restart": "no",
+      "stop_grace_period": "330s",
+      "labels": {
+        "aydra.local.revision": "${AYDRA_WORKER_REVISION:-unknown}"
+      },
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "profiles": [
+        "setup"
+      ],
+      "command": [
+        "sh",
+        "-c",
+        "tr -d '\\r' < deployment/docker/install-dependencies.sh | sh"
+      ]
+    }
+  },
+  "volumes": {
+    "vendor": {
+      "name": "${AYDRA_VENDOR_VOLUME:?Use Artisan}"
+    }
+  }
+}

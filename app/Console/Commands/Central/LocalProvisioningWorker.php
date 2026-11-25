@@ -25,6 +25,11 @@ class LocalProvisioningWorker extends Command
 
             return self::FAILURE;
         }
+        if (config('aydra-workers.driver') === 'docker' && in_array($action, ['install', 'start'], true)) {
+            $this->error('Mode Docker actif : utilisez aydra:docker-workers start. Les anciennes tâches Windows peuvent être arrêtées avec aydra:local-queue stop.');
+
+            return self::FAILURE;
+        }
         $root = base_path();
         $suffix = substr(hash('sha256', strtolower($root)), 0, 12);
         $workers = [

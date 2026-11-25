@@ -1867,6 +1867,10 @@ Queue : central-provisioning est la CONNEXION Laravel, driver database, connexio
 
 La réservation et l’insertion du job restent atomiques dans la même transaction MySQL : dispatch beforeCommit est intentionnel, après contrôle que la connexion de queue est bien la centrale. Le worker séparé ne voit pas la ligne non validée, et le provisionneur refuse toute DDL dans une transaction centrale ouverte. Ne pas remplacer ce mécanisme durable par un traitement HTTP synchrone ou par un dispatch après commit susceptible de perdre le job si l’insertion échoue. Le callback historique TenantCreated de TenancyServiceProvider ne sert pas aux routes normales : il reste l’exception synchrone des anciennes créations directes de modèles, notamment fixtures/tests existants. Les nouvelles créations fonctionnelles doivent toujours passer par TenantCreator et sa queue.
 
+## Workers locaux Docker / Herd
+
+Mode local optionnel `AYDRA_LOCAL_WORKERS=docker` : voir [Workers-Docker-Locaux.md](Workers-Docker-Locaux.md). Une image de runtime PHP 8.5 construite localement depuis Git, trois conteneurs workers et un scheduler, code et stockage montés, vendor Linux dédié par version du lock. La commande `serve` explicite démarre Docker après contrôles ; aucune action HTTP ni production. Les connexions et files existantes ne changent pas. Les tâches Windows ci-dessous sont le mode historique, à arrêter avant Docker. Aucune base n’est créée ou migrée par l’installateur.
+
 ## Workers locaux Windows / Herd
 
 ### Complément du 25 novembre 2026 — mails de comptes

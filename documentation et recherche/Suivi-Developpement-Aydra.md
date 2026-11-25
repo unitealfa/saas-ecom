@@ -1,5 +1,9 @@
 # Suivi de développement et audit Aydra
 
+## 25 novembre 2026 — Supervision Docker locale
+
+Préparation d’une image PHP de runtime construite localement (aucun registre privé ni publication d’image) et de Docker Compose : provisionnement, documents, mails de comptes et Scheduler. Démarrage via `serve`/`composer dev` en mode Docker explicite. Aucune intervention production. Tests Docker/MySQL et parcours métier à exécuter sur le poste ; aucun succès de bout en bout revendiqué. Voir [Workers Docker locaux](Workers-Docker-Locaux.md).
+
 ## 25 novembre 2026 — Mails de comptes et corrections de provisionnement
 
 Patch local appliqué sur dev (référence `00258872acea3002f9197454a7cc963c285d7dda`) : invitations centrales et mails tenant via listeners, mode sync par défaut ; vérification et récupération centrales inchangées. Voir [asynchrone.md](asynchrone.md). Journal utilisateur : 18 modifications, 19 créations, 33 lint PHP réussis, seconde application sans écriture (37 cibles). Tests Laravel bloqués à la découverte par la double déclaration Pest du nouveau test tenant ; validation métier à reprendre après correction. Aucune migration, installation de worker de production ni modification de configuration réelle par cette intervention documentaire.

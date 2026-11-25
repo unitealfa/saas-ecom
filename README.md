@@ -123,7 +123,11 @@ npm.cmd run build
 - Le seeder normal prépare les pays et l'offre gratuite ; `AuthorizationSeeder` prépare les rôles et permissions, sans créer de compte Super Admin.
 - Pour l'accès administratif initial, faire préparer un Super Admin par le responsable du projet ; aucune commande dédiée de création de ce compte n'est actuellement fournie.
 
-### 7. Installer et démarrer le worker Windows
+### 7. Démarrer les workers Docker locaux (mode recommandé)
+
+Voir [Workers Docker locaux](<documentation et recherche/Workers-Docker-Locaux.md>) pour la construction locale de l’image, le `.env`, les droits MySQL et les contrôles. Après activation de `AYDRA_LOCAL_WORKERS=docker`, `php artisan serve` ou `composer dev` démarre les trois workers et le Scheduler. Ne pas démarrer les anciennes tâches Windows ni un deuxième Scheduler.
+
+#### Ancien mode Windows (uniquement si Docker non activé)
 
 > Mise à jour du 25 novembre 2026 : voir la [documentation asynchrone](<documentation et recherche/asynchrone.md>). `aydra:local-queue` gère désormais trois workers (provisionnement, documents, mails de comptes) et le planificateur. Le worker supplémentaire `Aydra-Account-Mail-<suffixe>` écoute `database/default` ; journal `storage/logs/local-account-mail-worker.log`. Les nouveaux mails restent immédiats par défaut (`QUEUE_ACCOUNT_MAIL_CONNECTION=sync`). Ne pas démarrer de worker supplémentaire en production sans infrastructure adaptée.
 
@@ -171,6 +175,8 @@ npm.cmd run dev
 
 ### 10. Démarrer les tâches planifiées locales
 
+**Mode Docker : ne pas exécuter la commande ci-dessous.** Le Scheduler est déjà démarré par `aydra:docker-workers start` (ou `php artisan serve`). La procédure historique ci-dessous concerne uniquement le mode Windows ou un lancement manuel sans Scheduler actif.
+
 Dans un troisième terminal ouvert à la racine :
 
 ```powershell
@@ -179,6 +185,8 @@ $aydraPhp = "$env:USERPROFILE\.config\herd\bin\php85\php.exe"
 ```
 
 ### 11. Vérifier le démarrage
+
+En mode Docker, remplacer les commandes `aydra:local-queue status/stop/start` ci-dessous par `aydra:docker-workers status/stop/start` ; après modification du code ou du `.env`, utiliser `php artisan config:clear` si nécessaire puis `php artisan aydra:docker-workers restart`.
 
 ```powershell
 & $aydraPhp artisan --version

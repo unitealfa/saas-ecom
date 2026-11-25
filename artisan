@@ -13,6 +13,18 @@ require __DIR__.'/vendor/autoload.php';
 /** @var Application $app */
 $app = require_once __DIR__.'/bootstrap/app.php';
 
+// Start local Docker workers only for the explicit serve command (never for HTTP, tests or queue jobs).
+if (($argv[1] ?? null) === 'serve' && ! array_intersect($argv, ['--help', '-h', '--version', '-V'])) {
+    $workers = new \Symfony\Component\Process\Process([PHP_BINARY, __FILE__, 'aydra:docker-workers', 'auto-start', '--no-interaction'], __DIR__);
+    $workers->setTimeout(null);
+    $workers->run(static function (string $type, string $buffer): void {
+        fwrite($type === \Symfony\Component\Process\Process::ERR ? STDERR : STDOUT, $buffer);
+    });
+    if (! $workers->isSuccessful()) {
+        exit($workers->getExitCode() ?? 1);
+    }
+}
+
 $status = $app->handleCommand(new ArgvInput);
 
 exit($status);

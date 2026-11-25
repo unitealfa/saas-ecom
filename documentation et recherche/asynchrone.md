@@ -1,5 +1,7 @@
 # Mails de comptes : mode synchrone par défaut
 
+> Pour activer localement les listeners en mode database avec Docker, consulter [Workers Docker locaux](Workers-Docker-Locaux.md). La valeur par défaut de l’application reste sync ; ne pas démarrer simultanément Windows et Docker.
+
 ## Portée de cette livraison
 
 - Invitations centrales (création, renvoi central et personnel, renouvellement après changement d’adresse non vérifiée) : `AccountInvitationRequested`, `StaffInvitationResent` → `SendAccountInvitation`.
