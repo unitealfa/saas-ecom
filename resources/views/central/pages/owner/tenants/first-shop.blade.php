@@ -1,6 +1,6 @@
-<x-layouts::auth :title="($additional ?? false) ? 'Créer une boutique supplémentaire' : 'Configurer votre première boutique'">
+<x-layouts::auth.split :title="($additional ?? false) ? 'Créer une boutique supplémentaire' : 'Configurer votre première boutique'">
     <div class="space-y-6">
-        <flux:heading size="xl">{{ ($additional ?? false) ? 'Créer une boutique supplémentaire' : 'Configurez votre première boutique' }}</flux:heading>
+        <flux:heading size="xl" class="aydra-login-heading">{{ ($additional ?? false) ? 'Créer une boutique supplémentaire' : 'Configurez votre première boutique' }}</flux:heading>
         <flux:text>Votre adresse e-mail est vérifiée et votre inscription est approuvée. Choisissez maintenant le nom et l’adresse de votre boutique. Elle sera créée uniquement après votre confirmation.</flux:text>
         @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
         <form method="POST" action="{{ route(($additional ?? false) ? 'owner.shops.store' : 'owner.first-shop.store') }}" class="space-y-5">
@@ -18,4 +18,4 @@
         </form>
         <form method="POST" action="{{ route('logout') }}">@csrf <flux:button type="submit" variant="ghost">Se déconnecter</flux:button></form>
     </div>
-</x-layouts::auth>
+</x-layouts::auth.split>
