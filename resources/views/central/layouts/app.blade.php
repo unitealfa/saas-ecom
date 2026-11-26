@@ -1,5 +1,5 @@
 <x-layouts::app.sidebar :title="$title ?? null">
-    <flux:main :inset="app(\App\Services\Central\Authorization\CentralUserAccess::class)->isStaff(auth('central')->user())">
+    <flux:main inset>
         @php
             $owner = auth('central')->user();
             $endingSubscription = $owner && ! app(\App\Services\Central\Authorization\CentralUserAccess::class)->isStaff($owner)

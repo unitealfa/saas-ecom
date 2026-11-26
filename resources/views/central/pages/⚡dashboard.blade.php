@@ -14,8 +14,8 @@ new class extends Component {
     }
 }; ?>
 
-<section class="flex flex-col gap-6">
-    <flux:heading size="xl" level="1">{{ __('Bonjour, :name', ['name' => auth('central')->user()->name]) }}</flux:heading>
+<section class="mx-auto flex w-full max-w-screen-2xl flex-col gap-6">
+    <header class="space-y-2"><h1 class="aydra-heading text-3xl font-semibold tracking-tight sm:text-4xl">{{ __('Bonjour, :name', ['name' => auth('central')->user()->name]) }}</h1><p class="aydra-muted text-sm">Retrouvez votre espace et les informations de vos boutiques.</p></header>
 
     @if (session('status'))
         <flux:callout>{{ session('status') }}</flux:callout>
@@ -33,22 +33,22 @@ new class extends Component {
         @endcan
     @else
         @can('createOwned', [\App\Models\Central\Tenants\Tenant::class, auth('central')->user()])
-            <div><flux:button :href="route('owner.shops.create')">Créer une boutique</flux:button></div>
+            <div><flux:button variant="primary" icon="plus" :href="route('owner.shops.create')">Créer une boutique</flux:button></div>
         @endcan
         <flux:callout>
             <flux:callout.heading>{{ __('Bienvenue dans votre espace commerçant.') }}</flux:callout.heading>
             <flux:callout.text>{{ __('Votre compte est actif. Retrouvez vos boutiques ci-dessous et ouvrez leur administration.') }}</flux:callout.text>
         </flux:callout>
         @if ($this->overview['shops']->isNotEmpty())
-            <div id="mes-boutiques" class="space-y-3" wire:poll.15s.visible>
-                <flux:heading level="2">{{ __('Vos boutiques') }}</flux:heading>
-                <ul class="space-y-2">
+            <div id="mes-boutiques" class="aydra-users-panel" wire:poll.15s.visible>
+                <div class="aydra-users-toolbar"><h2 class="aydra-heading text-lg font-semibold">{{ __('Vos boutiques') }}</h2></div>
+                <ul class="divide-y divide-zinc-200 px-5 dark:divide-zinc-700">
                     @foreach ($this->overview['shops'] as $shop)
-                        <li wire:key="shop-name-{{ $shop['uuid'] }}">
-                            <flux:text>{{ $shop['name'] }} — {{ $shop['status'] }}</flux:text>
+                        <li wire:key="shop-name-{{ $shop['uuid'] }}" class="flex flex-wrap items-center justify-between gap-3 py-4">
+                            <div><p class="aydra-heading font-semibold">{{ $shop['name'] }}</p><flux:text>{{ $shop['status'] }}</flux:text></div>
                             @if ($shop['ready'])
-                                <flux:button :href="route('owner.shops.access', $shop['uuid'])">Administrer</flux:button>
-                                <flux:button :href="route('owner.shops.domains.index', $shop['uuid'])">Domaines</flux:button>
+                                <div class="flex flex-wrap gap-2"><flux:button :href="route('owner.shops.access', $shop['uuid'])">Administrer</flux:button>
+                                <flux:button :href="route('owner.shops.domains.index', $shop['uuid'])">Domaines</flux:button></div>
                             @else
                                 <flux:text>Accès indisponible tant que la boutique n’est pas prête et active.</flux:text>
                             @endif
@@ -56,6 +56,8 @@ new class extends Component {
                     @endforeach
                 </ul>
             </div>
+        @else
+            <div id="mes-boutiques" class="aydra-users-panel p-5 sm:p-6"><h2 class="aydra-heading text-lg font-semibold">Vos boutiques</h2><p class="aydra-muted mt-2 text-sm">Aucune boutique enregistrée pour le moment.</p></div>
         @endif
     @endif
 </section>

@@ -3,15 +3,14 @@
 @endphp
 <x-layouts::app title="Mon abonnement et les offres">
     <section class="mx-auto flex w-full max-w-5xl flex-col gap-6">
-        <flux:heading size="xl" level="1">Mon abonnement et les offres</flux:heading>
-        <flux:button :href="route('owner.subscription-requests.index')">Mes demandes d’abonnement</flux:button>
+        <header class="flex flex-wrap items-start justify-between gap-4"><div class="space-y-2"><h1 class="aydra-heading text-3xl font-semibold tracking-tight">Mon abonnement et les offres</h1><p class="aydra-muted text-sm">Consultez vos périodes et choisissez l’offre adaptée à votre activité.</p></div><flux:button :href="route('owner.subscription-requests.index')">Mes demandes d’abonnement</flux:button></header>
         @foreach ($errors->all() as $error)<flux:text role="alert">{{ $error }}</flux:text>@endforeach
         @if (session('status'))<flux:callout>{{ session('status') }}</flux:callout>@endif
         <flux:text>Les offres à 0,00 DZD attendent une validation administrative. Pour les offres payantes, le montant est réglé en une fois.</flux:text>
         @php($pending = $subscriptions->contains(fn ($subscription) => $subscription->status === \App\Enums\Central\Subscriptions\StatusEnum::SCHEDULED && ($subscription->period_ends_at === null || $subscription->period_ends_at->isFuture())))
         @if ($pending)<flux:callout>Une période est déjà prévue ou en attente. Vous pouvez modifier ou annuler une demande non payée ci-dessous, puis choisir une autre offre.</flux:callout>@endif
         <div class="grid gap-4 md:grid-cols-2">
-            @foreach ($plans as $plan)<article class="rounded-lg border border-zinc-200 p-5 dark:border-zinc-700">
+            @foreach ($plans as $plan)<article class="aydra-users-panel p-5 sm:p-6">
                 <flux:heading>{{ $plan['name'] }}</flux:heading><flux:text>{{ $plan['description'] }}</flux:text>
                 @if ($plan['is_default'])<flux:text>Par défaut — attribution gratuite</flux:text>@else<flux:text>{{ $plan['monthly_price'] }} DZD/mois — {{ $plan['annual_price'] }} DZD/an</flux:text>@endif
                 @foreach ($plan['features'] as $feature)<flux:text>{{ $feature['name'] }} : {{ $feature['value'] }}</flux:text>@endforeach
@@ -72,7 +71,7 @@
         </div>
         <flux:heading>Mes périodes</flux:heading>
         @forelse ($subscriptions as $subscription)
-            <article class="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+            <article class="aydra-users-panel flex flex-col items-start gap-3 p-5 sm:p-6">
                 <flux:button :href="route('owner.subscriptions.show', $subscription)">{{ $subscription->plan->name }} — {{ $subscription->status->label() }} — {{ $subscription->effectiveStartsAt()->format('d/m/Y') }}</flux:button>
                 @can('startNow', $subscription)
                     <flux:button :href="route('owner.subscriptions.show', $subscription).'#demarrer'">Appliquer ce plan maintenant</flux:button>
